@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en-PH">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="theme-color" content="#3b82f6" />
+<meta name="description" content="Shop Ledger PH - Complete POS & Inventory System" />
+<title>Shop Ledger PH</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script>tailwind.config={darkMode:'class',theme:{extend:{colors:{phblue:{50:'#eff6ff',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8'}}}}};</script>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}.fade-in{animation:fadeIn .2s ease-out}@keyframes fadeIn{from{opacity:0}to{opacity:1}}.slide-in{animation:slideIn .25s ease-out}@keyframes slideIn{from{transform:translateY(10px);opacity:0}to{transform:translateY(0);opacity:1}}@media print{.no-print{display:none!important}body{background:white!important}}.login-bg{background:linear-gradient(135deg,#1e3a5f 0%,#3b82f6 50%,#1d4ed8 100%)}::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#94a3b8;border-radius:3px}.dark ::-webkit-scrollbar-thumb{background:#475569}
+</style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen">
+
+<div id="login-screen" class="fixed inset-0 z-[200] login-bg flex items-center justify-center">
+  <div class="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-2xl w-96 fade-in">
+    <div class="text-center mb-6">
+      <div class="text-5xl mb-2">🏪</div>
+      <h1 class="text-3xl font-bold">Shop Ledger PH</h1>
+      <p class="text-gray-500 text-sm mt-1">Sign in to continue</p>
+    </div>
+    <div class="space-y-3">
+      <input id="login-user" type="text" placeholder="Username" class="w-full px-4 py-3 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
+      <input id="login-pass" type="password" placeholder="Password" class="w-full px-4 py-3 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
+      <button onclick="doLogin()" class="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">Sign In</button>
+      <p id="login-error" class="text-red-500 text-sm text-center hidden"></p>
+      <div class="text-center"><button onclick="toggleTheme()" class="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">🌓 Toggle Theme</button></div>
+      <p class="text-xs text-gray-500 text-center mt-2">Default: admin / admin123</p>
+    </div>
+  </div>
+</div>
+
+<div id="app" class="flex min-h-screen hidden">
+  <aside class="no-print w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col flex-shrink-0">
+    <div class="p-5 border-b border-gray-200 dark:border-gray-700">
+      <div class="flex items-center gap-2 mb-1"><span class="text-2xl">🏪</span><h1 class="text-xl font-bold">Shop Ledger PH</h1></div>
+      <p class="text-xs text-gray-500 truncate" id="shop-name">Store</p>
+      <p class="text-xs text-gray-400 mt-1" id="user-info">User</p>
+    </div>
+    <nav class="flex-1 p-3 space-y-0.5 overflow-auto" id="main-nav">
+      <button data-route="dashboard" class="nav-btn w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm flex items-center gap-2"><span>📊</span>Dashboard</button>
+      <button data-route="clients" class="nav-btn w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm flex items-center gap-2"><span>👥</span>Clients</button>
+      <button data-route="utang" class="nav-btn w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm flex items-center gap-2"><span>📒</span>Utang</button>
+      <button data-route="transactions" class="nav-btn w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm flex items-center gap-2"><span>🧾</span>Sales</button>
+      <button data-route="inventory" class="nav-btn w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm flex items-center gap-2"><span>📦</span>Inventory</button>
+      <button data-route="expenses" class="nav-btn w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm flex items-center gap-2"><span>💸</span>Expenses</button>
+      <button data-route="suppliers" class="nav-btn w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm flex items-center gap-2"><span>🏭</span>Suppliers</button>
+      <button data-route="payments" class="nav-btn w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm flex items-center gap-2"><span>💵</span>Payments</button>
+      <button data-route="purchase-orders" class="nav-btn w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm flex items-center gap-2"><span>📋</span>POs</button>
+      <button data-route="loyalty" class="nav-btn w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm flex items-center gap-2"><span>⭐</span>Loyalty</button>
+      <button data-route="reports" class="nav-btn w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm flex items-center gap-2"><span>📈</span>Reports</button>
+      <button data-route="settings" class="nav-btn w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm flex items-center gap-2"><span>⚙️</span>Settings</button>
+    </nav>
+    <div class="p-3 border-t border-gray-200 dark:border-gray-700 space-y-1">
+      <button onclick="toggleTheme()" class="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"><span>🌓</span>Theme</button>
+      <button onclick="showShortcuts()" class="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"><span>⌨️</span>Shortcuts</button>
+      <button onclick="doLogout()" class="w-full text-left px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"><span>🚪</span>Logout</button>
+    </div>
+  </aside>
+
+  <main class="flex-1 flex flex-col overflow-hidden">
+    <header class="no-print bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-3 flex items-center justify-between shadow-sm">
+      <h2 id="page-title" class="text-2xl font-bold">Dashboard</h2>
+      <div id="header-actions"></div>
+    </header>
+    <div id="view" class="flex-1 overflow-auto p-6"></div>
+  </main>
+</div>
+
+<div id="toasts" class="fixed bottom-4 right-4 z-[100] space-y-2"></div>
+<div id="modal-root"></div>
+
+<script src="js/database.js"></script>
+<script src="js/state.js"></script>
+<script src="js/helpers.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/router.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/clients.js"></script>
+<script src="js/utang.js"></script>
+<script src="js/transactions.js"></script>
+<script src="js/inventory.js"></script>
+<script src="js/expenses.js"></script>
+<script src="js/suppliers.js"></script>
+<script src="js/payments.js"></script>
+<script src="js/purchaseOrders.js"></script>
+<script src="js/loyalty.js"></script>
+<script src="js/reports.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/boot.js"></script>
+</body>
+</html>

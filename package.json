@@ -1,0 +1,55 @@
+{
+  "name": "shop-ledger-ph",
+  "version": "3.0.0",
+  "description": "Shop Ledger PH - Complete POS & Inventory System for Philippine Sari-Sari Stores",
+  "repository": "stephenruma8-star/shop-ledger-ph",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win"
+  },
+  "dependencies": {
+    "axios": "^1.18.1",
+    "cors": "^2.8.6",
+    "electron-updater": "^6.1.8",
+    "express": "^4.22.2",
+    "nodemailer": "^6.10.1",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "electron": "^30.5.1",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.shopledger.ph",
+    "productName": "Shop Ledger PH",
+    "files": [
+      "main.js",
+      "preload.js",
+      "shop-ledger-ph.html",
+      "mobile.html",
+      "js/**/*",
+      "assets/**/*"
+    ],
+    "directories": {
+      "output": "build"
+    },
+    "icon": "assets/icon.png",
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        "nsis"
+      ]
+    },
+    "publish": [
+      { "provider": "github", "owner": "stephenruma8-star", "repo": "shop-ledger-ph" }
+    ],
+    "nsis": {
+      "oneClick": true,
+      "createDesktopShortcut": true,
+      "perMachine": false,
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico"
+    }
+  }
+}
