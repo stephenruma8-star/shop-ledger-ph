@@ -1,7 +1,5 @@
 async function viewReports(root) {
-  state.transactions = await dbAll('transactions');
-  state.payments = await dbAll('payments');
-  state.expenses = await dbAll('expenses');
+  await Promise.all([dbLoad('transactions'), dbLoad('payments'), dbLoad('expenses')]);
   const totalRevenue = state.transactions.reduce((s, t) => s + (t.grandTotal || 0), 0);
   const totalExpenses = state.expenses.reduce((s, e) => s + (e.amount || 0), 0);
   const netProfit = totalRevenue - totalExpenses;
@@ -9,20 +7,20 @@ async function viewReports(root) {
   root.innerHTML = `
     <div class="space-y-4 fade-in">
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border-l-4 border-green-500">
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border-l-4 stat-card border-green-500">
           <p class="text-xs text-gray-500 uppercase">Total Revenue</p>
           <p class="text-2xl font-bold text-green-600">${peso(totalRevenue)}</p>
         </div>
-        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border-l-4 border-red-500">
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border-l-4 stat-card border-red-500">
           <p class="text-xs text-gray-500 uppercase">Total Expenses</p>
           <p class="text-2xl font-bold text-red-600">${peso(totalExpenses)}</p>
         </div>
-        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border-l-4 ${netProfit >= 0 ? 'border-blue-500' : 'border-red-500'}">
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border-l-4 stat-card ${netProfit >= 0 ? 'border-blue-500' : 'border-red-500'}">
           <p class="text-xs text-gray-500 uppercase">Net Profit</p>
           <p class="text-2xl font-bold ${netProfit >= 0 ? 'text-blue-600' : 'text-red-600'}">${peso(netProfit)} <span class="text-sm">(${profitMargin}%)</span></p>
         </div>
       </div>
-      <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm">
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm glass-card">
         <h3 class="font-bold mb-3">Monthly Overview <span class="text-sm font-normal text-gray-500">(last 6 months)</span></h3>
         <canvas id="reportChart" height="200"></canvas>
       </div>
@@ -33,6 +31,8 @@ async function viewReports(root) {
         <button onclick="encryptedBackupFlow()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">Encrypted Backup</button>
         <button onclick="fileBackupFlow()" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">File Backup</button>
         <button onclick="emailBackupFlow()" class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700">Email Backup</button>
+        <button onclick="showRestoreModal()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Restore</button>
+        <button onclick="signalLanUpdate()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Signal Update on LAN</button>
       </div>
     </div>`;
   drawReportChart();
@@ -68,13 +68,14 @@ function drawReportChart() {
 }
 
 async function getAllData() {
+  const users = (await dbAll('users')).map(u => { const { password, ...rest } = u; return rest; });
   return {
     clients: await dbAll('clients'), transactions: await dbAll('transactions'),
     payments: await dbAll('payments'), inventory: await dbAll('inventory'),
     quickItems: await dbAll('quickItems'), expenses: await dbAll('expenses'),
     suppliers: await dbAll('suppliers'), purchaseOrders: await dbAll('purchaseOrders'),
     loyaltyPoints: await dbAll('loyaltyPoints'), notifications: await dbAll('notifications'),
-    auditLogs: await dbAll('auditLogs'), users: await dbAll('users'),
+    auditLogs: await dbAll('auditLogs'), users,
     settings: await dbAll('settings'), exportedAt: now()
   };
 }
@@ -167,4 +168,84 @@ async function emailBackupFlow() {
     if (result.success) { toast('Backup emailed successfully', 'success'); await logAudit('backup', 'Email backup sent'); }
     else toast('Error: ' + (result.error || 'Unknown'), 'error');
   } catch (e) { toast('Error: ' + e.message, 'error'); }
+}
+
+function showRestoreModal() {
+  modal(`
+    <div class="p-6">
+      <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">Restore Backup</h3><button onclick="closeModal()" class="text-gray-400 text-2xl">&times;</button></div>
+      <p class="text-sm text-gray-500 mb-4">This will <strong>overwrite all current data</strong>. Export a backup first if needed.</p>
+      <div class="space-y-3">
+        <button onclick="closeModal();restoreJSONFlow()" class="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">Restore from JSON Backup</button>
+        <button onclick="closeModal();restoreEncryptedFlow()" class="w-full py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold">Restore from Encrypted Backup</button>
+      </div>
+    </div>`);
+}
+
+async function restoreJSONFlow() {
+  if (!window.electronAPI) { toast('Restore only available in desktop app', 'warning'); return; }
+  if (!await confirmModal('This will replace ALL data. Continue?')) return;
+  const result = await window.electronAPI.loadBackupFile();
+  if (!result.success) return;
+  const data = result.data;
+  if (!data || typeof data !== 'object') { toast('Invalid backup file', 'error'); return; }
+  try {
+    const stores = ['clients','transactions','payments','inventory','quickItems','settings','users','expenses','suppliers','purchaseOrders','loyaltyPoints','notifications','auditLogs'];
+    await Promise.all(stores.map(s => dbClear(s)));
+    for (const store of stores) {
+      const items = data[store];
+      if (items && Array.isArray(items)) {
+        for (const item of items) await dbPut(store, item);
+      }
+    }
+    toast('Data restored successfully', 'success');
+    await logAudit('backup', 'Data restored from JSON backup');
+  } catch (e) { toast('Restore error: ' + e.message, 'error'); }
+}
+
+async function restoreEncryptedFlow() {
+  if (!window.electronAPI) { toast('Restore only available in desktop app', 'warning'); return; }
+  if (!await confirmModal('This will replace ALL data. Continue?')) return;
+  const pw = await new Promise(resolve => {
+    window._restoreResolve = resolve;
+    modal(`
+      <div class="p-6">
+        <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">Decrypt Backup</h3><button onclick="closeModal()" class="text-gray-400 text-2xl">&times;</button></div>
+        <p class="text-sm text-gray-500 mb-3">Enter the encryption password, then select the .enc file.</p>
+        <input id="rb-password" type="password" placeholder="Encryption password" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 mb-3" />
+        <button onclick="document.getElementById('rb-password').value ? window._restorePwSubmit() : null" class="w-full py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">Select File & Decrypt</button>
+      </div>`);
+    window._restorePwSubmit = () => {
+      const pw = document.getElementById('rb-password').value;
+      closeModal();
+      window._restoreResolve(pw);
+    };
+  });
+  delete window._restoreResolve;
+  delete window._restorePwSubmit;
+  if (!pw) { toast('Password required', 'error'); return; }
+  const fileResult = await window.electronAPI.loadEncryptedBackup();
+  if (!fileResult.success) return;
+  try {
+    const decryptResult = await window.electronAPI.decryptBackupData(fileResult.data, pw);
+    if (!decryptResult.success) { toast('Decryption failed: ' + (decryptResult.error || 'Wrong password?'), 'error'); return; }
+    const data = decryptResult.data;
+    const stores = ['clients','transactions','payments','inventory','quickItems','settings','users','expenses','suppliers','purchaseOrders','loyaltyPoints','notifications','auditLogs'];
+    await Promise.all(stores.map(s => dbClear(s)));
+    for (const store of stores) {
+      const items = data[store];
+      if (items && Array.isArray(items)) {
+        for (const item of items) await dbPut(store, item);
+      }
+    }
+    toast('Data restored successfully', 'success');
+    await logAudit('backup', 'Data restored from encrypted backup');
+  } catch (e) { toast('Restore error: ' + e.message, 'error'); }
+}
+
+async function signalLanUpdate() {
+  if (!window.electronAPI) { toast('LAN signaling only available in desktop app', 'warning'); return; }
+  if (!await confirmModal('Send update signal to all computers on the LAN?')) return;
+  window.electronAPI.signalLanUpdate();
+  toast('Update signal sent to LAN', 'success');
 }

@@ -1,12 +1,12 @@
 async function viewInventory(root) {
-  state.inventory = await dbAll('inventory');
+  await dbLoad('inventory');
   root.innerHTML = `
     <div class="space-y-4 fade-in">
       <div class="flex gap-2 flex-wrap items-center">
-        <input id="invSearch" placeholder="Search inventory..." class="flex-1 min-w-[200px] px-4 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" oninput="renderInvTable()" />
+        <input id="invSearch" placeholder="Search inventory..." class="flex-1 min-w-[200px] px-4 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" oninput="debouncedRenderInvTable()" />
         <button onclick="openInventoryModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">+ New Item</button>
       </div>
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
+      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden glass-card">
         <div class="overflow-auto" id="invTable"></div>
       </div>
     </div>`;
@@ -24,8 +24,8 @@ function renderInvTable() {
     <tbody>${sorted.map(i => {
       const low = (i.stock || 0) <= (i.minStock || 5);
       return `<tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-        <td class="p-3 font-medium">${i.name}</td><td class="p-3 text-gray-500">${i.sku || '-'}</td>
-        <td class="p-3">${i.category || '-'}</td><td class="p-3 text-right">${peso(i.sellPrice||i.price||0)}</td>
+        <td class="p-3 font-medium">${escapeHtml(i.name)}</td><td class="p-3 text-gray-500">${escapeHtml(i.sku || '-')}</td>
+        <td class="p-3">${escapeHtml(i.category || '-')}</td><td class="p-3 text-right">${peso(i.sellPrice||i.price||0)}</td>
         <td class="p-3 text-right text-gray-500">${peso(i.costPrice||0)}</td>
         <td class="p-3 text-center"><span class="${low ? 'text-red-600 font-bold' : ''}">${i.stock || 0}</span>${low ? ' ⚠️' : ''}</td>
         <td class="p-3 text-center">
@@ -34,6 +34,7 @@ function renderInvTable() {
         </td></tr>`;
     }).join('')}</tbody></table>`;
 }
+var debouncedRenderInvTable = debounce(renderInvTable, 250);
 
 function openInventoryModal(id) {
   const isEdit = !!id;
@@ -43,10 +44,10 @@ function openInventoryModal(id) {
       <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">${isEdit ? 'Edit' : 'New'} Inventory Item</h3><button onclick="closeModal()" class="text-gray-400 text-2xl">&times;</button></div>
       <div class="space-y-3">
         <div class="grid grid-cols-2 gap-3">
-          <div><label class="text-xs text-gray-500 block">Name *</label><input id="if-name" value="${isEdit ? (i.name||'') : ''}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
-          <div><label class="text-xs text-gray-500 block">SKU</label><input id="if-sku" value="${isEdit ? (i.sku||'') : ''}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
+          <div><label class="text-xs text-gray-500 block">Name *</label><input id="if-name" value="${isEdit ? escapeHtml(i.name||'') : ''}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
+          <div><label class="text-xs text-gray-500 block">SKU</label><input id="if-sku" value="${isEdit ? escapeHtml(i.sku||'') : ''}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
         </div>
-        <div><label class="text-xs text-gray-500 block">Category</label><input id="if-category" value="${isEdit ? (i.category||'') : ''}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
+        <div><label class="text-xs text-gray-500 block">Category</label><input id="if-category" value="${isEdit ? escapeHtml(i.category||'') : ''}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
         <div class="grid grid-cols-2 gap-3">
           <div><label class="text-xs text-gray-500 block">Sell Price *</label><input id="if-price" type="number" step="0.01" value="${isEdit ? (i.sellPrice||i.price||0) : '0'}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
           <div><label class="text-xs text-gray-500 block">Cost Price</label><input id="if-cost" type="number" step="0.01" value="${isEdit ? (i.costPrice||0) : '0'}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
@@ -82,7 +83,7 @@ async function saveInv(id) {
 }
 
 async function deleteInv(id) {
-  if (!confirm('Delete this item?')) return;
+  if (!await confirmModal('Delete this item?')) return;
   await dbDel('inventory', id);
   state.inventory = await dbAll('inventory');
   renderInvTable();

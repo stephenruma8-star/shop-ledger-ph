@@ -9,7 +9,7 @@ function openDB() {
       const d = e.target.result;
       const stores = ['clients','transactions','payments','inventory','quickItems','settings','auditLogs','users','expenses','suppliers','purchaseOrders','loyaltyPoints','notifications'];
       stores.forEach(s => { if (!d.objectStoreNames.contains(s)) d.createObjectStore(s, { keyPath: 'id', autoIncrement: true }); });
-      if (!d.objectStoreNames.contains('clients')) d.createObjectStore('clients', { keyPath: 'id', autoIncrement: true });
+
     };
     req.onsuccess = (e) => { db = e.target.result; resolve(db); };
     req.onerror = () => reject(req.error);
@@ -18,6 +18,7 @@ function openDB() {
 
 function dbOp(store, mode, fn) {
   return new Promise((resolve, reject) => {
+    if (!db) { reject(new Error('Database not opened')); return; }
     const tx = db.transaction(store, mode);
     const os = tx.objectStore(store);
     const result = fn(os);

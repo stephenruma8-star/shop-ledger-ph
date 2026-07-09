@@ -25,11 +25,17 @@
 <script>
 const API = window.location.origin;
 const peso = (n) => '₱' + (Number(n) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 });
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 let state = { clients: [] };
 
 async function loadClients() {
-  try { const r = await fetch(API + '/api/clients'); state.clients = await r.json(); }
+  try { const r = await fetch(API + '/api/clients', { headers: { 'X-Auth-Token': getToken() } }); state.clients = await r.json(); }
   catch (e) { document.getElementById('conn-status').textContent = '⚠ Error'; }
+}
+
+function getToken() {
+  const m = window.location.search.match(/token=([^&]+)/);
+  return m ? m[1] : '';
 }
 
 function showView(view, data) {
@@ -51,7 +57,7 @@ async function renderHome(root) {
     <div class="space-y-2">
       ${state.clients.filter(c => c.balance > 0).sort((a, b) => b.balance - a.balance).slice(0, 10).map(c => `
         <div class="bg-white p-3 rounded-xl shadow-sm flex justify-between items-center">
-          <div><div class="font-semibold">${c.name}</div><div class="text-xs text-gray-500">${c.phone || ''}</div></div>
+          <div><div class="font-semibold">${esc(c.name)}</div><div class="text-xs text-gray-500">${esc(c.phone || '')}</div></div>
           <div class="text-right"><div class="font-bold text-orange-600">${peso(c.balance)}</div>
           <button onclick="showView('pay', ${c.id})" class="text-xs text-blue-600">💵 Bayad</button></div>
         </div>`).join('') || '<p class="text-gray-500 text-center py-8">🎉 Walang utang!</p>'}
@@ -65,7 +71,7 @@ async function renderClients(root) {
 }
 
 function clientListHTML(clients) {
-  return clients.map(c => '<div class="bg-white p-3 rounded-xl shadow-sm flex justify-between items-center"><div><div class="font-semibold">' + c.name + '</div><div class="text-xs text-gray-500">' + (c.phone || '') + '</div></div><div class="font-bold ' + (c.balance <= 0 ? 'text-green-600' : 'text-orange-600') + '">' + peso(c.balance) + '</div></div>').join('');
+  return clients.map(c => '<div class="bg-white p-3 rounded-xl shadow-sm flex justify-between items-center"><div><div class="font-semibold">' + esc(c.name) + '</div><div class="text-xs text-gray-500">' + esc(c.phone || '') + '</div></div><div class="font-bold ' + (c.balance <= 0 ? 'text-green-600' : 'text-orange-600') + '">' + peso(c.balance) + '</div></div>').join('');
 }
 
 function filterClients(q) {
@@ -76,7 +82,7 @@ function filterClients(q) {
 async function renderPay(root, preselectedId) {
   await loadClients();
   root.innerHTML = '<h2 class="text-xl font-bold mb-3">💵 Record Bayad</h2><div class="bg-white p-4 rounded-xl shadow-sm space-y-3"><select id="pay-client" class="w-full px-3 py-3 border rounded-lg">' +
-    state.clients.map(c => '<option value="' + c.id + '" ' + (c.id === preselectedId ? 'selected' : '') + '>' + c.name + ' - ' + peso(c.balance) + '</option>').join('') +
+    state.clients.map(c => '<option value="' + c.id + '" ' + (c.id === preselectedId ? 'selected' : '') + '>' + esc(c.name) + ' - ' + peso(c.balance) + '</option>').join('') +
     '</select><input id="pay-amount" type="number" step="0.01" placeholder="Amount" class="w-full px-3 py-3 border rounded-lg text-2xl font-bold text-center" />' +
     '<div class="grid grid-cols-4 gap-2"><button onclick="setAmt(100)" class="py-2 bg-gray-100 rounded-lg text-sm">+₱100</button><button onclick="setAmt(500)" class="py-2 bg-gray-100 rounded-lg text-sm">+₱500</button><button onclick="setAmt(1000)" class="py-2 bg-gray-100 rounded-lg text-sm">+₱1000</button><button onclick="setAmt(\'full\')" class="py-2 bg-blue-100 text-blue-700 rounded-lg text-sm font-semibold">Full</button></div>' +
     '<select id="pay-type" class="w-full px-3 py-3 border rounded-lg"><option>Cash</option><option>GCash</option><option>Maya</option><option>Bank Transfer</option></select>' +
@@ -95,7 +101,7 @@ async function submitPay() {
   const type = document.getElementById('pay-type').value;
   if (!clientId || !amount) return alert('Fill all fields');
   try {
-    const r = await fetch(API + '/api/payments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId, amount, type, date: new Date().toISOString().split('T')[0] }) });
+    const r = await fetch(API + '/api/payments', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Auth-Token': getToken() }, body: JSON.stringify({ clientId, amount, type, date: new Date().toISOString().split('T')[0] }) });
     const result = await r.json();
     if (result.success) { alert('✅ Bayad recorded!'); showView('home'); }
     else alert('Error: ' + result.error);

@@ -1,9 +1,5 @@
 async function viewDashboard(root) {
-  state.clients = await dbAll('clients');
-  state.transactions = await dbAll('transactions');
-  state.expenses = await dbAll('expenses');
-  state.payments = await dbAll('payments');
-  state.inventory = await dbAll('inventory');
+  await Promise.all([dbLoad('clients'), dbLoad('transactions'), dbLoad('expenses'), dbLoad('payments'), dbLoad('inventory')]);
   const todayStr = today();
   const todayTx = state.transactions.filter(t => t.date === todayStr);
   const todayExp = state.expenses.filter(e => e.date === todayStr);
@@ -24,21 +20,21 @@ async function viewDashboard(root) {
   root.innerHTML = `
     <div class="space-y-6 fade-in">
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border-l-4 border-green-500">
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border-l-4 stat-card border-green-500">
           <p class="text-xs text-gray-500 uppercase tracking-wide">Today Sales</p>
           <p class="text-2xl font-bold text-green-600">${peso(todaySales)}</p>
           <p class="text-xs text-gray-400">${todayTx.length} transactions</p>
         </div>
-        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border-l-4 border-red-500">
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border-l-4 stat-card border-red-500">
           <p class="text-xs text-gray-500 uppercase tracking-wide">Today Expenses</p>
           <p class="text-2xl font-bold text-red-600">${peso(todayExpTotal)}</p>
         </div>
-        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border-l-4 border-orange-500">
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border-l-4 stat-card border-orange-500">
           <p class="text-xs text-gray-500 uppercase tracking-wide">Total Utang</p>
           <p class="text-2xl font-bold text-orange-600">${peso(totalUtang)}</p>
           <p class="text-xs text-gray-400">${state.clients.filter(c => (c.balance||0) > 0).length} clients</p>
         </div>
-        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border-l-4 border-blue-500">
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border-l-4 stat-card border-blue-500">
           <p class="text-xs text-gray-500 uppercase tracking-wide">Today Collections</p>
           <p class="text-2xl font-bold text-blue-600">${peso(todayPayTotal)}</p>
         </div>
@@ -51,28 +47,28 @@ async function viewDashboard(root) {
         <div class="mt-2 bg-white/20 rounded-full h-2"><div class="bg-white rounded-full h-2 transition-all" style="width:${Math.min(profitMargin, 100)}%"></div></div>
       </div>
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm">
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm glass-card">
           <h3 class="font-bold mb-3">Sales (7 Days)</h3>
           <canvas id="salesChart" height="200"></canvas>
         </div>
-        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm">
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm glass-card">
           <h3 class="font-bold mb-3">Payment Methods</h3>
           <canvas id="paymentChart" height="200"></canvas>
         </div>
       </div>
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm">
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm glass-card">
           <h3 class="font-bold mb-3">Top Utang</h3>
           ${topUtang.length === 0 ? '<p class="text-gray-400 text-sm">No utang records</p>' : topUtang.map(c => `
             <div class="flex justify-between py-2 border-b dark:border-gray-700 last:border-0">
-              <span>${c.name}</span><span class="font-semibold text-orange-600">${peso(c.balance)}</span>
+              <span>${escapeHtml(c.name)}</span><span class="font-semibold text-orange-600">${peso(c.balance)}</span>
             </div>`).join('')}
         </div>
-        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm">
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm glass-card">
           <h3 class="font-bold mb-3 text-red-600">Low Stock Alerts</h3>
           ${lowStock.length === 0 ? '<p class="text-gray-400 text-sm">All items stocked</p>' : lowStock.map(i => `
             <div class="flex justify-between py-2 border-b dark:border-gray-700 last:border-0">
-              <span>${i.name}</span><span class="font-semibold text-red-600">${i.stock || 0} / ${i.minStock || 5}</span>
+              <span>${escapeHtml(i.name)}</span><span class="font-semibold text-red-600">${i.stock || 0} / ${i.minStock || 5}</span>
             </div>`).join('')}
         </div>
       </div>

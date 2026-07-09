@@ -1,4 +1,16 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu, Tray, nativeImage, Notification } = require('electron');
+const _log = function(m) {
+  try { require('fs').appendFileSync(require('path').join(require('os').tmpdir(),'slp-crash.log'), new Date().toISOString()+' '+m+'\n'); }catch(e){}
+};
+const origEmit = process.emit;
+process.emit = function(ev, ...a) {
+  if (ev === 'uncaughtException') { _log('UNCAUGHT: '+(a[0]?.message||a[0])+'\n'+(a[0]?.stack||'')); return true; }
+  return origEmit.apply(this, [ev, ...a]);
+};
+process.on('unhandledRejection', function(e) { _log('UNHANDLED: '+(e?.message||e)); });
+
+const { app, BrowserWindow, ipcMain, dialog, Menu, Tray, nativeImage, crashReporter } = require('electron');
+try { crashReporter.start({ submitURL: '', uploadToServer: false, ignoreSystemCrashHandler: true }); } catch(e) {}
+try { dialog.showErrorBox = function(){}; } catch(e) {}
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -8,11 +20,15 @@ const cors = require('cors');
 const nodemailer = require('nodemailer');
 const QRCode = require('qrcode');
 const axios = require('axios');
-const { autoUpdater } = require('electron-updater');
 
-let mainWindow, tray, lanServer;
+let autoUpdater = null;
+try { autoUpdater = require('electron-updater').autoUpdater; if (autoUpdater) autoUpdater.autoCheckUpdates = false; autoUpdater.autoDownload = false; } catch (e) { console.error('autoUpdater not available:', e.message); }
+
+let mainWindow, tray, lanServer, udpBroadcast;
 let isQuitting = false;
+let _lanToken = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
 const LAN_PORT = 3456;
+const UDP_PORT = 3457;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -36,9 +52,11 @@ function createWindow() {
 }
 
 function createTray() {
-  const iconPath = path.join(__dirname, 'assets/tray-icon.png');
-  const trayIcon = fs.existsSync(iconPath) ? nativeImage.createFromPath(iconPath) : nativeImage.createEmpty();
-  tray = new Tray(trayIcon);
+  try {
+    const iconPath = path.join(__dirname, 'assets/icon.png');
+    const trayIcon = fs.existsSync(iconPath) ? nativeImage.createFromPath(iconPath) : nativeImage.createEmpty();
+    if (trayIcon.isEmpty()) return;
+    tray = new Tray(trayIcon);
   tray.setToolTip('Shop Ledger PH');
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: 'Show App', click: () => mainWindow?.show() },
@@ -49,6 +67,7 @@ function createTray() {
     { label: 'Quit', click: () => { isQuitting = true; app.quit(); }}
   ]));
   tray.on('double-click', () => mainWindow?.show());
+  } catch (e) { console.error('Tray error:', e.message); }
 }
 
 function getLocalIP() {
@@ -62,35 +81,37 @@ function getLocalIP() {
 }
 
 function setupAutoUpdater() {
-  if (!app.isPackaged) return;
+  ipcMain.handle('download-update', () => { if (autoUpdater) autoUpdater.downloadUpdate(); });
+  ipcMain.handle('install-update', () => { if (autoUpdater) { isQuitting = true; autoUpdater.quitAndInstall(); } });
+  if (!autoUpdater || !app.isPackaged) return;
   autoUpdater.autoDownload = false;
   autoUpdater.on('update-available', (info) => {
-    dialog.showMessageBox(mainWindow, {
-      type: 'info', title: 'Update Available',
-      message: `v${info.version} is available. Download?`,
-      buttons: ['Download', 'Later'], defaultId: 0
-    }).then(({ response }) => { if (response === 0) autoUpdater.downloadUpdate(); });
+    mainWindow?.webContents.send('update-available', info);
   });
   autoUpdater.on('update-downloaded', (info) => {
-    dialog.showMessageBox(mainWindow, {
-      type: 'info', title: 'Update Ready',
-      message: `v${info.version} ready. Restart now?`,
-      buttons: ['Restart', 'Later'], defaultId: 0
-    }).then(({ response }) => {
-      if (response === 0) { isQuitting = true; autoUpdater.quitAndInstall(); }
-    });
+    mainWindow?.webContents.send('update-downloaded', info);
   });
 }
 
 function checkForUpdates() {
-  if (!app.isPackaged) return;
-  autoUpdater.checkForUpdates().catch(err => console.error('Update error:', err));
+  if (!autoUpdater || !app.isPackaged) return;
+  const https = require('https');
+  https.get('https://api.github.com/repos/stephenruma8-star/shop-ledger-ph/releases/latest', { headers: { 'User-Agent': 'shop-ledger-ph' } }, (res) => {
+    if (res.statusCode === 200) autoUpdater.checkForUpdates().catch(() => {});
+    else console.log('No published releases yet, skipping update check');
+  }).on('error', () => {});
 }
 
 function startLANServer() {
   const expressApp = express();
   expressApp.use(cors());
   expressApp.use(express.json({ limit: '100mb' }));
+  expressApp.use((req, res, next) => {
+    if (req.path === '/api/health' || req.path === '/') return next();
+    const token = req.headers['x-auth-token'] || req.query.token;
+    if (token === _lanToken) return next();
+    res.status(401).json({ error: 'Unauthorized' });
+  });
 
   expressApp.get('/', (req, res) => {
     res.type('html').send(fs.readFileSync(path.join(__dirname, 'mobile.html'), 'utf8'));
@@ -98,6 +119,7 @@ function startLANServer() {
 
   expressApp.get('/api/clients', async (req, res) => {
     try {
+      if (!mainWindow || mainWindow.isDestroyed()) return res.status(503).json({ error: 'Window not ready' });
       const dump = await mainWindow.webContents.executeJavaScript('window.getDBDump()');
       res.json(dump.clients);
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -105,12 +127,16 @@ function startLANServer() {
 
   expressApp.post('/api/payments', async (req, res) => {
     try {
+      if (!mainWindow || mainWindow.isDestroyed()) return res.status(503).json({ error: 'Window not ready' });
       const { clientId, amount, type, date } = req.body;
+      const payData = JSON.stringify({ clientId, amount, type, date, createdAt: new Date().toISOString() });
+      const cId = JSON.stringify(clientId);
+      const amt = JSON.stringify(amount);
       await mainWindow.webContents.executeJavaScript(`
         (async () => {
-          await dbAdd('payments', ${JSON.stringify({ clientId, amount, type, date, createdAt: new Date().toISOString() })});
-          const c = await dbGet('clients', ${clientId});
-          await dbPut('clients', { ...c, balance: (c.balance || 0) - ${amount} });
+          await dbAdd('payments', ${payData});
+          const c = await dbGet('clients', ${cId});
+          await dbPut('clients', { ...c, balance: (c.balance || 0) - ${amt} });
           return { success: true };
         })()
       `);
@@ -120,9 +146,42 @@ function startLANServer() {
 
   expressApp.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
-  lanServer = expressApp.listen(LAN_PORT, '0.0.0.0', () => {
-    console.log(`LAN server at http://${getLocalIP()}:${LAN_PORT}`);
-  });
+  try {
+    lanServer = expressApp.listen(LAN_PORT, '0.0.0.0', () => {
+      console.log(`LAN server at http://${getLocalIP()}:${LAN_PORT}`);
+    });
+  } catch (e) { console.error('LAN server error:', e.message); }
+}
+
+function startUDPBroadcast() {
+  try {
+    const dgram = require('dgram');
+    udpBroadcast = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+    udpBroadcast.on('message', (msg, rinfo) => {
+      try {
+        const pkt = JSON.parse(msg.toString());
+        if (pkt.type === 'update-signal' && mainWindow && !mainWindow.isDestroyed()) {
+          const sender = pkt.hostName || rinfo.address;
+          mainWindow.webContents.send('lan-update-signal', { from: sender, version: pkt.version || '?' });
+        }
+      } catch (e) {}
+    });
+    udpBroadcast.bind(UDP_PORT, () => {
+      udpBroadcast.setBroadcast(true);
+    });
+  } catch (e) { console.error('UDP broadcast error:', e.message); }
+}
+
+function broadcastUpdateSignal() {
+  if (!udpBroadcast) return;
+  try {
+    const msg = JSON.stringify({
+      type: 'update-signal',
+      version: require('./package.json').version,
+      hostName: os.hostname()
+    });
+    udpBroadcast.send(msg, 0, msg.length, UDP_PORT, '255.255.255.255');
+  } catch (e) { console.error('broadcast error:', e.message); }
 }
 
 function encryptData(data, password) {
@@ -144,6 +203,11 @@ function decryptData(encryptedObj, password) {
   decrypted += decipher.final('utf8');
   return decrypted;
 }
+
+ipcMain.handle('signal-lan-update', () => {
+  broadcastUpdateSignal();
+  return { success: true };
+});
 
 ipcMain.handle('save-encrypted-backup', async (event, { data, password, filename }) => {
   try {
@@ -208,10 +272,28 @@ ipcMain.handle('save-backup-file', async (event, { data, filename }) => {
   } catch (err) { return { success: false, error: err.message }; }
 });
 
+ipcMain.handle('decrypt-backup-data', async (event, { encrypted, password }) => {
+  try {
+    const decrypted = decryptData(encrypted, password);
+    return { success: true, data: JSON.parse(decrypted) };
+  } catch (err) { return { success: false, error: err.message }; }
+});
+
+ipcMain.handle('load-backup-file', async () => {
+  try {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      filters: [{ name: 'JSON', extensions: ['json'] }]
+    });
+    if (result.canceled) return { success: false };
+    const content = fs.readFileSync(result.filePaths[0], 'utf8');
+    return { success: true, data: JSON.parse(content) };
+  } catch (err) { return { success: false, error: err.message }; }
+});
+
 ipcMain.handle('generate-mobile-qr', async () => {
   const url = `http://${getLocalIP()}:${LAN_PORT}`;
   const qr = await QRCode.toDataURL(url, { width: 300 });
-  return { url, qr };
+  return { url, qr, token: _lanToken };
 });
 
 ipcMain.handle('save-logo', async (event, { dataUrl }) => {
@@ -247,11 +329,22 @@ function buildMenu() {
   ]);
 }
 
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) { console.log('Another instance running, quitting.'); app.exit(0); return; }
+app.on('second-instance', () => { if (mainWindow) { if (mainWindow.isMinimized()) mainWindow.restore(); mainWindow.show(); mainWindow.focus(); } });
+
 app.whenReady().then(() => {
-  setupAutoUpdater();
-  createWindow();
-  createTray();
-  startLANServer();
-});
+  try {
+    setupAutoUpdater();
+    createWindow();
+    createTray();
+    startLANServer();
+    startUDPBroadcast();
+  } catch (e) { console.error('Startup error:', e); }
+}).catch(e => console.error('whenReady failed:', e));
 app.on('before-quit', () => { isQuitting = true; });
-app.on('window-all-closed', () => { if (lanServer) lanServer.close(); if (process.platform !== 'darwin') app.quit(); });
+app.on('window-all-closed', () => {
+  if (lanServer) lanServer.close();
+  if (udpBroadcast) try { udpBroadcast.close(); } catch(e) {}
+  if (process.platform !== 'darwin') app.quit();
+});

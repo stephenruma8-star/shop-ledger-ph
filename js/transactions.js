@@ -6,18 +6,27 @@ function lineAmt(item) { return lineSub(item) + lineInt(item); }
 let txCart = [];
 let txEditingId = null;
 
+function updateCartRowAmt(i) {
+  const el = document.getElementById('cart-amt-' + i);
+  if (el) el.textContent = peso(lineAmt(txCart[i]));
+}
+
+var debouncedRenderTxTable = debounce(renderTxTable, 250);
+
 async function viewTransactions(root) {
-  state.transactions = await dbAll('transactions');
-  state.clients = await dbAll('clients');
-  state.quickItems = await dbAll('quickItems');
-  state.inventory = await dbAll('inventory');
+  await Promise.all([
+    dbLoad('transactions'),
+    dbLoad('clients'),
+    dbLoad('quickItems'),
+    dbLoad('inventory')
+  ]);
   root.innerHTML = `
     <div class="space-y-4 fade-in">
       <div class="flex gap-2 flex-wrap items-center">
-        <input id="txSearch" placeholder="Search transactions..." class="flex-1 min-w-[200px] px-4 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" oninput="renderTxTable()" />
+        <input id="txSearch" placeholder="Search transactions..." class="flex-1 min-w-[200px] px-4 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" oninput="debouncedRenderTxTable()" />
         <button onclick="openTransactionModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">+ New Sale</button>
       </div>
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
+      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden glass-card">
         <div class="overflow-auto" id="txTable"></div>
       </div>
     </div>`;
@@ -34,9 +43,9 @@ function renderTxTable() {
   container.innerHTML = `<table class="w-full text-sm"><thead><tr class="bg-gray-50 dark:bg-gray-700 text-left"><th class="p-3">Invoice</th><th class="p-3">Date</th><th class="p-3">Client</th><th class="p-3">Items</th><th class="p-3 text-right">Total</th><th class="p-3">Method</th><th class="p-3 text-center">Actions</th></tr></thead>
     <tbody>${sorted.slice(0, 100).map(t => `<tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer" onclick="viewTransactionDetail(${t.id})">
       <td class="p-3 font-medium">${t.invoiceNo || 'N/A'}</td><td class="p-3 text-gray-500">${fmtDate(t.date)}</td>
-      <td class="p-3">${t.clientName || 'Walk-in'}</td><td class="p-3">${(t.items||[]).length}</td>
+      <td class="p-3">${escapeHtml(t.clientName || 'Walk-in')}</td><td class="p-3">${(t.items||[]).length}</td>
       <td class="p-3 text-right font-bold">${peso(t.grandTotal)}</td>
-      <td class="p-3"><span class="px-2 py-0.5 rounded-full text-xs ${t.paymentMethod === 'Cash' ? 'bg-green-100 text-green-700 dark:bg-green-900/30' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30'}">${t.paymentMethod || 'Cash'}</span></td>
+      <td class="p-3"><span class="px-2 py-0.5 rounded-full text-xs ${t.paymentMethod === 'Cash' ? 'bg-green-100 text-green-700 dark:bg-green-900/30' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30'}">${escapeHtml(t.paymentMethod || 'Cash')}</span></td>
       <td class="p-3 text-center"><button onclick="event.stopPropagation();printReceipt(${t.id})" class="text-blue-600 hover:text-blue-800 text-xs underline">Print</button></td>
     </tr>`).join('')}</tbody></table>`;
 }
@@ -57,7 +66,7 @@ function openTransactionModal() {
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div class="space-y-3">
           <div class="grid grid-cols-2 gap-2">
-            <div><label class="text-xs text-gray-500 block">Client</label><select id="tm-client" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"><option value="">Walk-in</option>${clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}</select></div>
+            <div><label class="text-xs text-gray-500 block">Client</label><select id="tm-client" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"><option value="">Walk-in</option>${clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}</select></div>
             <div><label class="text-xs text-gray-500 block">Payment</label><select id="tm-payment" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"><option>Cash</option><option>GCash</option><option>Maya</option><option>Bank Transfer</option></select></div>
           </div>
           <div class="grid grid-cols-2 gap-2">
@@ -68,11 +77,11 @@ function openTransactionModal() {
             <label class="flex items-center gap-1 text-sm"><input type="checkbox" id="tm-sc" onchange="toggleSC()" /> SC/PWD 20% Discount</label>
           </div>
           <div class="flex gap-2 flex-wrap">
-            <select id="tm-item-select" class="flex-1 min-w-[140px] px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"><option value="">Inventory item...</option>${inv.map(i => `<option value="${i.id}" data-name="${i.name}" data-price="${i.sellPrice||i.price||0}">${i.name} - ${peso(i.sellPrice||i.price||0)}</option>`).join('')}</select>
+            <select id="tm-item-select" class="flex-1 min-w-[140px] px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"><option value="">Inventory item...</option>${inv.map(i => `<option value="${i.id}" data-name="${escapeHtml(i.name)}" data-price="${i.sellPrice||i.price||0}">${escapeHtml(i.name)} - ${peso(i.sellPrice||i.price||0)}</option>`).join('')}</select>
             <input id="tm-qty" type="number" value="1" min="1" class="w-14 px-2 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm text-center" />
             <button onclick="addToCart()" class="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm whitespace-nowrap">+ Add Item</button>
           </div>
-          ${qItems.length > 0 ? `<div><label class="text-xs text-gray-500 block">Quick Items (click to add row)</label><div class="flex flex-wrap gap-1">${qItems.map(q => `<button onclick="quickAddToCart('${q.name.replace(/'/g,"\\'")}',${q.price})" class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs hover:bg-gray-200 dark:hover:bg-gray-600">${q.name} ${peso(q.price)}</button>`).join('')}</div></div>` : ''}
+          ${qItems.length > 0 ? `<div><label class="text-xs text-gray-500 block">Quick Items (click to add row)</label><div class="flex flex-wrap gap-1">${qItems.map(q => `<button onclick="quickAddToCart('${q.name.replace(/'/g,"\\'")}',${q.price})" class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs hover:bg-gray-200 dark:hover:bg-gray-600">${escapeHtml(q.name)} ${peso(q.price)}</button>`).join('')}</div></div>` : ''}
         </div>
         <div>
           <div class="flex justify-between items-center mb-2"><h4 class="font-semibold text-sm">Items</h4><button onclick="txCart.push({date:today(),description:'',name:'1',unitCost:0,intRate:0,invId:null});renderTMCart();updateTMTotals()" class="text-xs text-blue-600 hover:text-blue-800">+ Add Blank Row</button></div>
@@ -112,16 +121,15 @@ function renderTMCart() {
   if (txCart.length === 0) { el.innerHTML = '<p class="text-gray-400 text-xs p-2">No items added yet</p>'; return; }
   el.innerHTML = `<table class="w-full text-xs"><thead><tr class="bg-gray-50 dark:bg-gray-700 sticky top-0"><th class="p-1 text-left">Date</th><th class="p-1 text-left">Description</th><th class="p-1 text-center">Name</th><th class="p-1 text-right">Unit Cost</th><th class="p-1 text-right">Int. Rate</th><th class="p-1 text-right">Amount</th><th class="p-1"></th></tr></thead><tbody>${txCart.map((item, i) => {
     return `<tr class="border-b dark:border-gray-700">
-      <td class="p-1"><input type="date" value="${item.date}" onchange="txCart[${i}].date=this.value;renderTMCart()" class="w-24 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs" /></td>
-      <td class="p-1"><input type="text" value="${item.description}" placeholder="Item..." onchange="txCart[${i}].description=this.value;renderTMCart()" class="w-28 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs" /></td>
-      <td class="p-1"><input type="text" value="${item.name}" placeholder="1 pc" onchange="txCart[${i}].name=this.value;renderTMCart();updateTMTotals()" class="w-20 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs text-center" /></td>
-      <td class="p-1"><input type="number" value="${item.unitCost}" min="0" step="0.01" onchange="txCart[${i}].unitCost=Math.max(0,parseFloat(this.value)||0);renderTMCart();updateTMTotals()" class="w-16 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs text-right" /></td>
-      <td class="p-1"><div class="flex items-center gap-0.5"><input type="number" value="${item.intRate}" min="0" step="0.5" onchange="txCart[${i}].intRate=Math.max(0,parseFloat(this.value)||0);renderTMCart();updateTMTotals()" class="w-12 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs text-right" /><span class="text-gray-400 text-xs">%</span></div></td>
-      <td class="p-1 text-right font-medium whitespace-nowrap">${peso(lineAmt(item))}</td>
+      <td class="p-1"><input type="date" value="${item.date}" onchange="txCart[${i}].date=this.value" class="w-24 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs" /></td>
+      <td class="p-1"><input type="text" value="${escapeHtml(item.description)}" placeholder="Item..." onchange="txCart[${i}].description=this.value" class="w-28 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs" /></td>
+      <td class="p-1"><input type="text" value="${escapeHtml(item.name)}" placeholder="1 pc" onchange="txCart[${i}].name=this.value;updateCartRowAmt(${i});updateTMTotals()" class="w-20 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs text-center" /></td>
+      <td class="p-1"><input type="number" value="${item.unitCost}" min="0" step="0.01" onchange="txCart[${i}].unitCost=Math.max(0,parseFloat(this.value)||0);updateCartRowAmt(${i});updateTMTotals()" class="w-16 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs text-right" /></td>
+      <td class="p-1"><div class="flex items-center gap-0.5"><input type="number" value="${item.intRate}" min="0" step="0.5" onchange="txCart[${i}].intRate=Math.max(0,parseFloat(this.value)||0);updateCartRowAmt(${i});updateTMTotals()" class="w-12 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs text-right" /><span class="text-gray-400 text-xs">%</span></div></td>
+      <td class="p-1 text-right font-medium whitespace-nowrap" id="cart-amt-${i}">${peso(lineAmt(item))}</td>
       <td class="p-1"><button onclick="removeCartItem(${i})" class="text-red-500 text-xs">&times;</button></td>
     </tr>`;
   }).join('')}</tbody></table>`;
-  // recalc amount display without full re-render — amount updates via render on each input change already
 }
 
 function removeCartItem(i) { txCart.splice(i, 1); renderTMCart(); updateTMTotals(); }
@@ -173,19 +181,33 @@ async function saveTransaction() {
     paymentMethod: document.getElementById('tm-payment')?.value || 'Cash',
     status: grandTotal <= 0 ? 'paid' : 'pending'
   };
-  await dbAdd('transactions', transaction);
-  for (const item of txCart) {
-    if (item.invId) {
-      const inv = await dbGet('inventory', item.invId);
-      if (inv) { inv.stock = (inv.stock || 0) - getQty(item.name); await dbPut('inventory', inv); }
+  const rollback = [];
+  try {
+    await dbAdd('transactions', transaction);
+    for (const item of txCart) {
+      if (item.invId) {
+        const inv = await dbGet('inventory', item.invId);
+        if (inv) {
+          const dec = getQty(item.name);
+          inv.stock = (inv.stock || 0) - dec;
+          await dbPut('inventory', inv);
+          rollback.push(() => dbGet('inventory', item.invId).then(i => { if (i) { i.stock = (i.stock || 0) + dec; return dbPut('inventory', i); } }));
+        }
+      }
     }
-  }
-  if (clientId) {
-    const c = await dbGet('clients', clientId);
-    if (c) {
-      c.balance = (c.balance || 0) + grandTotal;
-      await dbPut('clients', c);
+    if (clientId) {
+      const c = await dbGet('clients', clientId);
+      if (c) {
+        c.balance = (c.balance || 0) + grandTotal;
+        await dbPut('clients', c);
+        rollback.push(() => dbGet('clients', clientId).then(cc => { if (cc) { cc.balance = (cc.balance || 0) - grandTotal; return dbPut('clients', cc); } }));
+      }
     }
+  } catch (err) {
+    console.error('Sale failed, rolling back:', err);
+    for (const fn of rollback.reverse()) await fn().catch(() => {});
+    toast('Sale failed - rolled back: ' + err.message, 'error');
+    return;
   }
   const settingsMap = {};
   state.settings.forEach(s => settingsMap[s.key] = s.value);
@@ -198,9 +220,9 @@ async function saveTransaction() {
       else { await dbAdd('loyaltyPoints', { clientId, clientName, points: pts, createdAt: now(), updatedAt: now() }); }
     }
   }
-  state.transactions = await dbAll('transactions');
-  state.inventory = await dbAll('inventory');
-  state.loyaltyPoints = await dbAll('loyaltyPoints');
+  [state.transactions, state.inventory, state.loyaltyPoints] = await Promise.all([
+    dbAll('transactions'), dbAll('inventory'), dbAll('loyaltyPoints')
+  ]);
   closeModal();
   toast(`Sale completed! Invoice: ${invoiceNo}`, 'success');
   await logAudit('sale', `Sale ${invoiceNo} - ${peso(grandTotal)}`);
@@ -252,12 +274,12 @@ function viewTransactionDetail(id) {
   modal(`
     <div class="p-6">
       <div class="flex justify-between items-center mb-4">
-        <div><h3 class="text-xl font-bold">${t.invoiceNo || 'N/A'}</h3><p class="text-sm text-gray-500">${fmtDate(t.date)} &middot; ${t.paymentMethod || 'Cash'}</p></div>
+        <div><h3 class="text-xl font-bold">${t.invoiceNo || 'N/A'}</h3><p class="text-sm text-gray-500">${fmtDate(t.date)} &middot; ${escapeHtml(t.paymentMethod || 'Cash')}</p></div>
         <button onclick="closeModal()" class="text-gray-400 text-2xl">&times;</button>
       </div>
-      <div class="text-sm mb-4">${t.clientName || 'Walk-in'}${t.clientId ? ` &middot; <a href="#" onclick="closeModal();viewClientHistory(${t.clientId})" class="text-blue-600">View Client</a>` : ''}</div>
+      <div class="text-sm mb-4">${escapeHtml(t.clientName || 'Walk-in')}${t.clientId ? ` &middot; <a href="#" onclick="closeModal();viewClientHistory(${t.clientId})" class="text-blue-600">View Client</a>` : ''}</div>
       <table class="w-full text-xs mb-3"><thead><tr class="bg-gray-50 dark:bg-gray-700"><th class="p-2 text-left">Date</th><th class="p-2 text-left">Description</th><th class="p-2 text-center">Name</th><th class="p-2 text-right">Unit Cost</th><th class="p-2 text-right">Int.</th><th class="p-2 text-right">Amount</th></tr></thead>
-        <tbody>${(t.items||[]).map(item => `<tr class="border-b dark:border-gray-700"><td class="p-2">${fmtDate(item.date)}</td><td class="p-2">${item.description || '-'}</td><td class="p-2 text-center">${item.name || item.qty || ''}</td><td class="p-2 text-right">${peso(item.unitCost||item.price||0)}</td><td class="p-2 text-right">${item.intRate != null ? item.intRate + '%' : (item.interest ? '₱'+item.interest : '-')}</td><td class="p-2 text-right font-medium">${peso(item.amount || lineAmt(item))}</td></tr>`).join('')}</tbody>
+        <tbody>${(t.items||[]).map(item => `<tr class="border-b dark:border-gray-700"><td class="p-2">${fmtDate(item.date)}</td><td class="p-2">${escapeHtml(item.description || '-')}</td><td class="p-2 text-center">${escapeHtml(item.name || item.qty || '')}</td><td class="p-2 text-right">${peso(item.unitCost||item.price||0)}</td><td class="p-2 text-right">${item.intRate != null ? item.intRate + '%' : (item.interest ? '₱'+item.interest : '-')}</td><td class="p-2 text-right font-medium">${peso(item.amount || lineAmt(item))}</td></tr>`).join('')}</tbody>
       </table>
       <div class="border-t dark:border-gray-700 pt-2 space-y-1 text-sm">
         <div class="flex justify-between"><span>Subtotal</span><span>${peso(t.subtotal)}</span></div>
@@ -294,7 +316,7 @@ pre{white-space:pre;margin:0 auto;width:fit-content}
   <span style="width:1px;height:24px;background:#d1d5db;display:inline-block"></span>
   <button class="print-btn" onclick="window.print()">🖨 Print</button>
 </div>
-<div class="preview"><pre>${receiptText}</pre></div>
+<div class="preview"><pre>${escapeHtml(receiptText)}</pre></div>
 <script>
 function setSize(sz){document.querySelectorAll('.toolbar button[id^="sz-"]').forEach(b=>b.classList.remove('active'));
 document.getElementById('sz-'+sz.toLowerCase()).classList.add('active');

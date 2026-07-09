@@ -7,37 +7,66 @@
 <meta name="description" content="Shop Ledger PH - Complete POS & Inventory System" />
 <title>Shop Ledger PH</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <script>tailwind.config={darkMode:'class',theme:{extend:{colors:{phblue:{50:'#eff6ff',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8'}}}}};</script>
 <style>
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}.fade-in{animation:fadeIn .2s ease-out}@keyframes fadeIn{from{opacity:0}to{opacity:1}}.slide-in{animation:slideIn .25s ease-out}@keyframes slideIn{from{transform:translateY(10px);opacity:0}to{transform:translateY(0);opacity:1}}@media print{.no-print{display:none!important}body{background:white!important}}.login-bg{background:linear-gradient(135deg,#1e3a5f 0%,#3b82f6 50%,#1d4ed8 100%)}::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#94a3b8;border-radius:3px}.dark ::-webkit-scrollbar-thumb{background:#475569}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;transition:background-color .3s,color .3s}
+.fade-in{animation:fadeIn .2s ease-out}@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.slide-in{animation:slideIn .25s ease-out}@keyframes slideIn{from{transform:translateY(10px);opacity:0}to{transform:translateY(0);opacity:1}}
+.slide-up{animation:slideUp .3s ease-out}@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+.scale-in{animation:scaleIn .2s ease-out}@keyframes scaleIn{from{transform:scale(.95);opacity:0}to{transform:scale(1);opacity:1}}
+.glow{animation:glow 2s ease-in-out infinite alternate}@keyframes glow{from{box-shadow:0 0 4px rgba(59,130,246,.3)}to{box-shadow:0 0 12px rgba(59,130,246,.5)}}
+.pulse-soft{animation:pulseSoft 2s ease-in-out infinite}@keyframes pulseSoft{0%,100%{opacity:1}50%{opacity:.7}}
+.shimmer{background:linear-gradient(90deg,transparent,rgba(255,255,255,.08),transparent);background-size:200% 100%;animation:shimmer 2s infinite}@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.card-hover{transition:transform .2s ease,box-shadow .2s ease;will-change:transform}.card-hover:hover{transform:translateY(-1px);box-shadow:0 4px 15px rgba(0,0,0,.1)}
+.dark .glass{background:rgba(30,41,59,.88)!important;border:1px solid rgba(255,255,255,.08)!important}
+.dark .glass-strong{background:rgba(15,23,42,.95)!important;border:1px solid rgba(255,255,255,.1)!important}
+.dark .glass-card{background:rgba(30,41,59,.8)!important;border:1px solid rgba(255,255,255,.06)!important}
+.dark .glass-input{background:rgba(30,41,59,.6)!important;border:1px solid rgba(255,255,255,.08)!important}
+.dark .glass-input:focus{background:rgba(30,41,59,.75)!important;border-color:rgba(59,130,246,.5)!important}
+.dark .glass-nav{background:rgba(15,23,42,.95)!important;border-right:1px solid rgba(255,255,255,.06)!important}
+.dark .glass-header{background:rgba(15,23,42,.9)!important;border-bottom:1px solid rgba(255,255,255,.06)!important}
+.dark .btn-glass{background:rgba(37,99,235,.85)!important;border:1px solid rgba(59,130,246,.4)!important}
+.dark .btn-glass:hover{background:rgba(37,99,235,.95)!important;border-color:rgba(59,130,246,.6)!important}
+.dark .stat-card{background:rgba(30,41,59,.8)!important;border:1px solid rgba(255,255,255,.06)!important}
+.dark input, .dark select, .dark textarea{background:rgba(30,41,59,.6)!important}
+.dark input:focus, .dark select:focus, .dark textarea:focus{background:rgba(30,41,59,.75)!important}
+@media print{.no-print{display:none!important}body{background:white!important}}
+.login-bg{background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 50%,#1d4ed8 100%)}
+.dark body{background:#0f172a}
+.dark .nav-btn.active{background:rgba(59,130,246,.15)!important;border-left:3px solid #3b82f6;border-radius:0 8px 8px 0}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#475569;border-radius:3px}::-webkit-scrollbar-thumb:hover{background:#64748b}
 </style>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen">
 
 <div id="login-screen" class="fixed inset-0 z-[200] login-bg flex items-center justify-center">
-  <div class="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-2xl w-96 fade-in">
+  <div class="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-2xl w-96 scale-in" style="border:1px solid rgba(255,255,255,.1)">
     <div class="text-center mb-6">
       <div class="text-5xl mb-2">🏪</div>
       <h1 class="text-3xl font-bold">Shop Ledger PH</h1>
       <p class="text-gray-500 text-sm mt-1">Sign in to continue</p>
     </div>
-    <div class="space-y-3">
-      <input id="login-user" type="text" placeholder="Username" class="w-full px-4 py-3 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
-      <input id="login-pass" type="password" placeholder="Password" class="w-full px-4 py-3 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
-      <button onclick="doLogin()" class="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">Sign In</button>
+      <div class="space-y-3" onkeydown="if(event.key==='Enter')doLogin()">
+        <input id="login-user" type="text" placeholder="Username" autofocus class="w-full px-4 py-3 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 glass-input focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
+        <div class="relative">
+          <input id="login-pass" type="password" placeholder="Password" class="w-full px-4 py-3 pr-10 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 glass-input focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
+          <button type="button" onclick="togglePass()" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" tabindex="-1" id="passToggle">👁️</button>
+        </div>
+        <button onclick="doLogin()" class="btn-glass w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">Sign In</button>
       <p id="login-error" class="text-red-500 text-sm text-center hidden"></p>
       <div class="text-center"><button onclick="toggleTheme()" class="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">🌓 Toggle Theme</button></div>
+      <div class="text-center"><button onclick="forgotPassword()" class="text-xs text-blue-500 hover:text-blue-700 dark:hover:text-blue-400">Forgot Password?</button></div>
       <p class="text-xs text-gray-500 text-center mt-2">Default: admin / admin123</p>
     </div>
   </div>
 </div>
 
 <div id="app" class="flex min-h-screen hidden">
-  <aside class="no-print w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col flex-shrink-0">
+  <aside class="no-print w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col flex-shrink-0 glass-nav">
     <div class="p-5 border-b border-gray-200 dark:border-gray-700">
       <div class="flex items-center gap-2 mb-1"><span class="text-2xl">🏪</span><h1 class="text-xl font-bold">Shop Ledger PH</h1></div>
       <p class="text-xs text-gray-500 truncate" id="shop-name">Store</p>
@@ -65,11 +94,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}.fade-in
   </aside>
 
   <main class="flex-1 flex flex-col overflow-hidden">
-    <header class="no-print bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-3 flex items-center justify-between shadow-sm">
+    <header class="no-print bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-3 flex items-center justify-between shadow-sm glass-header">
       <h2 id="page-title" class="text-2xl font-bold">Dashboard</h2>
       <div id="header-actions"></div>
     </header>
-    <div id="view" class="flex-1 overflow-auto p-6"></div>
+    <div id="view" class="flex-1 overflow-auto p-6" style="contain:layout style paint"></div>
   </main>
 </div>
 

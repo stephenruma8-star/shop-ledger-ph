@@ -1,4 +1,6 @@
+let _navToken = 0;
 async function navigate(route) {
+  const token = ++_navToken;
   state.currentRoute = route;
   const titles = {
     dashboard: 'Dashboard', clients: 'Clients', utang: 'Utang',
@@ -8,14 +10,18 @@ async function navigate(route) {
   };
   document.getElementById('page-title').textContent = titles[route] || 'Dashboard';
   document.querySelectorAll('.nav-btn').forEach(b => {
-    b.classList.toggle('bg-blue-50', b.dataset.route === route);
-    b.classList.toggle('dark:bg-blue-900/20', b.dataset.route === route);
-    b.classList.toggle('text-blue-600', b.dataset.route === route);
-    b.classList.toggle('dark:text-blue-400', b.dataset.route === route);
+    const isActive = b.dataset.route === route;
+    b.classList.toggle('bg-blue-50', isActive);
+    b.classList.toggle('dark:bg-blue-900/20', isActive);
+    b.classList.toggle('text-blue-600', isActive);
+    b.classList.toggle('dark:text-blue-400', isActive);
+    b.classList.toggle('active', isActive);
   });
   const root = document.getElementById('view');
-  root.innerHTML = '<div class="flex items-center justify-center py-20"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>';
-  await new Promise(r => setTimeout(r, 50));
+  root.className = 'flex-1 overflow-auto p-6 slide-up';
+  root.innerHTML = '<div class="flex items-center justify-center py-20"><div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div></div>';
+  await new Promise(r => setTimeout(r, 20));
+  if (token !== _navToken) return;
   switch (route) {
     case 'dashboard': await viewDashboard(root); break;
     case 'clients': await viewClients(root); break;
@@ -35,9 +41,8 @@ async function navigate(route) {
 
 async function loadAll() {
   const stores = ['clients','transactions','payments','inventory','quickItems','settings','users','expenses','suppliers','purchaseOrders','loyaltyPoints','notifications','auditLogs'];
-  for (const s of stores) {
-    try { state[s] = await dbAll(s); } catch (e) { state[s] = []; }
-  }
+  const results = await Promise.all(stores.map(s => dbAll(s).catch(() => [])));
+  stores.forEach((s, i) => { state[s] = results[i]; });
   const shop = state.settings.find(x => x.key === 'shopName');
   if (shop) document.getElementById('shop-name').textContent = shop.value;
 }
