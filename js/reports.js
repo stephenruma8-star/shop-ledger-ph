@@ -20,9 +20,9 @@ async function viewReports(root) {
           <p class="text-2xl font-bold ${netProfit >= 0 ? 'text-blue-600' : 'text-red-600'}">${peso(netProfit)} <span class="text-sm">(${profitMargin}%)</span></p>
         </div>
       </div>
-      <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm glass-card">
-        <h3 class="font-bold mb-3">Monthly Overview <span class="text-sm font-normal text-gray-500">(last 6 months)</span></h3>
-        <canvas id="reportChart" height="200"></canvas>
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-3 shadow-sm glass-card">
+        <h3 class="font-bold mb-1.5 text-sm">Monthly Overview <span class="text-xs font-normal text-gray-500">(last 6 months)</span></h3>
+        <canvas id="reportChart" height="100"></canvas>
       </div>
       <div class="flex gap-2 flex-wrap">
         <button onclick="exportExcel()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Export Excel</button>
@@ -62,7 +62,9 @@ function drawReportChart() {
       { label: 'Expenses', data: expData, backgroundColor: '#ef4444', borderRadius: 4 }
     ]},
     options: { responsive: true, maintainAspectRatio: false,
-      scales: { y: { beginAtZero: true, ticks: { callback: v => '₱' + v.toLocaleString() } } }
+      scales: { y: { beginAtZero: true, ticks: { callback: v => '₱' + v.toLocaleString(), font: { size: 9 } } },
+        x: { ticks: { font: { size: 9 } } } },
+      plugins: { legend: { labels: { boxWidth: 10, padding: 8, font: { size: 10 } } } }
     }
   });
 }
