@@ -135,21 +135,27 @@ async function recoverPassword() {
   const user = users.find(x => x.username === uname);
   if (!user) { result.className = 'text-red-500 text-sm'; result.textContent = 'User not found'; result.classList.remove('hidden'); return; }
 
-  const smtpSetting = state.settings?.find(x => x.key === 'smtpConfig');
-  const emailTo = state.settings?.find(x => x.key === 'backupEmail');
-
-  if (smtpSetting?.value && emailTo?.value && window.electronAPI) {
-    try {
-      const smtp = JSON.parse(smtpSetting.value);
-      if (smtp.host && smtp.user && smtp.pass) {
-        const data = { message: 'Password recovery for Shop Ledger PH', users: [{ username: user.username, password: user.password, name: user.name }] };
-        const r = await window.electronAPI.sendEmailBackup({ smtp, to: emailTo.value, data, filename: 'password-recovery.json' });
-        if (r.success) { result.className = 'text-green-500 text-sm'; result.textContent = 'Recovery info sent to your backup email'; result.classList.remove('hidden'); return; }
-      }
-    } catch(e) {}
-  }
-
-  result.className = 'text-yellow-700 dark:text-yellow-300 text-sm p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/20';
-  result.innerHTML = 'No email configured. Contact your admin or ask them to set up SMTP in Settings &gt; Backup.';
+  result.className = 'text-green-600 dark:text-green-400 text-sm p-3 rounded-lg bg-green-50 dark:bg-green-900/20';
+  result.innerHTML = `
+    <div class="text-center">User <strong>${escapeHtml(user.name || user.username)}</strong> found.</div>
+    <div class="mt-3 space-y-2">
+      <div><label class="text-xs text-gray-500 block">New Password</label><input id="fp-newpass" type="password" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" /></div>
+      <div><label class="text-xs text-gray-500 block">Confirm Password</label><input id="fp-newpass2" type="password" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" /></div>
+      <button onclick="resetPasswordFromRecover(${user.id})" class="w-full py-2 bg-amber-600 text-white rounded-lg font-semibold hover:bg-amber-700 text-sm">Reset Password</button>
+    </div>`;
   result.classList.remove('hidden');
+}
+
+async function resetPasswordFromRecover(id) {
+  const p1 = document.getElementById('fp-newpass').value;
+  const p2 = document.getElementById('fp-newpass2').value;
+  if (!p1 || p1.length < 4) { toast('Password must be at least 4 characters', 'error'); return; }
+  if (p1 !== p2) { toast('Passwords do not match', 'error'); return; }
+  const user = await dbGet('users', id);
+  if (!user) { toast('User not found', 'error'); return; }
+  user.password = await hashPassword(p1);
+  await dbPut('users', user);
+  toast('Password reset. You can now sign in.', 'success');
+  const result = document.getElementById('fp-result');
+  if (result) { result.className = 'text-green-500 text-sm'; result.textContent = 'Password reset successfully! You can now sign in.'; }
 }
