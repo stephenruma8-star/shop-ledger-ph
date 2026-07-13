@@ -4,7 +4,7 @@ async function navigate(route) {
   state.currentRoute = route;
   const titles = {
     dashboard: 'Dashboard', clients: 'Clients', utang: 'Utang',
-    transactions: 'Sales', inventory: 'Inventory', expenses: 'Expenses',
+    transactions: 'Sales', inventory: 'Inventory', stocktake: 'Stock Take', expenses: 'Expenses',
     suppliers: 'Suppliers', payments: 'Payments', 'purchase-orders': 'Purchase Orders',
     loyalty: 'Loyalty', reports: 'Reports', settings: 'Settings'
   };
@@ -28,6 +28,7 @@ async function navigate(route) {
     case 'utang': await viewUtang(root); break;
     case 'transactions': await viewTransactions(root); break;
     case 'inventory': await viewInventory(root); break;
+    case 'stocktake': await viewStockTake(root); break;
     case 'expenses': await viewExpenses(root); break;
     case 'suppliers': await viewSuppliers(root); break;
     case 'payments': await viewPayments(root); break;
@@ -46,6 +47,7 @@ async function loadAll() {
   const shop = state.settings.find(x => x.key === 'shopName');
   if (shop) document.getElementById('shop-name').textContent = shop.value;
   updateLowStockBadge();
+  updateNotifications();
 }
 
 function render() {

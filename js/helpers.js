@@ -144,3 +144,31 @@ function updateLowStockBadge() {
   if (count > 0) { badge.textContent = count; badge.classList.remove('hidden'); }
   else badge.classList.add('hidden');
 }
+
+function updateNotifications() {
+  const badge = document.getElementById('notif-badge');
+  const panel = document.getElementById('notif-panel');
+  if (!badge) return;
+  const overdue = (state.clients || []).filter(c => (c.balance || 0) > 0 && c.dueDate && c.dueDate < today()).length;
+  const lowStock = (state.inventory || []).filter(i => (i.stock || 0) <= (i.minStock || 5)).length;
+  const recentPOs = (state.purchaseOrders || []).filter(po => po.status === 'Received' && po.receivedAt && new Date(po.receivedAt) > new Date(Date.now() - 86400000)).length;
+  const total = overdue + lowStock + recentPOs;
+  if (total > 0) { badge.textContent = total; badge.classList.remove('hidden'); }
+  else badge.classList.add('hidden');
+  if (panel) {
+    panel.innerHTML = `<div class="p-3 space-y-2 text-sm">
+      <div class="flex justify-between items-center border-b dark:border-gray-700 pb-2"><span class="font-bold">Notifications</span><button onclick="document.getElementById('notif-panel').classList.add('hidden')" class="text-xs text-gray-400 hover:text-gray-600">&times;</button></div>
+      ${overdue > 0 ? `<div class="flex items-center gap-2 text-red-600"><span>⚠️</span><span>${overdue} overdue utang</span></div>` : ''}
+      ${lowStock > 0 ? `<div class="flex items-center gap-2 text-orange-600"><span>📦</span><span>${lowStock} low stock items</span></div>` : ''}
+      ${recentPOs > 0 ? `<div class="flex items-center gap-2 text-green-600"><span>📋</span><span>${recentPOs} POs received today</span></div>` : ''}
+      ${total === 0 ? '<div class="text-gray-400 text-center py-4">✓ All good!</div>' : ''}
+    </div>`;
+  }
+}
+
+function toggleNotifPanel() {
+  const panel = document.getElementById('notif-panel');
+  if (!panel) return;
+  panel.classList.toggle('hidden');
+  updateNotifications();
+}

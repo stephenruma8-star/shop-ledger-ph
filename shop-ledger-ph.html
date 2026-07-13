@@ -78,6 +78,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;transiti
       <button data-route="utang" class="nav-btn w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm flex items-center gap-2"><span>📒</span>Utang</button>
       <button data-route="transactions" class="nav-btn w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm flex items-center gap-2"><span>🧾</span>Sales</button>
       <button data-route="inventory" class="nav-btn w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm flex items-center gap-2"><span>📦</span><span class="flex-1">Inventory</span><span id="lowStockBadge" class="hidden text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full"></span></button>
+      <button data-route="stocktake" class="nav-btn w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm flex items-center gap-2"><span>📋</span>Stock Take</button>
       <button data-route="expenses" class="nav-btn w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm flex items-center gap-2"><span>💸</span>Expenses</button>
       <button data-route="suppliers" class="nav-btn w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm flex items-center gap-2"><span>🏭</span>Suppliers</button>
       <button data-route="payments" class="nav-btn w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm flex items-center gap-2"><span>💵</span>Payments</button>
@@ -97,7 +98,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;transiti
   <main class="flex-1 flex flex-col overflow-hidden">
     <header class="no-print bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-3 flex items-center justify-between shadow-sm glass-header">
       <h2 id="page-title" class="text-2xl font-bold">Dashboard</h2>
-      <div id="header-actions"></div>
+      <div class="flex items-center gap-3">
+        <div class="relative" id="notif-container">
+          <button onclick="toggleNotifPanel()" class="text-xl relative hover:opacity-80 transition-opacity">🔔<span id="notif-badge" class="hidden absolute -top-1 -right-2 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold"></span></button>
+          <div id="notif-panel" class="hidden absolute right-0 top-full mt-2 w-80 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border dark:border-gray-700 z-50 max-h-96 overflow-auto"></div>
+        </div>
+        <div id="header-actions"></div>
+      </div>
     </header>
     <div id="view" class="flex-1 overflow-auto p-6" style="contain:layout style paint"></div>
   </main>
@@ -122,6 +129,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;transiti
 <script src="js/purchaseOrders.js"></script>
 <script src="js/loyalty.js"></script>
 <script src="js/reports.js"></script>
+<script src="js/stocktake.js"></script>
 <script src="js/settings.js"></script>
 <script src="js/boot.js"></script>
 </body>

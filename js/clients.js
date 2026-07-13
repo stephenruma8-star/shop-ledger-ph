@@ -171,7 +171,7 @@ async function viewClientHistory(id) {
   modal(`
     <div class="p-6">
       <div class="flex justify-between items-center mb-4"><div><h3 class="text-xl font-bold">${escapeHtml(c.name)}</h3><p class="text-sm text-gray-500">${escapeHtml(c.phone || '')} ${c.address ? '| '+escapeHtml(c.address) : ''}</p></div>
-        <div class="flex gap-2"><button onclick="closeModal();openClientModal(${c.id})" class="px-3 py-1 text-sm bg-blue-600 text-white rounded-lg">Edit</button><button onclick="closeModal();recordClientPayment(${c.id})" class="px-3 py-1 text-sm bg-green-600 text-white rounded-lg">Bayad</button><button onclick="closeModal();deleteClient(${c.id})" class="px-3 py-1 text-sm bg-red-600 text-white rounded-lg">Delete</button><button onclick="closeModal();printClientInfo(${c.id})" class="px-3 py-1 text-sm bg-gray-600 text-white rounded-lg">Print</button><button onclick="closeModal()" class="text-gray-400 text-2xl">&times;</button></div></div>
+        <div class="flex gap-2"><button onclick="closeModal();openClientModal(${c.id})" class="px-3 py-1 text-sm bg-blue-600 text-white rounded-lg">Edit</button><button onclick="closeModal();recordClientPayment(${c.id})" class="px-3 py-1 text-sm bg-green-600 text-white rounded-lg">Bayad</button><button onclick="closeModal();exportClientHistory(${c.id})" class="px-3 py-1 text-sm bg-amber-600 text-white rounded-lg">Export</button><button onclick="closeModal();deleteClient(${c.id})" class="px-3 py-1 text-sm bg-red-600 text-white rounded-lg">Delete</button><button onclick="closeModal();printClientInfo(${c.id})" class="px-3 py-1 text-sm bg-gray-600 text-white rounded-lg">Print</button><button onclick="closeModal()" class="text-gray-400 text-2xl">&times;</button></div></div>
       <div class="grid grid-cols-4 gap-2 mb-4">
         <div class="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg text-center"><p class="text-xs text-gray-500">Balance</p><p class="text-lg font-bold ${(c.balance||0)>0?'text-red-600':'text-green-600'}">${peso(c.balance)}</p></div>
         <div class="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg text-center"><p class="text-xs text-gray-500">Purchases</p><p class="text-lg font-bold">${txns.length}</p></div>
@@ -395,4 +395,22 @@ async function deleteClient(id) {
   state.clients = state.clients.filter(x => x.id !== id);
   renderClientGrid();
   toast('Client deleted');
+}
+
+function exportClientHistory(id) {
+  const c = state.clients.find(x => x.id === id);
+  if (!c) { toast('Client not found', 'error'); return; }
+  const txns = state.transactions.filter(t => t.clientId === id).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  const pays = state.payments.filter(p => p.clientId === id).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  const esc = s => (''+s).replace(/"/g,'""');
+  let csv = 'Type,Date,Description,Amount\n';
+  txns.forEach(t => { csv += `Sale,${t.date || t.createdAt},"${esc(t.invoiceNo||'')}",${t.grandTotal||0}\n`; });
+  pays.forEach(p => { csv += `Payment,${p.date || p.createdAt},"${esc(p.notes||'')}",-${p.amount||0}\n`; });
+  csv += `\nFinal Balance,${c.balance||0}\n`;
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `${c.name.replace(/[^a-zA-Z0-9]/g,'_')}_history.csv`; a.click();
+  URL.revokeObjectURL(url);
+  toast('CSV exported');
 }

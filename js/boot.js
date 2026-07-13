@@ -121,4 +121,12 @@ async function boot() {
   }
 }
 
+document.addEventListener('click', (e) => {
+  const panel = document.getElementById('notif-panel');
+  const container = document.getElementById('notif-container');
+  if (panel && !panel.classList.contains('hidden') && container && !container.contains(e.target)) {
+    panel.classList.add('hidden');
+  }
+});
+
 document.addEventListener('DOMContentLoaded', boot);

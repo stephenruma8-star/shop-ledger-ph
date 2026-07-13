@@ -24,6 +24,9 @@ async function viewTransactions(root) {
     <div class="space-y-4 fade-in">
       <div class="flex gap-2 flex-wrap items-center">
         <input id="txSearch" placeholder="Search transactions..." class="flex-1 min-w-[200px] px-4 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" oninput="debouncedRenderTxTable()" />
+        <input id="txDateFrom" type="date" class="w-36 px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" onchange="renderTxTable()" />
+        <input id="txDateTo" type="date" class="w-36 px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" onchange="renderTxTable()" />
+        <button onclick="document.getElementById('txDateFrom').value='';document.getElementById('txDateTo').value='';renderTxTable()" class="px-3 py-2 text-sm border dark:border-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">Clear</button>
         <button onclick="openTransactionModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">+ New Sale</button>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden glass-card">
@@ -35,7 +38,11 @@ async function viewTransactions(root) {
 
 function renderTxTable() {
   const q = document.getElementById('txSearch')?.value || '';
-  const filtered = searchData(state.transactions, q, ['invoiceNo','clientName','paymentMethod']);
+  const dFrom = document.getElementById('txDateFrom')?.value || '';
+  const dTo = document.getElementById('txDateTo')?.value || '';
+  let filtered = searchData(state.transactions, q, ['invoiceNo','clientName','paymentMethod']);
+  if (dFrom) filtered = filtered.filter(t => (t.date || '') >= dFrom);
+  if (dTo) filtered = filtered.filter(t => (t.date || '') <= dTo);
   const sorted = [...filtered].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   const container = document.getElementById('txTable');
   if (!container) return;

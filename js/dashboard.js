@@ -42,6 +42,10 @@ async function viewDashboard(root) {
         </div>
         <div class="mt-1 bg-white/20 rounded-full h-1.5"><div class="bg-white rounded-full h-1.5" style="width:${Math.min(profitMargin, 100)}%"></div></div>
       </div>
+      <details class="bg-white dark:bg-gray-800 rounded-lg shadow-sm" id="chart-section">
+        <summary class="p-3 cursor-pointer font-bold text-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg">📊 7-Day Trend <span id="chart-toggle" class="text-xs font-normal text-gray-400 ml-auto">Show chart</span></summary>
+        <div class="px-3 pb-3"><canvas id="dashChart" height="120"></canvas></div>
+      </details>
       <div class="grid grid-cols-2 gap-2">
         <div class="bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm">
           <h3 class="font-bold text-xs mb-1">Top Utang</h3>
@@ -73,6 +77,7 @@ async function viewDashboard(root) {
         </details>
       </div>
     </div>`;
+  drawDashChart();
 }
 
 async function askAI() {
@@ -141,4 +146,32 @@ User question: ${q}`;
     document.getElementById('ai-status').textContent = 'Error';
   }
   chat.scrollTop = chat.scrollHeight;
+}
+
+function drawDashChart() {
+  if (chartInstances.dash) chartInstances.dash.destroy();
+  const labels = [];
+  const sales = [], expenses = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const key = d.toISOString().split('T')[0];
+    labels.push(d.toLocaleDateString('en-PH', { weekday: 'short' }));
+    const dayTx = state.transactions.filter(t => t.date === key);
+    const dayExp = state.expenses.filter(e => e.date === key);
+    sales.push(dayTx.reduce((s, t) => s + (t.grandTotal || 0), 0));
+    expenses.push(dayExp.reduce((s, e) => s + (e.amount || 0), 0));
+  }
+  const ctx = document.getElementById('dashChart');
+  if (!ctx) return;
+  chartInstances.dash = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [
+      { label: 'Sales', data: sales, backgroundColor: '#3b82f6', borderRadius: 3 },
+      { label: 'Expenses', data: expenses, backgroundColor: '#ef4444', borderRadius: 3 }
+    ]},
+    options: { responsive: true, maintainAspectRatio: true,
+      scales: { y: { beginAtZero: true, ticks: { callback: v => '₱' + v.toLocaleString() } } },
+      plugins: { legend: { display: false } }
+    }
+  });
 }
