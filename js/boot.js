@@ -121,6 +121,25 @@ async function boot() {
   }
 }
 
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey && e.shiftKey && e.key === 'B') {
+    const tmCart = document.getElementById('tm-cart');
+    if (tmCart && tmCart.offsetParent !== null) {
+      e.preventDefault();
+      txCart.push({date:today(),description:'',name:'1',unitCost:0,intRate:0,invId:null});
+      renderTMCart();
+      updateTMTotals();
+      return;
+    }
+    const cfCartEl = document.getElementById('cf-cart');
+    if (cfCartEl && cfCartEl.offsetParent !== null) {
+      e.preventDefault();
+      cfCart.push({date:today(),description:'',name:'1',unitCost:0,intRate:0,invId:null});
+      cfRenderCart();
+    }
+  }
+});
+
 document.addEventListener('click', (e) => {
   const panel = document.getElementById('notif-panel');
   const container = document.getElementById('notif-container');
