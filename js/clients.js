@@ -213,16 +213,8 @@ async function printClientInfo(id) {
   if (shopAddr) html += `<p style="margin:2px 0">${esc(shopAddr)}</p>`;
   if (shopContact) html += `<p style="margin:2px 0">Contact: ${esc(shopContact)}</p>`;
   if (headerText) html += headerText.split('\n').filter(Boolean).map(l => `<p style="margin:2px 0">${esc(l)}</p>`).join('');
+  html += `<h2 style="margin:8px 0 0;font-size:18px">${esc(c.name)}</h2>`;
   html += `</div>`;
-
-  // Client info
-  html += `<h3 style="margin:0 0 10px">Client Summary — ${esc(c.name)}</h3>`;
-  html += `<table style="width:100%;border-collapse:collapse;margin-bottom:16px"><tr>`;
-  html += `<td style="border:1px solid #000;padding:8px;text-align:center;font-weight:bold;font-size:16px;${(c.balance||0)>0?'color:#dc2626':'color:#16a34a'}">Balance: ₱${amt(c.balance)}</td>`;
-  html += `<td style="border:1px solid #000;padding:8px;text-align:center">Purchases: ${txns.length}</td>`;
-  html += `<td style="border:1px solid #000;padding:8px;text-align:center">Payments: ${pays.length}</td>`;
-  html += `<td style="border:1px solid #000;padding:8px;text-align:center">Due: ${c.dueDate ? esc(c.dueDate) : '—'}</td>`;
-  html += `</tr></table>`;
 
   // Transactions with items
   if (txns.length > 0) {
