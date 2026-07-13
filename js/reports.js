@@ -74,7 +74,7 @@ async function getAllData() {
     payments: await dbAll('payments'), inventory: await dbAll('inventory'),
     quickItems: await dbAll('quickItems'), expenses: await dbAll('expenses'),
     suppliers: await dbAll('suppliers'), purchaseOrders: await dbAll('purchaseOrders'),
-    loyaltyPoints: await dbAll('loyaltyPoints'), notifications: await dbAll('notifications'),
+    notifications: await dbAll('notifications'),
     auditLogs: await dbAll('auditLogs'), users,
     settings: await dbAll('settings'), exportedAt: now()
   };
@@ -190,7 +190,7 @@ async function restoreJSONFlow() {
   const data = result.data;
   if (!data || typeof data !== 'object') { toast('Invalid backup file', 'error'); return; }
   try {
-    const stores = ['clients','transactions','payments','inventory','quickItems','settings','users','expenses','suppliers','purchaseOrders','loyaltyPoints','notifications','auditLogs'];
+    const stores = ['clients','transactions','payments','inventory','quickItems','settings','users','expenses','suppliers','purchaseOrders','notifications','auditLogs'];
     await Promise.all(stores.map(s => dbClear(s)));
     for (const store of stores) {
       const items = data[store];
@@ -230,7 +230,7 @@ async function restoreEncryptedFlow() {
     const decryptResult = await window.electronAPI.decryptBackupData(fileResult.data, pw);
     if (!decryptResult.success) { toast('Decryption failed: ' + (decryptResult.error || 'Wrong password?'), 'error'); return; }
     const data = decryptResult.data;
-    const stores = ['clients','transactions','payments','inventory','quickItems','settings','users','expenses','suppliers','purchaseOrders','loyaltyPoints','notifications','auditLogs'];
+    const stores = ['clients','transactions','payments','inventory','quickItems','settings','users','expenses','suppliers','purchaseOrders','notifications','auditLogs'];
     await Promise.all(stores.map(s => dbClear(s)));
     for (const store of stores) {
       const items = data[store];

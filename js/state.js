@@ -10,7 +10,6 @@ const state = {
   expenses: [],
   suppliers: [],
   purchaseOrders: [],
-  loyaltyPoints: [],
   notifications: [],
   user: null,
   currentRoute: 'dashboard'

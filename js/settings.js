@@ -13,13 +13,6 @@ async function viewSettings(root) {
         </div>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
-        <h3 class="font-bold text-lg mb-4">⚙️ Business Rules</h3>
-        <div class="grid grid-cols-2 gap-3">
-          <div><label class="text-xs text-gray-500 block">Loyalty Rate (%)</label><input id="set-loyaltyRate" type="number" step="0.1" value="${settingsMap['loyaltyRate'] || '0'}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
-          <div><label class="text-xs text-gray-500 block">Currency</label><input value="PHP" disabled class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-gray-100 dark:bg-gray-700" /></div>
-        </div>
-      </div>
-      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
         <h3 class="font-bold text-lg mb-4">🖼️ Receipt Branding</h3>
         <div class="space-y-3">
           <div><label class="text-xs text-gray-500 block">Shop Logo</label>
@@ -78,7 +71,7 @@ async function viewSettings(root) {
 }
 
 async function saveSettings() {
-  const keys = ['shopName','shopContact','shopAddress','loyaltyRate','smsApiKey','backupEmail','aiApiKey','aiModel','receiptFooter','receiptHeaderText'];
+  const keys = ['shopName','shopContact','shopAddress','smsApiKey','backupEmail','aiApiKey','aiModel','receiptFooter','receiptHeaderText'];
   for (const key of keys) {
     const el = document.getElementById(`set-${key}`);
     if (el) {

@@ -6,7 +6,7 @@ async function navigate(route) {
     dashboard: 'Dashboard', clients: 'Clients', utang: 'Utang',
     transactions: 'Sales', inventory: 'Inventory', stocktake: 'Stock Take', expenses: 'Expenses',
     suppliers: 'Suppliers', payments: 'Payments', 'purchase-orders': 'Purchase Orders',
-    loyalty: 'Loyalty', reports: 'Reports', settings: 'Settings'
+    reports: 'Reports', settings: 'Settings'
   };
   document.getElementById('page-title').textContent = titles[route] || 'Dashboard';
   document.querySelectorAll('.nav-btn').forEach(b => {
@@ -33,7 +33,6 @@ async function navigate(route) {
     case 'suppliers': await viewSuppliers(root); break;
     case 'payments': await viewPayments(root); break;
     case 'purchase-orders': await viewPurchaseOrders(root); break;
-    case 'loyalty': await viewLoyalty(root); break;
     case 'reports': await viewReports(root); break;
     case 'settings': await viewSettings(root); break;
     default: root.innerHTML = '<div class="text-center py-20 text-gray-500">Page not found</div>';
@@ -41,7 +40,7 @@ async function navigate(route) {
 }
 
 async function loadAll() {
-  const stores = ['clients','transactions','payments','inventory','quickItems','settings','users','expenses','suppliers','purchaseOrders','loyaltyPoints','notifications','auditLogs'];
+  const stores = ['clients','transactions','payments','inventory','quickItems','settings','users','expenses','suppliers','purchaseOrders','notifications','auditLogs'];
   const results = await Promise.all(stores.map(s => dbAll(s).catch(() => [])));
   stores.forEach((s, i) => { state[s] = results[i]; });
   const shop = state.settings.find(x => x.key === 'shopName');

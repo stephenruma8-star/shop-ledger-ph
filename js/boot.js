@@ -1,6 +1,6 @@
 if (window.electronAPI) {
   window.getDBDump = async () => {
-    const stores = ['clients','transactions','payments','inventory','quickItems','settings','users','expenses','suppliers','purchaseOrders','loyaltyPoints','notifications','auditLogs'];
+    const stores = ['clients','transactions','payments','inventory','quickItems','settings','users','expenses','suppliers','purchaseOrders','notifications','auditLogs'];
     const results = await Promise.all(stores.map(s => dbAll(s).catch(() => [])));
     const dump = {};
     stores.forEach((s, i) => {
@@ -95,7 +95,6 @@ async function seedIfEmpty() {
     await dbAdd('settings', { key: 'shopName', value: 'My Sari-Sari Store' });
     await dbAdd('settings', { key: 'shopContact', value: '' });
     await dbAdd('settings', { key: 'shopAddress', value: 'Philippines' });
-    await dbAdd('settings', { key: 'loyaltyRate', value: '1' });
   }
 }
 

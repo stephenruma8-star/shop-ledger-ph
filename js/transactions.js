@@ -248,22 +248,11 @@ async function saveTransaction() {
       toast('Sale failed - rolled back: ' + err.message, 'error');
       return;
     }
-    const settingsMap = {};
-    state.settings.forEach(s => settingsMap[s.key] = s.value);
-    const loyaltyRate = parseFloat(settingsMap['loyaltyRate']) || 0;
-    if (clientId && loyaltyRate > 0 && grandTotal > 0) {
-      const pts = Math.floor(grandTotal * (loyaltyRate / 100));
-      if (pts > 0) {
-        const existing = state.loyaltyPoints.find(l => l.clientId === clientId);
-        if (existing) { existing.points = (existing.points || 0) + pts; existing.updatedAt = now(); await dbPut('loyaltyPoints', existing); }
-        else { await dbAdd('loyaltyPoints', { clientId, clientName, points: pts, createdAt: now(), updatedAt: now() }); }
-      }
-    }
     toast(`Sale completed! Invoice: ${invoiceNo}`, 'success');
     await logAudit('sale', `Sale ${invoiceNo} - ${peso(grandTotal)}`);
   }
-  [state.transactions, state.inventory, state.loyaltyPoints] = await Promise.all([
-    dbAll('transactions'), dbAll('inventory'), dbAll('loyaltyPoints')
+  [state.transactions, state.inventory] = await Promise.all([
+    dbAll('transactions'), dbAll('inventory')
   ]);
   updateLowStockBadge();
   closeModal();
