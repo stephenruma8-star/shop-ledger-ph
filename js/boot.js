@@ -93,8 +93,8 @@ async function seedIfEmpty() {
   }
   if (settings.length === 0) {
     await dbAdd('settings', { key: 'shopName', value: 'My Sari-Sari Store' });
+    await dbAdd('settings', { key: 'shopContact', value: '' });
     await dbAdd('settings', { key: 'shopAddress', value: 'Philippines' });
-    await dbAdd('settings', { key: 'taxRate', value: '0' });
     await dbAdd('settings', { key: 'loyaltyRate', value: '1' });
   }
 }

@@ -107,7 +107,7 @@ async function submitSale() {
     const r = await fetch(API + '/api/sales', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Auth-Token': getToken() },
-      body: JSON.stringify({ clientId: chargeClient ? clientId : null, items: postItems, paymentMethod, discount: 0, taxRate: 0 })
+      body: JSON.stringify({ clientId: chargeClient ? clientId : null, items: postItems, paymentMethod, discount: 0 })
     });
     const result = await r.json();
     if (result.success) { alert('✅ Sale recorded! Invoice: ' + result.invoiceNo); saleItems = []; showView('home'); }

@@ -69,13 +69,9 @@ function renderTransactionModal(editTxn) {
   const clients = state.clients;
   const inv = state.inventory.filter(i => (i.stock || 0) > 0);
   const qItems = state.quickItems;
-  const settingsMap = {};
-  state.settings.forEach(s => settingsMap[s.key] = s.value);
-  const taxRate = parseFloat(settingsMap['taxRate']) || 0;
   const selClient = isEdit && editTxn.clientId ? editTxn.clientId : '';
   const selPay = isEdit ? editTxn.paymentMethod || 'Cash' : 'Cash';
   const selDisc = isEdit ? (editTxn.discount || 0) - (editTxn.scDiscount || 0) : 0;
-  const selTax = isEdit ? (editTxn.taxRate || taxRate) : taxRate;
   const selSC = isEdit && (editTxn.scDiscount || 0) > 0;
   modal(`
     <div class="p-6">
@@ -88,7 +84,7 @@ function renderTransactionModal(editTxn) {
           </div>
           <div class="grid grid-cols-2 gap-2">
             <div><label class="text-xs text-gray-500 block">Discount (₱)</label><input id="tm-discount" type="number" value="${selDisc}" min="0" step="0.01" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" oninput="updateTMTotals()" /></div>
-            <div><label class="text-xs text-gray-500 block">Tax (${taxRate}%)</label><input id="tm-tax" type="number" value="${selTax}" min="0" step="0.01" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" oninput="updateTMTotals()" /></div>
+            <div></div>
           </div>
           <div class="flex gap-2">
             <label class="flex items-center gap-1 text-sm"><input type="checkbox" id="tm-sc" onchange="toggleSC()" ${selSC ? 'checked' : ''} /> SC/PWD 20% Discount</label>
@@ -161,16 +157,12 @@ function updateTMTotals() {
   const scCheck = document.getElementById('tm-sc');
   const scDiscount = scCheck && scCheck.checked ? subtotal * 0.2 : 0;
   const discount = parseFloat(document.getElementById('tm-discount')?.value || 0) + scDiscount;
-  const taxRate = parseFloat(document.getElementById('tm-tax')?.value || 0);
-  const taxable = subtotal + totalInterest - discount;
-  const tax = taxable > 0 ? taxable * (taxRate / 100) : 0;
-  const grandTotal = Math.max(0, taxable + tax);
+  const grandTotal = Math.max(0, subtotal + totalInterest - discount);
   el.innerHTML = `
     <div class="flex justify-between"><span>Subtotal (goods)</span><span>${peso(subtotal)}</span></div>
     ${totalInterest > 0 ? `<div class="flex justify-between text-amber-600"><span>Total Interest</span><span>${peso(totalInterest)}</span></div>` : ''}
     ${scDiscount > 0 ? `<div class="flex justify-between text-green-600"><span>SC/PWD 20%</span><span>-${peso(scDiscount)}</span></div>` : ''}
     ${discount > 0 ? `<div class="flex justify-between text-orange-600"><span>Discount</span><span>-${peso(discount)}</span></div>` : ''}
-    <div class="flex justify-between"><span>Tax (${taxRate}%)</span><span>${peso(tax)}</span></div>
     <div class="flex justify-between font-bold text-lg border-t dark:border-gray-700 pt-1"><span>Total</span><span class="text-green-600">${peso(grandTotal)}</span></div>`;
 }
 
@@ -183,10 +175,7 @@ async function saveTransaction() {
   const scCheck = document.getElementById('tm-sc');
   const scDiscount = scCheck && scCheck.checked ? subtotal * 0.2 : 0;
   const discount = parseFloat(document.getElementById('tm-discount')?.value || 0) + scDiscount;
-  const taxRate = parseFloat(document.getElementById('tm-tax')?.value || 0);
-  const taxable = subtotal + totalInterest - discount;
-  const tax = taxable > 0 ? taxable * (taxRate / 100) : 0;
-  const grandTotal = Math.max(0, taxable + tax);
+  const grandTotal = Math.max(0, subtotal + totalInterest - discount);
   const clientSel = document.getElementById('tm-client');
   const clientId = clientSel.value ? parseInt(clientSel.value) : null;
   const clientName = clientSel.options[clientSel.selectedIndex]?.text || 'Walk-in';
@@ -217,7 +206,7 @@ async function saveTransaction() {
       const c = await dbGet('clients', clientId);
       if (c) { c.balance = (c.balance || 0) + grandTotal; await dbPut('clients', c); }
     }
-    const updated = { ...oldTxn, clientId, clientName, paymentMethod, items: newItems, subtotal, totalInterest, discount, tax, taxRate, scDiscount, grandTotal, editedAt: now() };
+    const updated = { ...oldTxn, clientId, clientName, paymentMethod, items: newItems, subtotal, totalInterest, discount, scDiscount, grandTotal, editedAt: now() };
     await dbPut('transactions', updated);
     toast(`Sale ${oldTxn.invoiceNo} updated`, 'success');
     await logAudit('sale-edit', `Sale ${oldTxn.invoiceNo} updated: ${peso(oldTxn.grandTotal)} → ${peso(grandTotal)}`);
@@ -228,7 +217,7 @@ async function saveTransaction() {
     const transaction = {
       invoiceNo, clientId, clientName, date: today(), createdAt: now(),
       items: txCart.map(i => ({ date: i.date, description: i.description, name: i.name, unitCost: i.unitCost, intRate: i.intRate, amount: lineAmt(i), invId: i.invId })),
-      subtotal, totalInterest, discount, tax, taxRate, scDiscount, grandTotal,
+      subtotal, totalInterest, discount, scDiscount, grandTotal,
       paymentMethod, status: grandTotal <= 0 ? 'paid' : 'pending'
     };
     const rollback = [];
@@ -287,13 +276,17 @@ function buildReceiptHTML(t) {
   const shopName = settingsMap['shopName'] || 'Shop Ledger PH';
   const shopAddr = settingsMap['shopAddress'] || '';
   const shopTin = settingsMap['shopTin'] || '';
+  const shopContact = settingsMap['shopContact'] || '';
+  const headerText = settingsMap['receiptHeaderText'] || '';
   const logo = settingsMap['receiptLogo'] || '';
   const footerMsg = settingsMap['receiptFooter'] || 'Thank you for your patronage!';
   const lines = [];
   if (logo) lines.push('[LOGO]');
   lines.push(' '.repeat(Math.max(0, Math.floor((32 - shopName.length) / 2))) + shopName);
   if (shopAddr) lines.push(' '.repeat(Math.max(0, Math.floor((32 - shopAddr.length) / 2))) + shopAddr);
+  if (shopContact) lines.push('Contact: ' + shopContact);
   if (shopTin) lines.push('TIN: ' + shopTin);
+  if (headerText) { headerText.split('\n').filter(Boolean).forEach(l => lines.push(l)); }
   lines.push('='.repeat(32));
   lines.push(' '.repeat(Math.max(0, Math.floor((32 - 14) / 2))) + 'OFFICIAL RECEIPT');
   lines.push('Invoice: ' + (t.invoiceNo || 'N/A'));
@@ -313,7 +306,6 @@ function buildReceiptHTML(t) {
   if (t.totalInterest > 0) lines.push(`Interest:         ${peso(t.totalInterest)}`);
   if (t.scDiscount > 0) lines.push(`SC/PWD 20%:       -${peso(t.scDiscount)}`);
   if (t.discount > 0) lines.push(`Discount:         -${peso(t.discount)}`);
-  if (t.tax > 0) lines.push(`Tax:              ${peso(t.tax)}`);
   lines.push(`TOTAL:            ${peso(t.grandTotal)}`);
   lines.push('='.repeat(32));
   lines.push('Payment: ' + (t.paymentMethod || 'Cash'));
@@ -341,7 +333,6 @@ function viewTransactionDetail(id) {
         ${t.totalInterest > 0 ? `<div class="flex justify-between text-amber-600"><span>Interest</span><span>${peso(t.totalInterest)}</span></div>` : ''}
         ${t.scDiscount > 0 ? `<div class="flex justify-between text-green-600"><span>SC/PWD 20%</span><span>-${peso(t.scDiscount)}</span></div>` : ''}
         ${t.discount > 0 ? `<div class="flex justify-between text-orange-600"><span>Discount</span><span>-${peso(t.discount)}</span></div>` : ''}
-        ${t.tax > 0 ? `<div class="flex justify-between"><span>Tax (${t.taxRate||0}%)</span><span>${peso(t.tax)}</span></div>` : ''}
         <div class="flex justify-between font-bold text-lg border-t dark:border-gray-700 pt-1"><span>Total</span><span class="text-green-600">${peso(t.grandTotal)}</span></div>
       </div>
       <div class="flex gap-2 mt-4">

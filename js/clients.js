@@ -136,7 +136,7 @@ async function saveClient(id) {
       const nextNo = invNos.length > 0 ? Math.max(...invNos) + 1 : 1;
       const invoiceNo = 'INV-' + String(nextNo).padStart(5,'0');
       const items = cfCart.map(i => ({ date: i.date, description: i.description, name: i.name, unitCost: i.unitCost, intRate: i.intRate, amount: getQty(i.name) * (i.unitCost || 0) + (getQty(i.name) * (i.unitCost || 0)) * ((i.intRate||0)/100), invId: null }));
-      await dbAdd('transactions', { invoiceNo, clientId: id, clientName: name, date: today(), createdAt: now(), items, subtotal, totalInterest, discount: 0, tax: 0, taxRate: 0, scDiscount: 0, grandTotal, paymentMethod: 'Cash', status: grandTotal <= 0 ? 'paid' : 'pending' });
+      await dbAdd('transactions', { invoiceNo, clientId: id, clientName: name, date: today(), createdAt: now(), items, subtotal, totalInterest, discount: 0, scDiscount: 0, grandTotal, paymentMethod: 'Cash', status: grandTotal <= 0 ? 'paid' : 'pending' });
       c.balance = (c.balance || 0) + grandTotal;
       await dbPut('clients', c);
     }
@@ -151,7 +151,7 @@ async function saveClient(id) {
       const nextNo = invNos.length > 0 ? Math.max(...invNos) + 1 : 1;
       const invoiceNo = 'INV-' + String(nextNo).padStart(5,'0');
       const items = cfCart.map(i => ({ date: i.date, description: i.description, name: i.name, unitCost: i.unitCost, intRate: i.intRate, amount: getQty(i.name) * (i.unitCost || 0) + (getQty(i.name) * (i.unitCost || 0)) * ((i.intRate||0)/100), invId: null }));
-      await dbAdd('transactions', { invoiceNo, clientId, clientName: name, date: today(), createdAt: now(), items, subtotal, totalInterest, discount: 0, tax: 0, taxRate: 0, scDiscount: 0, grandTotal, paymentMethod: 'Cash', status: grandTotal <= 0 ? 'paid' : 'pending' });
+      await dbAdd('transactions', { invoiceNo, clientId, clientName: name, date: today(), createdAt: now(), items, subtotal, totalInterest, discount: 0, scDiscount: 0, grandTotal, paymentMethod: 'Cash', status: grandTotal <= 0 ? 'paid' : 'pending' });
       const c = await dbGet('clients', clientId);
       if (c) { c.balance = (c.balance || 0) + grandTotal; await dbPut('clients', c); }
     }
@@ -195,6 +195,8 @@ async function printClientInfo(id) {
   const shopName = settingsMap['shopName'] || 'Shop Ledger PH';
   const shopAddr = settingsMap['shopAddress'] || '';
   const shopTin = settingsMap['shopTin'] || '';
+  const shopContact = settingsMap['shopContact'] || '';
+  const headerText = settingsMap['receiptHeaderText'] || '';
   const logo = settingsMap['receiptLogo'] || '';
   const footerMsg = settingsMap['receiptFooter'] || 'Thank you for your patronage!';
   const txns = state.transactions.filter(t => t.clientId === id).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
@@ -210,7 +212,9 @@ async function printClientInfo(id) {
   if (logo) html += `<img src="${esc(logo)}" style="max-height:60px;margin-bottom:8px" />`;
   html += `<h2 style="margin:0;font-size:20px">${esc(shopName)}</h2>`;
   if (shopAddr) html += `<p style="margin:2px 0">${esc(shopAddr)}</p>`;
+  if (shopContact) html += `<p style="margin:2px 0">Contact: ${esc(shopContact)}</p>`;
   if (shopTin) html += `<p style="margin:2px 0">TIN: ${esc(shopTin)}</p>`;
+  if (headerText) html += headerText.split('\n').filter(Boolean).map(l => `<p style="margin:2px 0">${esc(l)}</p>`).join('');
   html += `</div>`;
 
   // Client info
@@ -235,12 +239,11 @@ async function printClientInfo(id) {
         return `<tr><td style="border:1px solid #d1d5db;padding:3px 6px">${item.date ? esc(item.date) : esc(fmtDate(t.date||t.createdAt))}</td><td style="border:1px solid #d1d5db;padding:3px 6px">${esc(item.description||'')}</td><td style="border:1px solid #d1d5db;padding:3px 6px;text-align:center">${esc(item.name||item.qty||'1')}</td><td style="border:1px solid #d1d5db;padding:3px 6px;text-align:right">₱${amt(item.unitCost||item.price||0)}</td><td style="border:1px solid #d1d5db;padding:3px 6px;text-align:right">${item.intRate != null ? item.intRate+'%' : (item.interest ? '₱'+amt(item.interest) : '-')}</td><td style="border:1px solid #d1d5db;padding:3px 6px;text-align:right;font-weight:bold">₱${amt(item.amount || sub+intr)}</td></tr>`;
       }).join('')}</tbody>`;
       html += `</table>`;
-      if (t.totalInterest > 0 || t.discount > 0 || t.tax > 0 || t.scDiscount > 0) {
+      if (t.totalInterest > 0 || t.discount > 0 || t.scDiscount > 0) {
         html += `<div style="font-size:11px;text-align:right;padding:4px 0">`;
         if (t.totalInterest > 0) html += `<div>Interest: ₱${amt(t.totalInterest)}</div>`;
         if (t.scDiscount > 0) html += `<div>SC/PWD: -₱${amt(t.scDiscount)}</div>`;
         if (t.discount > 0) html += `<div>Discount: -₱${amt(t.discount)}</div>`;
-        if (t.tax > 0) html += `<div>Tax: ₱${amt(t.tax)}</div>`;
         html += `</div>`;
       }
       html += `</div>`;
