@@ -19,6 +19,7 @@
 <nav class="fixed bottom-0 left-0 right-0 bg-white border-t flex shadow-lg z-10">
   <button onclick="showView('home')" class="flex-1 py-3 text-center text-xs"><div class="text-xl">🏠</div>Home</button>
   <button onclick="showView('clients')" class="flex-1 py-3 text-center text-xs"><div class="text-xl">👥</div>Clients</button>
+  <button onclick="showView('sale')" class="flex-1 py-3 text-center text-xs"><div class="text-xl">🛒</div>Sale</button>
   <button onclick="showView('pay')" class="flex-1 py-3 text-center text-xs bg-blue-50 text-blue-600 rounded-t-xl"><div class="text-xl bg-blue-600 text-white w-10 h-10 rounded-full mx-auto -mt-6 flex items-center justify-center shadow-lg">💵</div>Bayad</button>
 </nav>
 
@@ -42,7 +43,76 @@ function showView(view, data) {
   const v = document.getElementById('view');
   if (view === 'home') renderHome(v);
   else if (view === 'clients') renderClients(v);
+  else if (view === 'sale') renderSale(v);
   else if (view === 'pay') renderPay(v, data);
+}
+
+let saleItems = [];
+
+function renderSale(root) {
+  loadClients().then(() => {
+    root.innerHTML = `
+      <h2 class="text-xl font-bold mb-3">🛒 Add Sale</h2>
+      <div class="bg-white p-4 rounded-xl shadow-sm space-y-3">
+        <select id="sale-client" class="w-full px-3 py-3 border rounded-lg">
+          <option value="">Walk-in (no client)</option>
+          ${state.clients.map(c => '<option value="' + c.id + '">' + esc(c.name) + ' - ' + peso(c.balance) + '</option>').join('')}
+        </select>
+        <div class="flex gap-2">
+          <input id="sale-item-name" type="text" placeholder="Item name" class="flex-1 px-3 py-2 border rounded-lg" />
+          <input id="sale-item-qty" type="number" value="1" min="1" class="w-16 px-2 py-2 border rounded-lg text-center" />
+          <input id="sale-item-cost" type="number" step="0.01" placeholder="Price" class="w-24 px-3 py-2 border rounded-lg" />
+          <button onclick="addSaleItem()" class="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm">+</button>
+        </div>
+        <div id="sale-items-list" class="space-y-1"></div>
+        <div class="text-right text-sm font-bold">Total: <span id="sale-total">₱0.00</span></div>
+        <div class="grid grid-cols-2 gap-2">
+          <select id="sale-payment" class="px-3 py-3 border rounded-lg"><option>Cash</option><option>GCash</option><option>Maya</option><option>Bank Transfer</option><option>Installment</option></select>
+          <select id="sale-client-charge" class="px-3 py-3 border rounded-lg"><option value="no">No charge</option><option value="yes">Charge to client</option></select>
+        </div>
+        <button onclick="submitSale()" class="w-full py-4 bg-blue-500 text-white rounded-xl font-bold text-lg">✓ Save Sale</button>
+      </div>`;
+  });
+}
+
+function addSaleItem() {
+  const name = document.getElementById('sale-item-name').value.trim();
+  const qty = parseInt(document.getElementById('sale-item-qty').value) || 1;
+  const unitCost = parseFloat(document.getElementById('sale-item-cost').value);
+  if (!name || !unitCost) return alert('Enter item name and price');
+  saleItems.push({ name, qty, unitCost, intRate: 0, invId: null });
+  document.getElementById('sale-item-name').value = '';
+  document.getElementById('sale-item-cost').value = '';
+  document.getElementById('sale-item-qty').value = '1';
+  renderSaleItems();
+}
+
+function renderSaleItems() {
+  const list = document.getElementById('sale-items-list');
+  const total = saleItems.reduce((s, i) => s + (i.qty * i.unitCost), 0);
+  list.innerHTML = saleItems.map((i, idx) =>
+    '<div class="flex justify-between items-center text-sm py-1 border-b"><span>' + esc(i.name) + ' x' + i.qty + '</span><span>' + peso(i.qty * i.unitCost) + ' <button onclick="saleItems.splice(' + idx + ',1);renderSaleItems()" class="text-red-500 ml-2">&times;</button></span></div>'
+  ).join('');
+  document.getElementById('sale-total').textContent = peso(total);
+}
+
+async function submitSale() {
+  const clientId = parseInt(document.getElementById('sale-client').value) || null;
+  const paymentMethod = document.getElementById('sale-payment').value;
+  const chargeClient = document.getElementById('sale-client-charge').value === 'yes';
+  if (!saleItems.length) return alert('Add at least one item');
+  if (chargeClient && !clientId) return alert('Select a client to charge');
+  const postItems = saleItems.map(i => ({ ...i }));
+  try {
+    const r = await fetch(API + '/api/sales', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Auth-Token': getToken() },
+      body: JSON.stringify({ clientId: chargeClient ? clientId : null, items: postItems, paymentMethod, discount: 0, taxRate: 0 })
+    });
+    const result = await r.json();
+    if (result.success) { alert('✅ Sale recorded! Invoice: ' + result.invoiceNo); saleItems = []; showView('home'); }
+    else alert('Error: ' + result.error);
+  } catch (e) { alert('Network error'); }
 }
 
 async function renderHome(root) {

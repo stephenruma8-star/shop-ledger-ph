@@ -77,7 +77,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;transiti
       <button data-route="clients" class="nav-btn w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm flex items-center gap-2"><span>👥</span>Clients</button>
       <button data-route="utang" class="nav-btn w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm flex items-center gap-2"><span>📒</span>Utang</button>
       <button data-route="transactions" class="nav-btn w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm flex items-center gap-2"><span>🧾</span>Sales</button>
-      <button data-route="inventory" class="nav-btn w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm flex items-center gap-2"><span>📦</span>Inventory</button>
+      <button data-route="inventory" class="nav-btn w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm flex items-center gap-2"><span>📦</span><span class="flex-1">Inventory</span><span id="lowStockBadge" class="hidden text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full"></span></button>
       <button data-route="expenses" class="nav-btn w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm flex items-center gap-2"><span>💸</span>Expenses</button>
       <button data-route="suppliers" class="nav-btn w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm flex items-center gap-2"><span>🏭</span>Suppliers</button>
       <button data-route="payments" class="nav-btn w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm flex items-center gap-2"><span>💵</span>Payments</button>
@@ -89,6 +89,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;transiti
     <div class="p-3 border-t border-gray-200 dark:border-gray-700 space-y-1">
       <button onclick="toggleTheme()" class="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"><span>🌓</span>Theme</button>
       <button onclick="showShortcuts()" class="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"><span>⌨️</span>Shortcuts</button>
+      <button onclick="changePassword()" class="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"><span>🔑</span>Change Password</button>
       <button onclick="doLogout()" class="w-full text-left px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"><span>🚪</span>Logout</button>
     </div>
   </aside>

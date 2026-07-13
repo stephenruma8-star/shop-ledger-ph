@@ -5,12 +5,81 @@ function toast(msg, type = 'info') {
   el.className = `${colors[type] || colors.info} text-white px-4 py-3 rounded-lg shadow-lg slide-in text-sm max-w-sm`;
   el.textContent = msg;
   c.appendChild(el);
+  if (type === 'error') playSound('error');
+  else if (type === 'success') playSound('success');
   setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 300); }, 3500);
+}
+
+// Sound effects
+let _audioCtx;
+function playSound(type) {
+  try {
+    if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = _audioCtx.createOscillator();
+    const gain = _audioCtx.createGain();
+    osc.connect(gain); gain.connect(_audioCtx.destination);
+    if (type === 'success') {
+      osc.frequency.setValueAtTime(523, _audioCtx.currentTime);
+      osc.frequency.setValueAtTime(659, _audioCtx.currentTime + 0.1);
+      osc.frequency.setValueAtTime(784, _audioCtx.currentTime + 0.2);
+      gain.gain.setValueAtTime(0.15, _audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, _audioCtx.currentTime + 0.4);
+      osc.start(_audioCtx.currentTime); osc.stop(_audioCtx.currentTime + 0.4);
+    } else if (type === 'error') {
+      osc.frequency.setValueAtTime(200, _audioCtx.currentTime);
+      osc.frequency.setValueAtTime(150, _audioCtx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.15, _audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, _audioCtx.currentTime + 0.3);
+      osc.start(_audioCtx.currentTime); osc.stop(_audioCtx.currentTime + 0.3);
+    } else if (type === 'payment') {
+      osc.frequency.setValueAtTime(440, _audioCtx.currentTime);
+      osc.frequency.setValueAtTime(554, _audioCtx.currentTime + 0.08);
+      osc.frequency.setValueAtTime(659, _audioCtx.currentTime + 0.16);
+      gain.gain.setValueAtTime(0.12, _audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, _audioCtx.currentTime + 0.3);
+      osc.start(_audioCtx.currentTime); osc.stop(_audioCtx.currentTime + 0.3);
+    }
+  } catch (e) { /* audio not available */ }
+}
+
+// Loading spinner
+function showSpinner(msg = 'Loading...') {
+  const v = document.getElementById('view');
+  if (v) v.innerHTML = `<div class="flex items-center justify-center h-64"><div class="text-center"><div class="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div><p class="text-gray-500 text-sm">${escapeHtml(msg)}</p></div></div>`;
+}
+
+// Confetti
+function confetti() {
+  const c = document.createElement('canvas');
+  c.className = 'fixed inset-0 pointer-events-none z-[200]';
+  c.width = window.innerWidth; c.height = window.innerHeight;
+  document.body.appendChild(c);
+  const ctx = c.getContext('2d');
+  const colors = ['#f56565','#ed8936','#ecc94b','#48bb78','#4299e1','#9f7aea','#ed64a6'];
+  const pieces = Array.from({length: 120}, () => ({
+    x: Math.random() * c.width, y: Math.random() * c.height - c.height,
+    w: Math.random() * 8 + 4, h: Math.random() * 6 + 3,
+    color: colors[Math.floor(Math.random() * colors.length)],
+    vx: (Math.random() - 0.5) * 4, vy: Math.random() * 3 + 2,
+    rot: Math.random() * 360, rv: (Math.random() - 0.5) * 10
+  }));
+  let frames = 0;
+  function draw() {
+    if (frames++ > 150) { c.remove(); return; }
+    ctx.clearRect(0, 0, c.width, c.height);
+    pieces.forEach(p => {
+      p.x += p.vx; p.vy += 0.05; p.y += p.vy; p.rot += p.rv;
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot * Math.PI / 180);
+      ctx.fillStyle = p.color; ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h); ctx.restore();
+    });
+    requestAnimationFrame(draw);
+  }
+  draw();
 }
 
 function modal(html) {
   const root = document.getElementById('modal-root');
-  root.innerHTML = `<div class="fixed inset-0 bg-black/50 z-50 flex items-start justify-center pt-10 overflow-auto fade-in" onclick="if(event.target===this)closeModal()"><div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl mx-4 mb-10 slide-in max-h-[85vh] overflow-auto glass-strong" onclick="event.stopPropagation()">${html}</div></div>`;
+  root.innerHTML = `<div class="fixed inset-0 bg-black/50 z-50 flex items-start justify-center pt-4 overflow-auto fade-in" onclick="if(event.target===this)closeModal()"><div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-7xl mx-4 mb-4 slide-in max-h-[95vh] overflow-auto glass-strong" onclick="event.stopPropagation()">${html}</div></div>`;
 }
 
 function closeModal() {
@@ -66,4 +135,12 @@ function searchData(arr, query, fields) {
   if (!query || !query.trim()) return arr;
   const q = query.toLowerCase().trim();
   return arr.filter(item => fields.some(f => String(item[f] || '').toLowerCase().includes(q)));
+}
+
+function updateLowStockBadge() {
+  const badge = document.getElementById('lowStockBadge');
+  if (!badge) return;
+  const count = (state.inventory || []).filter(i => (i.stock || 0) <= (i.minStock || 5)).length;
+  if (count > 0) { badge.textContent = count; badge.classList.remove('hidden'); }
+  else badge.classList.add('hidden');
 }

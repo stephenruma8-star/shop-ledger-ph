@@ -71,6 +71,45 @@ function togglePass() {
   else { inp.type = 'password'; btn.textContent = '👁️'; }
 }
 
+function changePassword() {
+  modal(`
+    <div class="p-6">
+      <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">🔑 Change Password</h3><button onclick="closeModal()" class="text-gray-400 text-2xl">&times;</button></div>
+      <div class="space-y-3">
+        <div><label class="text-xs text-gray-500 block mb-1">Current Password</label><input id="cp-current" type="password" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
+        <div><label class="text-xs text-gray-500 block mb-1">New Password</label><input id="cp-new" type="password" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
+        <div><label class="text-xs text-gray-500 block mb-1">Confirm New Password</label><input id="cp-confirm" type="password" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
+        <p id="cp-error" class="text-red-500 text-sm hidden"></p>
+        <div class="flex gap-2 pt-2">
+          <button onclick="doChangePassword()" class="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Change Password</button>
+          <button onclick="closeModal()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg">Cancel</button>
+        </div>
+      </div>
+    </div>`);
+}
+
+async function doChangePassword() {
+  const current = document.getElementById('cp-current').value;
+  const newPw = document.getElementById('cp-new').value;
+  const confirm = document.getElementById('cp-confirm').value;
+  const err = document.getElementById('cp-error');
+  if (!current || !newPw || !confirm) { err.textContent = 'All fields required'; err.classList.remove('hidden'); return; }
+  if (newPw !== confirm) { err.textContent = 'New passwords do not match'; err.classList.remove('hidden'); return; }
+  if (newPw.length < 4) { err.textContent = 'Password must be at least 4 characters'; err.classList.remove('hidden'); return; }
+  const pHash = await hashPassword(current);
+  if (state.user.password !== pHash) { err.textContent = 'Current password is incorrect'; err.classList.remove('hidden'); return; }
+  const user = await dbGet('users', state.user.id);
+  if (!user) { err.textContent = 'User not found'; err.classList.remove('hidden'); return; }
+  user.password = await hashPassword(newPw);
+  await dbPut('users', user);
+  state.user.password = user.password;
+  const safe = { ...state.user, password: undefined };
+  sessionStorage.setItem('shopUser', JSON.stringify(safe));
+  closeModal();
+  toast('Password changed successfully', 'success');
+  await logAudit('user', `User ${user.username} changed their password`);
+}
+
 async function forgotPassword() {
   const users = await dbAll('users');
   modal(`

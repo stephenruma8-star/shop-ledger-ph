@@ -21,7 +21,20 @@ async function viewSettings(root) {
         </div>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
-        <h3 class="font-bold text-lg mb-4">📱 SMS & Email</h3>
+        <h3 class="font-bold text-lg mb-4">🖼️ Receipt Branding</h3>
+        <div class="space-y-3">
+          <div><label class="text-xs text-gray-500 block">Shop Logo</label>
+            <div class="flex items-center gap-3">
+              <div class="w-16 h-16 border-2 border-dashed dark:border-gray-600 rounded-lg flex items-center justify-center overflow-hidden bg-gray-50 dark:bg-gray-700" id="logo-preview">${settingsMap['receiptLogo'] ? `<img src="${escapeHtml(settingsMap['receiptLogo'])}" class="w-full h-full object-contain" />` : '<span class="text-2xl text-gray-300">📷</span>'}</div>
+              <label class="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 rounded-lg text-sm cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600">Choose File<input type="file" accept="image/*" class="hidden" onchange="uploadReceiptLogo(event)" /></label>
+              ${settingsMap['receiptLogo'] ? `<button onclick="removeReceiptLogo()" class="text-xs text-red-500">Remove</button>` : ''}
+            </div>
+          </div>
+          <div><label class="text-xs text-gray-500 block">Receipt Footer Message</label><input id="set-receiptFooter" value="${escapeHtml(settingsMap['receiptFooter'] || 'Thank you for your patronage!')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
+        </div>
+      </div>
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
+        <h3 class="font-bold text-lg mb-4">📱 SMS &amp; Email</h3>
         <div class="space-y-3">
           <div><label class="text-xs text-gray-500 block">Semaphore API Key</label><input id="set-smsApiKey" value="${escapeHtml(settingsMap['smsApiKey'] || '')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" placeholder="From semaphore.co" /></div>
           <div><label class="text-xs text-gray-500 block">Backup Email (recipient)</label><input id="set-backupEmail" value="${escapeHtml(settingsMap['backupEmail'] || '')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
@@ -37,6 +50,14 @@ async function viewSettings(root) {
             </div>
           </details>
         </div>
+      </div>
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
+        <h3 class="font-bold text-lg mb-4">🤖 AI Assistant</h3>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="text-xs text-gray-500 block">API Key <span class="text-gray-400 font-normal">(leave blank for local)</span></label><input id="set-aiApiKey" type="password" value="${escapeHtml(settingsMap['aiApiKey'] || '')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 font-mono text-xs" placeholder="sk-... or empty for Ollama" /></div>
+          <div><label class="text-xs text-gray-500 block">Provider</label><select id="set-aiModel" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"><option value="ollama" ${(settingsMap['aiModel']||'ollama') === 'ollama' ? 'selected' : ''}>Ollama (local, free)</option><option value="gpt-4o-mini" ${settingsMap['aiModel'] === 'gpt-4o-mini' ? 'selected' : ''}>OpenAI GPT-4o-mini</option><option value="gpt-4o" ${settingsMap['aiModel'] === 'gpt-4o' ? 'selected' : ''}>OpenAI GPT-4o</option></select></div>
+        </div>
+        <p class="text-xs text-gray-400 mt-2">No API key? Use <strong>Ollama</strong> — free local AI. <a href="#" onclick="require('electron').shell.openExternal('https://ollama.ai/download')" class="text-blue-500 hover:underline">Download Ollama</a>, run <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">ollama pull llama3.2</code>, then select "Ollama" above.</p>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
         <h3 class="font-bold text-lg mb-4">📋 Quick Items</h3>
@@ -57,7 +78,7 @@ async function viewSettings(root) {
 }
 
 async function saveSettings() {
-  const keys = ['shopName','shopTin','shopAddress','taxRate','loyaltyRate','smsApiKey','backupEmail'];
+  const keys = ['shopName','shopTin','shopAddress','taxRate','loyaltyRate','smsApiKey','backupEmail','aiApiKey','aiModel','receiptFooter'];
   for (const key of keys) {
     const el = document.getElementById(`set-${key}`);
     if (el) {
@@ -101,6 +122,32 @@ async function deleteQuickItem(id) {
   await dbDel('quickItems', id);
   state.quickItems = await dbAll('quickItems');
   viewSettings(document.getElementById('view'));
+}
+
+function uploadReceiptLogo(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async (ev) => {
+    const dataUrl = ev.target.result;
+    const existing = state.settings.find(s => s.key === 'receiptLogo');
+    if (existing) { existing.value = dataUrl; await dbPut('settings', existing); }
+    else { await dbAdd('settings', { key: 'receiptLogo', value: dataUrl }); }
+    state.settings = await dbAll('settings');
+    const preview = document.getElementById('logo-preview');
+    if (preview) preview.innerHTML = `<img src="${escapeHtml(dataUrl)}" class="w-full h-full object-contain" />`;
+    toast('Logo uploaded');
+  };
+  reader.readAsDataURL(file);
+}
+
+async function removeReceiptLogo() {
+  const existing = state.settings.find(s => s.key === 'receiptLogo');
+  if (existing) { await dbDel('settings', existing.id); }
+  state.settings = await dbAll('settings');
+  const preview = document.getElementById('logo-preview');
+  if (preview) preview.innerHTML = '<span class="text-2xl text-gray-300">📷</span>';
+  toast('Logo removed');
 }
 
 function openUserModal(id) {

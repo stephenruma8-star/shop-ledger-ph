@@ -5,7 +5,9 @@ async function viewInventory(root) {
       <div class="flex gap-2 flex-wrap items-center">
         <input id="invSearch" placeholder="Search inventory..." class="flex-1 min-w-[200px] px-4 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" oninput="debouncedRenderInvTable()" />
         <button onclick="openInventoryModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">+ New Item</button>
+        <button onclick="showReorderSuggestions()" class="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700">Reorder</button>
       </div>
+      <div id="reorderSection" class="hidden"></div>
       <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden glass-card">
         <div class="overflow-auto" id="invTable"></div>
       </div>
@@ -67,6 +69,11 @@ function openInventoryModal(id) {
 async function saveInv(id) {
   const name = document.getElementById('if-name').value.trim();
   if (!name) { toast('Name is required', 'error'); return; }
+  const sku = document.getElementById('if-sku').value.trim();
+  const dupName = state.inventory.find(i => i.name.toLowerCase() === name.toLowerCase() && i.id !== id);
+  if (dupName) { toast('Item with this name already exists', 'error'); return; }
+  const dupSku = sku && state.inventory.find(i => i.sku && i.sku.toLowerCase() === sku.toLowerCase() && i.id !== id);
+  if (dupSku) { toast('Item with this SKU already exists', 'error'); return; }
   const obj = {
     name, sku: document.getElementById('if-sku').value.trim(),
     category: document.getElementById('if-category').value.trim(),
@@ -75,17 +82,50 @@ async function saveInv(id) {
     stock: parseInt(document.getElementById('if-stock').value) || 0,
     minStock: parseInt(document.getElementById('if-min').value) || 5
   };
-  if (id) { const existing = await dbGet('inventory', id); if (existing) obj.createdAt = existing.createdAt; obj.id = id; await dbPut('inventory', obj); toast('Item updated'); }
-  else { obj.createdAt = now(); await dbAdd('inventory', obj); toast('Item added'); }
+  if (id) {
+    const existing = await dbGet('inventory', id);
+    if (existing) {
+      obj.createdAt = existing.createdAt;
+      const oldStock = existing.stock || 0;
+      const newStock = obj.stock || 0;
+      if (oldStock !== newStock) await logAudit('inventory', `${existing.name}: stock ${oldStock} → ${newStock} (adj: ${newStock - oldStock})`);
+    }
+    obj.id = id; await dbPut('inventory', obj); toast('Item updated');
+  } else { obj.createdAt = now(); await dbAdd('inventory', obj); await logAudit('inventory', `New item: ${obj.name}`); toast('Item added'); }
   closeModal();
   state.inventory = await dbAll('inventory');
+  updateLowStockBadge();
   renderInvTable();
 }
 
 async function deleteInv(id) {
-  if (!await confirmModal('Delete this item?')) return;
+  const item = state.inventory.find(i => i.id === id);
+  if (!item) return;
+  const used = state.transactions.some(t => (t.items||[]).some(i => i.invId === id));
+  if (used) {
+    if (!await confirmModal(`"${item.name}" was used in past sales. Delete anyway? (Data in those sales will remain.)`)) return;
+  } else {
+    if (!await confirmModal(`Delete "${item.name}"?`)) return;
+  }
   await dbDel('inventory', id);
   state.inventory = await dbAll('inventory');
   renderInvTable();
   toast('Item deleted');
+}
+
+function showReorderSuggestions() {
+  const sec = document.getElementById('reorderSection');
+  if (!sec) return;
+  const needsReorder = state.inventory.filter(i => (i.stock || 0) <= (i.minStock || 5)).sort((a, b) => ((a.stock||0)/(a.minStock||5)) - ((b.stock||0)/(b.minStock||5)));
+  if (needsReorder.length === 0) {
+    sec.classList.add('hidden'); toast('All items sufficiently stocked', 'success'); return;
+  }
+  sec.classList.remove('hidden');
+  sec.innerHTML = `<div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 shadow-sm">
+    <div class="flex justify-between items-center mb-2"><h3 class="font-bold text-sm text-amber-800 dark:text-amber-300">Reorder Suggestions</h3><button onclick="document.getElementById('reorderSection').classList.add('hidden')" class="text-amber-600 text-xs">Close</button></div>
+    <table class="w-full text-xs"><thead><tr class="text-left text-amber-700 dark:text-amber-400"><th class="p-1">Item</th><th class="p-1 text-right">Stock</th><th class="p-1 text-right">Min</th><th class="p-1 text-right">Suggest</th><th class="p-1 text-right">Cost</th><th class="p-1 text-right">Total</th></tr></thead>
+    <tbody>${needsReorder.map(i => {
+      const suggest = Math.max((i.minStock||5) * 2 - (i.stock||0), (i.minStock||5));
+      return `<tr class="border-b border-amber-200 dark:border-amber-800"><td class="p-1">${escapeHtml(i.name)}</td><td class="p-1 text-right text-red-600 font-bold">${i.stock||0}</td><td class="p-1 text-right">${i.minStock||5}</td><td class="p-1 text-right font-bold">${suggest}</td><td class="p-1 text-right">${peso(i.costPrice||0)}</td><td class="p-1 text-right">${peso((i.costPrice||0) * suggest)}</td></tr>`;
+    }).join('')}</tbody></table></div>`;
 }

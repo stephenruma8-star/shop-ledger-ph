@@ -53,44 +53,56 @@ function renderTxTable() {
 function openTransactionModal() {
   txCart = [];
   txEditingId = null;
-  renderTMCart();
+  renderTransactionModal(null);
+}
+
+function renderTransactionModal(editTxn) {
+  const isEdit = !!editTxn;
+  if (!isEdit) { txCart = []; txEditingId = null; }
   const clients = state.clients;
   const inv = state.inventory.filter(i => (i.stock || 0) > 0);
   const qItems = state.quickItems;
   const settingsMap = {};
   state.settings.forEach(s => settingsMap[s.key] = s.value);
   const taxRate = parseFloat(settingsMap['taxRate']) || 0;
+  const selClient = isEdit && editTxn.clientId ? editTxn.clientId : '';
+  const selPay = isEdit ? editTxn.paymentMethod || 'Cash' : 'Cash';
+  const selDisc = isEdit ? (editTxn.discount || 0) - (editTxn.scDiscount || 0) : 0;
+  const selTax = isEdit ? (editTxn.taxRate || taxRate) : taxRate;
+  const selSC = isEdit && (editTxn.scDiscount || 0) > 0;
   modal(`
     <div class="p-6">
-      <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">New Sale</h3><button onclick="closeModal()" class="text-gray-400 text-2xl">&times;</button></div>
+      <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">${isEdit ? 'Edit Sale' : 'New Sale'}</h3><button onclick="closeModal()" class="text-gray-400 text-2xl">&times;</button></div>
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div class="space-y-3">
           <div class="grid grid-cols-2 gap-2">
-            <div><label class="text-xs text-gray-500 block">Client</label><select id="tm-client" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"><option value="">Walk-in</option>${clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}</select></div>
-            <div><label class="text-xs text-gray-500 block">Payment</label><select id="tm-payment" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"><option>Cash</option><option>GCash</option><option>Maya</option><option>Bank Transfer</option></select></div>
+            <div><label class="text-xs text-gray-500 block">Client</label><select id="tm-client" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"><option value="">Walk-in</option>${clients.map(c => `<option value="${c.id}" ${c.id === selClient ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}</select></div>
+            <div><label class="text-xs text-gray-500 block">Payment</label><select id="tm-payment" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"><option ${selPay==='Cash'?'selected':''}>Cash</option><option ${selPay==='GCash'?'selected':''}>GCash</option><option ${selPay==='Maya'?'selected':''}>Maya</option><option ${selPay==='Bank Transfer'?'selected':''}>Bank Transfer</option></select></div>
           </div>
           <div class="grid grid-cols-2 gap-2">
-            <div><label class="text-xs text-gray-500 block">Discount (₱)</label><input id="tm-discount" type="number" value="0" min="0" step="0.01" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" oninput="updateTMTotals()" /></div>
-            <div><label class="text-xs text-gray-500 block">Tax (${taxRate}%)</label><input id="tm-tax" type="number" value="${taxRate}" min="0" step="0.01" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" oninput="updateTMTotals()" /></div>
+            <div><label class="text-xs text-gray-500 block">Discount (₱)</label><input id="tm-discount" type="number" value="${selDisc}" min="0" step="0.01" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" oninput="updateTMTotals()" /></div>
+            <div><label class="text-xs text-gray-500 block">Tax (${taxRate}%)</label><input id="tm-tax" type="number" value="${selTax}" min="0" step="0.01" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" oninput="updateTMTotals()" /></div>
           </div>
           <div class="flex gap-2">
-            <label class="flex items-center gap-1 text-sm"><input type="checkbox" id="tm-sc" onchange="toggleSC()" /> SC/PWD 20% Discount</label>
+            <label class="flex items-center gap-1 text-sm"><input type="checkbox" id="tm-sc" onchange="toggleSC()" ${selSC ? 'checked' : ''} /> SC/PWD 20% Discount</label>
           </div>
           <div class="flex gap-2 flex-wrap">
             <select id="tm-item-select" class="flex-1 min-w-[140px] px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"><option value="">Inventory item...</option>${inv.map(i => `<option value="${i.id}" data-name="${escapeHtml(i.name)}" data-price="${i.sellPrice||i.price||0}">${escapeHtml(i.name)} - ${peso(i.sellPrice||i.price||0)}</option>`).join('')}</select>
             <input id="tm-qty" type="number" value="1" min="1" class="w-14 px-2 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm text-center" />
             <button onclick="addToCart()" class="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm whitespace-nowrap">+ Add Item</button>
           </div>
-          ${qItems.length > 0 ? `<div><label class="text-xs text-gray-500 block">Quick Items (click to add row)</label><div class="flex flex-wrap gap-1">${qItems.map(q => `<button onclick="quickAddToCart('${q.name.replace(/'/g,"\\'")}',${q.price})" class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs hover:bg-gray-200 dark:hover:bg-gray-600">${escapeHtml(q.name)} ${peso(q.price)}</button>`).join('')}</div></div>` : ''}
+          ${qItems.length > 0 ? `<div><label class="text-xs text-gray-500 block">Quick Items (click to add row)</label><div class="flex flex-wrap gap-1">${qItems.map(q => `<button data-qiname="${escapeHtml(q.name)}" data-qiprice="${q.price}" onclick="quickAddToCart(this.dataset.qiname, parseFloat(this.dataset.qiprice))" class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs hover:bg-gray-200 dark:hover:bg-gray-600">${escapeHtml(q.name)} ${peso(q.price)}</button>`).join('')}</div></div>` : ''}
         </div>
         <div>
           <div class="flex justify-between items-center mb-2"><h4 class="font-semibold text-sm">Items</h4><button onclick="txCart.push({date:today(),description:'',name:'1',unitCost:0,intRate:0,invId:null});renderTMCart();updateTMTotals()" class="text-xs text-blue-600 hover:text-blue-800">+ Add Blank Row</button></div>
           <div id="tm-cart" class="max-h-72 overflow-auto border dark:border-gray-700 rounded-lg mb-2"></div>
           <div id="tm-totals" class="space-y-1 text-sm"></div>
-          <button onclick="saveTransaction()" class="w-full mt-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">Complete Sale</button>
+          <button onclick="saveTransaction()" class="w-full mt-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">${isEdit ? 'Update Sale' : 'Complete Sale'}</button>
+          ${isEdit ? `<p class="text-xs text-gray-400 mt-1 text-center">Editing ${editTxn.invoiceNo} — old data will be replaced</p>` : ''}
         </div>
       </div>
     </div>`);
+  renderTMCart();
   updateTMTotals();
 }
 
@@ -171,61 +183,94 @@ async function saveTransaction() {
   const clientSel = document.getElementById('tm-client');
   const clientId = clientSel.value ? parseInt(clientSel.value) : null;
   const clientName = clientSel.options[clientSel.selectedIndex]?.text || 'Walk-in';
-  const invNos = state.transactions.filter(t => t.invoiceNo?.startsWith('INV-')).map(t => parseInt(t.invoiceNo.replace('INV-','')) || 0);
-  const nextNo = invNos.length > 0 ? Math.max(...invNos) + 1 : 1;
-  const invoiceNo = 'INV-' + String(nextNo).padStart(5,'0');
-  const transaction = {
-    invoiceNo, clientId, clientName, date: today(), createdAt: now(),
-    items: txCart.map(i => ({ date: i.date, description: i.description, name: i.name, unitCost: i.unitCost, intRate: i.intRate, amount: lineAmt(i), invId: i.invId })),
-    subtotal, totalInterest, discount, tax, taxRate, scDiscount, grandTotal,
-    paymentMethod: document.getElementById('tm-payment')?.value || 'Cash',
-    status: grandTotal <= 0 ? 'paid' : 'pending'
-  };
-  const rollback = [];
-  try {
-    await dbAdd('transactions', transaction);
+  const paymentMethod = document.getElementById('tm-payment')?.value || 'Cash';
+
+  if (txEditingId) {
+    const oldTxn = await dbGet('transactions', txEditingId);
+    if (!oldTxn) { toast('Original transaction not found', 'error'); return; }
+    if (oldTxn.status === 'voided') { toast('Cannot edit a voided sale', 'error'); return; }
+    for (const item of (oldTxn.items || [])) {
+      if (item.invId) {
+        const inv = await dbGet('inventory', item.invId);
+        if (inv) { inv.stock = (inv.stock || 0) + getQty(item.name); await dbPut('inventory', inv); }
+      }
+    }
+    if (oldTxn.clientId) {
+      const oldC = await dbGet('clients', oldTxn.clientId);
+      if (oldC) { oldC.balance = Math.max(0, (oldC.balance || 0) - (oldTxn.grandTotal || 0)); await dbPut('clients', oldC); }
+    }
+    const newItems = txCart.map(i => ({ date: i.date, description: i.description, name: i.name, unitCost: i.unitCost, intRate: i.intRate, amount: lineAmt(i), invId: i.invId }));
     for (const item of txCart) {
       if (item.invId) {
         const inv = await dbGet('inventory', item.invId);
-        if (inv) {
-          const dec = getQty(item.name);
-          inv.stock = (inv.stock || 0) - dec;
-          await dbPut('inventory', inv);
-          rollback.push(() => dbGet('inventory', item.invId).then(i => { if (i) { i.stock = (i.stock || 0) + dec; return dbPut('inventory', i); } }));
-        }
+        if (inv) { inv.stock = (inv.stock || 0) - getQty(item.name); await dbPut('inventory', inv); }
       }
     }
     if (clientId) {
       const c = await dbGet('clients', clientId);
-      if (c) {
-        c.balance = (c.balance || 0) + grandTotal;
-        await dbPut('clients', c);
-        rollback.push(() => dbGet('clients', clientId).then(cc => { if (cc) { cc.balance = (cc.balance || 0) - grandTotal; return dbPut('clients', cc); } }));
+      if (c) { c.balance = (c.balance || 0) + grandTotal; await dbPut('clients', c); }
+    }
+    const updated = { ...oldTxn, clientId, clientName, paymentMethod, items: newItems, subtotal, totalInterest, discount, tax, taxRate, scDiscount, grandTotal, editedAt: now() };
+    await dbPut('transactions', updated);
+    toast(`Sale ${oldTxn.invoiceNo} updated`, 'success');
+    await logAudit('sale-edit', `Sale ${oldTxn.invoiceNo} updated: ${peso(oldTxn.grandTotal)} → ${peso(grandTotal)}`);
+  } else {
+    const invNos = state.transactions.filter(t => t.invoiceNo?.startsWith('INV-')).map(t => parseInt(t.invoiceNo.replace('INV-','')) || 0);
+    const nextNo = invNos.length > 0 ? Math.max(...invNos) + 1 : 1;
+    const invoiceNo = 'INV-' + String(nextNo).padStart(5,'0');
+    const transaction = {
+      invoiceNo, clientId, clientName, date: today(), createdAt: now(),
+      items: txCart.map(i => ({ date: i.date, description: i.description, name: i.name, unitCost: i.unitCost, intRate: i.intRate, amount: lineAmt(i), invId: i.invId })),
+      subtotal, totalInterest, discount, tax, taxRate, scDiscount, grandTotal,
+      paymentMethod, status: grandTotal <= 0 ? 'paid' : 'pending'
+    };
+    const rollback = [];
+    try {
+      await dbAdd('transactions', transaction);
+      for (const item of txCart) {
+        if (item.invId) {
+          const inv = await dbGet('inventory', item.invId);
+          if (inv) {
+            const dec = getQty(item.name);
+            inv.stock = (inv.stock || 0) - dec;
+            await dbPut('inventory', inv);
+            rollback.push(() => dbGet('inventory', item.invId).then(i => { if (i) { i.stock = (i.stock || 0) + dec; return dbPut('inventory', i); } }));
+          }
+        }
+      }
+      if (clientId) {
+        const c = await dbGet('clients', clientId);
+        if (c) {
+          c.balance = (c.balance || 0) + grandTotal;
+          await dbPut('clients', c);
+          rollback.push(() => dbGet('clients', clientId).then(cc => { if (cc) { cc.balance = (cc.balance || 0) - grandTotal; return dbPut('clients', cc); } }));
+        }
+      }
+    } catch (err) {
+      console.error('Sale failed, rolling back:', err);
+      for (const fn of rollback.reverse()) await fn().catch(() => {});
+      toast('Sale failed - rolled back: ' + err.message, 'error');
+      return;
+    }
+    const settingsMap = {};
+    state.settings.forEach(s => settingsMap[s.key] = s.value);
+    const loyaltyRate = parseFloat(settingsMap['loyaltyRate']) || 0;
+    if (clientId && loyaltyRate > 0 && grandTotal > 0) {
+      const pts = Math.floor(grandTotal * (loyaltyRate / 100));
+      if (pts > 0) {
+        const existing = state.loyaltyPoints.find(l => l.clientId === clientId);
+        if (existing) { existing.points = (existing.points || 0) + pts; existing.updatedAt = now(); await dbPut('loyaltyPoints', existing); }
+        else { await dbAdd('loyaltyPoints', { clientId, clientName, points: pts, createdAt: now(), updatedAt: now() }); }
       }
     }
-  } catch (err) {
-    console.error('Sale failed, rolling back:', err);
-    for (const fn of rollback.reverse()) await fn().catch(() => {});
-    toast('Sale failed - rolled back: ' + err.message, 'error');
-    return;
-  }
-  const settingsMap = {};
-  state.settings.forEach(s => settingsMap[s.key] = s.value);
-  const loyaltyRate = parseFloat(settingsMap['loyaltyRate']) || 0;
-  if (clientId && loyaltyRate > 0 && grandTotal > 0) {
-    const pts = Math.floor(grandTotal * (loyaltyRate / 100));
-    if (pts > 0) {
-      const existing = state.loyaltyPoints.find(l => l.clientId === clientId);
-      if (existing) { existing.points = (existing.points || 0) + pts; existing.updatedAt = now(); await dbPut('loyaltyPoints', existing); }
-      else { await dbAdd('loyaltyPoints', { clientId, clientName, points: pts, createdAt: now(), updatedAt: now() }); }
-    }
+    toast(`Sale completed! Invoice: ${invoiceNo}`, 'success');
+    await logAudit('sale', `Sale ${invoiceNo} - ${peso(grandTotal)}`);
   }
   [state.transactions, state.inventory, state.loyaltyPoints] = await Promise.all([
     dbAll('transactions'), dbAll('inventory'), dbAll('loyaltyPoints')
   ]);
+  updateLowStockBadge();
   closeModal();
-  toast(`Sale completed! Invoice: ${invoiceNo}`, 'success');
-  await logAudit('sale', `Sale ${invoiceNo} - ${peso(grandTotal)}`);
   renderTxTable();
 }
 
@@ -235,7 +280,10 @@ function buildReceiptHTML(t) {
   const shopName = settingsMap['shopName'] || 'Shop Ledger PH';
   const shopAddr = settingsMap['shopAddress'] || '';
   const shopTin = settingsMap['shopTin'] || '';
+  const logo = settingsMap['receiptLogo'] || '';
+  const footerMsg = settingsMap['receiptFooter'] || 'Thank you for your patronage!';
   const lines = [];
+  if (logo) lines.push('[LOGO]');
   lines.push(' '.repeat(Math.max(0, Math.floor((32 - shopName.length) / 2))) + shopName);
   if (shopAddr) lines.push(' '.repeat(Math.max(0, Math.floor((32 - shopAddr.length) / 2))) + shopAddr);
   if (shopTin) lines.push('TIN: ' + shopTin);
@@ -263,7 +311,7 @@ function buildReceiptHTML(t) {
   lines.push('='.repeat(32));
   lines.push('Payment: ' + (t.paymentMethod || 'Cash'));
   lines.push('');
-  lines.push('Thank you for your patronage!');
+  lines.push(footerMsg);
   lines.push('');
   return lines.join('\n');
 }
@@ -289,14 +337,56 @@ function viewTransactionDetail(id) {
         ${t.tax > 0 ? `<div class="flex justify-between"><span>Tax (${t.taxRate||0}%)</span><span>${peso(t.tax)}</span></div>` : ''}
         <div class="flex justify-between font-bold text-lg border-t dark:border-gray-700 pt-1"><span>Total</span><span class="text-green-600">${peso(t.grandTotal)}</span></div>
       </div>
-      <div class="flex gap-2 mt-4"><button onclick="closeModal();printReceipt(${t.id})" class="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Print Receipt</button><button onclick="closeModal()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg">Close</button></div>
+      <div class="flex gap-2 mt-4">
+        <button onclick="closeModal();printReceipt(${t.id})" class="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Print Receipt</button>
+        ${t.status !== 'voided' ? `<button onclick="closeModal();editTransaction(${t.id})" class="px-3 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm">Edit</button>` : ''}
+        ${t.status !== 'voided' ? `<button onclick="closeModal();voidTransaction(${t.id})" class="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm">Void</button>` : ''}
+        <button onclick="closeModal()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg">Close</button>
+      </div>
+      ${t.status === 'voided' ? '<p class="text-center text-red-500 font-bold text-sm mt-2">⚠️ VOIDED</p>' : ''}
     </div>`);
+}
+
+async function voidTransaction(id) {
+  if (!await confirmModal('Void this sale? This will restore inventory and adjust client balance.')) return;
+  const t = await dbGet('transactions', id);
+  if (!t) { toast('Transaction not found', 'error'); return; }
+  if (t.status === 'voided') { toast('Already voided', 'warning'); return; }
+  for (const item of (t.items || [])) {
+    if (item.invId) {
+      const inv = await dbGet('inventory', item.invId);
+      if (inv) { inv.stock = (inv.stock || 0) + getQty(item.name); await dbPut('inventory', inv); }
+    }
+  }
+  if (t.clientId) {
+    const c = await dbGet('clients', t.clientId);
+    if (c) { c.balance = Math.max(0, (c.balance || 0) - (t.grandTotal || 0)); await dbPut('clients', c); }
+  }
+  t.status = 'voided'; t.voidedAt = now();
+  await dbPut('transactions', t);
+  [state.transactions, state.inventory, state.clients] = await Promise.all([dbAll('transactions'), dbAll('inventory'), dbAll('clients')]);
+  updateLowStockBadge();
+  toast(`Sale ${t.invoiceNo} voided`, 'success');
+  await logAudit('void', `Sale ${t.invoiceNo} voided - ${peso(t.grandTotal)}`);
+  renderTxTable();
+}
+
+function editTransaction(id) {
+  const t = state.transactions.find(x => x.id === id);
+  if (!t) { toast('Transaction not found', 'error'); return; }
+  txCart = (t.items || []).map(i => ({ date: i.date || today(), description: i.description || '', name: i.name || '1', unitCost: i.unitCost || 0, intRate: i.intRate || 0, invId: i.invId }));
+  txEditingId = id;
+  renderTMCart();
+  renderTransactionModal(t);
 }
 
 async function printReceipt(id) {
   const t = await dbGet('transactions', id);
   if (!t) { toast('Transaction not found', 'error'); return; }
   const receiptText = buildReceiptHTML(t);
+  const settingsMap = {};
+  state.settings.forEach(s => settingsMap[s.key] = s.value);
+  const logo = settingsMap['receiptLogo'] || '';
   const win = window.open('', '_blank', 'width=380,height=600');
   win.document.write(`<html><head><style>
 body{margin:0;padding:20px;font-family:'Courier New',monospace;font-size:12px;background:#f0f0f0}
@@ -316,7 +406,7 @@ pre{white-space:pre;margin:0 auto;width:fit-content}
   <span style="width:1px;height:24px;background:#d1d5db;display:inline-block"></span>
   <button class="print-btn" onclick="window.print()">🖨 Print</button>
 </div>
-<div class="preview"><pre>${escapeHtml(receiptText)}</pre></div>
+<div class="preview"><pre>${escapeHtml(receiptText)}</pre></div>${logo ? `<div style="display:none" id="logoData">${logo}</div>` : ''}
 <script>
 function setSize(sz){document.querySelectorAll('.toolbar button[id^="sz-"]').forEach(b=>b.classList.remove('active'));
 document.getElementById('sz-'+sz.toLowerCase()).classList.add('active');

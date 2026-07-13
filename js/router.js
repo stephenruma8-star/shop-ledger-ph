@@ -45,6 +45,7 @@ async function loadAll() {
   stores.forEach((s, i) => { state[s] = results[i]; });
   const shop = state.settings.find(x => x.key === 'shopName');
   if (shop) document.getElementById('shop-name').textContent = shop.value;
+  updateLowStockBadge();
 }
 
 function render() {
@@ -53,6 +54,7 @@ function render() {
 
 document.addEventListener('keydown', (e) => {
   const key = e.key;
+  if (key === 'Escape') { closeModal(); return; }
   if (key === 'F1') { e.preventDefault(); navigate('dashboard'); }
   else if (key === 'F2') { e.preventDefault(); navigate('transactions'); }
   else if (key === 'F3') { e.preventDefault(); navigate('payments'); }

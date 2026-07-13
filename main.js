@@ -144,6 +144,34 @@ function startLANServer() {
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
+  expressApp.post('/api/sales', async (req, res) => {
+    try {
+      if (!mainWindow || mainWindow.isDestroyed()) return res.status(503).json({ error: 'Window not ready' });
+      const { clientId, items, paymentMethod, discount, taxRate } = req.body;
+      if (!items || !items.length) return res.status(400).json({ error: 'No items' });
+      const exec = (js) => mainWindow.webContents.executeJavaScript(js);
+      const invNos = JSON.parse(await exec(`JSON.stringify(state.transactions.filter(t=>t.invoiceNo?.startsWith('INV-')).map(t=>parseInt(t.invoiceNo.replace('INV-',''))||0))`));
+      const nextNo = invNos.length > 0 ? Math.max(...invNos) + 1 : 1;
+      const invoiceNo = 'INV-' + String(nextNo).padStart(5,'0');
+      const subtotal = items.reduce((s, i) => s + ((i.qty||1) * (i.unitCost || 0)), 0);
+      const totalInterest = items.reduce((s, i) => s + ((i.qty||1) * (i.unitCost || 0)) * ((i.intRate||0)/100), 0);
+      const d = parseFloat(discount) || 0;
+      const tr = parseFloat(taxRate) || 0;
+      const taxable = subtotal + totalInterest - d;
+      const tax = taxable > 0 ? taxable * (tr / 100) : 0;
+      const grandTotal = Math.max(0, taxable + tax);
+      const clientData = clientId ? JSON.parse(await exec(`JSON.stringify(await dbGet('clients', ${JSON.stringify(clientId)}))`)) : null;
+      const clientName = clientData ? clientData.name : 'Walk-in';
+      const txnData = JSON.stringify({ invoiceNo, clientId: clientId || null, clientName, date: new Date().toISOString().split('T')[0], createdAt: new Date().toISOString(), items: items.map(i => ({ ...i, amount: ((i.qty||1) * (i.unitCost || 0)) + ((i.qty||1) * (i.unitCost || 0)) * ((i.intRate||0)/100) })), subtotal, totalInterest, discount: d, tax, taxRate: tr, scDiscount: 0, grandTotal, paymentMethod: paymentMethod || 'Cash', status: grandTotal <= 0 ? 'paid' : 'pending' });
+      await exec(`dbAdd('transactions', ${txnData})`);
+      for (const item of items) {
+        if (item.invId) await exec(`(async()=>{const i=await dbGet('inventory',${item.invId});if(i){i.stock=(i.stock||0)-${parseInt(item.qty)||1};await dbPut('inventory',i);}})()`);
+      }
+      if (clientId) await exec(`(async()=>{const c=await dbGet('clients',${JSON.stringify(clientId)});if(c){c.balance=(c.balance||0)+${grandTotal};await dbPut('clients',c);}})()`);
+      res.json({ success: true, invoiceNo });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
   expressApp.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
   try {
