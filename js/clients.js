@@ -194,7 +194,6 @@ async function printClientInfo(id) {
   state.settings.forEach(s => settingsMap[s.key] = s.value);
   const shopName = settingsMap['shopName'] || 'Shop Ledger PH';
   const shopAddr = settingsMap['shopAddress'] || '';
-  const shopTin = settingsMap['shopTin'] || '';
   const shopContact = settingsMap['shopContact'] || '';
   const headerText = settingsMap['receiptHeaderText'] || '';
   const logo = settingsMap['receiptLogo'] || '';
@@ -213,7 +212,6 @@ async function printClientInfo(id) {
   html += `<h2 style="margin:0;font-size:20px">${esc(shopName)}</h2>`;
   if (shopAddr) html += `<p style="margin:2px 0">${esc(shopAddr)}</p>`;
   if (shopContact) html += `<p style="margin:2px 0">Contact: ${esc(shopContact)}</p>`;
-  if (shopTin) html += `<p style="margin:2px 0">TIN: ${esc(shopTin)}</p>`;
   if (headerText) html += headerText.split('\n').filter(Boolean).map(l => `<p style="margin:2px 0">${esc(l)}</p>`).join('');
   html += `</div>`;
 

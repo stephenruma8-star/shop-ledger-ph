@@ -275,7 +275,6 @@ function buildReceiptHTML(t) {
   state.settings.forEach(s => settingsMap[s.key] = s.value);
   const shopName = settingsMap['shopName'] || 'Shop Ledger PH';
   const shopAddr = settingsMap['shopAddress'] || '';
-  const shopTin = settingsMap['shopTin'] || '';
   const shopContact = settingsMap['shopContact'] || '';
   const headerText = settingsMap['receiptHeaderText'] || '';
   const logo = settingsMap['receiptLogo'] || '';
@@ -285,7 +284,6 @@ function buildReceiptHTML(t) {
   lines.push(' '.repeat(Math.max(0, Math.floor((32 - shopName.length) / 2))) + shopName);
   if (shopAddr) lines.push(' '.repeat(Math.max(0, Math.floor((32 - shopAddr.length) / 2))) + shopAddr);
   if (shopContact) lines.push('Contact: ' + shopContact);
-  if (shopTin) lines.push('TIN: ' + shopTin);
   if (headerText) { headerText.split('\n').filter(Boolean).forEach(l => lines.push(l)); }
   lines.push('='.repeat(32));
   lines.push(' '.repeat(Math.max(0, Math.floor((32 - 14) / 2))) + 'OFFICIAL RECEIPT');
