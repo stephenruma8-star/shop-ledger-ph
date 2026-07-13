@@ -42,7 +42,11 @@
       ]
     },
     "publish": [
-      { "provider": "github", "owner": "stephenruma8-star", "repo": "shop-ledger-ph" }
+      {
+        "provider": "github",
+        "owner": "stephenruma8-star",
+        "repo": "shop-ledger-ph"
+      }
     ],
     "nsis": {
       "oneClick": true,
