@@ -206,14 +206,20 @@ async function printClientInfo(id) {
 
   let html = '';
 
-  // Header
-  html += `<div style="text-align:center;margin-bottom:20px">`;
+  // Header — shop info centered
+  html += `<div style="text-align:center;margin-bottom:12px">`;
   if (logo) html += `<img src="${esc(logo)}" style="max-height:60px;margin-bottom:8px" />`;
   html += `<h2 style="margin:0;font-size:20px">${esc(shopName)}</h2>`;
   if (shopAddr) html += `<p style="margin:2px 0">${esc(shopAddr)}</p>`;
   if (shopContact) html += `<p style="margin:2px 0">Contact: ${esc(shopContact)}</p>`;
   if (headerText) html += headerText.split('\n').filter(Boolean).map(l => `<p style="margin:2px 0">${esc(l)}</p>`).join('');
-  html += `<h2 style="margin:8px 0 0;font-size:18px">${esc(c.name)}</h2>`;
+  html += `</div>`;
+
+  // Client info — left-aligned
+  html += `<div style="margin-bottom:16px">`;
+  html += `<h2 style="margin:0;font-size:18px">${esc(c.name)}</h2>`;
+  if (c.address) html += `<p style="margin:2px 0">${esc(c.address)}</p>`;
+  if (c.phone) html += `<p style="margin:2px 0">${esc(c.phone)}</p>`;
   html += `</div>`;
 
   // Transactions with items
