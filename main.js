@@ -1,3 +1,20 @@
+const { app, BrowserWindow, ipcMain, dialog, Menu, Tray, nativeImage, crashReporter } = require('electron');
+
+// Single-instance lock — must run before anything else
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) { app.exit(0); return; }
+const lockPath = require('path').join(require('os').tmpdir(), 'shop-ledger-ph.lock');
+let lockFd = null;
+try {
+  lockFd = require('fs').openSync(lockPath, 'wx');
+  require('fs').writeFileSync(lockFd, String(process.pid));
+} catch (e) { app.exit(0); return; }
+process.on('exit', () => { if (lockFd !== null) { try { require('fs').closeSync(lockFd); } catch(e){} try { require('fs').unlinkSync(lockPath); } catch(e){} } });
+process.on('SIGTERM', () => process.exit(0));
+process.on('SIGINT', () => process.exit(0));
+
+app.on('second-instance', () => { if (mainWindow) { if (mainWindow.isMinimized()) mainWindow.restore(); mainWindow.show(); mainWindow.focus(); } });
+
 const _log = function(m) {
   try { require('fs').appendFileSync(require('path').join(require('os').tmpdir(),'slp-crash.log'), new Date().toISOString()+' '+m+'\n'); }catch(e){}
 };
@@ -7,8 +24,6 @@ process.emit = function(ev, ...a) {
   return origEmit.apply(this, [ev, ...a]);
 };
 process.on('unhandledRejection', function(e) { _log('UNHANDLED: '+(e?.message||e)); });
-
-const { app, BrowserWindow, ipcMain, dialog, Menu, Tray, nativeImage, crashReporter } = require('electron');
 try { crashReporter.start({ submitURL: '', uploadToServer: false, ignoreSystemCrashHandler: true }); } catch(e) {}
 try { dialog.showErrorBox = function(){}; } catch(e) {}
 const path = require('path');
@@ -353,10 +368,6 @@ function buildMenu() {
     { label: 'View', submenu: [{ role: 'reload' }, { role: 'toggleDevTools' }, { role: 'togglefullscreen' }] }
   ]);
 }
-
-const gotLock = app.requestSingleInstanceLock();
-if (!gotLock) { console.log('Another instance running, quitting.'); app.exit(0); return; }
-app.on('second-instance', () => { if (mainWindow) { if (mainWindow.isMinimized()) mainWindow.restore(); mainWindow.show(); mainWindow.focus(); } });
 
 app.whenReady().then(() => {
   try {

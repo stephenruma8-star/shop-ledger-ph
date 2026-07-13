@@ -1,6 +1,6 @@
 {
   "name": "shop-ledger-ph",
-  "version": "3.3.0",
+  "version": "3.3.1",
   "description": "Shop Ledger PH - Complete POS & Inventory System for Philippine Sari-Sari Stores",
   "repository": "stephenruma8-star/shop-ledger-ph",
   "main": "main.js",
