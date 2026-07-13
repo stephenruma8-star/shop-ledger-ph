@@ -336,6 +336,7 @@ async function saveClientPayment(id) {
   state.payments = await dbAll('payments');
   state.clients = await dbAll('clients');
   closeModal();
+  renderClientGrid();
   playSound('payment');
   if (!wasFullyPaid && c.balance <= 0) confetti();
   viewClientHistory(id);
@@ -355,6 +356,7 @@ async function deleteClientSale(txnId, clientId) {
   state.transactions = await dbAll('transactions');
   state.clients = await dbAll('clients');
   closeModal();
+  renderClientGrid();
   viewClientHistory(clientId);
   toast('Sale deleted, balance adjusted');
 }
