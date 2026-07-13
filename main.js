@@ -8,7 +8,21 @@ let lockFd = null;
 try {
   lockFd = require('fs').openSync(lockPath, 'wx');
   require('fs').writeFileSync(lockFd, String(process.pid));
-} catch (e) { app.exit(0); return; }
+} catch (e) {
+  // Lock file exists — check if the PID inside is still alive
+  try {
+    const oldPid = parseInt(require('fs').readFileSync(lockPath, 'utf8').trim(), 10);
+    process.kill(oldPid, 0);
+    app.exit(0); return; // PID still running
+  } catch (e2) {
+    // PID not running — stale lock, remove and retry
+    try { require('fs').unlinkSync(lockPath); } catch(e3) {}
+    try {
+      lockFd = require('fs').openSync(lockPath, 'wx');
+      require('fs').writeFileSync(lockFd, String(process.pid));
+    } catch (e4) { app.exit(0); return; }
+  }
+}
 process.on('exit', () => { if (lockFd !== null) { try { require('fs').closeSync(lockFd); } catch(e){} try { require('fs').unlinkSync(lockPath); } catch(e){} } });
 process.on('SIGTERM', () => process.exit(0));
 process.on('SIGINT', () => process.exit(0));
