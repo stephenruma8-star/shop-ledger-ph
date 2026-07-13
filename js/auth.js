@@ -111,20 +111,25 @@ async function doChangePassword() {
 }
 
 async function forgotPassword() {
-  const users = await dbAll('users');
-  modal(`
-    <div class="p-6">
-      <h2 class="text-xl font-bold mb-4">Forgot Password</h2>
-      <div class="space-y-3">
-        <div><label class="text-xs text-gray-500 block mb-1">Username</label>
-          <input id="fp-user" type="text" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
-        <div id="fp-result" class="hidden"></div>
-        <div class="flex gap-2">
-          <button onclick="recoverPassword()" class="flex-1 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700">Recover</button>
-          <button onclick="closeModal()" class="px-4 py-2 border dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">Cancel</button>
-        </div>
-      </div>
-    </div>`);
+  document.getElementById('login-form').classList.add('hidden');
+  const rf = document.getElementById('recovery-form');
+  rf.innerHTML = `
+    <div class="space-y-3">
+      <div><label class="text-xs text-gray-500 block mb-1">Username</label>
+        <input id="fp-user" type="text" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" onkeydown="if(event.key==='Enter')recoverPassword()" /></div>
+      <div id="fp-result" class="hidden"></div>
+      <button onclick="recoverPassword()" class="w-full py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700">Recover</button>
+      <div class="text-center"><button onclick="cancelRecovery()" class="text-xs text-gray-500 hover:text-gray-700">← Back to Login</button></div>
+    </div>`;
+  rf.classList.remove('hidden');
+}
+
+function cancelRecovery() {
+  document.getElementById('recovery-form').classList.add('hidden');
+  document.getElementById('login-form').classList.remove('hidden');
+  document.getElementById('login-user').value = '';
+  document.getElementById('login-pass').value = '';
+  document.getElementById('login-user').focus();
 }
 
 async function recoverPassword() {
@@ -139,8 +144,8 @@ async function recoverPassword() {
   result.innerHTML = `
     <div class="text-center">User <strong>${escapeHtml(user.name || user.username)}</strong> found.</div>
     <div class="mt-3 space-y-2">
-      <div><label class="text-xs text-gray-500 block">New Password</label><input id="fp-newpass" type="password" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" /></div>
-      <div><label class="text-xs text-gray-500 block">Confirm Password</label><input id="fp-newpass2" type="password" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" /></div>
+      <div><label class="text-xs text-gray-500 block">New Password</label><input id="fp-newpass" type="password" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" onkeydown="if(event.key==='Enter')document.getElementById('fp-newpass2').focus()" /></div>
+      <div><label class="text-xs text-gray-500 block">Confirm Password</label><input id="fp-newpass2" type="password" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" onkeydown="if(event.key==='Enter')resetPasswordFromRecover(${user.id})" /></div>
       <button onclick="resetPasswordFromRecover(${user.id})" class="w-full py-2 bg-amber-600 text-white rounded-lg font-semibold hover:bg-amber-700 text-sm">Reset Password</button>
     </div>`;
   result.classList.remove('hidden');
@@ -155,7 +160,8 @@ async function resetPasswordFromRecover(id) {
   if (!user) { toast('User not found', 'error'); return; }
   user.password = await hashPassword(p1);
   await dbPut('users', user);
-  toast('Password reset. You can now sign in.', 'success');
-  const result = document.getElementById('fp-result');
-  if (result) { result.className = 'text-green-500 text-sm'; result.textContent = 'Password reset successfully! You can now sign in.'; }
+  toast('Password reset! You can now sign in.', 'success');
+  cancelRecovery();
+  document.getElementById('login-error').textContent = 'Password reset successfully. Sign in with your new password.';
+  document.getElementById('login-error').className = 'text-green-500 text-sm text-center';
 }
