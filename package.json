@@ -37,6 +37,7 @@
     "icon": "assets/icon.png",
     "win": {
       "icon": "assets/icon.ico",
+      "requestedExecutionLevel": "requireAdministrator",
       "target": [
         "nsis",
         "portable"
