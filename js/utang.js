@@ -27,6 +27,7 @@ async function viewUtang(root) {
           <div class="flex gap-2">
             <input id="utangSearch" placeholder="Search..." class="px-3 py-1.5 text-sm border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" oninput="debouncedRenderUtangTable()" />
             <button onclick="bulkSMSOverdue()" class="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 whitespace-nowrap">Bulk SMS</button>
+            <button onclick="printBlankDebtForm()" class="px-3 py-1.5 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 whitespace-nowrap">🖨 Blank Form</button>
           </div>
         </div>
         <div id="utangTable" class="overflow-auto"></div>
@@ -132,4 +133,73 @@ async function doBulkSMS() {
   closeModal();
   if (sent > 0) { toast(`SMS sent to ${sent} client(s)`); await logAudit('bulk-sms', `Bulk SMS sent to ${sent} clients`); }
   if (failed > 0) toast(`${failed} failed`, 'warning');
+}
+
+function printBlankDebtForm() {
+  const shopName = (state.settings.find(x => x.key === 'shopName') || {}).value || 'Shop Ledger PH';
+  const shopAddr = (state.settings.find(x => x.key === 'shopAddress') || {}).value || '';
+  const shopContact = (state.settings.find(x => x.key === 'shopContact') || {}).value || '';
+  const todayStr = today();
+  const rows = Array.from({length: 25}, (_, i) => `
+    <tr>
+      <td class="num">${i + 1}</td>
+      <td class="date"></td>
+      <td class="name"></td>
+      <td class="desc"></td>
+      <td class="amt"></td>
+      <td class="pay"></td>
+      <td class="bal"></td>
+      <td class="rem"></td>
+      <td class="sig"></td>
+    </tr>`).join('');
+  const w = window.open('', '_blank', 'width=850,height=700');
+  w.document.write(`
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Blank Debt Record Form</title>
+<style>
+  @page { margin: 15mm 10mm }
+  * { box-sizing: border-box; margin: 0; padding: 0 }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; color: #000; padding: 10px }
+  .header { text-align: center; margin-bottom: 12px; border-bottom: 2px solid #000; padding-bottom: 8px }
+  .header h1 { font-size: 18px; margin-bottom: 2px }
+  .header p { font-size: 11px; color: #333 }
+  .title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px }
+  .title-row h2 { font-size: 14px }
+  table { width: 100%; border-collapse: collapse }
+  th { background: #eee; border: 1px solid #000; padding: 5px 3px; font-size: 10px; text-align: center; font-weight: 600 }
+  td { border: 1px solid #000; padding: 4px 3px; height: 22px }
+  td.num { width: 22px; text-align: center; font-size: 10px; color: #666 }
+  td.date { width: 65px }
+  td.name { width: 90px }
+  td.desc { width: 120px }
+  td.amt, td.pay, td.bal { width: 55px; text-align: right }
+  td.rem { width: 80px }
+  td.sig { width: 70px }
+  .footer { margin-top: 10px; font-size: 10px; display: flex; justify-content: space-between }
+  .footer .total { font-weight: 600 }
+  .print-btn { display: block; margin: 10px auto; padding: 8px 24px; font-size: 14px; cursor: pointer }
+  @media print { .print-btn { display: none } body { padding: 0 } }
+</style></head><body>
+  <div class="header">
+    <h1>${escapeHtml(shopName)}</h1>
+    <p>${escapeHtml(shopAddr)}${shopContact ? ' | Tel: ' + escapeHtml(shopContact) : ''}</p>
+  </div>
+  <div class="title-row">
+    <h2>Debt Record Form</h2>
+    <span>Date: _______________</span>
+  </div>
+  <table>
+    <thead><tr>
+      <th>#</th><th>Date</th><th>Client Name</th><th>Item/Description</th>
+      <th>Amount (₱)</th><th>Payment (₱)</th><th>Balance (₱)</th><th>Remarks</th><th>Signature</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="footer">
+    <span>Prepared by: _________________</span>
+    <span class="total">Total Amount: ₱_________</span>
+    <span>Date: ${todayStr}</span>
+  </div>
+  <button class="print-btn" onclick="window.print()">🖨 Print Form</button>
+</body></html>`);
+  w.document.close();
 }
