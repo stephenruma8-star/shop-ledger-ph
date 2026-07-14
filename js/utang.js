@@ -136,6 +136,17 @@ async function doBulkSMS() {
 }
 
 function printBlankDebtForm() {
+  modal(`
+    <div class="p-6 text-center">
+      <h3 class="text-lg font-bold mb-4">Select Paper Orientation</h3>
+      <div class="flex gap-3 justify-center">
+        <button onclick="closeModal();openDebtForm('portrait')" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">📄 Portrait</button>
+        <button onclick="closeModal();openDebtForm('landscape')" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">📄 Landscape</button>
+      </div>
+    </div>`);
+}
+
+function openDebtForm(orientation) {
   const shopName = (state.settings.find(x => x.key === 'shopName') || {}).value || 'Shop Ledger PH';
   const shopAddr = (state.settings.find(x => x.key === 'shopAddress') || {}).value || '';
   const shopContact = (state.settings.find(x => x.key === 'shopContact') || {}).value || '';
@@ -152,13 +163,15 @@ function printBlankDebtForm() {
       <td class="rem"></td>
       <td class="sig"></td>
     </tr>`).join('');
+  const isLandscape = orientation === 'landscape';
+  const pageSize = isLandscape ? 'landscape' : 'portrait';
   const w = window.open('', '_blank', 'width=850,height=700');
   w.document.write(`
 <!DOCTYPE html><html><head><meta charset="UTF-8"><title>Blank Debt Record Form</title>
 <style>
-  @page { margin: 15mm 10mm }
+  @page { size: ${pageSize}; margin: ${isLandscape ? '10mm 12mm' : '15mm 10mm'} }
   * { box-sizing: border-box; margin: 0; padding: 0 }
-  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; color: #000; padding: 10px }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: ${isLandscape ? '12px' : '11px'}; color: #000; padding: 10px }
   .header { text-align: center; margin-bottom: 12px; border-bottom: 2px solid #000; padding-bottom: 8px }
   .header h1 { font-size: 18px; margin-bottom: 2px }
   .header p { font-size: 11px; color: #333 }
@@ -166,14 +179,14 @@ function printBlankDebtForm() {
   .title-row h2 { font-size: 14px }
   table { width: 100%; border-collapse: collapse }
   th { background: #eee; border: 1px solid #000; padding: 5px 3px; font-size: 10px; text-align: center; font-weight: 600 }
-  td { border: 1px solid #000; padding: 4px 3px; height: 22px }
+  td { border: 1px solid #000; padding: 4px 3px; height: ${isLandscape ? '26px' : '22px'} }
   td.num { width: 22px; text-align: center; font-size: 10px; color: #666 }
-  td.date { width: 65px }
-  td.name { width: 90px }
-  td.desc { width: 120px }
-  td.amt, td.pay, td.bal { width: 55px; text-align: right }
-  td.rem { width: 80px }
-  td.sig { width: 70px }
+  td.date { width: ${isLandscape ? '75px' : '65px'} }
+  td.name { width: ${isLandscape ? '110px' : '90px'} }
+  td.desc { width: ${isLandscape ? '150px' : '120px'} }
+  td.amt, td.pay, td.bal { width: ${isLandscape ? '65px' : '55px'}; text-align: right }
+  td.rem { width: ${isLandscape ? '100px' : '80px'} }
+  td.sig { width: ${isLandscape ? '85px' : '70px'} }
   .footer { margin-top: 10px; font-size: 10px; display: flex; justify-content: space-between }
   .footer .total { font-weight: 600 }
   .print-btn { display: block; margin: 10px auto; padding: 8px 24px; font-size: 14px; cursor: pointer }
