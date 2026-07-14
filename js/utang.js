@@ -154,14 +154,14 @@ function openDebtForm(orientation) {
   const rows = Array.from({length: 25}, (_, i) => `
     <tr>
       <td class="num">${i + 1}</td>
-      <td class="date"></td>
-      <td class="name"></td>
-      <td class="desc"></td>
-      <td class="amt"></td>
-      <td class="pay"></td>
-      <td class="bal"></td>
-      <td class="rem"></td>
-      <td class="sig"></td>
+      <td class="date"><input type="text" class="ci" placeholder="" /></td>
+      <td class="name"><input type="text" class="ci" placeholder="" /></td>
+      <td class="desc"><input type="text" class="ci" placeholder="" /></td>
+      <td class="amt"><input type="text" class="ci" placeholder="" /></td>
+      <td class="pay"><input type="text" class="ci" placeholder="" /></td>
+      <td class="bal"><input type="text" class="ci" placeholder="" /></td>
+      <td class="rem"><input type="text" class="ci" placeholder="" /></td>
+      <td class="sig"><input type="text" class="ci" placeholder="" /></td>
     </tr>`).join('');
   const isLandscape = orientation === 'landscape';
   const pageSize = isLandscape ? 'landscape' : 'portrait';
@@ -179,14 +179,17 @@ function openDebtForm(orientation) {
   .title-row h2 { font-size: 14px }
   table { width: 100%; border-collapse: collapse }
   th { background: #eee; border: 1px solid #000; padding: 5px 3px; font-size: 10px; text-align: center; font-weight: 600 }
-  td { border: 1px solid #000; padding: 4px 3px; height: ${isLandscape ? '26px' : '22px'} }
-  td.num { width: 22px; text-align: center; font-size: 10px; color: #666 }
+  td { border: 1px solid #000; padding: 0; height: ${isLandscape ? '26px' : '22px'} }
+  td.num { width: 22px; text-align: center; font-size: 10px; color: #666; padding: 4px 3px }
   td.date { width: ${isLandscape ? '75px' : '65px'} }
   td.name { width: ${isLandscape ? '110px' : '90px'} }
   td.desc { width: ${isLandscape ? '150px' : '120px'} }
   td.amt, td.pay, td.bal { width: ${isLandscape ? '65px' : '55px'}; text-align: right }
   td.rem { width: ${isLandscape ? '100px' : '80px'} }
   td.sig { width: ${isLandscape ? '85px' : '70px'} }
+  .ci { width: 100%; border: none; background: transparent; font: inherit; color: inherit; padding: 4px 3px; margin: 0; outline: none; box-sizing: border-box; text-align: inherit }
+  .ci:focus { background: #e8f4ff; box-shadow: inset 0 0 0 1px #3b82f6 }
+  @media print { .ci { border: none; background: transparent; padding: 4px 3px } .ci:focus { box-shadow: none } }
   .footer { margin-top: 10px; font-size: 10px; display: flex; justify-content: space-between }
   .footer .total { font-weight: 600 }
   .print-btn { display: block; margin: 10px auto; padding: 8px 24px; font-size: 14px; cursor: pointer }
