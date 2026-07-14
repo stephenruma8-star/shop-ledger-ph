@@ -155,10 +155,10 @@ function openDebtForm(orientation) {
     <tr>
       <td class="num">${i + 1}</td>
       <td class="date"><input type="text" class="ci" placeholder="" /></td>
-      <td class="name"><input type="text" class="ci" placeholder="" /></td>
       <td class="desc"><input type="text" class="ci" placeholder="" /></td>
       <td class="amt"><input type="text" class="ci" placeholder="" /></td>
       <td class="pay"><input type="text" class="ci" placeholder="" /></td>
+      <td class="int"><input type="text" class="ci" placeholder="" /></td>
       <td class="bal"><input type="text" class="ci" placeholder="" /></td>
       <td class="rem"><input type="text" class="ci" placeholder="" /></td>
       <td class="sig"><input type="text" class="ci" placeholder="" /></td>
@@ -182,11 +182,12 @@ function openDebtForm(orientation) {
   td { border: 1px solid #000; padding: 0; height: ${isLandscape ? '26px' : '22px'} }
   td.num { width: 22px; text-align: center; font-size: 10px; color: #666; padding: 4px 3px }
   td.date { width: ${isLandscape ? '75px' : '65px'} }
-  td.name { width: ${isLandscape ? '110px' : '90px'} }
-  td.desc { width: ${isLandscape ? '150px' : '120px'} }
-  td.amt, td.pay, td.bal { width: ${isLandscape ? '65px' : '55px'}; text-align: right }
+  td.desc { width: ${isLandscape ? '160px' : '130px'} }
+  td.amt, td.pay, td.int, td.bal { width: ${isLandscape ? '60px' : '50px'}; text-align: right }
   td.rem { width: ${isLandscape ? '100px' : '80px'} }
   td.sig { width: ${isLandscape ? '85px' : '70px'} }
+  .client-row { margin-bottom: 6px; font-size: 12px }
+  .client-row .ci-client { width: 250px; border-bottom: 1px solid #999; padding: 2px 4px; font-size: 12px }
   .ci { width: 100%; border: none; background: transparent; font: inherit; color: inherit; padding: 4px 3px; margin: 0; outline: none; box-sizing: border-box; text-align: inherit }
   .ci:focus { background: #e8f4ff; box-shadow: inset 0 0 0 1px #3b82f6 }
   @media print { .ci { border: none; background: transparent; padding: 4px 3px } .ci:focus { box-shadow: none } }
@@ -203,10 +204,13 @@ function openDebtForm(orientation) {
     <h2>Debt Record Form</h2>
     <span>Date: _______________</span>
   </div>
+  <div class="client-row">
+    <span>Client Name: <input type="text" class="ci ci-client" placeholder="" /></span>
+  </div>
   <table>
     <thead><tr>
-      <th>#</th><th>Date</th><th>Client Name</th><th>Item/Description</th>
-      <th>Amount (₱)</th><th>Payment (₱)</th><th>Balance (₱)</th><th>Remarks</th><th>Signature</th>
+      <th>#</th><th>Date</th><th>Item/Description</th>
+      <th>Amount (₱)</th><th>Payment (₱)</th><th>Interest (%)</th><th>Balance (₱)</th><th>Remarks</th><th>Signature</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>
