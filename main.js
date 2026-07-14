@@ -368,6 +368,23 @@ ipcMain.handle('get-logo', async () => {
   return null;
 });
 
+ipcMain.handle('select-folder', async () => {
+  try {
+    const result = await dialog.showOpenDialog(mainWindow, { properties: ['openDirectory'] });
+    if (result.canceled) return { success: false };
+    return { success: true, path: result.filePaths[0] };
+  } catch (err) { return { success: false, error: err.message }; }
+});
+
+ipcMain.handle('save-encrypted-backup-to-path', async (event, { data, password, filename, folder }) => {
+  try {
+    const filePath = path.join(folder, filename);
+    const encrypted = encryptData(JSON.stringify(data), password);
+    fs.writeFileSync(filePath, JSON.stringify(encrypted));
+    return { success: true, path: filePath };
+  } catch (err) { return { success: false, error: err.message }; }
+});
+
 function buildMenu() {
   return Menu.buildFromTemplate([
     { label: 'File', submenu: [

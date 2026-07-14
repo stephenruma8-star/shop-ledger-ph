@@ -54,6 +54,18 @@ async function viewSettings(root) {
         <p class="text-xs text-gray-400 mt-2">No API key? Use <strong>Ollama</strong> — free local AI. <a href="#" onclick="require('electron').shell.openExternal('https://ollama.ai/download')" class="text-blue-500 hover:underline">Download Ollama</a>, run <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">ollama pull llama3.2</code>, then select "Ollama" above.</p>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
+        <h3 class="font-bold text-lg mb-4">☁️ Cloud Backup</h3>
+        <div class="space-y-3">
+          <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="set-cloudBackupEnabled" ${settingsMap['cloudBackupEnabled'] === 'true' ? 'checked' : ''} /> Enable auto cloud backup</label>
+          <div><label class="text-xs text-gray-500 block">Backup Folder <span class="text-gray-400">(OneDrive / Google Drive / Dropbox)</span></label>
+            <div class="flex gap-2"><input id="set-cloudBackupFolder" value="${escapeHtml(settingsMap['cloudBackupFolder'] || '')}" class="flex-1 px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" placeholder="C:\Users\...\OneDrive\Shop Backups" /><button onclick="selectCloudFolder()" class="px-3 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg text-sm hover:bg-gray-300 dark:hover:bg-gray-600">Browse</button></div>
+          </div>
+          <div><label class="text-xs text-gray-500 block">Encryption Password</label><input id="set-cloudBackupPassword" type="password" value="${escapeHtml(settingsMap['cloudBackupPassword'] || '')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" placeholder="Password to protect your backup" /></div>
+          <div><label class="text-xs text-gray-500 block">Backup Frequency</label><select id="set-cloudBackupInterval" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"><option value="daily" ${(settingsMap['cloudBackupInterval']||'daily') === 'daily' ? 'selected' : ''}>Daily</option><option value="weekly" ${settingsMap['cloudBackupInterval'] === 'weekly' ? 'selected' : ''}>Weekly</option><option value="monthly" ${settingsMap['cloudBackupInterval'] === 'monthly' ? 'selected' : ''}>Monthly</option></select></div>
+          <p class="text-xs text-gray-400">Last backup: ${settingsMap['lastCloudBackup'] || 'Never'}</p>
+        </div>
+      </div>
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
         <h3 class="font-bold text-lg mb-4">📋 Quick Items</h3>
         <div class="space-y-2">
           ${state.quickItems.map(q => `<div class="flex items-center gap-2 text-sm"><input class="flex-1 px-2 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800" value="${escapeHtml(q.name)}" data-qi-id="${q.id}" data-field="name" /><input class="w-24 px-2 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800" type="number" step="0.01" value="${q.price}" data-qi-id="${q.id}" data-field="price" /><button onclick="deleteQuickItem(${q.id})" class="text-red-500 text-xs">Del</button></div>`).join('')}
@@ -72,7 +84,7 @@ async function viewSettings(root) {
 }
 
 async function saveSettings() {
-  const keys = ['shopName','shopContact','shopAddress','dailyInterestRate','smsApiKey','backupEmail','aiApiKey','aiModel','receiptFooter','receiptHeaderText'];
+  const keys = ['shopName','shopContact','shopAddress','dailyInterestRate','cloudBackupFolder','cloudBackupPassword','cloudBackupInterval','smsApiKey','backupEmail','aiApiKey','aiModel','receiptFooter','receiptHeaderText'];
   for (const key of keys) {
     const el = document.getElementById(`set-${key}`);
     if (el) {
@@ -80,6 +92,13 @@ async function saveSettings() {
       if (existing) { existing.value = el.value; await dbPut('settings', existing); }
       else { await dbAdd('settings', { key, value: el.value }); }
     }
+  }
+  const cb = document.getElementById('set-cloudBackupEnabled');
+  if (cb) {
+    const val = cb.checked ? 'true' : 'false';
+    const existing = state.settings.find(s => s.key === 'cloudBackupEnabled');
+    if (existing) { existing.value = val; await dbPut('settings', existing); }
+    else { await dbAdd('settings', { key: 'cloudBackupEnabled', value: val }); }
   }
   const smtp = { host: document.getElementById('set-smtp-host')?.value || '', port: document.getElementById('set-smtp-port')?.value || '587', user: document.getElementById('set-smtp-user')?.value || '', pass: document.getElementById('set-smtp-pass')?.value || '', fromName: document.getElementById('set-smtp-fromName')?.value || '' };
   const smtpExisting = state.settings.find(s => s.key === 'smtpConfig');
@@ -142,6 +161,14 @@ async function removeReceiptLogo() {
   const preview = document.getElementById('logo-preview');
   if (preview) preview.innerHTML = '<span class="text-2xl text-gray-300">📷</span>';
   toast('Logo removed');
+}
+
+async function selectCloudFolder() {
+  if (!window.electronAPI) { toast('Folder selection only in desktop app', 'warning'); return; }
+  const result = await window.electronAPI.selectFolder();
+  if (result.success) {
+    document.getElementById('set-cloudBackupFolder').value = result.path;
+  }
 }
 
 function openUserModal(id) {

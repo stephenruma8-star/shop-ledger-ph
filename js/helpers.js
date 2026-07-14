@@ -206,3 +206,56 @@ async function applyDailyInterest() {
   if (applied > 0) toast(`Interest applied: ${applied} client(s) over ${days} day(s)`, 'info');
   await logAudit('interest', `Daily interest applied: ${rate}% × ${days} days on ${applied} client(s)`);
 }
+
+async function runCloudBackup() {
+  if (!window.electronAPI) return;
+  const settingsMap = {};
+  state.settings.forEach(s => settingsMap[s.key] = s.value);
+  const pw = settingsMap['cloudBackupPassword'] || '';
+  if (!pw) return;
+  const folder = settingsMap['cloudBackupFolder'] || '';
+  if (!folder) return;
+  const users = state.users.map(u => { const { password, ...rest } = u; return rest; });
+  const data = {
+    clients: state.clients, transactions: state.transactions,
+    payments: state.payments, inventory: state.inventory,
+    quickItems: state.quickItems, expenses: state.expenses,
+    suppliers: state.suppliers, purchaseOrders: state.purchaseOrders,
+    notifications: state.notifications,
+    auditLogs: state.auditLogs, users,
+    settings: state.settings, exportedAt: now()
+  };
+  const filename = `shop-ledger-ph-backup-${today()}.enc`;
+  const result = await window.electronAPI.saveEncryptedBackupToPath(data, pw, filename, folder);
+  if (result.success) {
+    const existing = state.settings.find(s => s.key === 'lastCloudBackup');
+    if (existing) { existing.value = today(); await dbPut('settings', existing); }
+    else { await dbAdd('settings', { key: 'lastCloudBackup', value: today() }); }
+    state.settings = await dbAll('settings');
+    toast('Cloud backup saved', 'success');
+    await logAudit('backup', 'Auto cloud backup saved to ' + folder);
+  }
+}
+
+async function checkCloudBackupDue() {
+  const settingsMap = {};
+  state.settings.forEach(s => settingsMap[s.key] = s.value);
+  if (settingsMap['cloudBackupEnabled'] !== 'true') return;
+  const folder = settingsMap['cloudBackupFolder'] || '';
+  const pw = settingsMap['cloudBackupPassword'] || '';
+  if (!folder || !pw) return;
+  const lastBackup = settingsMap['lastCloudBackup'] || '';
+  const interval = settingsMap['cloudBackupInterval'] || 'daily';
+  const todayStr = today();
+  if (lastBackup === todayStr) return;
+  if (interval === 'daily') { await runCloudBackup(); return; }
+  if (interval === 'weekly') {
+    const daysSince = Math.floor((new Date(todayStr) - new Date(lastBackup || '2000-01-01')) / 86400000);
+    if (daysSince >= 7) await runCloudBackup();
+    return;
+  }
+  if (interval === 'monthly') {
+    const d = new Date(lastBackup || '2000-01-01');
+    if (d.getMonth() !== new Date().getMonth() || d.getFullYear() !== new Date().getFullYear()) await runCloudBackup();
+  }
+}

@@ -19,4 +19,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   installUpdate: () => ipcRenderer.invoke('install-update'),
   signalLanUpdate: () => ipcRenderer.invoke('signal-lan-update'),
   onLanUpdateSignal: (callback) => ipcRenderer.on('lan-update-signal', (_, info) => callback(info)),
+  selectFolder: () => ipcRenderer.invoke('select-folder'),
+  saveEncryptedBackupToPath: (data, password, filename, folder) => ipcRenderer.invoke('save-encrypted-backup-to-path', { data, password, filename, folder }),
 });

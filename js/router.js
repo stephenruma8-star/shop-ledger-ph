@@ -48,6 +48,7 @@ async function loadAll() {
   updateLowStockBadge();
   updateNotifications();
   await applyDailyInterest();
+  await checkCloudBackupDue();
 }
 
 function render() {
