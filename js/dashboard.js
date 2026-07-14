@@ -149,6 +149,7 @@ User question: ${q}`;
 }
 
 function drawDashChart() {
+  if (typeof Chart === 'undefined') { setTimeout(drawDashChart, 200); return; }
   if (chartInstances.dash) chartInstances.dash.destroy();
   const labels = [];
   const sales = [], expenses = [];

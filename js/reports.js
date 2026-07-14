@@ -20,11 +20,8 @@ async function viewReports(root) {
           <p class="text-2xl font-bold ${netProfit >= 0 ? 'text-blue-600' : 'text-red-600'}">${peso(netProfit)} <span class="text-sm">(${profitMargin}%)</span></p>
         </div>
       </div>
-      <div class="bg-white dark:bg-gray-800 rounded-xl p-3 shadow-sm glass-card">
-        <h3 class="font-bold mb-1.5 text-sm">Monthly Overview <span class="text-xs font-normal text-gray-500">(last 6 months)</span></h3>
-        <canvas id="reportChart" height="100"></canvas>
-      </div>
       <div class="flex gap-2 flex-wrap">
+        <button onclick="showMonthlyOverview()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">📊 Monthly Overview</button>
         <button onclick="exportExcel()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Export Excel</button>
         <button onclick="exportPDF()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Export PDF</button>
         <button onclick="backupJSON()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Backup JSON</button>
@@ -35,10 +32,13 @@ async function viewReports(root) {
         <button onclick="signalLanUpdate()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Signal Update on LAN</button>
       </div>
     </div>`;
-  drawReportChart();
 }
 
-function drawReportChart() {
+function showMonthlyOverview() {
+  if (typeof Chart === 'undefined') {
+    toast('Chart library loading, try again in a moment', 'warning');
+    return;
+  }
   if (chartInstances.report) chartInstances.report.destroy();
   const labels = [];
   const revData = [];
@@ -53,19 +53,31 @@ function drawReportChart() {
     revData.push(monthRev.reduce((s, t) => s + (t.grandTotal || 0), 0));
     expData.push(monthExp.reduce((s, e) => s + (e.amount || 0), 0));
   }
-  const ctx = document.getElementById('reportChart');
-  if (!ctx) return;
-  chartInstances.report = new Chart(ctx, {
-    type: 'bar',
-    data: { labels, datasets: [
-      { label: 'Revenue', data: revData, backgroundColor: '#10b981', borderRadius: 4 },
-      { label: 'Expenses', data: expData, backgroundColor: '#ef4444', borderRadius: 4 }
-    ]},
-    options: { responsive: true, maintainAspectRatio: false,
-      scales: { y: { beginAtZero: true, ticks: { callback: v => '₱' + v.toLocaleString(), font: { size: 9 } } },
-        x: { ticks: { font: { size: 9 } } } },
-      plugins: { legend: { labels: { boxWidth: 10, padding: 8, font: { size: 10 } } } }
-    }
+  modal(`
+    <div class="p-4">
+      <div class="flex justify-between items-center mb-3">
+        <h3 class="text-lg font-bold">📊 Monthly Overview <span class="text-xs font-normal text-gray-500">(last 6 months)</span></h3>
+        <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+      </div>
+      <div style="position:relative;height:calc(85vh - 140px);width:100%">
+        <canvas id="modalChart" style="width:100%;height:100%"></canvas>
+      </div>
+    </div>`);
+  requestAnimationFrame(() => {
+    const ctx = document.getElementById('modalChart');
+    if (!ctx) return;
+    chartInstances.report = new Chart(ctx, {
+      type: 'bar',
+      data: { labels, datasets: [
+        { label: 'Revenue', data: revData, backgroundColor: '#10b981', borderRadius: 4 },
+        { label: 'Expenses', data: expData, backgroundColor: '#ef4444', borderRadius: 4 }
+      ]},
+      options: { responsive: true, maintainAspectRatio: false,
+        scales: { y: { beginAtZero: true, ticks: { callback: v => '₱' + v.toLocaleString(), font: { size: 11 } } },
+          x: { ticks: { font: { size: 11 } } } },
+        plugins: { legend: { labels: { boxWidth: 12, padding: 10, font: { size: 12 } } } }
+      }
+    });
   });
 }
 
