@@ -209,7 +209,7 @@ function openDebtForm(orientation) {
   </div>
   <div class="client-row" style="display:flex;gap:20px;align-items:center">
     <span>Client Name: <input type="text" class="ci ci-client" placeholder="" /></span>
-    <span class="rate-label">Daily Interest Rate: ${escapeHtml(rate)}%</span>
+
   </div>
   <table>
     <thead><tr>
