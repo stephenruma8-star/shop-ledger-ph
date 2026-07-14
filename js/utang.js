@@ -1,5 +1,6 @@
 async function viewUtang(root) {
   await Promise.all([dbLoad('clients'), dbLoad('transactions'), dbLoad('payments')]);
+  await applyDailyInterest();
   const debtors = state.clients.filter(c => (c.balance || 0) > 0).sort((a, b) => (b.balance || 0) - (a.balance || 0));
   const totalUtang = debtors.reduce((s, c) => s + (c.balance || 0), 0);
   const maxUtang = debtors.length > 0 ? Math.max(...debtors.map(c => c.balance || 0)) : 0;
@@ -150,6 +151,7 @@ function openDebtForm(orientation) {
   const shopName = (state.settings.find(x => x.key === 'shopName') || {}).value || 'Shop Ledger PH';
   const shopAddr = (state.settings.find(x => x.key === 'shopAddress') || {}).value || '';
   const shopContact = (state.settings.find(x => x.key === 'shopContact') || {}).value || '';
+  const rate = (state.settings.find(x => x.key === 'dailyInterestRate') || {}).value || '0';
   const todayStr = today();
   const rows = Array.from({length: 25}, (_, i) => `
     <tr>
@@ -188,6 +190,7 @@ function openDebtForm(orientation) {
   td.sig { width: ${isLandscape ? '85px' : '70px'} }
   .client-row { margin-bottom: 6px; font-size: 12px }
   .client-row .ci-client { width: 250px; border-bottom: 1px solid #999; padding: 2px 4px; font-size: 12px }
+  .rate-label { font-size: 11px; color: #555 }
   .ci { width: 100%; border: none; background: transparent; font: inherit; color: inherit; padding: 4px 3px; margin: 0; outline: none; box-sizing: border-box; text-align: inherit }
   .ci:focus { background: #e8f4ff; box-shadow: inset 0 0 0 1px #3b82f6 }
   @media print { .ci { border: none; background: transparent; padding: 4px 3px } .ci:focus { box-shadow: none } }
@@ -204,8 +207,9 @@ function openDebtForm(orientation) {
     <h2>Debt Record Form</h2>
     <span>Date: _______________</span>
   </div>
-  <div class="client-row">
+  <div class="client-row" style="display:flex;gap:20px;align-items:center">
     <span>Client Name: <input type="text" class="ci ci-client" placeholder="" /></span>
+    <span class="rate-label">Daily Interest Rate: ${escapeHtml(rate)}%</span>
   </div>
   <table>
     <thead><tr>

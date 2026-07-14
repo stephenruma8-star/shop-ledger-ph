@@ -47,6 +47,7 @@ async function loadAll() {
   if (shop) document.getElementById('shop-name').textContent = shop.value;
   updateLowStockBadge();
   updateNotifications();
+  await applyDailyInterest();
 }
 
 function render() {

@@ -10,6 +10,7 @@ async function viewSettings(root) {
           <div><label class="text-xs text-gray-500 block">Shop Name</label><input id="set-shopName" value="${escapeHtml(settingsMap['shopName'] || '')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
           <div><label class="text-xs text-gray-500 block">Contact Number</label><input id="set-shopContact" value="${escapeHtml(settingsMap['shopContact'] || '')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
           <div class="col-span-2"><label class="text-xs text-gray-500 block">Address</label><input id="set-shopAddress" value="${escapeHtml(settingsMap['shopAddress'] || '')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
+          <div><label class="text-xs text-gray-500 block">Daily Interest Rate (%)</label><input id="set-dailyInterestRate" type="number" step="0.01" value="${escapeHtml(settingsMap['dailyInterestRate'] || '0')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" placeholder="0.1 = 0.1% per day" /></div>
         </div>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
@@ -71,7 +72,7 @@ async function viewSettings(root) {
 }
 
 async function saveSettings() {
-  const keys = ['shopName','shopContact','shopAddress','smsApiKey','backupEmail','aiApiKey','aiModel','receiptFooter','receiptHeaderText'];
+  const keys = ['shopName','shopContact','shopAddress','dailyInterestRate','smsApiKey','backupEmail','aiApiKey','aiModel','receiptFooter','receiptHeaderText'];
   for (const key of keys) {
     const el = document.getElementById(`set-${key}`);
     if (el) {

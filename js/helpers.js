@@ -172,3 +172,33 @@ function toggleNotifPanel() {
   panel.classList.toggle('hidden');
   updateNotifications();
 }
+
+async function applyDailyInterest() {
+  const rateSetting = state.settings.find(s => s.key === 'dailyInterestRate');
+  const rate = parseFloat(rateSetting?.value) || 0;
+  if (rate <= 0) return;
+  const lastDateSetting = state.settings.find(s => s.key === 'lastInterestDate');
+  const lastDate = lastDateSetting?.value || '';
+  const todayStr = today();
+  if (lastDate === todayStr) return;
+  const fromDate = lastDate || todayStr;
+  const days = Math.floor((new Date(todayStr) - new Date(fromDate)) / 86400000);
+  if (days <= 0) return;
+  const clients = state.clients.filter(c => (c.balance || 0) > 0);
+  if (clients.length === 0) return;
+  let applied = 0;
+  for (const c of clients) {
+    const interest = parseFloat((c.balance * (rate / 100) * days).toFixed(2));
+    if (interest <= 0) continue;
+    c.balance = parseFloat((c.balance + interest).toFixed(2));
+    c.interestAccrued = (c.interestAccrued || 0) + interest;
+    await dbPut('clients', c);
+    applied++;
+  }
+  if (lastDateSetting) { lastDateSetting.value = todayStr; await dbPut('settings', lastDateSetting); }
+  else { await dbAdd('settings', { key: 'lastInterestDate', value: todayStr }); }
+  state.settings = await dbAll('settings');
+  state.clients = await dbAll('clients');
+  if (applied > 0) toast(`Interest applied: ${applied} client(s) over ${days} day(s)`, 'info');
+  await logAudit('interest', `Daily interest applied: ${rate}% × ${days} days on ${applied} client(s)`);
+}
