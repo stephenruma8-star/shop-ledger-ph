@@ -185,11 +185,11 @@ async function applyDailyInterest() {
   if (clients.length === 0) return;
   let fromDate = lastDate;
   if (!fromDate) {
-    const dates = clients.map(c => c.createdAt).filter(Boolean).sort();
-    fromDate = dates.length > 0 ? dates[0] : new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+    await dbAdd('settings', { key: 'lastInterestDate', value: todayStr });
+    return;
   }
   const days = Math.floor((new Date(todayStr) - new Date(fromDate)) / 86400000);
-  if (days <= 0) { await dbAdd('settings', { key: 'lastInterestDate', value: todayStr }); return; }
+  if (days <= 0) return;
   let applied = 0;
   for (const c of clients) {
     const interest = parseFloat((c.balance * (rate / 100) * days).toFixed(2));
