@@ -1,3 +1,18 @@
+function dp(d) { const p = (d||'').split('-'); return { y: p[0]||'', m: p[1]||'', d: p[2]||'' }; }
+
+function intRateOptions(selected) {
+  let opts = '<option value="0"' + (selected == 0 ? ' selected' : '') + '>0%</option>';
+  for (let r = 0.5; r <= 20; r += 0.5) {
+    const v = Math.round(r * 10) / 10;
+    opts += '<option value="' + v + '"' + (selected == v ? ' selected' : '') + '>' + v + '%</option>';
+  }
+  return opts;
+}
+
+function calcInterest(sub, ratePct, days) {
+  return sub === 0 || ratePct === 0 ? 0 : parseFloat((sub * (ratePct / 100) * (days / 30)).toFixed(2));
+}
+
 function toast(msg, type = 'info') {
   const colors = { info: 'bg-blue-600', success: 'bg-green-600', error: 'bg-red-600', warning: 'bg-yellow-600' };
   const c = document.getElementById('toasts');

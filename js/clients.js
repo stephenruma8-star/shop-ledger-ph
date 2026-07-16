@@ -37,6 +37,16 @@ function renderClientGrid() {
 
 let cfCart = [];
 
+function cfLineSub(item) { return getQty(item.name) * (item.unitCost || 0); }
+function cfLineInt(item) {
+  const sub = cfLineSub(item);
+  if ((item.intRate || 0) === 0 || sub === 0) return 0;
+  const itemDate = item.date || today();
+  const days = Math.max(1, Math.floor((new Date(today()) - new Date(itemDate)) / 86400000));
+  return calcInterest(sub, item.intRate, days);
+}
+function cfLineAmt(item) { return cfLineSub(item) + cfLineInt(item); }
+
 function openClientModal(c) {
   if (typeof c === 'number') c = state.clients.find(x => x.id === c);
   const isEdit = !!c;
@@ -60,7 +70,7 @@ function openClientModal(c) {
             <input id="cf-qty" type="number" value="1" min="1" class="w-14 px-2 py-2 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-sm text-center" />
             <button onclick="cfAddInvItem()" class="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm whitespace-nowrap">+ Add</button></div>
             ${qItems.length > 0 ? `<div class="flex flex-wrap gap-1">${qItems.map(q => `<button data-qiname="${escapeHtml(q.name)}" data-qiprice="${q.price}" onclick="cfCart.push({date:today(),description:this.dataset.qiname,name:'1',unitCost:parseFloat(this.dataset.qiprice),intRate:0,invId:null});cfRenderCart()" class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs hover:bg-gray-200">${escapeHtml(q.name)} ${peso(q.price)}</button>`).join('')}</div>` : ''}
-            <div class="flex justify-between items-center mt-2"><button onclick="cfCart.push({date:today(),description:'',name:'1',unitCost:0,intRate:0,invId:null});cfRenderCart()" class="text-xs text-blue-600 hover:text-blue-800">+ Add Blank Row</button></div>
+            <div class="flex justify-between items-center mt-2"><button onclick="cfCart.push({date:today(),description:'',name:'1',unitCost:0,intRate:0,invId:null});cfRenderCart()" class="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs hover:bg-green-700">+ Add Blank Row</button></div>
           </div>
         </div>
         <div class="lg:col-span-3 flex flex-col min-h-0">
@@ -85,20 +95,23 @@ function cfAddInvItem() {
   cfRenderCart();
 }
 
+function cfUpdateRowAmt(i) {
+  const el = document.getElementById('cf-amt-' + i);
+  if (el) el.textContent = peso(cfLineAmt(cfCart[i]));
+}
+
 function cfRenderCart() {
   const el = document.getElementById('cf-cart');
   if (!el) return;
   if (cfCart.length === 0) { el.innerHTML = '<p class="text-gray-400 text-xs p-2">No items — just creating client</p>'; cfUpdateTotals(); return; }
   el.innerHTML = `<table class="w-full text-xs"><thead><tr class="bg-gray-50 dark:bg-gray-700 sticky top-0"><th class="p-1 text-left">Date</th><th class="p-1 text-left">Description</th><th class="p-1 text-center">Name</th><th class="p-1 text-right">Unit Cost</th><th class="p-1 text-right">Int.</th><th class="p-1 text-right">Amount</th><th class="p-1"></th></tr></thead><tbody>${cfCart.map((item, i) => {
-    const sub = getQty(item.name) * (item.unitCost || 0);
-    const intr = sub * ((item.intRate||0) / 100);
     return `<tr class="border-b dark:border-gray-700">
-      <td class="p-1"><input type="date" value="${item.date}" onchange="cfCart[${i}].date=this.value" class="w-24 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs" /></td>
+      <td class="p-1 whitespace-nowrap">${(() => { const _d = dp(item.date); return `<input type="text" inputmode="numeric" value="${_d.m}" placeholder="MM" maxlength="2" class="w-7 px-0.5 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs text-center" onfocus="this.select()" oninput="if(this.value.length>=2)this.nextElementSibling.focus()" onchange="cfCart[${i}].date=this.value.padStart(2,'0')+'-'+this.nextElementSibling.value.padStart(2,'0')+'-'+this.nextElementSibling.nextElementSibling.value;cfUpdateRowAmt(${i});cfUpdateTotals()" /><input type="text" inputmode="numeric" value="${_d.d}" placeholder="DD" maxlength="2" class="w-7 px-0.5 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs text-center" onfocus="this.select()" oninput="if(this.value.length>=2)this.nextElementSibling.focus()" onchange="cfCart[${i}].date=this.previousElementSibling.value.padStart(2,'0')+'-'+this.value.padStart(2,'0')+'-'+this.nextElementSibling.value;cfUpdateRowAmt(${i});cfUpdateTotals()" /><input type="text" inputmode="numeric" value="${_d.y}" placeholder="YYYY" maxlength="4" class="w-12 px-0.5 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs text-center" onfocus="this.select()" onchange="cfCart[${i}].date=this.previousElementSibling.previousElementSibling.value.padStart(2,'0')+'-'+this.previousElementSibling.value.padStart(2,'0')+'-'+this.value;cfUpdateRowAmt(${i});cfUpdateTotals()" />`; })()}</td>
       <td class="p-1"><input type="text" value="${escapeHtml(item.description)}" onchange="cfCart[${i}].description=this.value" class="w-28 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs" /></td>
-      <td class="p-1"><input type="text" value="${escapeHtml(item.name)}" onchange="cfCart[${i}].name=this.value;cfRenderCart()" class="w-20 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs text-center" /></td>
-      <td class="p-1"><input type="number" value="${item.unitCost}" step="0.01" onchange="cfCart[${i}].unitCost=Math.max(0,parseFloat(this.value)||0);cfRenderCart()" class="w-16 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs text-right" /></td>
-      <td class="p-1"><input type="number" value="${item.intRate}" step="0.5" onchange="cfCart[${i}].intRate=Math.max(0,parseFloat(this.value)||0);cfRenderCart()" class="w-12 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs text-right" /></td>
-      <td class="p-1 text-right font-medium">${peso(sub + intr)}</td>
+      <td class="p-1"><input type="text" value="${escapeHtml(item.name)}" onchange="cfCart[${i}].name=this.value;cfUpdateRowAmt(${i});cfUpdateTotals()" class="w-20 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs text-center" /></td>
+      <td class="p-1"><input type="number" value="${item.unitCost}" step="0.01" onchange="cfCart[${i}].unitCost=Math.max(0,parseFloat(this.value)||0);cfUpdateRowAmt(${i});cfUpdateTotals()" class="w-16 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs text-right" /></td>
+      <td class="p-1"><select onchange="cfCart[${i}].intRate=Math.max(0,parseFloat(this.value)||0);cfUpdateRowAmt(${i});cfUpdateTotals()" class="w-14 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs text-right">${intRateOptions(item.intRate)}</select></td>
+      <td class="p-1 text-right font-medium" id="cf-amt-${i}">${peso(cfLineAmt(item))}</td>
       <td class="p-1"><button onclick="cfCart.splice(${i},1);cfRenderCart()" class="text-red-500 text-xs">&times;</button></td>
     </tr>`;
   }).join('')}</tbody></table>`;
@@ -108,8 +121,8 @@ function cfRenderCart() {
 function cfUpdateTotals() {
   const el = document.getElementById('cf-totals');
   if (!el) return;
-  const subtotal = cfCart.reduce((s, i) => s + getQty(i.name) * (i.unitCost || 0), 0);
-  const totalInt = cfCart.reduce((s, i) => s + (getQty(i.name) * (i.unitCost || 0)) * ((i.intRate||0)/100), 0);
+  const subtotal = cfCart.reduce((s, i) => s + cfLineSub(i), 0);
+  const totalInt = cfCart.reduce((s, i) => s + cfLineInt(i), 0);
   const grand = subtotal + totalInt;
   el.innerHTML = `
     <div class="flex justify-between"><span>Subtotal</span><span>${peso(subtotal)}</span></div>
@@ -129,13 +142,13 @@ async function saveClient(id) {
     c.dueDate = document.getElementById('cf-dueDate').value || '';
     await dbPut('clients', c);
     if (cfCart.length > 0) {
-      const subtotal = cfCart.reduce((s, i) => s + getQty(i.name) * (i.unitCost || 0), 0);
-      const totalInterest = cfCart.reduce((s, i) => s + (getQty(i.name) * (i.unitCost || 0)) * ((i.intRate||0)/100), 0);
+      const subtotal = cfCart.reduce((s, i) => s + cfLineSub(i), 0);
+      const totalInterest = cfCart.reduce((s, i) => s + cfLineInt(i), 0);
       const grandTotal = subtotal + totalInterest;
       const invNos = state.transactions.filter(t => t.invoiceNo?.startsWith('INV-')).map(t => parseInt(t.invoiceNo.replace('INV-','')) || 0);
       const nextNo = invNos.length > 0 ? Math.max(...invNos) + 1 : 1;
       const invoiceNo = 'INV-' + String(nextNo).padStart(5,'0');
-      const items = cfCart.map(i => ({ date: i.date, description: i.description, name: i.name, unitCost: i.unitCost, intRate: i.intRate, amount: getQty(i.name) * (i.unitCost || 0) + (getQty(i.name) * (i.unitCost || 0)) * ((i.intRate||0)/100), invId: null }));
+      const items = cfCart.map(i => ({ date: i.date, description: i.description, name: i.name, unitCost: i.unitCost, intRate: i.intRate, amount: cfLineAmt(i), invId: null }));
       await dbAdd('transactions', { invoiceNo, clientId: id, clientName: name, date: today(), createdAt: now(), items, subtotal, totalInterest, discount: 0, scDiscount: 0, grandTotal, paymentMethod: 'Cash', status: grandTotal <= 0 ? 'paid' : 'pending' });
       c.balance = (c.balance || 0) + grandTotal;
       await dbPut('clients', c);
@@ -144,13 +157,13 @@ async function saveClient(id) {
   } else {
     const clientId = await dbAdd('clients', { name, phone, address, balance: 0, createdAt: now() });
     if (cfCart.length > 0) {
-      const subtotal = cfCart.reduce((s, i) => s + getQty(i.name) * (i.unitCost || 0), 0);
-      const totalInterest = cfCart.reduce((s, i) => s + (getQty(i.name) * (i.unitCost || 0)) * ((i.intRate||0)/100), 0);
+      const subtotal = cfCart.reduce((s, i) => s + cfLineSub(i), 0);
+      const totalInterest = cfCart.reduce((s, i) => s + cfLineInt(i), 0);
       const grandTotal = subtotal + totalInterest;
       const invNos = state.transactions.filter(t => t.invoiceNo?.startsWith('INV-')).map(t => parseInt(t.invoiceNo.replace('INV-','')) || 0);
       const nextNo = invNos.length > 0 ? Math.max(...invNos) + 1 : 1;
       const invoiceNo = 'INV-' + String(nextNo).padStart(5,'0');
-      const items = cfCart.map(i => ({ date: i.date, description: i.description, name: i.name, unitCost: i.unitCost, intRate: i.intRate, amount: getQty(i.name) * (i.unitCost || 0) + (getQty(i.name) * (i.unitCost || 0)) * ((i.intRate||0)/100), invId: null }));
+      const items = cfCart.map(i => ({ date: i.date, description: i.description, name: i.name, unitCost: i.unitCost, intRate: i.intRate, amount: cfLineAmt(i), invId: null }));
       await dbAdd('transactions', { invoiceNo, clientId, clientName: name, date: today(), createdAt: now(), items, subtotal, totalInterest, discount: 0, scDiscount: 0, grandTotal, paymentMethod: 'Cash', status: grandTotal <= 0 ? 'paid' : 'pending' });
       const c = await dbGet('clients', clientId);
       if (c) { c.balance = (c.balance || 0) + grandTotal; await dbPut('clients', c); }
@@ -231,8 +244,11 @@ async function printClientInfo(id) {
       html += `<thead><tr style="background:#f3f4f6;font-weight:bold"><td style="border:1px solid #d1d5db;padding:4px 6px">Date</td><td style="border:1px solid #d1d5db;padding:4px 6px">Description</td><td style="border:1px solid #d1d5db;padding:4px 6px;text-align:center">Name/Qty</td><td style="border:1px solid #d1d5db;padding:4px 6px;text-align:right">Unit Cost</td><td style="border:1px solid #d1d5db;padding:4px 6px;text-align:right">Int%</td><td style="border:1px solid #d1d5db;padding:4px 6px;text-align:right">Amount</td></tr></thead>`;
       html += `<tbody>${(t.items||[]).map(item => {
         const sub = getQty(item.name||item.qty) * (item.unitCost||item.price||0);
-        const intr = sub * ((item.intRate||0)/100);
-        return `<tr><td style="border:1px solid #d1d5db;padding:3px 6px">${item.date ? esc(item.date) : esc(fmtDate(t.date||t.createdAt))}</td><td style="border:1px solid #d1d5db;padding:3px 6px">${esc(item.description||'')}</td><td style="border:1px solid #d1d5db;padding:3px 6px;text-align:center">${esc(item.name||item.qty||'1')}</td><td style="border:1px solid #d1d5db;padding:3px 6px;text-align:right">₱${amt(item.unitCost||item.price||0)}</td><td style="border:1px solid #d1d5db;padding:3px 6px;text-align:right">${item.intRate != null ? item.intRate+'%' : (item.interest ? '₱'+amt(item.interest) : '-')}</td><td style="border:1px solid #d1d5db;padding:3px 6px;text-align:right;font-weight:bold">₱${amt(item.amount || sub+intr)}</td></tr>`;
+        const r = item.intRate || 0;
+        const iDate = item.date || t.date;
+        const days = r > 0 && sub > 0 ? Math.max(1, Math.floor((new Date(today()) - new Date(iDate)) / 86400000)) : 0;
+        const intr = days > 0 ? calcInterest(sub, r, days) : 0;
+        return `<tr><td style="border:1px solid #d1d5db;padding:3px 6px">${item.date ? esc(item.date) : esc(fmtDate(t.date||t.createdAt))}</td><td style="border:1px solid #d1d5db;padding:3px 6px">${esc(item.description||'')}</td><td style="border:1px solid #d1d5db;padding:3px 6px;text-align:center">${esc(item.name||item.qty||'1')}</td><td style="border:1px solid #d1d5db;padding:3px 6px;text-align:right">₱${amt(item.unitCost||item.price||0)}</td><td style="border:1px solid #d1d5db;padding:3px 6px;text-align:right">${item.intRate != null ? item.intRate+'%' : (item.interest ? '₱'+amt(item.interest) : '-')}</td><td style="border:1px solid #d1d5db;padding:3px 6px;text-align:right;font-weight:bold">₱${amt(sub + intr)}</td></tr>`;
       }).join('')}</tbody>`;
       html += `</table>`;
       if (t.totalInterest > 0 || t.discount > 0 || t.scDiscount > 0) {

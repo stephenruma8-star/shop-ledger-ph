@@ -1,6 +1,12 @@
 function getQty(name) { const m = String(name||'1').match(/^[\d.]+/); return m ? parseFloat(m[0]) : 1; }
 function lineSub(item) { return getQty(item.name) * (item.unitCost || 0); }
-function lineInt(item) { return lineSub(item) * ((item.intRate||0) / 100); }
+function lineInt(item) {
+  const sub = lineSub(item);
+  if ((item.intRate || 0) === 0 || sub === 0) return 0;
+  const itemDate = item.date || today();
+  const days = Math.max(1, Math.floor((new Date(today()) - new Date(itemDate)) / 86400000));
+  return calcInterest(sub, item.intRate, days);
+}
 function lineAmt(item) { return lineSub(item) + lineInt(item); }
 
 let txCart = [];
@@ -97,7 +103,7 @@ function renderTransactionModal(editTxn) {
           ${qItems.length > 0 ? `<div><label class="text-xs text-gray-500 block">Quick Items (click to add row)</label><div class="flex flex-wrap gap-1">${qItems.map(q => `<button data-qiname="${escapeHtml(q.name)}" data-qiprice="${q.price}" onclick="quickAddToCart(this.dataset.qiname, parseFloat(this.dataset.qiprice))" class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs hover:bg-gray-200 dark:hover:bg-gray-600">${escapeHtml(q.name)} ${peso(q.price)}</button>`).join('')}</div></div>` : ''}
         </div>
         <div>
-          <div class="flex justify-between items-center mb-2"><h4 class="font-semibold text-sm">Items</h4><button onclick="txCart.push({date:today(),description:'',name:'1',unitCost:0,intRate:0,invId:null});renderTMCart();updateTMTotals()" class="text-xs text-blue-600 hover:text-blue-800">+ Add Blank Row</button></div>
+          <div class="flex justify-between items-center mb-2"><h4 class="font-semibold text-sm">Items</h4><button onclick="txCart.push({date:today(),description:'',name:'1',unitCost:0,intRate:0,invId:null});renderTMCart();updateTMTotals()" class="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs hover:bg-green-700">+ Add Blank Row</button></div>
           <div id="tm-cart" class="max-h-72 overflow-auto border dark:border-gray-700 rounded-lg mb-2"></div>
           <div id="tm-totals" class="space-y-1 text-sm"></div>
           <button onclick="saveTransaction()" class="w-full mt-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">${isEdit ? 'Update Sale' : 'Complete Sale'}</button>
@@ -136,11 +142,11 @@ function renderTMCart() {
   if (txCart.length === 0) { el.innerHTML = '<p class="text-gray-400 text-xs p-2">No items added yet</p>'; return; }
   el.innerHTML = `<table class="w-full text-xs"><thead><tr class="bg-gray-50 dark:bg-gray-700 sticky top-0"><th class="p-1 text-left">Date</th><th class="p-1 text-left">Description</th><th class="p-1 text-center">Name</th><th class="p-1 text-right">Unit Cost</th><th class="p-1 text-right">Int. Rate</th><th class="p-1 text-right">Amount</th><th class="p-1"></th></tr></thead><tbody>${txCart.map((item, i) => {
     return `<tr class="border-b dark:border-gray-700">
-      <td class="p-1"><input type="date" value="${item.date}" onchange="txCart[${i}].date=this.value" class="w-24 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs" /></td>
+      <td class="p-1 whitespace-nowrap">${(() => { const _d = dp(item.date); return `<input type="text" inputmode="numeric" value="${_d.m}" placeholder="MM" maxlength="2" class="w-7 px-0.5 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs text-center" onfocus="this.select()" oninput="if(this.value.length>=2)this.nextElementSibling.focus()" onchange="txCart[${i}].date=this.value.padStart(2,'0')+'-'+this.nextElementSibling.value.padStart(2,'0')+'-'+this.nextElementSibling.nextElementSibling.value;updateCartRowAmt(${i});updateTMTotals()" /><input type="text" inputmode="numeric" value="${_d.d}" placeholder="DD" maxlength="2" class="w-7 px-0.5 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs text-center" onfocus="this.select()" oninput="if(this.value.length>=2)this.nextElementSibling.focus()" onchange="txCart[${i}].date=this.previousElementSibling.value.padStart(2,'0')+'-'+this.value.padStart(2,'0')+'-'+this.nextElementSibling.value;updateCartRowAmt(${i});updateTMTotals()" /><input type="text" inputmode="numeric" value="${_d.y}" placeholder="YYYY" maxlength="4" class="w-12 px-0.5 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs text-center" onfocus="this.select()" onchange="txCart[${i}].date=this.previousElementSibling.previousElementSibling.value.padStart(2,'0')+'-'+this.previousElementSibling.value.padStart(2,'0')+'-'+this.value;updateCartRowAmt(${i});updateTMTotals()" />`; })()}</td>
       <td class="p-1"><input type="text" value="${escapeHtml(item.description)}" placeholder="Item..." onchange="txCart[${i}].description=this.value" class="w-28 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs" /></td>
       <td class="p-1"><input type="text" value="${escapeHtml(item.name)}" placeholder="1 pc" onchange="txCart[${i}].name=this.value;updateCartRowAmt(${i});updateTMTotals()" class="w-20 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs text-center" /></td>
       <td class="p-1"><input type="number" value="${item.unitCost}" min="0" step="0.01" onchange="txCart[${i}].unitCost=Math.max(0,parseFloat(this.value)||0);updateCartRowAmt(${i});updateTMTotals()" class="w-16 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs text-right" /></td>
-      <td class="p-1"><div class="flex items-center gap-0.5"><input type="number" value="${item.intRate}" min="0" step="0.5" onchange="txCart[${i}].intRate=Math.max(0,parseFloat(this.value)||0);updateCartRowAmt(${i});updateTMTotals()" class="w-12 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs text-right" /><span class="text-gray-400 text-xs">%</span></div></td>
+      <td class="p-1"><select onchange="txCart[${i}].intRate=Math.max(0,parseFloat(this.value)||0);updateCartRowAmt(${i});updateTMTotals()" class="w-14 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs text-right">${intRateOptions(item.intRate)}</select></td>
       <td class="p-1 text-right font-medium whitespace-nowrap" id="cart-amt-${i}">${peso(lineAmt(item))}</td>
       <td class="p-1"><button onclick="removeCartItem(${i})" class="text-red-500 text-xs">&times;</button></td>
     </tr>`;
@@ -284,8 +290,10 @@ function buildReceiptHTML(t) {
     const qt = item.name || String(item.qty || 1);
     const rate = item.intRate != null ? item.intRate : (item.interest ? +((item.interest / (getQty(item.name) * (item.unitCost || 1)) * 100).toFixed(1)) : 0);
     const sub = getQty(item.name||item.qty) * (item.unitCost||item.price||0);
-    const intr = sub * (rate / 100);
-    lines.push((item.description || item.name || 'Item') + (rate > 0 ? ` (${rate}% int)` : ''));
+    const iDate = item.date || t.date;
+    const days = rate > 0 && sub > 0 ? Math.max(1, Math.floor((new Date(today()) - new Date(iDate)) / 86400000)) : 0;
+    const intr = days > 0 ? calcInterest(sub, rate, days) : 0;
+    lines.push((item.description || item.name || 'Item') + (rate > 0 ? ` (${rate}%/mo, ${days}d)` : ''));
     lines.push(`  ${qt} x ${peso(item.unitCost || item.price)}  ${peso(sub + intr)}`);
   });
   lines.push('-'.repeat(32));
@@ -305,6 +313,10 @@ function buildReceiptHTML(t) {
 function viewTransactionDetail(id) {
   const t = state.transactions.find(x => x.id === id);
   if (!t) { toast('Transaction not found', 'error'); return; }
+  const dynItems = (t.items||[]).map(item => ({ ...item, _amt: lineAmt(item) }));
+  const dynSub = dynItems.reduce((s, i) => s + lineSub(i), 0);
+  const dynInt = dynItems.reduce((s, i) => s + lineInt(i), 0);
+  const dynTotal = dynSub + dynInt - t.scDiscount - t.discount;
   modal(`
     <div class="p-6">
       <div class="flex justify-between items-center mb-4">
@@ -313,14 +325,14 @@ function viewTransactionDetail(id) {
       </div>
       <div class="text-sm mb-4">${escapeHtml(t.clientName || 'Walk-in')}${t.clientId ? ` &middot; <a href="#" onclick="closeModal();viewClientHistory(${t.clientId})" class="text-blue-600">View Client</a>` : ''}</div>
       <table class="w-full text-xs mb-3"><thead><tr class="bg-gray-50 dark:bg-gray-700"><th class="p-2 text-left">Date</th><th class="p-2 text-left">Description</th><th class="p-2 text-center">Name</th><th class="p-2 text-right">Unit Cost</th><th class="p-2 text-right">Int.</th><th class="p-2 text-right">Amount</th></tr></thead>
-        <tbody>${(t.items||[]).map(item => `<tr class="border-b dark:border-gray-700"><td class="p-2">${fmtDate(item.date)}</td><td class="p-2">${escapeHtml(item.description || '-')}</td><td class="p-2 text-center">${escapeHtml(item.name || item.qty || '')}</td><td class="p-2 text-right">${peso(item.unitCost||item.price||0)}</td><td class="p-2 text-right">${item.intRate != null ? item.intRate + '%' : (item.interest ? '₱'+item.interest : '-')}</td><td class="p-2 text-right font-medium">${peso(item.amount || lineAmt(item))}</td></tr>`).join('')}</tbody>
+        <tbody>${dynItems.map(item => `<tr class="border-b dark:border-gray-700"><td class="p-2">${fmtDate(item.date)}</td><td class="p-2">${escapeHtml(item.description || '-')}</td><td class="p-2 text-center">${escapeHtml(item.name || item.qty || '')}</td><td class="p-2 text-right">${peso(item.unitCost||item.price||0)}</td><td class="p-2 text-right">${item.intRate != null ? item.intRate + '%' : (item.interest ? '₱'+item.interest : '-')}</td><td class="p-2 text-right font-medium">${peso(item._amt)}</td></tr>`).join('')}</tbody>
       </table>
       <div class="border-t dark:border-gray-700 pt-2 space-y-1 text-sm">
-        <div class="flex justify-between"><span>Subtotal</span><span>${peso(t.subtotal)}</span></div>
-        ${t.totalInterest > 0 ? `<div class="flex justify-between text-amber-600"><span>Interest</span><span>${peso(t.totalInterest)}</span></div>` : ''}
+        <div class="flex justify-between"><span>Subtotal</span><span>${peso(dynSub)}</span></div>
+        ${dynInt > 0 ? `<div class="flex justify-between text-amber-600"><span>Interest (current)</span><span>${peso(dynInt)}</span></div>` : ''}
         ${t.scDiscount > 0 ? `<div class="flex justify-between text-green-600"><span>SC/PWD 20%</span><span>-${peso(t.scDiscount)}</span></div>` : ''}
         ${t.discount > 0 ? `<div class="flex justify-between text-orange-600"><span>Discount</span><span>-${peso(t.discount)}</span></div>` : ''}
-        <div class="flex justify-between font-bold text-lg border-t dark:border-gray-700 pt-1"><span>Total</span><span class="text-green-600">${peso(t.grandTotal)}</span></div>
+        <div class="flex justify-between font-bold text-lg border-t dark:border-gray-700 pt-1"><span>Total</span><span class="text-green-600">${peso(dynTotal)}</span></div>
       </div>
       <div class="flex gap-2 mt-4">
         <button onclick="closeModal();printReceipt(${t.id})" class="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Print Receipt</button>
