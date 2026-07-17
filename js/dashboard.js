@@ -42,8 +42,8 @@ async function viewDashboard(root) {
         </div>
         <div class="mt-1 bg-white/20 rounded-full h-1.5"><div class="bg-white rounded-full h-1.5" style="width:${Math.min(profitMargin, 100)}%"></div></div>
       </div>
-      <details class="bg-white dark:bg-gray-800 rounded-lg shadow-sm" id="chart-section">
-        <summary class="p-3 cursor-pointer font-bold text-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg">📊 7-Day Trend <span id="chart-toggle" class="text-xs font-normal text-gray-400 ml-auto">Show chart</span></summary>
+      <details open class="bg-white dark:bg-gray-800 rounded-lg shadow-sm" id="chart-section">
+        <summary class="p-3 cursor-pointer font-bold text-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg">📊 7-Day Trend <span id="chart-toggle" class="text-xs font-normal text-gray-400 ml-auto">Hide chart</span></summary>
         <div class="px-3 pb-3"><canvas id="dashChart" height="120"></canvas></div>
       </details>
       <div class="grid grid-cols-2 gap-2">

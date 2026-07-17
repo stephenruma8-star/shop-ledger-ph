@@ -4,6 +4,9 @@ async function viewExpenses(root) {
     <div class="space-y-4 fade-in">
       <div class="flex gap-2 flex-wrap items-center">
         <input id="expSearch" placeholder="Search expenses..." class="flex-1 min-w-[200px] px-4 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" oninput="debouncedRenderExpTable()" />
+        <input id="expDateFrom" type="date" class="px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" onchange="debouncedRenderExpTable()" />
+        <span class="text-gray-400 text-sm">—</span>
+        <input id="expDateTo" type="date" class="px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" onchange="debouncedRenderExpTable()" />
         <button onclick="openExpenseModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">+ New Expense</button>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden glass-card">
@@ -15,7 +18,11 @@ async function viewExpenses(root) {
 
 function renderExpTable() {
   const q = document.getElementById('expSearch')?.value || '';
-  const filtered = searchData(state.expenses, q, ['category','description','payee']);
+  const df = document.getElementById('expDateFrom')?.value || '';
+  const dt = document.getElementById('expDateTo')?.value || '';
+  let filtered = searchData(state.expenses, q, ['category','description','payee']);
+  if (df) filtered = filtered.filter(e => (e.date || '').replace(/-/g,'') >= df.replace(/-/g,''));
+  if (dt) filtered = filtered.filter(e => (e.date || '').replace(/-/g,'') <= dt.replace(/-/g,''));
   const sorted = [...filtered].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   const total = sorted.reduce((s, e) => s + (e.amount || 0), 0);
   const container = document.getElementById('expTable');

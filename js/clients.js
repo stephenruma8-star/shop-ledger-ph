@@ -6,6 +6,7 @@ async function viewClients(root) {
         <input id="clientSearch" placeholder="Search clients..." class="flex-1 px-4 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" oninput="debouncedRenderClientGrid()" />
         <button onclick="openClientModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">+ New Client</button>
         <button onclick="importClients()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Import CSV</button>
+        <button onclick="exportAllClientsCSV()" class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700">Export CSV</button>
       </div>
       <div id="clientGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
     </div>`;
@@ -412,6 +413,21 @@ async function deleteClient(id) {
   state.clients = state.clients.filter(x => x.id !== id);
   renderClientGrid();
   toast('Client deleted');
+}
+
+function exportAllClientsCSV() {
+  if (!state.clients || !state.clients.length) { toast('No clients to export', 'info'); return; }
+  const esc = s => (''+s).replace(/"/g,'""');
+  let csv = 'Name,Phone,Address,Balance\n';
+  state.clients.forEach(c => {
+    csv += `"${esc(c.name)}","${esc(c.phone||'')}","${esc(c.address||'')}",${c.balance||0}\n`;
+  });
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'all_clients.csv'; a.click();
+  URL.revokeObjectURL(url);
+  toast('All clients exported');
 }
 
 function exportClientHistory(id) {

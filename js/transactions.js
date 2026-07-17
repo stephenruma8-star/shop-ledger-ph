@@ -250,7 +250,7 @@ async function saveTransaction() {
       }
     } catch (err) {
       console.error('Sale failed, rolling back:', err);
-      for (const fn of rollback.reverse()) await fn().catch(() => {});
+      for (const fn of rollback.reverse()) await fn().catch(e => console.error('Rollback failed:', e));
       toast('Sale failed - rolled back: ' + err.message, 'error');
       return;
     }

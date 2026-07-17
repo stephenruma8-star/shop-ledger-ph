@@ -5,6 +5,9 @@ async function viewPayments(root) {
     <div class="space-y-4 fade-in">
       <div class="flex gap-2 flex-wrap items-center">
         <input id="paySearch" placeholder="Search payments..." class="flex-1 min-w-[200px] px-4 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" oninput="debouncedRenderPayTable()" />
+        <input id="payDateFrom" type="date" class="px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" onchange="debouncedRenderPayTable()" />
+        <span class="text-gray-400 text-sm">—</span>
+        <input id="payDateTo" type="date" class="px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" onchange="debouncedRenderPayTable()" />
         <button onclick="openPaymentModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">+ Record Payment</button>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden glass-card">
@@ -16,7 +19,11 @@ async function viewPayments(root) {
 
 function renderPayTable() {
   const q = document.getElementById('paySearch')?.value || '';
-  const filtered = searchData(state.payments, q, ['clientName','type','notes']);
+  const df = document.getElementById('payDateFrom')?.value || '';
+  const dt = document.getElementById('payDateTo')?.value || '';
+  let filtered = searchData(state.payments, q, ['clientName','type','notes']);
+  if (df) filtered = filtered.filter(p => (p.date || '').replace(/-/g,'') >= df.replace(/-/g,''));
+  if (dt) filtered = filtered.filter(p => (p.date || '').replace(/-/g,'') <= dt.replace(/-/g,''));
   const sorted = [...filtered].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   const total = sorted.reduce((s, p) => s + (p.amount || 0), 0);
   const container = document.getElementById('payTable');

@@ -89,8 +89,8 @@ function createTray() {
   tray.setToolTip('Shop Ledger PH');
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: 'Show App', click: () => mainWindow?.show() },
-    { label: 'Backup', click: () => { mainWindow?.show(); mainWindow?.webContents.send('shortcut', 'file-backup'); }},
-    { label: 'Email Backup', click: () => { mainWindow?.show(); mainWindow?.webContents.send('shortcut', 'email-backup'); }},
+    { label: 'Backup', click: () => { if (mainWindow && !mainWindow.isDestroyed()) { mainWindow.show(); mainWindow.webContents.send('shortcut', 'file-backup'); } }},
+    { label: 'Email Backup', click: () => { if (mainWindow && !mainWindow.isDestroyed()) { mainWindow.show(); mainWindow.webContents.send('shortcut', 'email-backup'); }}},
     { type: 'separator' },
     { label: `LAN: ${getLocalIP()}:${LAN_PORT}`, enabled: false },
     { label: 'Quit', click: () => { isQuitting = true; app.quit(); }}
@@ -115,10 +115,10 @@ function setupAutoUpdater() {
   if (!autoUpdater || !app.isPackaged) return;
   autoUpdater.autoDownload = false;
   autoUpdater.on('update-available', (info) => {
-    mainWindow?.webContents.send('update-available', info);
+    mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-available', info);
   });
   autoUpdater.on('update-downloaded', (info) => {
-    mainWindow?.webContents.send('update-downloaded', info);
+    mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-downloaded', info);
   });
 }
 
@@ -388,11 +388,11 @@ ipcMain.handle('save-encrypted-backup-to-path', async (event, { data, password, 
 function buildMenu() {
   return Menu.buildFromTemplate([
     { label: 'File', submenu: [
-      { label: 'New Sale', accelerator: 'F2', click: () => mainWindow?.webContents.send('shortcut', 'new-sale') },
-      { label: 'Record Bayad', accelerator: 'F3', click: () => mainWindow?.webContents.send('shortcut', 'new-payment') },
+      { label: 'New Sale', accelerator: 'F2', click: () => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('shortcut', 'new-sale'); } },
+      { label: 'Record Bayad', accelerator: 'F3', click: () => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('shortcut', 'new-payment'); } },
       { type: 'separator' },
-      { label: 'Backup', click: () => mainWindow?.webContents.send('shortcut', 'file-backup') },
-      { label: 'Email Backup', click: () => mainWindow?.webContents.send('shortcut', 'email-backup') },
+      { label: 'Backup', click: () => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('shortcut', 'file-backup'); } },
+      { label: 'Email Backup', click: () => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('shortcut', 'email-backup'); } },
       { type: 'separator' },
       { role: 'quit' }
     ]},

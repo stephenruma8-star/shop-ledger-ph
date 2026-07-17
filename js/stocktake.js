@@ -76,7 +76,8 @@ async function applyStockTake() {
   toast(`${diffs.length} item(s) adjusted`, 'success');
 }
 
-function clearStockTake() {
+async function clearStockTake() {
+  if (Object.keys(stCounts).length && !await confirmModal('Clear all entered counts?')) return;
   stCounts = {};
   document.getElementById('st-counts').innerHTML = '<p class="text-gray-400 text-sm">Click "New Count" to start</p>';
   document.getElementById('st-results').classList.add('hidden');
