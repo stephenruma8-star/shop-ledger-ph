@@ -94,9 +94,11 @@ export async function savePayment(id) {
   const ntEl = document.getElementById('pf-notes');
   if (!clEl || !amtEl || !dtEl || !tpEl || !ntEl) { toast('Form not ready', 'error'); return; }
   const clientId = parseInt(clEl.value);
-  if (!clientId) { toast('Select a client', 'error'); return; }
   const amount = parseFloat(amtEl.value);
-  if (!amount || amount <= 0) { toast('Valid amount required', 'error'); return; }
+  if (requireFields([
+    { el: clEl, test: () => !!clientId, msg: 'Please select a client' },
+    { el: amtEl, test: () => amount > 0, msg: 'Valid amount required' }
+  ])) return;
   const c = await dbGet('clients', clientId);
   if (!c) { toast('Client not found', 'error'); return; }
   const date = dtEl.value || today();

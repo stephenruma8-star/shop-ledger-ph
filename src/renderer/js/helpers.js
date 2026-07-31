@@ -413,6 +413,31 @@ export function validateNumber(v) { return !isNaN(parseFloat(v)) && isFinite(v) 
 
 export function validateRequired(v) { return v !== null && v !== undefined && String(v).trim() !== ''; }
 
+export function setFieldError(el, msg) {
+  if (!el || !el.parentElement) return;
+  const wrap = el.parentElement;
+  const err = wrap.querySelector(':scope > .field-error');
+  if (msg) {
+    el.classList.add('border-red-500', 'ring-1', 'ring-red-400');
+    if (err) err.textContent = msg;
+    else { const s = document.createElement('span'); s.className = 'field-error block text-xs text-red-600 dark:text-red-400 mt-1'; s.textContent = msg; el.insertAdjacentElement('afterend', s); }
+  } else {
+    el.classList.remove('border-red-500', 'ring-1', 'ring-red-400');
+    if (err) err.remove();
+  }
+}
+
+export function requireFields(specs) {
+  let firstBad = null;
+  for (const s of specs) {
+    const ok = s.test ? s.test(s.el) : String(s.el.value ?? '').trim() !== '';
+    setFieldError(s.el, ok ? null : (s.msg || 'Please fill out this field'));
+    if (!ok && !firstBad) firstBad = s.el;
+  }
+  if (firstBad) firstBad.focus();
+  return firstBad;
+}
+
 export function validatePhone(v) { return /^(\+63|0)?\d{10,11}$/.test(String(v).trim()); }
 
 export function debounce(fn, ms = 250) { let timer; return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); }; }
@@ -634,6 +659,8 @@ Object.defineProperties(window, {
   saveCurrentModal: { get: () => saveCurrentModal, configurable: true },
   validateNumber: { get: () => validateNumber, configurable: true },
   validateRequired: { get: () => validateRequired, configurable: true },
+  setFieldError: { get: () => setFieldError, configurable: true },
+  requireFields: { get: () => requireFields, configurable: true },
   validatePhone: { get: () => validatePhone, configurable: true },
   debounce: { get: () => debounce, configurable: true },
   escapeHtml: { get: () => escapeHtml, configurable: true },

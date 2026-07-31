@@ -76,7 +76,7 @@ export async function saveExpense(id) {
   const payeeEl = document.getElementById('ef-payee');
   if (!amtEl || !dateEl || !catEl || !descEl || !payeeEl) { toast('Form element missing', 'error'); return; }
   const amount = parseFloat(amtEl.value);
-  if (!amount || amount <= 0) { toast('Valid amount required', 'error'); return; }
+  if (requireFields([{ el: amtEl, test: () => amount > 0, msg: 'Valid amount required' }])) return;
   const obj = {
     date: dateEl.value || today(), category: catEl.value,
     description: descEl.value.trim(),

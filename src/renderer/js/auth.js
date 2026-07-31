@@ -1,5 +1,5 @@
 import { dbAdd, dbAll, dbGet, dbPut } from './database.js'
-import { closeModal, escapeHtml, hashPassword, modal, startClock, toast } from './helpers.js'
+import { closeModal, escapeHtml, hashPassword, modal, requireFields, setFieldError, startClock, toast } from './helpers.js'
 import { navigate } from './router.js'
 import { now, state, today } from './state.js'
 
@@ -10,7 +10,9 @@ export async function doLogin() {
   if (!uEl || !pEl || !err) return;
   const u = uEl.value.trim();
   const p = pEl.value.trim();
-  if (!u || !p) { err.textContent = 'Please enter username and password'; err.classList.remove('hidden'); return; }
+  setFieldError(uEl, u ? null : 'Please fill out this field');
+  setFieldError(pEl, p ? null : 'Please fill out this field');
+  if (!u || !p) { err.classList.add('hidden'); return; }
   const users = await dbAll('users');
   const pHash = await hashPassword(p);
   let user = users.find(x => x.username === u && x.password === pHash);
@@ -22,6 +24,8 @@ export async function doLogin() {
     }
   }
   err.classList.add('hidden');
+  setFieldError(uEl, null);
+  setFieldError(pEl, null);
   state.user = user;
   const safe = { ...user, password: undefined };
   sessionStorage.setItem('shopUser', JSON.stringify(safe));
@@ -108,9 +112,12 @@ export async function doChangePassword() {
   const current = curEl.value;
   const newPw = newEl.value;
   const confirm = confEl.value;
-  if (!current || !newPw || !confirm) { err.textContent = 'All fields required'; err.classList.remove('hidden'); return; }
-  if (newPw !== confirm) { err.textContent = 'New passwords do not match'; err.classList.remove('hidden'); return; }
-  if (newPw.length < 4) { err.textContent = 'Password must be at least 4 characters'; err.classList.remove('hidden'); return; }
+  if (requireFields([
+    { el: curEl, msg: 'Please fill out this field' },
+    { el: newEl, test: () => newPw.length >= 4, msg: 'Password must be at least 4 characters' },
+    { el: confEl, test: () => confirm === newPw, msg: 'New passwords do not match' }
+  ])) return;
+  err.classList.add('hidden');
   const pHash = await hashPassword(current);
   if (state.user.password !== pHash) { err.textContent = 'Current password is incorrect'; err.classList.remove('hidden'); return; }
   const user = await dbGet('users', state.user.id);
@@ -153,7 +160,8 @@ export async function recoverPassword() {
   const result = document.getElementById('fp-result');
   if (!fuEl || !result) return;
   const uname = fuEl.value.trim();
-  if (!uname) { result.className = 'text-red-500 text-sm'; result.textContent = 'Enter a username'; result.classList.remove('hidden'); return; }
+  if (!uname) { setFieldError(fuEl, 'Please fill out this field'); result.classList.add('hidden'); return; }
+  setFieldError(fuEl, null);
   const users = await dbAll('users');
   const user = users.find(x => x.username === uname);
   if (!user) { result.className = 'text-red-500 text-sm'; result.textContent = 'User not found'; result.classList.remove('hidden'); return; }
@@ -175,8 +183,10 @@ export async function resetPasswordFromRecover(id) {
   if (!p1El || !p2El) { toast('Form not ready', 'error'); return; }
   const p1 = p1El.value;
   const p2 = p2El.value;
-  if (!p1 || p1.length < 4) { toast('Password must be at least 4 characters', 'error'); return; }
-  if (p1 !== p2) { toast('Passwords do not match', 'error'); return; }
+  if (requireFields([
+    { el: p1El, test: () => p1.length >= 4, msg: 'Password must be at least 4 characters' },
+    { el: p2El, test: () => p2 === p1, msg: 'Passwords do not match' }
+  ])) return;
   const user = await dbGet('users', id);
   if (!user) { toast('User not found', 'error'); return; }
   user.password = await hashPassword(p1);

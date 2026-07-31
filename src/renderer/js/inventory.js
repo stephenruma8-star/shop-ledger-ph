@@ -109,7 +109,7 @@ export async function saveInv(id) {
   const unEl = document.getElementById('if-unit');
   if (!nmEl || !skEl || !ctEl || !prEl || !csEl || !stEl || !mnEl) { toast('Form not ready', 'error'); return; }
   const name = nmEl.value.trim();
-  if (!name) { toast('Name is required', 'error'); return; }
+  if (requireFields([{ el: nmEl, msg: 'Please fill out this field' }])) return;
   const sku = skEl.value.trim();
   const dupName = state.inventory.find(i => i.name.toLowerCase() === name.toLowerCase() && i.id !== id);
   if (dupName) { toast('Item with this name already exists', 'error'); return; }

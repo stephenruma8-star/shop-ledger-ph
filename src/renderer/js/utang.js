@@ -93,7 +93,7 @@ export async function doSendSMS(clientId) {
   const smEl = document.getElementById('smsMessage');
   if (!smEl) { toast('Form not ready', 'error'); return; }
   const msg = smEl.value.trim();
-  if (!msg) { toast('Please enter a message', 'error'); return; }
+  if (requireFields([{ el: smEl, msg: 'Please enter a message' }])) return;
   const smsSetting = state.settings.find(x => x.key === 'smsApiKey');
   try {
     if (window.electronAPI) {
@@ -129,7 +129,7 @@ export async function doBulkSMS() {
   const bmEl = document.getElementById('bulkSmsMsg');
   if (!bmEl) { toast('Form not ready', 'error'); return; }
   const msg = bmEl.value.trim();
-  if (!msg) { toast('Enter a message', 'error'); return; }
+  if (requireFields([{ el: bmEl, msg: 'Please enter a message' }])) return;
   const smsSetting = state.settings.find(x => x.key === 'smsApiKey');
   const overdue = state.clients.filter(c => (c.balance || 0) > 0 && c.dueDate && c.dueDate < today() && c.phone);
   let sent = 0, failed = 0;

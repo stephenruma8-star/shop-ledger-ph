@@ -62,9 +62,11 @@ export async function saveSup(id) {
   const adEl = document.getElementById('sf-address');
   if (!nmEl || !emEl || !ctEl || !cgEl || !adEl) { toast('Form not ready', 'error'); return; }
   const name = nmEl.value.trim();
-  if (!name) { toast('Name is required', 'error'); return; }
   const email = emEl.value.trim();
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast('Invalid email format', 'error'); return; }
+  if (requireFields([
+    { el: nmEl, msg: 'Please fill out this field' },
+    { el: emEl, test: () => !email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email), msg: 'Invalid email format' }
+  ])) return;
   const obj = {
     name, contact: ctEl.value.trim(),
     email,

@@ -168,9 +168,8 @@ export async function saveClient(id) {
   const lyEl = document.getElementById('cf-ledgerYear');
   if (!nmEl || !phEl || !adEl || !blEl || !ddEl) { toast('Form not ready', 'error'); return; }
   const name = nmEl.value.trim();
-  if (!name) { toast('Name is required', 'error'); return; }
   const phone = phEl.value.trim();
-  if (phone && !validatePhone(phone)) { toast('Invalid phone number (use PH format: +63 or 0 followed by 10-11 digits)', 'error'); return; }
+  if (requireFields([{ el: nmEl, msg: 'Please fill out this field' }, { el: phEl, test: () => !phone || validatePhone(phone), msg: 'Invalid phone (PH format: +63 or 0 + 10-11 digits)' }])) return;
   const address = adEl.value.trim();
   if (id) {
     const c = await dbGet('clients', id);

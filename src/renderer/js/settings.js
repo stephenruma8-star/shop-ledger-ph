@@ -154,7 +154,7 @@ export async function addQuickItem() {
   if (!nmEl || !prEl) { toast('Form not ready', 'warning'); return; }
   const name = nmEl.value.trim();
   const price = parseFloat(prEl.value) || 0;
-  if (!name) { toast('Enter item name', 'warning'); return; }
+  if (requireFields([{ el: nmEl, msg: 'Enter item name' }])) return;
   await dbAdd('quickItems', { name, price });
   state.quickItems = await dbAll('quickItems');
   nmEl.value = '';
@@ -232,8 +232,10 @@ export async function saveUser(id) {
   const password = pwEl.value;
   const name = nmEl.value.trim();
   const role = rlEl.value;
-  if (!username) { toast('Username required', 'error'); return; }
-  if (!id && !password) { toast('Password required', 'error'); return; }
+  if (requireFields([
+    { el: unEl, msg: 'Please fill out this field' },
+    { el: pwEl, test: () => !!(id || password), msg: 'Password required' }
+  ])) return;
   if (id) {
     const u = await dbGet('users', id);
     u.name = name; u.role = role;
