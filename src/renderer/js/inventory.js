@@ -1,4 +1,11 @@
-async function viewInventory(root) {
+import { logAudit } from './auth.js'
+import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
+import { closeModal, confirmModal, dbLoad, debounce, escapeHtml, modal, searchData, toast, updateLowStockBadge } from './helpers.js'
+import { escHtml } from './printLayout.js'
+import { now, peso, state } from './state.js'
+import { getQty } from './transactions.js'
+
+export async function viewInventory(root) {
   await dbLoad('inventory');
   root.innerHTML = `
     <div class="space-y-4 fade-in">
@@ -15,7 +22,7 @@ async function viewInventory(root) {
   renderInvTable();
 }
 
-function renderInvTable() {
+export function renderInvTable() {
   const q = document.getElementById('invSearch')?.value || '';
   const filtered = searchData(state.inventory, q, ['name','sku','category']);
   const sorted = [...filtered].sort((a, b) => a.name?.localeCompare(b.name));
@@ -44,7 +51,7 @@ function renderInvTable() {
       <button onclick="bulkDeleteInv()" class="ml-auto px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete Selected</button>
     </div>`;
 }
-function addVariantRow() {
+export function addVariantRow() {
   const list = document.getElementById('if-variants-list');
   if (!list) return;
   const div = document.createElement('div');
@@ -53,9 +60,9 @@ function addVariantRow() {
   list.appendChild(div);
 }
 
-let debouncedRenderInvTable = debounce(renderInvTable, 250);
+export let debouncedRenderInvTable = debounce(renderInvTable, 250);
 
-function openInventoryModal(id) {
+export function openInventoryModal(id) {
   const isEdit = !!id;
   const i = isEdit ? state.inventory.find(x => x.id === id) : null;
   modal(`
@@ -91,7 +98,7 @@ function openInventoryModal(id) {
     </div>`);
 }
 
-async function saveInv(id) {
+export async function saveInv(id) {
   const nmEl = document.getElementById('if-name');
   const skEl = document.getElementById('if-sku');
   const ctEl = document.getElementById('if-category');
@@ -146,7 +153,7 @@ async function saveInv(id) {
   renderInvTable();
 }
 
-async function deleteInv(id) {
+export async function deleteInv(id) {
   const item = state.inventory.find(i => i.id === id);
   if (!item) return;
   const used = state.transactions.some(t => (t.items||[]).some(i => i.invId === id));
@@ -161,7 +168,7 @@ async function deleteInv(id) {
   toast('Item deleted');
 }
 
-function showReorderSuggestions() {
+export function showReorderSuggestions() {
   const sec = document.getElementById('reorderSection');
   if (!sec) return;
   const needsReorder = state.inventory.filter(i => (i.stock || 0) <= (i.minStock || 5)).sort((a, b) => ((a.stock||0)/(a.minStock||5)) - ((b.stock||0)/(b.minStock||5)));
@@ -178,7 +185,7 @@ function showReorderSuggestions() {
     }).join('')}</tbody></table></div>`;
 }
 
-function toggleInvBulkBar() {
+export function toggleInvBulkBar() {
   const checked = document.querySelectorAll('.inv-check:checked');
   const bar = document.getElementById('inv-bulk-bar');
   if (!bar) return;
@@ -186,7 +193,7 @@ function toggleInvBulkBar() {
   else bar.classList.add('hidden');
 }
 
-async function bulkDeleteInv() {
+export async function bulkDeleteInv() {
   const checked = document.querySelectorAll('.inv-check:checked');
   if (!checked.length) return;
   if (!await confirmModal(`Delete ${checked.length} inventory item(s)?`)) return;
@@ -197,7 +204,7 @@ async function bulkDeleteInv() {
   toast(`${checked.length} item(s) deleted`);
 }
 
-function bulkEditInv() {
+export function bulkEditInv() {
   const checked = document.querySelectorAll('.inv-check:checked');
   if (!checked.length) return;
   modal(`
@@ -211,7 +218,7 @@ function bulkEditInv() {
     </div>`);
 }
 
-async function applyBulkEdit() {
+export async function applyBulkEdit() {
   const priceEl = document.getElementById('be-price');
   const catEl = document.getElementById('be-category');
   if (!priceEl || !catEl) { toast('Form not ready', 'error'); return; }
@@ -232,7 +239,7 @@ async function applyBulkEdit() {
   toast(`${checked.length} item(s) updated`);
 }
 
-function viewItemHistory(id) {
+export function viewItemHistory(id) {
   const item = state.inventory.find(i => i.id === id);
   if (!item) { toast('Item not found', 'error'); return; }
   const entries = [];
@@ -271,3 +278,21 @@ function viewItemHistory(id) {
     </div>
   </div>`);
 }
+
+
+// expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
+Object.defineProperties(window, {
+  viewInventory: { get: () => viewInventory, configurable: true },
+  renderInvTable: { get: () => renderInvTable, configurable: true },
+  addVariantRow: { get: () => addVariantRow, configurable: true },
+  debouncedRenderInvTable: { get: () => debouncedRenderInvTable, configurable: true },
+  openInventoryModal: { get: () => openInventoryModal, configurable: true },
+  saveInv: { get: () => saveInv, configurable: true },
+  deleteInv: { get: () => deleteInv, configurable: true },
+  showReorderSuggestions: { get: () => showReorderSuggestions, configurable: true },
+  toggleInvBulkBar: { get: () => toggleInvBulkBar, configurable: true },
+  bulkDeleteInv: { get: () => bulkDeleteInv, configurable: true },
+  bulkEditInv: { get: () => bulkEditInv, configurable: true },
+  applyBulkEdit: { get: () => applyBulkEdit, configurable: true },
+  viewItemHistory: { get: () => viewItemHistory, configurable: true }
+});

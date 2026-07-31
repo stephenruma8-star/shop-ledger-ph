@@ -1,5 +1,22 @@
-let _navToken = 0;
-async function navigate(route) {
+import { viewClients } from './clients.js'
+import { viewDashboard } from './dashboard.js'
+import { dbAll } from './database.js'
+import { viewExpenses } from './expenses.js'
+import { applyDailyInterest, checkCloudBackupDue, closeModal, focusPageSearch, populateYearSelector, saveCurrentModal, showShortcuts, toggleTheme, updateLowStockBadge, updateNotifications } from './helpers.js'
+import { viewInventory } from './inventory.js'
+import { AppParticles } from './particles.js'
+import { viewPayments } from './payments.js'
+import { viewPurchaseOrders } from './purchaseOrders.js'
+import { viewReports } from './reports.js'
+import { viewSettings } from './settings.js'
+import { state } from './state.js'
+import { viewStockTake } from './stocktake.js'
+import { viewSuppliers } from './suppliers.js'
+import { viewTransactions } from './transactions.js'
+import { viewUtang } from './utang.js'
+
+export let _navToken = 0;
+export async function navigate(route) {
   closeModal();
   const token = ++_navToken;
   state.currentRoute = route;
@@ -45,7 +62,7 @@ async function navigate(route) {
   if (aside && aside.classList.contains('open')) { aside.classList.remove('open'); document.getElementById('sidebar-overlay')?.classList.remove('open'); }
 }
 
-async function loadAll() {
+export async function loadAll() {
   const stores = ['clients','transactions','payments','inventory','quickItems','settings','users','expenses','suppliers','purchaseOrders','notifications','auditLogs'];
   const results = await Promise.all(stores.map(s => dbAll(s).catch(() => [])));
   stores.forEach((s, i) => { state[s] = results[i]; });
@@ -58,7 +75,7 @@ async function loadAll() {
   populateYearSelector();
 }
 
-function render() {
+export function render() {
   navigate(state.currentRoute);
 }
 
@@ -109,4 +126,13 @@ document.addEventListener('keydown', (e) => {
 
 document.querySelectorAll('.nav-btn').forEach(btn => {
   btn.addEventListener('click', () => navigate(btn.dataset.route));
+});
+
+
+// expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
+Object.defineProperties(window, {
+  _navToken: { get: () => _navToken, set: (v) => { _navToken = v; }, configurable: true },
+  navigate: { get: () => navigate, configurable: true },
+  loadAll: { get: () => loadAll, configurable: true },
+  render: { get: () => render, configurable: true }
 });

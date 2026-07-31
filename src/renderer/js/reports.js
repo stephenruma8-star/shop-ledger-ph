@@ -1,4 +1,13 @@
-async function viewReports(root) {
+import { logAudit } from './auth.js'
+import { dbAll, dbClear, dbPut } from './database.js'
+import { closeModal, confirmModal, dbLoad, escapeHtml, filterByYear, modal, paginate, renderPagination, toast } from './helpers.js'
+import { escHtml, openPrintWindow } from './printLayout.js'
+import { loadAll, render } from './router.js'
+import { fmtDate, now, peso, state, today } from './state.js'
+
+let _restoreResolve = null;
+
+export async function viewReports(root) {
   await Promise.all([dbLoad('transactions'), dbLoad('payments'), dbLoad('expenses')]);
   const rTx = filterByYear(state.transactions, 'date');
   const rEx = filterByYear(state.expenses, 'date');
@@ -39,7 +48,7 @@ async function viewReports(root) {
     </div>`;
 }
 
-function showMonthlyOverview() {
+export function showMonthlyOverview() {
   if (typeof Chart === 'undefined') {
     toast('Chart library loading, try again in a moment', 'warning');
     return;
@@ -86,7 +95,7 @@ function showMonthlyOverview() {
   });
 }
 
-async function getAllData() {
+export async function getAllData() {
   const users = (await dbAll('users')).map(u => { const { password, ...rest } = u; return rest; });
   return {
     clients: await dbAll('clients'), transactions: await dbAll('transactions'),
@@ -99,7 +108,7 @@ async function getAllData() {
   };
 }
 
-async function exportExcel() {
+export async function exportExcel() {
   try {
     await Promise.all([dbLoad('clients'), dbLoad('transactions'), dbLoad('payments'), dbLoad('expenses'), dbLoad('inventory'), dbLoad('suppliers'), dbLoad('purchaseOrders')]);
     function esc(s) { return (''+s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
@@ -269,7 +278,7 @@ async function exportExcel() {
   } catch (e) { toast('Export error: ' + e.message, 'error'); }
 }
 
-async function exportPDF() {
+export async function exportPDF() {
   await Promise.all([dbLoad('clients'), dbLoad('transactions'), dbLoad('payments'), dbLoad('expenses'), dbLoad('inventory'), dbLoad('suppliers'), dbLoad('purchaseOrders')]);
   const pdfTx = filterByYear(state.transactions, 'date');
   const pdfEx = filterByYear(state.expenses, 'date');
@@ -324,7 +333,7 @@ async function exportPDF() {
   openPrintWindow('Business Report', 1100, 800, html);
 }
 
-async function backupJSON() {
+export async function backupJSON() {
   try {
     const data = await getAllData();
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -336,7 +345,7 @@ async function backupJSON() {
   } catch (e) { toast('Backup error: ' + e.message, 'error'); }
 }
 
-async function encryptedBackupFlow() {
+export async function encryptedBackupFlow() {
   if (!window.electronAPI) { toast('Encrypted backup only available in desktop app', 'warning'); return; }
   modal(`
     <div class="p-6">
@@ -350,7 +359,7 @@ async function encryptedBackupFlow() {
     </div>`);
 }
 
-async function doEncryptedBackup() {
+export async function doEncryptedBackup() {
   if (!window.electronAPI) { toast('Encrypted backup only available in desktop app', 'warning'); return; }
   const pw = document.getElementById('eb-password')?.value;
   const confirm = document.getElementById('eb-confirm')?.value;
@@ -363,7 +372,7 @@ async function doEncryptedBackup() {
   } catch (e) { toast('Error: ' + e.message, 'error'); }
 }
 
-async function fileBackupFlow() {
+export async function fileBackupFlow() {
   if (!window.electronAPI) { toast('File backup only available in desktop app', 'warning'); return; }
   const data = await getAllData();
   try {
@@ -373,7 +382,7 @@ async function fileBackupFlow() {
   } catch (e) { toast('Error: ' + e.message, 'error'); }
 }
 
-async function emailBackupFlow() {
+export async function emailBackupFlow() {
   if (!window.electronAPI) { toast('Email backup only in desktop app', 'warning'); return; }
   const smtpSetting = state.settings.find(x => x.key === 'smtpConfig');
   const emailTo = state.settings.find(x => x.key === 'backupEmail');
@@ -392,7 +401,7 @@ async function emailBackupFlow() {
   } catch (e) { toast('Error: ' + e.message, 'error'); }
 }
 
-function showRestoreModal() {
+export function showRestoreModal() {
   modal(`
     <div class="p-6">
       <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">Restore Backup</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
@@ -404,7 +413,7 @@ function showRestoreModal() {
     </div>`);
 }
 
-async function restoreJSONFlow() {
+export async function restoreJSONFlow() {
   if (!window.electronAPI) { toast('Restore only available in desktop app', 'warning'); return; }
   if (!await confirmModal('This will replace ALL data. Continue?')) return;
   const result = await window.electronAPI.loadBackupFile();
@@ -426,7 +435,7 @@ async function restoreJSONFlow() {
   } catch (e) { toast('Restore error: ' + e.message, 'error'); }
 }
 
-async function restoreEncryptedFlow() {
+export async function restoreEncryptedFlow() {
   if (!window.electronAPI) { toast('Restore only available in desktop app', 'warning'); return; }
   if (!await confirmModal('This will replace ALL data. Continue?')) return;
   if (_restoreResolve) { toast('Restore already in progress', 'warning'); return; }
@@ -468,14 +477,14 @@ async function restoreEncryptedFlow() {
   } catch (e) { toast('Restore error: ' + e.message, 'error'); }
 }
 
-async function signalLanUpdate() {
+export async function signalLanUpdate() {
   if (!window.electronAPI) { toast('LAN signaling only available in desktop app', 'warning'); return; }
   if (!await confirmModal('Send update signal to all computers on the LAN?')) return;
   window.electronAPI.signalLanUpdate();
   toast('Update signal sent to LAN', 'success');
 }
 
-function viewAuditLog() {
+export function viewAuditLog() {
   const q = document.getElementById('al-search')?.value?.toLowerCase() || '';
   const filtered = (state.auditLogs || []).filter(e =>
     !q || e.action?.toLowerCase().includes(q) || (e.details || '').toLowerCase().includes(q) || (e.user || '').toLowerCase().includes(q)
@@ -505,3 +514,23 @@ function viewAuditLog() {
   }
   render();
 }
+
+
+// expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
+Object.defineProperties(window, {
+  viewReports: { get: () => viewReports, configurable: true },
+  showMonthlyOverview: { get: () => showMonthlyOverview, configurable: true },
+  getAllData: { get: () => getAllData, configurable: true },
+  exportExcel: { get: () => exportExcel, configurable: true },
+  exportPDF: { get: () => exportPDF, configurable: true },
+  backupJSON: { get: () => backupJSON, configurable: true },
+  encryptedBackupFlow: { get: () => encryptedBackupFlow, configurable: true },
+  doEncryptedBackup: { get: () => doEncryptedBackup, configurable: true },
+  fileBackupFlow: { get: () => fileBackupFlow, configurable: true },
+  emailBackupFlow: { get: () => emailBackupFlow, configurable: true },
+  showRestoreModal: { get: () => showRestoreModal, configurable: true },
+  restoreJSONFlow: { get: () => restoreJSONFlow, configurable: true },
+  restoreEncryptedFlow: { get: () => restoreEncryptedFlow, configurable: true },
+  signalLanUpdate: { get: () => signalLanUpdate, configurable: true },
+  viewAuditLog: { get: () => viewAuditLog, configurable: true }
+});

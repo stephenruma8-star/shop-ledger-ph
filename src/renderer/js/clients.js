@@ -1,4 +1,10 @@
-async function viewClients(root) {
+import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
+import { calcInterest, closeModal, confetti, confirmModal, debounce, escapeHtml, filterByYear, modal, parseCSVLine, playSound, searchData, toast, validatePhone } from './helpers.js'
+import { escHtml, openPrintWindow } from './printLayout.js'
+import { fmtDate, fmtDateTime, now, peso, state, today } from './state.js'
+import { getQty } from './transactions.js'
+
+export async function viewClients(root) {
   state.clients = await dbAll('clients');
   root.innerHTML = `
     <div class="space-y-4 fade-in">
@@ -13,12 +19,12 @@ async function viewClients(root) {
   renderClientGrid();
 }
 
-let _clientFiltered = [];
-let _clientPage = 0;
-const CLIENT_PAGE_SIZE = 20;
+export let _clientFiltered = [];
+export let _clientPage = 0;
+export const CLIENT_PAGE_SIZE = 20;
 
-let debouncedRenderClientGrid = debounce(() => { _clientPage = 0; renderClientGrid(); }, 250);
-function renderClientGrid() {
+export let debouncedRenderClientGrid = debounce(() => { _clientPage = 0; renderClientGrid(); }, 250);
+export function renderClientGrid() {
   const q = document.getElementById('clientSearch')?.value || '';
   _clientFiltered = searchData(state.clients, q, ['name','phone','address']);
   const grid = document.getElementById('clientGrid');
@@ -44,19 +50,19 @@ function renderClientGrid() {
 
 window.__app = window.__app || {};
 window.__app.cfCart = [];
-let cfCart = window.__app.cfCart;
+export let cfCart = window.__app.cfCart;
 
-function cfLineSub(item) { return getQty(item.name) * (item.unitCost || 0); }
-function cfLineInt(item) {
+export function cfLineSub(item) { return getQty(item.name) * (item.unitCost || 0); }
+export function cfLineInt(item) {
   const sub = cfLineSub(item);
   if ((item.intRate || 0) === 0 || sub === 0) return 0;
   const itemDate = item.date || today();
   const days = Math.max(1, Math.floor((new Date(today()) - new Date(itemDate)) / 86400000));
   return calcInterest(sub, item.intRate, days);
 }
-function cfLineAmt(item) { return cfLineSub(item) + cfLineInt(item); }
+export function cfLineAmt(item) { return cfLineSub(item) + cfLineInt(item); }
 
-function saveClientDraft() {
+export function saveClientDraft() {
   const f = (id) => document.getElementById(id);
   if (!f('cf-name')) return;
   sessionStorage.setItem('clientFormDraft', JSON.stringify({
@@ -67,7 +73,7 @@ function saveClientDraft() {
     ledgerYear: f('cf-ledgerYear')?.value || ''
   }));
 }
-function openClientModal(c) {
+export function openClientModal(c) {
   if (typeof c === 'number') c = state.clients.find(x => x.id === c);
   const isEdit = !!c;
   cfCart = [];
@@ -107,7 +113,7 @@ function openClientModal(c) {
   cfRenderCart();
 }
 
-function cfAddInvItem() {
+export function cfAddInvItem() {
   const sel = document.getElementById('cf-item-select');
   const opt = sel.options[sel.selectedIndex];
   if (!opt || !opt.value) { toast('Select an item', 'warning'); return; }
@@ -118,12 +124,12 @@ function cfAddInvItem() {
   cfRenderCart();
 }
 
-function cfUpdateRowAmt(i) {
+export function cfUpdateRowAmt(i) {
   const el = document.getElementById('cf-amt-' + i);
   if (el) el.textContent = peso(cfLineAmt(cfCart[i]));
 }
 
-function cfRenderCart() {
+export function cfRenderCart() {
   const el = document.getElementById('cf-cart');
   if (!el) return;
   if (cfCart.length === 0) { el.innerHTML = '<p class="text-gray-400 text-xs p-2">No items — just creating client</p>'; cfUpdateTotals(); return; }
@@ -141,7 +147,7 @@ function cfRenderCart() {
   cfUpdateTotals();
 }
 
-function cfUpdateTotals() {
+export function cfUpdateTotals() {
   const el = document.getElementById('cf-totals');
   if (!el) return;
   const subtotal = cfCart.reduce((s, i) => s + cfLineSub(i), 0);
@@ -153,7 +159,7 @@ function cfUpdateTotals() {
     <div class="flex justify-between font-bold"><span>Total</span><span class="text-green-600">${peso(grand)}</span></div>`;
 }
 
-async function saveClient(id) {
+export async function saveClient(id) {
   const nmEl = document.getElementById('cf-name');
   const phEl = document.getElementById('cf-phone');
   const adEl = document.getElementById('cf-address');
@@ -221,7 +227,7 @@ async function saveClient(id) {
   renderClientGrid();
 }
 
-async function viewClientHistory(id) {
+export async function viewClientHistory(id) {
   const c = await dbGet('clients', id);
   if (!c) { toast('Client not found', 'error'); return; }
   const allTx = filterByYear(state.transactions.filter(t => t.clientId === id), 'date').sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -294,7 +300,7 @@ async function viewClientHistory(id) {
   </div>`);
 }
 
-async function printClientInfo(id) {
+export async function printClientInfo(id) {
   const c = await dbGet('clients', id);
   if (!c) { toast('Client not found', 'error'); return; }
   const txns = filterByYear(state.transactions.filter(t => t.clientId === id), 'date').sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
@@ -358,7 +364,7 @@ async function printClientInfo(id) {
   openPrintWindow('Client - '+c.name, 1200, 800, html);
 }
 
-async function recordClientPayment(id) {
+export async function recordClientPayment(id) {
   const c = await dbGet('clients', id);
   if (!c) { toast('Client not found', 'error'); return; }
   modal(`
@@ -385,7 +391,7 @@ async function recordClientPayment(id) {
     </div>`);
 }
 
-async function saveClientPayment(id) {
+export async function saveClientPayment(id) {
   const amtEl = document.getElementById('cp-amount');
   const dtEl = document.getElementById('cp-date');
   const ntEl = document.getElementById('cp-notes');
@@ -408,7 +414,7 @@ async function saveClientPayment(id) {
   toast('Payment recorded', 'success');
 }
 
-async function deleteClientSale(txnId, clientId) {
+export async function deleteClientSale(txnId, clientId) {
   if (!await confirmModal('Delete this sale? Client balance will be adjusted.')) return;
   const t = state.transactions.find(x => x.id === txnId);
   if (!t) { toast('Transaction not found', 'error'); return; }
@@ -426,7 +432,7 @@ async function deleteClientSale(txnId, clientId) {
   toast('Sale deleted, balance adjusted');
 }
 
-function importClients() {
+export function importClients() {
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = '.csv';
@@ -450,7 +456,7 @@ function importClients() {
   input.click();
 }
 
-async function deleteClient(id) {
+export async function deleteClient(id) {
   const c = state.clients.find(x => x.id === id);
   if (!c) return;
   const txCount = state.transactions.filter(t => t.clientId === id).length;
@@ -469,7 +475,7 @@ async function deleteClient(id) {
   toast('Client and all associated records deleted');
 }
 
-function exportAllClientsCSV() {
+export function exportAllClientsCSV() {
   if (!state.clients || !state.clients.length) { toast('No clients to export', 'info'); return; }
   const esc = s => (''+s).replace(/"/g,'""');
   let csv = 'Name,Phone,Address,Balance\n';
@@ -501,3 +507,33 @@ function exportClientHistory(id) {
   URL.revokeObjectURL(url);
   toast('CSV exported');
 }
+
+
+// expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
+Object.defineProperties(window, {
+  viewClients: { get: () => viewClients, configurable: true },
+  _clientFiltered: { get: () => _clientFiltered, set: (v) => { _clientFiltered = v; }, configurable: true },
+  _clientPage: { get: () => _clientPage, set: (v) => { _clientPage = v; }, configurable: true },
+  CLIENT_PAGE_SIZE: { get: () => CLIENT_PAGE_SIZE, configurable: true },
+  debouncedRenderClientGrid: { get: () => debouncedRenderClientGrid, configurable: true },
+  renderClientGrid: { get: () => renderClientGrid, configurable: true },
+  cfCart: { get: () => cfCart, set: (v) => { cfCart = v; }, configurable: true },
+  cfLineSub: { get: () => cfLineSub, configurable: true },
+  cfLineInt: { get: () => cfLineInt, configurable: true },
+  cfLineAmt: { get: () => cfLineAmt, configurable: true },
+  saveClientDraft: { get: () => saveClientDraft, configurable: true },
+  openClientModal: { get: () => openClientModal, configurable: true },
+  cfAddInvItem: { get: () => cfAddInvItem, configurable: true },
+  cfUpdateRowAmt: { get: () => cfUpdateRowAmt, configurable: true },
+  cfRenderCart: { get: () => cfRenderCart, configurable: true },
+  cfUpdateTotals: { get: () => cfUpdateTotals, configurable: true },
+  saveClient: { get: () => saveClient, configurable: true },
+  viewClientHistory: { get: () => viewClientHistory, configurable: true },
+  printClientInfo: { get: () => printClientInfo, configurable: true },
+  recordClientPayment: { get: () => recordClientPayment, configurable: true },
+  saveClientPayment: { get: () => saveClientPayment, configurable: true },
+  deleteClientSale: { get: () => deleteClientSale, configurable: true },
+  importClients: { get: () => importClients, configurable: true },
+  deleteClient: { get: () => deleteClient, configurable: true },
+  exportAllClientsCSV: { get: () => exportAllClientsCSV, configurable: true }
+});

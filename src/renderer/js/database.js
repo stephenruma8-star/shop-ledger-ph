@@ -1,8 +1,8 @@
-const DB_NAME = 'ShopLedgerPH';
-const DB_VERSION = 3;
-let db = null;
+export const DB_NAME = 'ShopLedgerPH';
+export const DB_VERSION = 3;
+export let db = null;
 
-function openDB() {
+export function openDB() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = (e) => {
@@ -16,7 +16,7 @@ function openDB() {
   });
 }
 
-function dbOp(store, mode, fn) {
+export function dbOp(store, mode, fn) {
   return new Promise((resolve, reject) => {
     if (!db) { reject(new Error('Database not opened')); return; }
     try {
@@ -29,7 +29,7 @@ function dbOp(store, mode, fn) {
   });
 }
 
-function dbAll(store) {
+export function dbAll(store) {
   return new Promise((resolve, reject) => {
     dbOp(store, 'readonly', os => {
       const req = os.getAll();
@@ -39,7 +39,7 @@ function dbAll(store) {
   });
 }
 
-function dbGet(store, id) {
+export function dbGet(store, id) {
   return new Promise((resolve, reject) => {
     dbOp(store, 'readonly', os => {
       const req = os.get(id);
@@ -49,7 +49,7 @@ function dbGet(store, id) {
   });
 }
 
-function dbPut(store, obj) {
+export function dbPut(store, obj) {
   return new Promise((resolve, reject) => {
     dbOp(store, 'readwrite', os => {
       const req = os.put(obj);
@@ -59,7 +59,7 @@ function dbPut(store, obj) {
   });
 }
 
-function dbAdd(store, obj) {
+export function dbAdd(store, obj) {
   return new Promise((resolve, reject) => {
     dbOp(store, 'readwrite', os => {
       const req = os.add(obj);
@@ -69,7 +69,7 @@ function dbAdd(store, obj) {
   });
 }
 
-function dbDel(store, id) {
+export function dbDel(store, id) {
   return new Promise((resolve, reject) => {
     dbOp(store, 'readwrite', os => {
       const req = os.delete(id);
@@ -79,7 +79,7 @@ function dbDel(store, id) {
   });
 }
 
-function dbClear(store) {
+export function dbClear(store) {
   return new Promise((resolve, reject) => {
     dbOp(store, 'readwrite', os => {
       const req = os.clear();
@@ -88,3 +88,19 @@ function dbClear(store) {
     });
   });
 }
+
+
+// expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
+Object.defineProperties(window, {
+  DB_NAME: { get: () => DB_NAME, configurable: true },
+  DB_VERSION: { get: () => DB_VERSION, configurable: true },
+  db: { get: () => db, set: (v) => { db = v; }, configurable: true },
+  openDB: { get: () => openDB, configurable: true },
+  dbOp: { get: () => dbOp, configurable: true },
+  dbAll: { get: () => dbAll, configurable: true },
+  dbGet: { get: () => dbGet, configurable: true },
+  dbPut: { get: () => dbPut, configurable: true },
+  dbAdd: { get: () => dbAdd, configurable: true },
+  dbDel: { get: () => dbDel, configurable: true },
+  dbClear: { get: () => dbClear, configurable: true }
+});

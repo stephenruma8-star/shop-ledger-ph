@@ -1,4 +1,9 @@
-async function viewStockTake(root) {
+import { logAudit } from './auth.js'
+import { dbAll, dbGet, dbPut } from './database.js'
+import { confirmModal, dbLoad, escapeHtml, toast, updateLowStockBadge } from './helpers.js'
+import { state } from './state.js'
+
+export async function viewStockTake(root) {
   await dbLoad('inventory');
   root.innerHTML = `
     <div class="space-y-4 fade-in">
@@ -14,9 +19,9 @@ async function viewStockTake(root) {
     </div>`;
 }
 
-let stCounts = {};
+export let stCounts = {};
 
-function startStockTake() {
+export function startStockTake() {
   stCounts = {};
   const inv = state.inventory;
   inv.forEach(i => { stCounts[i.id] = i.stock || 0; });
@@ -30,7 +35,7 @@ function startStockTake() {
   stRenderCounts();
 }
 
-function stRenderCounts() {
+export function stRenderCounts() {
   const q = (document.getElementById('st-search')?.value || '').toLowerCase();
   const filtered = state.inventory.filter(i => !q || i.name.toLowerCase().includes(q) || (i.sku||'').toLowerCase().includes(q));
   const tbody = document.getElementById('st-tbody');
@@ -43,7 +48,7 @@ function stRenderCounts() {
   }).join('');
 }
 
-function stUpdateVariance(id) {
+export function stUpdateVariance(id) {
   const el = document.getElementById('st-var-' + id);
   if (!el) return;
   const item = state.inventory.find(i => i.id === id);
@@ -55,7 +60,7 @@ function stUpdateVariance(id) {
   el.className = 'p-2 text-right font-bold ' + (varAmt === 0 ? '' : varAmt > 0 ? 'text-green-600' : 'text-red-600');
 }
 
-async function applyStockTake() {
+export async function applyStockTake() {
   const diffs = [];
   for (const idStr of Object.keys(stCounts)) {
     const id = parseInt(idStr);
@@ -87,7 +92,7 @@ async function applyStockTake() {
   toast(`${diffs.length} item(s) adjusted`, 'success');
 }
 
-async function clearStockTake() {
+export async function clearStockTake() {
   if (Object.keys(stCounts).length && !await confirmModal('Clear all entered counts?')) return;
   stCounts = {};
   const sc = document.getElementById('st-counts');
@@ -95,3 +100,15 @@ async function clearStockTake() {
   const sr = document.getElementById('st-results');
   if (sr) sr.classList.add('hidden');
 }
+
+
+// expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
+Object.defineProperties(window, {
+  viewStockTake: { get: () => viewStockTake, configurable: true },
+  stCounts: { get: () => stCounts, set: (v) => { stCounts = v; }, configurable: true },
+  startStockTake: { get: () => startStockTake, configurable: true },
+  stRenderCounts: { get: () => stRenderCounts, configurable: true },
+  stUpdateVariance: { get: () => stUpdateVariance, configurable: true },
+  applyStockTake: { get: () => applyStockTake, configurable: true },
+  clearStockTake: { get: () => clearStockTake, configurable: true }
+});

@@ -1,4 +1,8 @@
-async function viewSuppliers(root) {
+import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
+import { closeModal, confirmModal, dbLoad, debounce, escapeHtml, modal, searchData, toast } from './helpers.js'
+import { now, state } from './state.js'
+
+export async function viewSuppliers(root) {
   await dbLoad('suppliers');
   root.innerHTML = `
     <div class="space-y-4 fade-in">
@@ -13,8 +17,8 @@ async function viewSuppliers(root) {
   renderSupTable();
 }
 
-let debouncedRenderSupTable = debounce(renderSupTable, 250);
-function renderSupTable() {
+export let debouncedRenderSupTable = debounce(renderSupTable, 250);
+export function renderSupTable() {
   const q = document.getElementById('supSearch')?.value || '';
   const filtered = searchData(state.suppliers, q, ['name','contact','email','category']);
   const container = document.getElementById('supTable');
@@ -28,7 +32,7 @@ function renderSupTable() {
     </tr>`).join('')}</tbody></table>`;
 }
 
-function openSupplierModal(id) {
+export function openSupplierModal(id) {
   const isEdit = !!id;
   const s = isEdit ? state.suppliers.find(x => x.id === id) : null;
   modal(`
@@ -50,7 +54,7 @@ function openSupplierModal(id) {
     </div>`);
 }
 
-async function saveSup(id) {
+export async function saveSup(id) {
   const nmEl = document.getElementById('sf-name');
   const emEl = document.getElementById('sf-email');
   const ctEl = document.getElementById('sf-contact');
@@ -74,10 +78,21 @@ async function saveSup(id) {
   renderSupTable();
 }
 
-async function deleteSup(id) {
+export async function deleteSup(id) {
   if (!await confirmModal('Delete this supplier?')) return;
   await dbDel('suppliers', id);
   state.suppliers = await dbAll('suppliers');
   renderSupTable();
   toast('Supplier deleted');
 }
+
+
+// expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
+Object.defineProperties(window, {
+  viewSuppliers: { get: () => viewSuppliers, configurable: true },
+  debouncedRenderSupTable: { get: () => debouncedRenderSupTable, configurable: true },
+  renderSupTable: { get: () => renderSupTable, configurable: true },
+  openSupplierModal: { get: () => openSupplierModal, configurable: true },
+  saveSup: { get: () => saveSup, configurable: true },
+  deleteSup: { get: () => deleteSup, configurable: true }
+});

@@ -1,4 +1,4 @@
-const AppParticles = (() => {
+export const AppParticles = (() => {
   const scenes = {
     dashboard:    { color: [96,165,250],   count: 40, mode: 'web', speed: 0.3,  size: 2.5, opacity: 0.7, repel: true },
     clients:      { color: [251,191,36],   count: 40, mode: 'web', speed: 0.3,  size: 2.5, opacity: 0.7 },
@@ -269,3 +269,9 @@ const AppParticles = (() => {
     },
   };
 })();
+
+
+// expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
+Object.defineProperties(window, {
+  AppParticles: { get: () => AppParticles, configurable: true }
+});

@@ -1,3 +1,13 @@
+import { applyPermissions } from './auth.js'
+import { cfCart, cfRenderCart } from './clients.js'
+import { dbAdd, dbAll, dbPut, openDB } from './database.js'
+import { escapeHtml, hashPassword, modal, playSound, startClock, toast } from './helpers.js'
+import { AppParticles } from './particles.js'
+import { emailBackupFlow, fileBackupFlow } from './reports.js'
+import { loadAll, navigate } from './router.js'
+import { state, today } from './state.js'
+import { renderTMCart, txCart, updateTMTotals } from './transactions.js'
+
 window.__app = window.__app || {};
 if (window.electronAPI) {
   window.__app.getDBDump = async () => {
@@ -66,7 +76,7 @@ if (window.electronAPI) {
   });
 }
 
-async function seedIfEmpty() {
+export async function seedIfEmpty() {
   const [users, clients, inventory, quickItems, settings] = await Promise.all([
     dbAll('users'), dbAll('clients'), dbAll('inventory'), dbAll('quickItems'), dbAll('settings')
   ]);
@@ -80,7 +90,7 @@ async function seedIfEmpty() {
   }
 }
 
-async function checkForNewBuild() {
+export async function checkForNewBuild() {
   try {
     const res = await fetch('version.json?' + Date.now());
     if (!res.ok) return;
@@ -100,7 +110,7 @@ async function checkForNewBuild() {
   } catch (e) { /* offline or no version.json */ }
 }
 
-async function boot() {
+export async function boot() {
   try {
     await openDB();
     await seedIfEmpty();
@@ -156,8 +166,8 @@ document.addEventListener('click', (e) => {
     panel.classList.add('hidden');
   }
 });
-let _loginParticleRAF = null;
-function initLoginParticles() {
+export let _loginParticleRAF = null;
+export function initLoginParticles() {
   try {
     let canvas = document.getElementById('login-canvas');
     if (!canvas) { canvas = document.createElement('canvas'); canvas.id = 'login-canvas'; }
@@ -224,4 +234,14 @@ document.addEventListener('DOMContentLoaded', () => {
   boot();
   initLoginParticles();
   if (typeof AppParticles !== 'undefined') AppParticles.init();
+});
+
+
+// expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
+Object.defineProperties(window, {
+  seedIfEmpty: { get: () => seedIfEmpty, configurable: true },
+  checkForNewBuild: { get: () => checkForNewBuild, configurable: true },
+  boot: { get: () => boot, configurable: true },
+  _loginParticleRAF: { get: () => _loginParticleRAF, set: (v) => { _loginParticleRAF = v; }, configurable: true },
+  initLoginParticles: { get: () => initLoginParticles, configurable: true }
 });

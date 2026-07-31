@@ -1,4 +1,8 @@
-async function viewPayments(root) {
+import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
+import { closeModal, confirmModal, dbLoad, debounce, escapeHtml, filterByYear, modal, paginate, renderPagination, searchData, toast } from './helpers.js'
+import { fmtDate, now, peso, state, today } from './state.js'
+
+export async function viewPayments(root) {
   await dbLoad('payments');
   await dbLoad('clients');
   root.innerHTML = `
@@ -17,7 +21,7 @@ async function viewPayments(root) {
   renderPayTable();
 }
 
-function renderPayTable() {
+export function renderPayTable() {
   const q = document.getElementById('paySearch')?.value || '';
   const df = document.getElementById('payDateFrom')?.value || '';
   const dt = document.getElementById('payDateTo')?.value || '';
@@ -39,9 +43,9 @@ function renderPayTable() {
       <td class="p-3 text-center"><button onclick="openPaymentModal(${p.id})" class="text-blue-600 hover:text-blue-800 text-xs mr-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit</button><button onclick="deletePay(${p.id})" class="text-red-600 hover:text-red-800 text-xs"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Del</button></td>
     </tr>`).join('')}</tbody></table>${renderPagination('pay', page, totalPages)}`;
 }
-let debouncedRenderPayTable = debounce(renderPayTable, 250);
+export let debouncedRenderPayTable = debounce(renderPayTable, 250);
 
-function openPaymentModal(id) {
+export function openPaymentModal(id) {
   const isEdit = !!id;
   const p = isEdit ? state.payments.find(x => x.id === id) : null;
   const clients = state.clients.filter(c => (c.balance || 0) > 0 || (isEdit && c.id === p.clientId));
@@ -70,7 +74,7 @@ function openPaymentModal(id) {
     </div>`);
 }
 
-function quickAmount(amt) {
+export function quickAmount(amt) {
   const sel = document.getElementById('pf-client');
   const clientId = parseInt(sel.value);
   if (!clientId) { toast('Select a client first', 'warning'); return; }
@@ -82,7 +86,7 @@ function quickAmount(amt) {
   else input.value = amt.toFixed(2);
 }
 
-async function savePayment(id) {
+export async function savePayment(id) {
   const clEl = document.getElementById('pf-client');
   const amtEl = document.getElementById('pf-amount');
   const dtEl = document.getElementById('pf-date');
@@ -125,7 +129,7 @@ async function savePayment(id) {
   renderPayTable();
 }
 
-async function deletePay(id) {
+export async function deletePay(id) {
   if (!await confirmModal('Delete this payment?')) return;
   const pay = await dbGet('payments', id);
   if (!pay) { toast('Payment not found', 'error'); return; }
@@ -137,3 +141,15 @@ async function deletePay(id) {
   renderPayTable();
   toast('Payment deleted');
 }
+
+
+// expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
+Object.defineProperties(window, {
+  viewPayments: { get: () => viewPayments, configurable: true },
+  renderPayTable: { get: () => renderPayTable, configurable: true },
+  debouncedRenderPayTable: { get: () => debouncedRenderPayTable, configurable: true },
+  openPaymentModal: { get: () => openPaymentModal, configurable: true },
+  quickAmount: { get: () => quickAmount, configurable: true },
+  savePayment: { get: () => savePayment, configurable: true },
+  deletePay: { get: () => deletePay, configurable: true }
+});

@@ -1,4 +1,7 @@
-function printCss(pageSize) {
+import { toast } from './helpers.js'
+import { fmtDateTime, now, state } from './state.js'
+
+export function printCss(pageSize) {
   const size = pageSize || 'A4';
   const m = {};
   if (typeof state !== 'undefined' && state.settings) state.settings.forEach(s => m[s.key] = s.value);
@@ -41,7 +44,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#1e293b;backgr
 @media print{*{-webkit-print-color-adjust:exact;print-color-adjust:exact}body{background:#fff;padding:0}.print-preview{box-shadow:none;border-radius:0;padding:24px 32px;max-width:none;min-height:auto;margin:0}.print-toolbar{display:none}}`;
 }
 
-function printToolbar(activeSize) {
+export function printToolbar(activeSize) {
   const sizes = ['A4','Letter','Legal'];
   const btns = sizes.map(s => `<button class="sz-btn${s===activeSize?' active':''}" onclick="setSize('${s}')" id="sz-${s.toLowerCase()}">${s}</button>`).join('');
   return `<div class="print-toolbar">
@@ -52,7 +55,7 @@ function printToolbar(activeSize) {
   </div>`;
 }
 
-function printHeader() {
+export function printHeader() {
   const m = {};
   state.settings.forEach(s => m[s.key] = s.value);
   const name = m['shopName'] || 'Shop Ledger PH';
@@ -65,18 +68,18 @@ function printHeader() {
   return `<div class="print-header">${logoHtml}<h1>${escHtml(name)}</h1>${p ? '<p>'+escHtml(p)+'</p>' : ''}${hdr ? '<p>'+hdr.split('\n').map(l=>escHtml(l)).join('<br>')+'</p>' : ''}<p class="print-date">Printed: ${fmtDateTime(now())}</p></div>`;
 }
 
-function printFooter() {
+export function printFooter() {
   const m = {};
   state.settings.forEach(s => m[s.key] = s.value);
   const msg = m['receiptFooter'] || 'Thank you for your patronage!';
   return `<div class="print-footer">${escHtml(msg)}</div>`;
 }
 
-function printScript() {
+export function printScript() {
   return `function setSize(sz){document.querySelectorAll('.sz-btn').forEach(b=>b.classList.remove('active'));document.getElementById('sz-'+sz.toLowerCase()).classList.add('active');var s=document.getElementById('page-size')||document.createElement('style');s.id='page-size';s.textContent='@page{margin:15mm 12mm;size:'+sz+'}';document.head.appendChild(s);}`;
 }
 
-function openPrintWindow(title, w, h, contentHtml, opts) {
+export function openPrintWindow(title, w, h, contentHtml, opts) {
   const o = opts || {};
   const size = o.size || 'A4';
   const win = window.open('', '_blank', `width=${w},height=${h},scrollbars=yes`);
@@ -90,6 +93,18 @@ ${printToolbar(size)}
   return win;
 }
 
-function escHtml(s) {
+export function escHtml(s) {
   return (''+(s||'')).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
+
+
+// expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
+Object.defineProperties(window, {
+  printCss: { get: () => printCss, configurable: true },
+  printToolbar: { get: () => printToolbar, configurable: true },
+  printHeader: { get: () => printHeader, configurable: true },
+  printFooter: { get: () => printFooter, configurable: true },
+  printScript: { get: () => printScript, configurable: true },
+  openPrintWindow: { get: () => openPrintWindow, configurable: true },
+  escHtml: { get: () => escHtml, configurable: true }
+});

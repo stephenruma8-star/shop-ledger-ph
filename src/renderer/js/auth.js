@@ -1,4 +1,9 @@
-async function doLogin() {
+import { dbAdd, dbAll, dbGet, dbPut } from './database.js'
+import { closeModal, escapeHtml, hashPassword, modal, startClock, toast } from './helpers.js'
+import { navigate } from './router.js'
+import { now, state, today } from './state.js'
+
+export async function doLogin() {
   const uEl = document.getElementById('login-user');
   const pEl = document.getElementById('login-pass');
   const err = document.getElementById('login-error');
@@ -29,7 +34,7 @@ async function doLogin() {
   navigate(state.currentRoute || 'dashboard');
 }
 
-async function doLogout() {
+export async function doLogout() {
   if (state.user) await logAudit('logout', `User ${state.user.username} logged out`);
   state.user = null;
   sessionStorage.removeItem('shopUser');
@@ -42,7 +47,7 @@ async function doLogout() {
   if (lp) lp.value = '';
 }
 
-function applyPermissions() {
+export function applyPermissions() {
   if (!state.user) return;
   const role = state.user.role;
   const restricted = role === 'staff' ? ['settings','reports','suppliers','purchase-orders'] : [];
@@ -52,7 +57,7 @@ function applyPermissions() {
   });
 }
 
-async function logAudit(action, details) {
+export async function logAudit(action, details) {
   try {
     await dbAdd('auditLogs', {
       action, details, user: state.user?.username || 'system',
@@ -61,11 +66,11 @@ async function logAudit(action, details) {
   } catch (e) { console.error('Audit log error:', e); }
 }
 
-async function addNotification(msg, type = 'info') {
+export async function addNotification(msg, type = 'info') {
   await dbAdd('notifications', { message: msg, type, read: false, createdAt: now(), date: today() });
 }
 
-function togglePass() {
+export function togglePass() {
   const inp = document.getElementById('login-pass');
   const btn = document.getElementById('passToggle');
   if (inp.type === 'password') {
@@ -77,7 +82,7 @@ function togglePass() {
   }
 }
 
-function changePassword() {
+export function changePassword() {
   modal(`
     <div class="p-6">
       <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">🔑 Change Password</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
@@ -94,7 +99,7 @@ function changePassword() {
     </div>`);
 }
 
-async function doChangePassword() {
+export async function doChangePassword() {
   const curEl = document.getElementById('cp-current');
   const newEl = document.getElementById('cp-new');
   const confEl = document.getElementById('cp-confirm');
@@ -120,7 +125,7 @@ async function doChangePassword() {
   await logAudit('user', `User ${user.username} changed their password`);
 }
 
-async function forgotPassword() {
+export async function forgotPassword() {
   document.getElementById('login-form').classList.add('hidden');
   const rf = document.getElementById('recovery-form');
   rf.innerHTML = `
@@ -134,7 +139,7 @@ async function forgotPassword() {
   rf.classList.remove('hidden');
 }
 
-function cancelRecovery() {
+export function cancelRecovery() {
   document.getElementById('recovery-form')?.classList.add('hidden');
   document.getElementById('login-form')?.classList.remove('hidden');
   const lu = document.getElementById('login-user');
@@ -143,7 +148,7 @@ function cancelRecovery() {
   if (lp) lp.value = '';
 }
 
-async function recoverPassword() {
+export async function recoverPassword() {
   const fuEl = document.getElementById('fp-user');
   const result = document.getElementById('fp-result');
   if (!fuEl || !result) return;
@@ -164,7 +169,7 @@ async function recoverPassword() {
   result.classList.remove('hidden');
 }
 
-async function resetPasswordFromRecover(id) {
+export async function resetPasswordFromRecover(id) {
   const p1El = document.getElementById('fp-newpass');
   const p2El = document.getElementById('fp-newpass2');
   if (!p1El || !p2El) { toast('Form not ready', 'error'); return; }
@@ -181,3 +186,20 @@ async function resetPasswordFromRecover(id) {
   const le = document.getElementById('login-error');
   if (le) { le.textContent = 'Password reset successfully. Sign in with your new password.'; le.className = 'text-green-500 text-sm text-center'; }
 }
+
+
+// expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
+Object.defineProperties(window, {
+  doLogin: { get: () => doLogin, configurable: true },
+  doLogout: { get: () => doLogout, configurable: true },
+  applyPermissions: { get: () => applyPermissions, configurable: true },
+  logAudit: { get: () => logAudit, configurable: true },
+  addNotification: { get: () => addNotification, configurable: true },
+  togglePass: { get: () => togglePass, configurable: true },
+  changePassword: { get: () => changePassword, configurable: true },
+  doChangePassword: { get: () => doChangePassword, configurable: true },
+  forgotPassword: { get: () => forgotPassword, configurable: true },
+  cancelRecovery: { get: () => cancelRecovery, configurable: true },
+  recoverPassword: { get: () => recoverPassword, configurable: true },
+  resetPasswordFromRecover: { get: () => resetPasswordFromRecover, configurable: true }
+});

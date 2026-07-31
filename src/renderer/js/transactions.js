@@ -1,5 +1,12 @@
-function getQty(name) { const m = String(name||'1').match(/^[\d.]+/); return m ? parseFloat(m[0]) : 1; }
-async function adjustStock(invId, item, delta) {
+import { logAudit } from './auth.js'
+import { renderClientGrid } from './clients.js'
+import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
+import { calcInterest, closeModal, confirmModal, dbLoad, debounce, escapeHtml, filterByYear, modal, paginate, renderPagination, searchData, toast, updateLowStockBadge } from './helpers.js'
+import { openPrintWindow } from './printLayout.js'
+import { fmtDate, fmtDateTime, now, peso, state, today } from './state.js'
+
+export function getQty(name) { const m = String(name||'1').match(/^[\d.]+/); return m ? parseFloat(m[0]) : 1; }
+export async function adjustStock(invId, item, delta) {
   if (!invId) return;
   const inv = await dbGet('inventory', invId);
   if (!inv) return;
@@ -11,27 +18,27 @@ async function adjustStock(invId, item, delta) {
   }
   await dbPut('inventory', inv);
 }
-function lineSub(item) { return getQty(item.name) * (item.unitCost || 0); }
-function lineInt(item) {
+export function lineSub(item) { return getQty(item.name) * (item.unitCost || 0); }
+export function lineInt(item) {
   const sub = lineSub(item);
   if ((item.intRate || 0) === 0 || sub === 0) return 0;
   const itemDate = item.date || today();
   const days = Math.max(1, Math.floor((new Date(today()) - new Date(itemDate)) / 86400000));
   return calcInterest(sub, item.intRate, days);
 }
-function lineAmt(item) { return lineSub(item) + lineInt(item); }
+export function lineAmt(item) { return lineSub(item) + lineInt(item); }
 
-let txCart = [];
-let txEditingId = null;
+export let txCart = [];
+export let txEditingId = null;
 
-function updateCartRowAmt(i) {
+export function updateCartRowAmt(i) {
   const el = document.getElementById('cart-amt-' + i);
   if (el) el.textContent = peso(lineAmt(txCart[i]));
 }
 
-let debouncedRenderTxTable = debounce(renderTxTable, 250);
+export let debouncedRenderTxTable = debounce(renderTxTable, 250);
 
-async function viewTransactions(root) {
+export async function viewTransactions(root) {
   await Promise.all([
     dbLoad('transactions'),
     dbLoad('clients'),
@@ -54,7 +61,7 @@ async function viewTransactions(root) {
   renderTxTable();
 }
 
-function renderTxTable() {
+export function renderTxTable() {
   const q = document.getElementById('txSearch')?.value || '';
   const dFrom = document.getElementById('txDateFrom')?.value || '';
   const dTo = document.getElementById('txDateTo')?.value || '';
@@ -88,13 +95,13 @@ function renderTxTable() {
     </div>${renderPagination('tx', page, totalPages)}`;
 }
 
-function openTransactionModal() {
+export function openTransactionModal() {
   txCart = [];
   txEditingId = null;
   renderTransactionModal(null);
 }
 
-function renderTransactionModal(editTxn) {
+export function renderTransactionModal(editTxn) {
   const isEdit = !!editTxn;
   if (!isEdit) { txCart = []; txEditingId = null; }
   const clients = state.clients;
@@ -140,7 +147,7 @@ function renderTransactionModal(editTxn) {
   updateTMTotals();
 }
 
-function addToCart() {
+export function addToCart() {
   const sel = document.getElementById('tm-item-select');
   const qtyEl = document.getElementById('tm-qty');
   if (!sel || !qtyEl) { toast('Form not ready', 'warning'); return; }
@@ -157,13 +164,13 @@ function addToCart() {
   updateTMTotals();
 }
 
-function quickAddToCart(name, price) {
+export function quickAddToCart(name, price) {
   txCart.push({ date: today(), description: name, name: '1', unitCost: price, intRate: 0, invId: null });
   renderTMCart();
   updateTMTotals();
 }
 
-function renderTMCart() {
+export function renderTMCart() {
   const el = document.getElementById('tm-cart');
   if (!el) return;
   if (txCart.length === 0) { el.innerHTML = '<p class="text-gray-400 text-xs p-2">No items added yet</p>'; return; }
@@ -184,9 +191,9 @@ function renderTMCart() {
   }).join('')}</tbody></table>`;
 }
 
-function removeCartItem(i) { txCart.splice(i, 1); renderTMCart(); updateTMTotals(); }
+export function removeCartItem(i) { txCart.splice(i, 1); renderTMCart(); updateTMTotals(); }
 
-function updateTMTotals() {
+export function updateTMTotals() {
   const el = document.getElementById('tm-totals');
   if (!el) return;
   const subtotal = txCart.reduce((s, i) => s + lineSub(i), 0);
@@ -203,9 +210,9 @@ function updateTMTotals() {
     <div class="flex justify-between font-bold text-lg border-t dark:border-gray-700 pt-1"><span>Total</span><span class="text-green-600">${peso(grandTotal)}</span></div>`;
 }
 
-function toggleSC() { updateTMTotals(); }
+export function toggleSC() { updateTMTotals(); }
 
-async function saveTransaction() {
+export async function saveTransaction() {
   if (window.__app._savingTx) return;
   window.__app._savingTx = true;
   try {
@@ -226,7 +233,7 @@ async function saveTransaction() {
   } finally { window.__app._savingTx = false; }
 }
 
-async function doSaveTransaction() {
+export async function doSaveTransaction() {
   const subtotal = txCart.reduce((s, i) => s + lineSub(i), 0);
   const totalInterest = txCart.reduce((s, i) => s + lineInt(i), 0);
   const scCheck = document.getElementById('tm-sc');
@@ -321,7 +328,7 @@ async function doSaveTransaction() {
   renderTxTable();
 }
 
-function buildReceiptHTML(t) {
+export function buildReceiptHTML(t) {
   const settingsMap = {};
   state.settings.forEach(s => settingsMap[s.key] = s.value);
   const shopName = settingsMap['shopName'] || 'Shop Ledger PH';
@@ -366,7 +373,7 @@ function buildReceiptHTML(t) {
   return lines.join('\n');
 }
 
-function viewTransactionDetail(id) {
+export function viewTransactionDetail(id) {
   const t = state.transactions.find(x => x.id === id);
   if (!t) { toast('Transaction not found', 'error'); return; }
   const dynItems = (t.items||[]).map(item => ({ ...item, _amt: lineAmt(item) }));
@@ -401,7 +408,7 @@ function viewTransactionDetail(id) {
     </div>`);
 }
 
-async function voidTransaction(id) {
+export async function voidTransaction(id) {
   const t = await dbGet('transactions', id);
   if (!await confirmModal(`Void sale ${t.invoiceNo} (${peso(t.grandTotal)})? This will restore inventory and adjust client balance.`)) return;
   if (t.status === 'voided') { toast('Already voided', 'warning'); return; }
@@ -421,7 +428,7 @@ async function voidTransaction(id) {
   renderTxTable();
 }
 
-async function returnTransaction(id) {
+export async function returnTransaction(id) {
   const orig = await dbGet('transactions', id);
   if (!orig) { toast('Transaction not found', 'error'); return; }
   if (orig.status === 'voided') { toast('Cannot return a voided sale', 'warning'); return; }
@@ -437,7 +444,7 @@ async function returnTransaction(id) {
     </div>`);
 }
 
-async function confirmReturn(id) {
+export async function confirmReturn(id) {
   const orig = await dbGet('transactions', id);
   if (!orig) { toast('Transaction not found', 'error'); return; }
   const checked = document.querySelectorAll('.ret-item:checked');
@@ -482,7 +489,7 @@ async function confirmReturn(id) {
   renderTxTable();
 }
 
-async function deleteClientFromSale(id) {
+export async function deleteClientFromSale(id) {
   const c = state.clients.find(x => x.id === id);
   if (!c) { toast('Client not found', 'error'); return; }
   const txCount = state.transactions.filter(t => t.clientId === id).length;
@@ -501,7 +508,7 @@ async function deleteClientFromSale(id) {
   toast('Client deleted');
 }
 
-function editTransaction(id) {
+export function editTransaction(id) {
   const t = state.transactions.find(x => x.id === id);
   if (!t) { toast('Transaction not found', 'error'); return; }
   txCart = (t.items || []).map(i => ({ date: i.date || today(), description: i.description || '', name: i.name || '1', unitCost: i.unitCost || 0, intRate: i.intRate || 0, invId: i.invId }));
@@ -509,7 +516,7 @@ function editTransaction(id) {
   renderTransactionModal(t);
 }
 
-async function printReceipt(id) {
+export async function printReceipt(id) {
   const t = await dbGet('transactions', id);
   if (!t) { toast('Transaction not found', 'error'); return; }
   modal(`
@@ -529,7 +536,7 @@ async function printReceipt(id) {
     </div>`);
 }
 
-async function doPrintReceipt(id, direct) {
+export async function doPrintReceipt(id, direct) {
   const t = await dbGet('transactions', id);
   if (!t) { toast('Transaction not found', 'error'); return; }
   const sizeEl = document.getElementById('rp-size');
@@ -612,7 +619,7 @@ async function doPrintReceipt(id, direct) {
   }
 }
 
-function toggleTxBulkBar() {
+export function toggleTxBulkBar() {
   const checked = document.querySelectorAll('.tx-check:checked');
   const bar = document.getElementById('tx-bulk-bar');
   if (!bar) return;
@@ -620,7 +627,7 @@ function toggleTxBulkBar() {
   else bar.classList.add('hidden');
 }
 
-async function bulkDeleteTx() {
+export async function bulkDeleteTx() {
   const checked = document.querySelectorAll('.tx-check:checked');
   if (!checked.length) return;
   if (!await confirmModal(`Delete ${checked.length} sale(s)? Transaction history will be removed and client balances adjusted.`)) return;
@@ -639,3 +646,40 @@ async function bulkDeleteTx() {
   updateLowStockBadge();
   toast(`${checked.length} sale(s) deleted`);
 }
+
+
+// expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
+Object.defineProperties(window, {
+  getQty: { get: () => getQty, configurable: true },
+  adjustStock: { get: () => adjustStock, configurable: true },
+  lineSub: { get: () => lineSub, configurable: true },
+  lineInt: { get: () => lineInt, configurable: true },
+  lineAmt: { get: () => lineAmt, configurable: true },
+  txCart: { get: () => txCart, set: (v) => { txCart = v; }, configurable: true },
+  txEditingId: { get: () => txEditingId, set: (v) => { txEditingId = v; }, configurable: true },
+  updateCartRowAmt: { get: () => updateCartRowAmt, configurable: true },
+  debouncedRenderTxTable: { get: () => debouncedRenderTxTable, configurable: true },
+  viewTransactions: { get: () => viewTransactions, configurable: true },
+  renderTxTable: { get: () => renderTxTable, configurable: true },
+  openTransactionModal: { get: () => openTransactionModal, configurable: true },
+  renderTransactionModal: { get: () => renderTransactionModal, configurable: true },
+  addToCart: { get: () => addToCart, configurable: true },
+  quickAddToCart: { get: () => quickAddToCart, configurable: true },
+  renderTMCart: { get: () => renderTMCart, configurable: true },
+  removeCartItem: { get: () => removeCartItem, configurable: true },
+  updateTMTotals: { get: () => updateTMTotals, configurable: true },
+  toggleSC: { get: () => toggleSC, configurable: true },
+  saveTransaction: { get: () => saveTransaction, configurable: true },
+  doSaveTransaction: { get: () => doSaveTransaction, configurable: true },
+  buildReceiptHTML: { get: () => buildReceiptHTML, configurable: true },
+  viewTransactionDetail: { get: () => viewTransactionDetail, configurable: true },
+  voidTransaction: { get: () => voidTransaction, configurable: true },
+  returnTransaction: { get: () => returnTransaction, configurable: true },
+  confirmReturn: { get: () => confirmReturn, configurable: true },
+  deleteClientFromSale: { get: () => deleteClientFromSale, configurable: true },
+  editTransaction: { get: () => editTransaction, configurable: true },
+  printReceipt: { get: () => printReceipt, configurable: true },
+  doPrintReceipt: { get: () => doPrintReceipt, configurable: true },
+  toggleTxBulkBar: { get: () => toggleTxBulkBar, configurable: true },
+  bulkDeleteTx: { get: () => bulkDeleteTx, configurable: true }
+});

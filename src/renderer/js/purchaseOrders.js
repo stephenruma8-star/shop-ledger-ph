@@ -1,6 +1,11 @@
-let poItems = [];
+import { logAudit } from './auth.js'
+import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
+import { closeModal, confirmModal, dbLoad, debounce, escapeHtml, modal, searchData, toast } from './helpers.js'
+import { fmtDate, now, peso, state, today } from './state.js'
 
-async function viewPurchaseOrders(root) {
+export let poItems = [];
+
+export async function viewPurchaseOrders(root) {
   await Promise.all([dbLoad('purchaseOrders'), dbLoad('suppliers'), dbLoad('inventory')]);
   root.innerHTML = `
     <div class="space-y-4 fade-in">
@@ -15,8 +20,8 @@ async function viewPurchaseOrders(root) {
   renderPOTable();
 }
 
-let debouncedRenderPOTable = debounce(renderPOTable, 250);
-function renderPOTable() {
+export let debouncedRenderPOTable = debounce(renderPOTable, 250);
+export function renderPOTable() {
   const q = document.getElementById('poSearch')?.value || '';
   const filtered = searchData(state.purchaseOrders, q, ['poNo','supplierName','status']);
   const sorted = [...filtered].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -37,7 +42,7 @@ function renderPOTable() {
     }).join('')}</tbody></table>`;
 }
 
-function openPOModal() {
+export function openPOModal() {
   poItems = [];
   const suppliers = state.suppliers;
   const inv = state.inventory;
@@ -63,7 +68,7 @@ function openPOModal() {
     </div>`);
 }
 
-function addPOItem() {
+export function addPOItem() {
   const sel = document.getElementById('po-item-select');
   const qtyEl = document.getElementById('po-qty');
   const prEl = document.getElementById('po-price');
@@ -81,7 +86,7 @@ function addPOItem() {
   renderPOCart();
 }
 
-function renderPOCart() {
+export function renderPOCart() {
   const el = document.getElementById('po-cart');
   const totalEl = document.getElementById('po-total');
   if (!el) return;
@@ -94,9 +99,9 @@ function renderPOCart() {
   </div>`).join('');
 }
 
-function removePOItem(i) { poItems.splice(i, 1); renderPOCart(); }
+export function removePOItem(i) { poItems.splice(i, 1); renderPOCart(); }
 
-async function savePO() {
+export async function savePO() {
   if (poItems.length === 0) { toast('Add at least one item', 'error'); return; }
   const supplierSel = document.getElementById('po-supplier');
   const dtEl = document.getElementById('po-date');
@@ -119,7 +124,7 @@ async function savePO() {
   closeModal();
 }
 
-async function receivePO(id) {
+export async function receivePO(id) {
   const po = await dbGet('purchaseOrders', id);
   if (!po) { toast('PO not found', 'error'); return; }
   if (po.status === 'Received') { toast('Already received', 'warning'); return; }
@@ -144,10 +149,26 @@ async function receivePO(id) {
   await logAudit('po-receive', `PO ${po.poNo} received`);
 }
 
-async function deletePO(id) {
+export async function deletePO(id) {
   if (!await confirmModal('Delete this purchase order?')) return;
   await dbDel('purchaseOrders', id);
   state.purchaseOrders = await dbAll('purchaseOrders');
   renderPOTable();
   toast('PO deleted');
 }
+
+
+// expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
+Object.defineProperties(window, {
+  poItems: { get: () => poItems, set: (v) => { poItems = v; }, configurable: true },
+  viewPurchaseOrders: { get: () => viewPurchaseOrders, configurable: true },
+  debouncedRenderPOTable: { get: () => debouncedRenderPOTable, configurable: true },
+  renderPOTable: { get: () => renderPOTable, configurable: true },
+  openPOModal: { get: () => openPOModal, configurable: true },
+  addPOItem: { get: () => addPOItem, configurable: true },
+  renderPOCart: { get: () => renderPOCart, configurable: true },
+  removePOItem: { get: () => removePOItem, configurable: true },
+  savePO: { get: () => savePO, configurable: true },
+  receivePO: { get: () => receivePO, configurable: true },
+  deletePO: { get: () => deletePO, configurable: true }
+});

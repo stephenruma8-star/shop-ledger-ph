@@ -1,4 +1,9 @@
-async function viewDashboard(root) {
+import { dbAdd, dbAll, dbPut } from './database.js'
+import { dbLoad, escapeHtml, modal, toast } from './helpers.js'
+import { escHtml, openPrintWindow } from './printLayout.js'
+import { fmtDate, fmtDateTime, peso, state, today } from './state.js'
+
+export async function viewDashboard(root) {
   await Promise.all([dbLoad('clients'), dbLoad('transactions'), dbLoad('expenses'), dbLoad('payments'), dbLoad('inventory'), dbLoad('settings')]);
   const todayStr = today();
   const todayTx = state.transactions.filter(t => t.date === todayStr);
@@ -111,7 +116,7 @@ async function viewDashboard(root) {
   if (dw.weather) { loadWeather(); loadNextHoliday(); loadHolidaysScroll(); }
 }
 
-function getDashWidgets() {
+export function getDashWidgets() {
   const ls = (() => { try { return JSON.parse(localStorage.getItem('dashWidgets')); } catch(e) { return null; } })();
   const setting = state.settings.find(s => s.key === 'dashWidgetConfig');
   const stored = setting ? (() => { try { return JSON.parse(setting.value); } catch(e) { return null; } })() : null;
@@ -126,7 +131,7 @@ function getDashWidgets() {
   return { ...defaults, ...(stored || {}) };
 }
 
-function dashCustomize() {
+export function dashCustomize() {
   const w = getDashWidgets();
   const items = { summaryCards: 'Summary Cards', profitBar: 'Profit Bar', weather: 'Weather & Holidays', chart: '7-Day Chart', payMethod: 'Payment Methods', topUtang: 'Top Utang', lowStock: 'Low Stock', aiInsights: 'AI Insights' };
   modal(`<div class="p-6"><div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">Customize Dashboard</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
@@ -134,7 +139,7 @@ function dashCustomize() {
     <div class="flex gap-2 pt-4"><button onclick="closeModal();viewDashboard(document.getElementById('view'))" class="flex-1 py-2 bg-blue-600 text-white rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Apply & Reload</button><button onclick="closeModal()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg">Close</button></div></div>`);
 }
 
-async function dashToggle(key, val) {
+export async function dashToggle(key, val) {
   const w = getDashWidgets();
   w[key] = val;
   const existing = state.settings.find(s => s.key === 'dashWidgetConfig');
@@ -143,7 +148,7 @@ async function dashToggle(key, val) {
   state.settings = await dbAll('settings');
 }
 
-async function dailySalesReport() {
+export async function dailySalesReport() {
   const todayStr = today();
   const todayTx = state.transactions.filter(t => t.date === todayStr);
   const todayExp = state.expenses.filter(e => e.date === todayStr);
@@ -170,7 +175,7 @@ async function dailySalesReport() {
     <div class="flex gap-2"><button onclick="printDailyReport(parseFloat(document.getElementById('drs-opening').value)||0)" class="flex-1 py-2 bg-blue-600 text-white rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print Report</button><button onclick="closeModal()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg">Cancel</button></div></div>`);
 }
 
-function printDailyReport(openingCash) {
+export function printDailyReport(openingCash) {
   const todayStr = today();
   const todayTx = state.transactions.filter(t => t.date === todayStr);
   const todayExp = state.expenses.filter(e => e.date === todayStr);
@@ -220,7 +225,7 @@ function printDailyReport(openingCash) {
   openPrintWindow('Daily Sales Report — ' + todayStr, 800, 700, html);
 }
 
-async function askAI() {
+export async function askAI() {
   const input = document.getElementById('ai-input');
   const chat = document.getElementById('ai-chat');
   const q = input.value.trim();
@@ -288,7 +293,7 @@ User question: ${q}`;
   chat.scrollTop = chat.scrollHeight;
 }
 
-async function loadWeather() {
+export async function loadWeather() {
   const el = document.getElementById('weather-display');
   if (!el) return;
   let cache;
@@ -346,7 +351,7 @@ async function loadWeather() {
   }
 }
 
-function getWeatherEmoji(code) {
+export function getWeatherEmoji(code) {
   const codeNum = parseInt(code);
   if (codeNum === 113) return '☀️';
   if (codeNum >= 116 && codeNum <= 119) return '⛅';
@@ -358,7 +363,7 @@ function getWeatherEmoji(code) {
   return '🌤️';
 }
 
-const PH_HOLIDAYS_FALLBACK = {
+export const PH_HOLIDAYS_FALLBACK = {
   '01-01': { localName: 'New Year\'s Day' },
   '02-25': { localName: 'EDSA People Power Revolution' },
   '04-09': { localName: 'Day of Valor' },
@@ -376,20 +381,20 @@ const PH_HOLIDAYS_FALLBACK = {
   '12-31': { localName: 'New Year\'s Eve' }
 };
 
-function _getHolidayYears() {
+export function _getHolidayYears() {
   const y = new Date().getFullYear();
   const years = [y];
   if (new Date().getMonth() >= 9) years.push(y + 1);
   return years;
 }
 
-async function _fetchHolidayCache(year) {
+export async function _fetchHolidayCache(year) {
   const cached = state.settings.find(s => s.key === 'holidays_' + year);
   if (cached) return JSON.parse(cached.value);
   return null;
 }
 
-async function _saveHolidayCache(year, holidays) {
+export async function _saveHolidayCache(year, holidays) {
   const existing = state.settings.find(s => s.key === 'holidays_' + year);
   const payload = { key: 'holidays_' + year, value: JSON.stringify(holidays) };
   if (existing) { existing.value = payload.value; await dbPut('settings', existing); }
@@ -397,7 +402,7 @@ async function _saveHolidayCache(year, holidays) {
   state.settings = await dbAll('settings');
 }
 
-function _fillFallbackHolidays(year, holidays) {
+export function _fillFallbackHolidays(year, holidays) {
   const existingDates = new Set(holidays.map(h => h.date));
   for (const [mmdd, info] of Object.entries(PH_HOLIDAYS_FALLBACK)) {
     const date = year + '-' + mmdd;
@@ -408,7 +413,7 @@ function _fillFallbackHolidays(year, holidays) {
   return holidays;
 }
 
-async function _loadHolidays(year) {
+export async function _loadHolidays(year) {
   let holidays = await _fetchHolidayCache(year);
   if (holidays) return holidays;
   try {
@@ -427,7 +432,7 @@ async function _loadHolidays(year) {
   return offlineHolidays;
 }
 
-async function loadHolidaysScroll() {
+export async function loadHolidaysScroll() {
   const el = document.getElementById('holidays-list');
   if (!el) return;
   try {
@@ -449,7 +454,7 @@ async function loadHolidaysScroll() {
   }
 }
 
-async function loadNextHoliday() {
+export async function loadNextHoliday() {
   const el = document.getElementById('next-holiday');
   if (!el) return;
   try {
@@ -476,7 +481,7 @@ async function loadNextHoliday() {
   }
 }
 
-async function showPHHolidays(year) {
+export async function showPHHolidays(year) {
   if (!year) year = new Date().getFullYear();
   const existing = document.getElementById('holiday-modal');
   if (existing) existing.remove();
@@ -517,7 +522,7 @@ async function showPHHolidays(year) {
   }
 }
 
-function drawDashChart() {
+export function drawDashChart() {
   if (typeof Chart === 'undefined') { setTimeout(drawDashChart, 200); return; }
   if (window.__app.chartInstances.dash) window.__app.chartInstances.dash.destroy();
   const labels = [];
@@ -546,7 +551,7 @@ function drawDashChart() {
   });
 }
 
-function drawPayMethodChart() {
+export function drawPayMethodChart() {
   if (typeof Chart === 'undefined') { setTimeout(drawPayMethodChart, 200); return; }
   if (window.__app.chartInstances.payMethod) window.__app.chartInstances.payMethod.destroy();
   const todayStr = today();
@@ -574,3 +579,28 @@ function drawPayMethodChart() {
     }
   });
 }
+
+
+// expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
+Object.defineProperties(window, {
+  viewDashboard: { get: () => viewDashboard, configurable: true },
+  getDashWidgets: { get: () => getDashWidgets, configurable: true },
+  dashCustomize: { get: () => dashCustomize, configurable: true },
+  dashToggle: { get: () => dashToggle, configurable: true },
+  dailySalesReport: { get: () => dailySalesReport, configurable: true },
+  printDailyReport: { get: () => printDailyReport, configurable: true },
+  askAI: { get: () => askAI, configurable: true },
+  loadWeather: { get: () => loadWeather, configurable: true },
+  getWeatherEmoji: { get: () => getWeatherEmoji, configurable: true },
+  PH_HOLIDAYS_FALLBACK: { get: () => PH_HOLIDAYS_FALLBACK, configurable: true },
+  _getHolidayYears: { get: () => _getHolidayYears, configurable: true },
+  _fetchHolidayCache: { get: () => _fetchHolidayCache, configurable: true },
+  _saveHolidayCache: { get: () => _saveHolidayCache, configurable: true },
+  _fillFallbackHolidays: { get: () => _fillFallbackHolidays, configurable: true },
+  _loadHolidays: { get: () => _loadHolidays, configurable: true },
+  loadHolidaysScroll: { get: () => loadHolidaysScroll, configurable: true },
+  loadNextHoliday: { get: () => loadNextHoliday, configurable: true },
+  showPHHolidays: { get: () => showPHHolidays, configurable: true },
+  drawDashChart: { get: () => drawDashChart, configurable: true },
+  drawPayMethodChart: { get: () => drawPayMethodChart, configurable: true }
+});

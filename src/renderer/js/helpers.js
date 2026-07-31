@@ -1,13 +1,22 @@
-function dp(d) { const p = (d||'').split('-'); return { y: p[0]||'', m: p[1]||'', d: p[2]||'' }; }
+import { logAudit } from './auth.js'
+import { cfUpdateRowAmt, cfUpdateTotals } from './clients.js'
+import { dbAdd, dbAll, dbPut } from './database.js'
+import { renderExpTable } from './expenses.js'
+import { renderPayTable } from './payments.js'
+import { navigate } from './router.js'
+import { now, peso, state, today } from './state.js'
+import { renderTxTable, txCart, updateCartRowAmt, updateTMTotals } from './transactions.js'
+
+export function dp(d) { const p = (d||'').split('-'); return { y: p[0]||'', m: p[1]||'', d: p[2]||'' }; }
 
 window.__app = window.__app || {};
 window.__app._suggestHide = null;
 window.__app._suggestIndex = -1;
 window.__app._suggestMatches = [];
 window.__app._pageState = { tx: 1, exp: 1, pay: 1 };
-const PAGE_SIZE = 50;
+export const PAGE_SIZE = 50;
 
-function paginate(arr, key) {
+export function paginate(arr, key) {
   const st = window.__app._pageState;
   const totalPages = Math.ceil(arr.length / PAGE_SIZE) || 1;
   if ((st[key] || 1) > totalPages) st[key] = totalPages;
@@ -15,20 +24,20 @@ function paginate(arr, key) {
   return { items: arr.slice((p-1)*PAGE_SIZE, p*PAGE_SIZE), page: p, totalPages };
 }
 
-function renderPagination(key, page, totalPages) {
+export function renderPagination(key, page, totalPages) {
   if (totalPages <= 1) return '';
   const prev = page > 1 ? `window.__app._pageState['${key}']=${page-1};renderPagedTable('${key}')` : '';
   const next = page < totalPages ? `window.__app._pageState['${key}']=${page+1};renderPagedTable('${key}')` : '';
   return `<div class="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-700 text-xs border-t dark:border-gray-700"><span>Page ${page} of ${totalPages}</span><div class="flex gap-1"><button onclick="${prev}" class="px-2 py-1 rounded ${page<=1?'text-gray-400 cursor-default':'bg-white dark:bg-gray-600 hover:bg-gray-200 dark:text-gray-200'}">Prev</button><button onclick="${next}" class="px-2 py-1 rounded ${page>=totalPages?'text-gray-400 cursor-default':'bg-white dark:bg-gray-600 hover:bg-gray-200 dark:text-gray-200'}">Next</button></div></div>`;
 }
 
-function renderPagedTable(key) {
+export function renderPagedTable(key) {
   if (key === 'tx') renderTxTable();
   else if (key === 'exp') renderExpTable();
   else if (key === 'pay') renderPayTable();
 }
 
-function showItemSuggestions(input, prefix, i) {
+export function showItemSuggestions(input, prefix, i) {
   if (window.__app._suggestHide) { clearTimeout(window.__app._suggestHide); window.__app._suggestHide = null; }
   const val = input.value.trim().toLowerCase();
   let existing = document.getElementById('suggest-drop-' + prefix + '-' + i);
@@ -69,13 +78,13 @@ function showItemSuggestions(input, prefix, i) {
   };
 }
 
-function clearItemSuggestions() {
+export function clearItemSuggestions() {
   document.querySelectorAll('[id^="suggest-drop-"]').forEach(el => el.remove());
   window.__app._suggestIndex = -1;
   window.__app._suggestMatches = [];
 }
 
-function selectItemSuggestion(name, price, invId, prefix, i) {
+export function selectItemSuggestion(name, price, invId, prefix, i) {
   const d = document.getElementById('suggest-drop-' + prefix + '-' + i);
   if (d) d.remove();
   const descEl = document.getElementById(prefix + '-desc-' + i);
@@ -111,7 +120,7 @@ document.addEventListener('click', function(e) {
   clearItemSuggestions();
 });
 
-function startClock() {
+export function startClock() {
   function tick() {
     const el = document.getElementById('sidebar-clock');
     if (!el) return;
@@ -127,7 +136,7 @@ function startClock() {
   setInterval(tick, 1000);
 }
 
-function populateYearSelector() {
+export function populateYearSelector() {
   const sel = document.getElementById('year-selector');
   if (!sel) return;
   const years = new Set();
@@ -140,14 +149,14 @@ function populateYearSelector() {
   sel.innerHTML = '<option value="all">All Years</option>' + sorted.map(y => `<option value="${y}" ${state.selectedYear === y ? 'selected' : ''}>${y}</option>`).join('');
 }
 
-function changeYear(year) {
+export function changeYear(year) {
   state.selectedYear = year;
   localStorage.setItem('selectedYear', year);
   if (year === 'all') { showAllYearsSummary(); return; }
   navigate(state.currentRoute);
 }
 
-function showAllYearsSummary() {
+export function showAllYearsSummary() {
   const years = new Set();
   state.transactions.forEach(t => { if (t.date) years.add(t.date.split('-')[0]); });
   state.expenses.forEach(e => { if (e.date) years.add(e.date.split('-')[0]); });
@@ -196,7 +205,7 @@ function showAllYearsSummary() {
   </div>`);
 }
 
-function filterByYear(data, dateField) {
+export function filterByYear(data, dateField) {
   if (state.selectedYear === 'all' || !data || !data.length) return data;
   const y = state.selectedYear;
   return data.filter(d => {
@@ -206,7 +215,7 @@ function filterByYear(data, dateField) {
   });
 }
 
-function lookupItem(prefix, i) {
+export function lookupItem(prefix, i) {
   const input = document.getElementById(prefix + '-desc-' + i);
   if (!input) return;
   const val = input.value.trim().toLowerCase();
@@ -228,7 +237,7 @@ function lookupItem(prefix, i) {
   else { updateCartRowAmt(i); updateTMTotals(); }
 }
 
-function intRateOptions(selected) {
+export function intRateOptions(selected) {
   let opts = '<option value="0"' + (selected == 0 ? ' selected' : '') + '>0%</option>';
   for (let r = 0.5; r <= 20; r += 0.5) {
     const v = Math.round(r * 10) / 10;
@@ -237,11 +246,11 @@ function intRateOptions(selected) {
   return opts;
 }
 
-function calcInterest(sub, ratePct, days) {
+export function calcInterest(sub, ratePct, days) {
   return sub === 0 || ratePct === 0 ? 0 : parseFloat((sub * (ratePct / 100) * (days / 30)).toFixed(2));
 }
 
-function toast(msg, type = 'info') {
+export function toast(msg, type = 'info') {
   const colors = { info: 'bg-blue-600', success: 'bg-green-600', error: 'bg-red-600', warning: 'bg-yellow-600' };
   const c = document.getElementById('toasts');
   if (!c) return;
@@ -255,8 +264,8 @@ function toast(msg, type = 'info') {
 }
 
 // Sound effects
-let _audioCtx;
-function playSound(type) {
+export let _audioCtx;
+export function playSound(type) {
   try {
     if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const osc = _audioCtx.createOscillator();
@@ -297,13 +306,13 @@ function playSound(type) {
 }
 
 // Loading spinner
-function showSpinner(msg = 'Loading...') {
+export function showSpinner(msg = 'Loading...') {
   const v = document.getElementById('view');
   if (v) v.innerHTML = `<div class="flex items-center justify-center h-64"><div class="text-center"><div class="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div><p class="text-gray-500 text-sm">${escapeHtml(msg)}</p></div></div>`;
 }
 
 // Confetti
-function confetti() {
+export function confetti() {
   const c = document.createElement('canvas');
   c.className = 'fixed inset-0 pointer-events-none z-[500]';
   c.width = window.innerWidth; c.height = window.innerHeight;
@@ -331,20 +340,20 @@ function confetti() {
   draw();
 }
 
-function modal(html) {
+export function modal(html) {
   const root = document.getElementById('modal-root');
   if (!root) return;
   root.innerHTML = `<div class="fixed inset-0 bg-black/50 z-[400] flex items-start justify-center pt-4 overflow-auto fade-in" onclick="if(event.target===this)closeModal()"><div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-[90vw] mx-4 mb-4 slide-in max-h-[95vh] overflow-auto glass-strong" onclick="event.stopPropagation()">${html}</div></div>`;
 }
 
-function closeModal() {
+export function closeModal() {
   if (_confirmResolve) { _confirmResolve(false); _confirmResolve = null; }
   clearItemSuggestions();
   const root = document.getElementById('modal-root');
   if (root) root.innerHTML = '';
 }
 
-function toggleSidebar() {
+export function toggleSidebar() {
   const aside = document.querySelector('#app > aside');
   const overlay = document.getElementById('sidebar-overlay');
   if (!aside) return;
@@ -352,12 +361,12 @@ function toggleSidebar() {
   if (overlay) overlay.classList.toggle('open', isOpen);
 }
 
-function toggleTheme() {
+export function toggleTheme() {
   document.documentElement.classList.toggle('dark');
   localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
 }
 
-function showShortcuts() {
+export function showShortcuts() {
   modal(`
     <div class="p-6">
       <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">⌨️ Keyboard Shortcuts</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
@@ -390,39 +399,39 @@ function showShortcuts() {
     </div>`);
 }
 
-function focusPageSearch() {
+export function focusPageSearch() {
   const searchInput = document.querySelector('#view input[placeholder*="Search"], #view input[type="search"], #txSearch, #paySearch, #expSearch, #utangSearch, #invSearch');
   if (searchInput) { searchInput.focus(); searchInput.select(); }
 }
 
-function saveCurrentModal() {
+export function saveCurrentModal() {
   const saveBtn = document.querySelector('#modal-root button.bg-blue-600:not([onclick*="closeModal"]), #modal-root button.bg-green-600');
   if (saveBtn) saveBtn.click();
 }
 
-function validateNumber(v) { return !isNaN(parseFloat(v)) && isFinite(v) && parseFloat(v) >= 0; }
+export function validateNumber(v) { return !isNaN(parseFloat(v)) && isFinite(v) && parseFloat(v) >= 0; }
 
-function validateRequired(v) { return v !== null && v !== undefined && String(v).trim() !== ''; }
+export function validateRequired(v) { return v !== null && v !== undefined && String(v).trim() !== ''; }
 
-function validatePhone(v) { return /^(\+63|0)?\d{10,11}$/.test(String(v).trim()); }
+export function validatePhone(v) { return /^(\+63|0)?\d{10,11}$/.test(String(v).trim()); }
 
-function debounce(fn, ms = 250) { let timer; return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); }; }
+export function debounce(fn, ms = 250) { let timer; return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); }; }
 
-function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-function dbLoad(store) {
+export function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+export function dbLoad(store) {
   if (state[store] && state[store].length > 0) return Promise.resolve(state[store]);
   return dbAll(store).then(data => { state[store] = data; return data; });
 }
 
-async function hashPassword(pw) { const b = new TextEncoder().encode(pw); const h = await crypto.subtle.digest('SHA-256', b); return Array.from(new Uint8Array(h)).map(b => b.toString(16).padStart(2,'0')).join(''); }
-let _confirmResolve = null;
-function confirmModal(msg, label) {
+export async function hashPassword(pw) { const b = new TextEncoder().encode(pw); const h = await crypto.subtle.digest('SHA-256', b); return Array.from(new Uint8Array(h)).map(b => b.toString(16).padStart(2,'0')).join(''); }
+export let _confirmResolve = null;
+export function confirmModal(msg, label) {
   if (_confirmResolve) { _confirmResolve(false); _confirmResolve = null; }
   modal(`<div class="p-6"><h3 class="text-lg font-bold mb-3">${escapeHtml(msg)}</h3><div class="flex gap-2 justify-end"><button onclick="closeModal();_confirmResolve&&_confirmResolve(false)" class="px-4 py-2 border dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Cancel</button><button onclick="_confirmResolve&&_confirmResolve(true);closeModal()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>${escapeHtml(label||'Confirm')}</button></div></div>`);
   return new Promise(r => { _confirmResolve = r; });
 }
 
-function parseCSVLine(line) {
+export function parseCSVLine(line) {
   const parts = [];
   let current = '';
   let inQuotes = false;
@@ -436,13 +445,13 @@ function parseCSVLine(line) {
   return parts;
 }
 
-function searchData(arr, query, fields) {
+export function searchData(arr, query, fields) {
   if (!query || !query.trim()) return arr;
   const q = query.toLowerCase().trim();
   return arr.filter(item => fields.some(f => String(item[f] || '').toLowerCase().includes(q)));
 }
 
-function updateLowStockBadge() {
+export function updateLowStockBadge() {
   const badge = document.getElementById('lowStockBadge');
   if (!badge) return;
   const count = (state.inventory || []).filter(i => (i.stock || 0) <= (i.minStock || 5)).length;
@@ -450,7 +459,7 @@ function updateLowStockBadge() {
   else badge.classList.add('hidden');
 }
 
-function updateNotifications() {
+export function updateNotifications() {
   const badge = document.getElementById('notif-badge');
   const panel = document.getElementById('notif-panel');
   if (!badge) return;
@@ -471,18 +480,18 @@ function updateNotifications() {
   }
 }
 
-function toggleNotifPanel() {
+export function toggleNotifPanel() {
   const panel = document.getElementById('notif-panel');
   if (!panel) return;
   panel.classList.toggle('hidden');
   updateNotifications();
 }
 
-function hasInterestItems(clientId) {
+export function hasInterestItems(clientId) {
   return (state.transactions || []).some(t => t.clientId === clientId && (t.items || []).some(i => parseFloat(i.intRate) > 0));
 }
 
-function getInterestRate(clientId) {
+export function getInterestRate(clientId) {
   const txns = (state.transactions || [])
     .filter(t => t.clientId === clientId)
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
@@ -493,7 +502,7 @@ function getInterestRate(clientId) {
   return 0;
 }
 
-async function applyDailyInterest() {
+export async function applyDailyInterest() {
   const lastDateSetting = state.settings.find(s => s.key === 'lastInterestDate');
   const lastDate = lastDateSetting?.value || '';
   const todayStr = today();
@@ -539,7 +548,7 @@ async function applyDailyInterest() {
   if (applied > 0) toast(`Interest applied: ${applied} client(s) over ${days} day(s)`, 'info');
 }
 
-async function runCloudBackup() {
+export async function runCloudBackup() {
   if (!window.electronAPI) return;
   const settingsMap = {};
   state.settings.forEach(s => settingsMap[s.key] = s.value);
@@ -569,7 +578,7 @@ async function runCloudBackup() {
   }
 }
 
-async function checkCloudBackupDue() {
+export async function checkCloudBackupDue() {
   const settingsMap = {};
   state.settings.forEach(s => settingsMap[s.key] = s.value);
   if (settingsMap['cloudBackupEnabled'] !== 'true') return;
@@ -591,3 +600,55 @@ async function checkCloudBackupDue() {
     if (d.getMonth() !== new Date().getMonth() || d.getFullYear() !== new Date().getFullYear()) await runCloudBackup();
   }
 }
+
+
+// expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
+Object.defineProperties(window, {
+  dp: { get: () => dp, configurable: true },
+  PAGE_SIZE: { get: () => PAGE_SIZE, configurable: true },
+  paginate: { get: () => paginate, configurable: true },
+  renderPagination: { get: () => renderPagination, configurable: true },
+  renderPagedTable: { get: () => renderPagedTable, configurable: true },
+  showItemSuggestions: { get: () => showItemSuggestions, configurable: true },
+  clearItemSuggestions: { get: () => clearItemSuggestions, configurable: true },
+  selectItemSuggestion: { get: () => selectItemSuggestion, configurable: true },
+  startClock: { get: () => startClock, configurable: true },
+  populateYearSelector: { get: () => populateYearSelector, configurable: true },
+  changeYear: { get: () => changeYear, configurable: true },
+  showAllYearsSummary: { get: () => showAllYearsSummary, configurable: true },
+  filterByYear: { get: () => filterByYear, configurable: true },
+  lookupItem: { get: () => lookupItem, configurable: true },
+  intRateOptions: { get: () => intRateOptions, configurable: true },
+  calcInterest: { get: () => calcInterest, configurable: true },
+  toast: { get: () => toast, configurable: true },
+  _audioCtx: { get: () => _audioCtx, set: (v) => { _audioCtx = v; }, configurable: true },
+  playSound: { get: () => playSound, configurable: true },
+  showSpinner: { get: () => showSpinner, configurable: true },
+  confetti: { get: () => confetti, configurable: true },
+  modal: { get: () => modal, configurable: true },
+  closeModal: { get: () => closeModal, configurable: true },
+  toggleSidebar: { get: () => toggleSidebar, configurable: true },
+  toggleTheme: { get: () => toggleTheme, configurable: true },
+  showShortcuts: { get: () => showShortcuts, configurable: true },
+  focusPageSearch: { get: () => focusPageSearch, configurable: true },
+  saveCurrentModal: { get: () => saveCurrentModal, configurable: true },
+  validateNumber: { get: () => validateNumber, configurable: true },
+  validateRequired: { get: () => validateRequired, configurable: true },
+  validatePhone: { get: () => validatePhone, configurable: true },
+  debounce: { get: () => debounce, configurable: true },
+  escapeHtml: { get: () => escapeHtml, configurable: true },
+  dbLoad: { get: () => dbLoad, configurable: true },
+  hashPassword: { get: () => hashPassword, configurable: true },
+  _confirmResolve: { get: () => _confirmResolve, set: (v) => { _confirmResolve = v; }, configurable: true },
+  confirmModal: { get: () => confirmModal, configurable: true },
+  parseCSVLine: { get: () => parseCSVLine, configurable: true },
+  searchData: { get: () => searchData, configurable: true },
+  updateLowStockBadge: { get: () => updateLowStockBadge, configurable: true },
+  updateNotifications: { get: () => updateNotifications, configurable: true },
+  toggleNotifPanel: { get: () => toggleNotifPanel, configurable: true },
+  hasInterestItems: { get: () => hasInterestItems, configurable: true },
+  getInterestRate: { get: () => getInterestRate, configurable: true },
+  applyDailyInterest: { get: () => applyDailyInterest, configurable: true },
+  runCloudBackup: { get: () => runCloudBackup, configurable: true },
+  checkCloudBackupDue: { get: () => checkCloudBackupDue, configurable: true }
+});

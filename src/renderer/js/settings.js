@@ -1,4 +1,8 @@
-async function viewSettings(root) {
+import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
+import { closeModal, dbLoad, escapeHtml, hashPassword, modal, toast } from './helpers.js'
+import { state } from './state.js'
+
+export async function viewSettings(root) {
   await Promise.all([dbLoad('settings'), dbLoad('users'), dbLoad('quickItems')]);
   const settingsMap = {};
   state.settings.forEach(s => settingsMap[s.key] = s.value);
@@ -108,7 +112,7 @@ async function viewSettings(root) {
     </div>`;
 }
 
-async function saveSettings() {
+export async function saveSettings() {
   const keys = ['shopName','shopContact','shopAddress','weatherLocation','cloudBackupFolder','cloudBackupPassword','cloudBackupInterval','smsApiKey','backupEmail','aiApiKey','aiModel','receiptFooter','receiptHeaderText','printStripeColor1','printStripeColor2'];
   for (const key of keys) {
     const el = document.getElementById(`set-${key}`);
@@ -136,7 +140,7 @@ async function saveSettings() {
   toast('Settings saved');
 }
 
-async function updateQuickItemField(el) {
+export async function updateQuickItemField(el) {
   const id = parseInt(el.dataset.qiId);
   const field = el.dataset.field;
   const val = field === 'price' ? (parseFloat(el.value) || 0) : el.value.trim();
@@ -144,7 +148,7 @@ async function updateQuickItemField(el) {
   if (item) { item[field] = val; await dbPut('quickItems', item); }
 }
 
-async function addQuickItem() {
+export async function addQuickItem() {
   const nmEl = document.getElementById('new-qi-name');
   const prEl = document.getElementById('new-qi-price');
   if (!nmEl || !prEl) { toast('Form not ready', 'warning'); return; }
@@ -159,13 +163,13 @@ async function addQuickItem() {
   toast('Quick item added');
 }
 
-async function deleteQuickItem(id) {
+export async function deleteQuickItem(id) {
   await dbDel('quickItems', id);
   state.quickItems = await dbAll('quickItems');
   viewSettings(document.getElementById('view'));
 }
 
-function uploadReceiptLogo(e) {
+export function uploadReceiptLogo(e) {
   const file = e.target.files[0];
   if (!file) return;
   const reader = new FileReader();
@@ -182,7 +186,7 @@ function uploadReceiptLogo(e) {
   reader.readAsDataURL(file);
 }
 
-async function removeReceiptLogo() {
+export async function removeReceiptLogo() {
   const existing = state.settings.find(s => s.key === 'receiptLogo');
   if (existing) { await dbDel('settings', existing.id); }
   state.settings = await dbAll('settings');
@@ -191,7 +195,7 @@ async function removeReceiptLogo() {
   toast('Logo removed');
 }
 
-async function selectCloudFolder() {
+export async function selectCloudFolder() {
   if (!window.electronAPI) { toast('Folder selection only in desktop app', 'warning'); return; }
   const result = await window.electronAPI.selectFolder();
   if (result.success) {
@@ -199,7 +203,7 @@ async function selectCloudFolder() {
   }
 }
 
-function openUserModal(id) {
+export function openUserModal(id) {
   const isEdit = !!id;
   const u = isEdit ? state.users.find(x => x.id === id) : null;
   modal(`
@@ -218,7 +222,7 @@ function openUserModal(id) {
     </div>`);
 }
 
-async function saveUser(id) {
+export async function saveUser(id) {
   const unEl = document.getElementById('uf-username');
   const pwEl = document.getElementById('uf-password');
   const nmEl = document.getElementById('uf-name');
@@ -245,7 +249,7 @@ async function saveUser(id) {
   viewSettings(document.getElementById('view'));
 }
 
-async function checkUpdates() {
+export async function checkUpdates() {
   const btn = document.getElementById('btn-check-update');
   const text = document.getElementById('check-update-text');
   const status = document.getElementById('update-status');
@@ -271,7 +275,7 @@ async function checkUpdates() {
   btn.disabled = false;
 }
 
-async function rebuildApp() {
+export async function rebuildApp() {
   if (!window.electronAPI?.rebuildApp) { toast('Rebuild only available in desktop app', 'warning'); return; }
   const btn = document.getElementById('btn-rebuild');
   const text = document.getElementById('rebuild-text');
@@ -304,3 +308,20 @@ async function rebuildApp() {
     btn.className = 'w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-xl hover:from-blue-700 hover:to-indigo-800 font-semibold flex items-center justify-center gap-2';
   }
 }
+
+
+// expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
+Object.defineProperties(window, {
+  viewSettings: { get: () => viewSettings, configurable: true },
+  saveSettings: { get: () => saveSettings, configurable: true },
+  updateQuickItemField: { get: () => updateQuickItemField, configurable: true },
+  addQuickItem: { get: () => addQuickItem, configurable: true },
+  deleteQuickItem: { get: () => deleteQuickItem, configurable: true },
+  uploadReceiptLogo: { get: () => uploadReceiptLogo, configurable: true },
+  removeReceiptLogo: { get: () => removeReceiptLogo, configurable: true },
+  selectCloudFolder: { get: () => selectCloudFolder, configurable: true },
+  openUserModal: { get: () => openUserModal, configurable: true },
+  saveUser: { get: () => saveUser, configurable: true },
+  checkUpdates: { get: () => checkUpdates, configurable: true },
+  rebuildApp: { get: () => rebuildApp, configurable: true }
+});

@@ -1,4 +1,10 @@
-async function viewUtang(root) {
+import { logAudit } from './auth.js'
+import { dbGet } from './database.js'
+import { applyDailyInterest, closeModal, dbLoad, debounce, escapeHtml, modal, searchData, toast } from './helpers.js'
+import { openPrintWindow } from './printLayout.js'
+import { fmtDate, peso, state, today } from './state.js'
+
+export async function viewUtang(root) {
   await Promise.all([dbLoad('clients'), dbLoad('transactions'), dbLoad('payments')]);
   await applyDailyInterest();
   const debtors = state.clients.filter(c => (c.balance || 0) > 0).sort((a, b) => (b.balance || 0) - (a.balance || 0));
@@ -37,8 +43,8 @@ async function viewUtang(root) {
   renderUtangTable();
 }
 
-let debouncedRenderUtangTable = debounce(renderUtangTable, 250);
-function renderUtangTable() {
+export let debouncedRenderUtangTable = debounce(renderUtangTable, 250);
+export function renderUtangTable() {
   const q = document.getElementById('utangSearch')?.value || '';
   const debtors = state.clients.filter(c => (c.balance || 0) > 0).sort((a, b) => (b.balance || 0) - (a.balance || 0));
   const filtered = searchData(debtors, q, ['name','phone']);
@@ -65,7 +71,7 @@ function renderUtangTable() {
       }).join('')}</tbody></table>`;
 }
 
-async function sendSMSReminder(clientId) {
+export async function sendSMSReminder(clientId) {
   const c = await dbGet('clients', clientId);
   if (!c || !c.phone) { toast('Client has no phone number', 'error'); return; }
   const smsSetting = state.settings.find(x => x.key === 'smsApiKey');
@@ -82,7 +88,7 @@ async function sendSMSReminder(clientId) {
     </div>`);
 }
 
-async function doSendSMS(clientId) {
+export async function doSendSMS(clientId) {
   const c = await dbGet('clients', clientId);
   const smEl = document.getElementById('smsMessage');
   if (!smEl) { toast('Form not ready', 'error'); return; }
@@ -100,7 +106,7 @@ async function doSendSMS(clientId) {
   } catch (e) { toast('SMS error: ' + e.message, 'error'); }
 }
 
-async function bulkSMSOverdue() {
+export async function bulkSMSOverdue() {
   const smsSetting = state.settings.find(x => x.key === 'smsApiKey');
   if (!smsSetting || !smsSetting.value) { toast('SMS API key not configured in Settings', 'warning'); return; }
   const overdue = state.clients.filter(c => (c.balance || 0) > 0 && c.dueDate && c.dueDate < today() && c.phone);
@@ -119,7 +125,7 @@ async function bulkSMSOverdue() {
     </div>`);
 }
 
-async function doBulkSMS() {
+export async function doBulkSMS() {
   const bmEl = document.getElementById('bulkSmsMsg');
   if (!bmEl) { toast('Form not ready', 'error'); return; }
   const msg = bmEl.value.trim();
@@ -140,7 +146,7 @@ async function doBulkSMS() {
   if (failed > 0) toast(`${failed} failed`, 'warning');
 }
 
-const debtColumns = [
+export const debtColumns = [
   { key: 'date', label: 'Date', align: 'left', inputAlign: '' },
   { key: 'item', label: 'Item/Description', align: 'left', inputAlign: '' },
   { key: 'qty', label: 'Qty/Name', align: 'ctr', inputAlign: 'center', cls: 'qty' },
@@ -152,12 +158,12 @@ const debtColumns = [
   { key: 'signature', label: 'Signature', align: 'left', inputAlign: '' }
 ];
 
-function getDebtCols() {
+export function getDebtCols() {
   try { return JSON.parse(localStorage.getItem('debtFormCols')) || debtColumns.map(c => c.key); }
   catch { return debtColumns.map(c => c.key); }
 }
 
-function printBlankDebtForm() {
+export function printBlankDebtForm() {
   const saved = getDebtCols();
   const rc = parseInt(localStorage.getItem('debtRowCount')) || 10;
   modal(`
@@ -180,19 +186,19 @@ function printBlankDebtForm() {
     </div>`);
 }
 
-function debtRowChanged() {
+export function debtRowChanged() {
   const drEl = document.getElementById('drc');
   if (!drEl) return;
   const v = parseInt(drEl.value) || 10;
   localStorage.setItem('debtRowCount', String(Math.max(1, Math.min(99, v))));
 }
 
-function debtColsChanged() {
+export function debtColsChanged() {
   const keys = [...document.querySelectorAll('#modal-root input[data-key]:checked')].map(cb => cb.dataset.key);
   localStorage.setItem('debtFormCols', JSON.stringify(keys));
 }
 
-function doDebtForm(orientation) {
+export function doDebtForm(orientation) {
   const todayStr = today();
   const isLandscape = orientation === 'landscape';
   const cols = debtColumns.filter(c => getDebtCols().includes(c.key));
@@ -263,3 +269,21 @@ ${tablesHtml}
 `;
   openPrintWindow('Blank Debt Record Form', 850, 700, content, { size: orientation, extraCss });
 }
+
+
+// expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
+Object.defineProperties(window, {
+  viewUtang: { get: () => viewUtang, configurable: true },
+  debouncedRenderUtangTable: { get: () => debouncedRenderUtangTable, configurable: true },
+  renderUtangTable: { get: () => renderUtangTable, configurable: true },
+  sendSMSReminder: { get: () => sendSMSReminder, configurable: true },
+  doSendSMS: { get: () => doSendSMS, configurable: true },
+  bulkSMSOverdue: { get: () => bulkSMSOverdue, configurable: true },
+  doBulkSMS: { get: () => doBulkSMS, configurable: true },
+  debtColumns: { get: () => debtColumns, configurable: true },
+  getDebtCols: { get: () => getDebtCols, configurable: true },
+  printBlankDebtForm: { get: () => printBlankDebtForm, configurable: true },
+  debtRowChanged: { get: () => debtRowChanged, configurable: true },
+  debtColsChanged: { get: () => debtColsChanged, configurable: true },
+  doDebtForm: { get: () => doDebtForm, configurable: true }
+});
