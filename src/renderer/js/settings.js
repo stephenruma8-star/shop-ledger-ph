@@ -94,7 +94,7 @@ export async function viewSettings(root) {
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
         <div class="flex items-center justify-between mb-3">
           <h3 class="font-bold text-lg">⚙️ App Version</h3>
-          <span class="text-xs text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded" id="app-version-label">v${settingsMap['lastBuildVersion'] || '3.4.4'}</span>
+          <span class="text-xs text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded" id="app-version-label">v${settingsMap['lastBuildVersion'] || '3.4.5'}</span>
         </div>
         <p class="text-xs text-gray-400 mb-3">Built from source at <code class="text-blue-500">C:\Users\CDH\Desktop\shop-ledger-ph</code></p>
         <button id="btn-check-update" onclick="checkUpdates()" class="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-xl hover:from-blue-700 hover:to-indigo-800 font-semibold flex items-center justify-center gap-2">
@@ -289,11 +289,11 @@ export async function rebuildApp() {
   try {
     const result = await window.electronAPI.rebuildApp();
     if (result.success) {
-      let version = '3.4.4';
+      let version = '3.4.5';
       const verRes = await fetch('version.json?' + Date.now());
       if (verRes.ok) { try { const v = await verRes.json(); if (v.version) { version = v.version; const s = state.settings.find(x => x.key === 'lastBuildVersion'); if (s) { s.value = v.version; await dbPut('settings', s); } else { await dbAdd('settings', { key: 'lastBuildVersion', value: v.version }); } } } catch(e) {} }
       status.className = 'text-xs text-green-500 mt-2 text-center';
-      status.textContent = `Build complete! Installer at build/Shop Ledger PH Setup ${version}.exe, portable at build/Shop-Ledger-PH-${version}-portable.exe`;
+      status.textContent = `Build complete! Installer at build/Shop-Ledger-PH-Setup-${version}.exe, portable at build/Shop-Ledger-PH-${version}-portable.exe`;
       text.textContent = 'Rebuild Complete ✓';
       btn.className = 'w-full py-3 bg-green-600 text-white rounded-xl font-semibold flex items-center justify-center gap-2';
       toast('Build successful — run the new .exe to update');
