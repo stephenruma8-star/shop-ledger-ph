@@ -4,7 +4,7 @@ async function viewSuppliers(root) {
     <div class="space-y-4 fade-in">
       <div class="flex gap-2 flex-wrap items-center">
         <input id="supSearch" placeholder="Search suppliers..." class="flex-1 min-w-[200px] px-4 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" oninput="debouncedRenderSupTable()" />
-        <button onclick="openSupplierModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">+ New Supplier</button>
+        <button onclick="openSupplierModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Supplier</button>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden glass-card">
         <div class="overflow-auto" id="supTable"></div>
@@ -13,7 +13,7 @@ async function viewSuppliers(root) {
   renderSupTable();
 }
 
-var debouncedRenderSupTable = debounce(renderSupTable, 250);
+let debouncedRenderSupTable = debounce(renderSupTable, 250);
 function renderSupTable() {
   const q = document.getElementById('supSearch')?.value || '';
   const filtered = searchData(state.suppliers, q, ['name','contact','email','category']);
@@ -24,7 +24,7 @@ function renderSupTable() {
     <tbody>${filtered.map(s => `<tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
       <td class="p-3 font-medium">${escapeHtml(s.name)}</td><td class="p-3">${escapeHtml(s.contact || '-')}</td><td class="p-3 text-gray-500">${escapeHtml(s.email || '-')}</td>
       <td class="p-3">${escapeHtml(s.category || '-')}</td>
-      <td class="p-3 text-center"><button onclick="openSupplierModal(${s.id})" class="text-blue-600 hover:text-blue-800 text-xs mr-2">Edit</button><button onclick="deleteSup(${s.id})" class="text-red-600 hover:text-red-800 text-xs">Del</button></td>
+      <td class="p-3 text-center"><button onclick="openSupplierModal(${s.id})" class="text-blue-600 hover:text-blue-800 text-xs mr-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit</button><button onclick="deleteSup(${s.id})" class="text-red-600 hover:text-red-800 text-xs"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Del</button></td>
     </tr>`).join('')}</tbody></table>`;
 }
 
@@ -33,7 +33,7 @@ function openSupplierModal(id) {
   const s = isEdit ? state.suppliers.find(x => x.id === id) : null;
   modal(`
     <div class="p-6">
-      <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">${isEdit ? 'Edit' : 'New'} Supplier</h3><button onclick="closeModal()" class="text-gray-400 text-2xl">&times;</button></div>
+      <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">${isEdit ? 'Edit' : 'New'} Supplier</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
       <div class="space-y-3">
         <div><label class="text-xs text-gray-500 block">Name *</label><input id="sf-name" value="${isEdit ? escapeHtml(s.name||'') : ''}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
         <div class="grid grid-cols-2 gap-3">
@@ -43,21 +43,29 @@ function openSupplierModal(id) {
         <div><label class="text-xs text-gray-500 block">Category</label><input id="sf-category" value="${isEdit ? escapeHtml(s.category||'') : ''}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
         <div><label class="text-xs text-gray-500 block">Address</label><input id="sf-address" value="${isEdit ? escapeHtml(s.address||'') : ''}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
         <div class="flex gap-2 pt-2">
-          <button onclick="saveSup(${isEdit ? id : 'null'})" class="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">${isEdit ? 'Update' : 'Save'}</button>
-          <button onclick="closeModal()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg">Cancel</button>
+          <button onclick="saveSup(${isEdit ? id : 'null'})" class="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="20 6 9 17 4 12"/></svg>${isEdit ? 'Update' : 'Save'}</button>
+          <button onclick="closeModal()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Cancel</button>
         </div>
       </div>
     </div>`);
 }
 
 async function saveSup(id) {
-  const name = document.getElementById('sf-name').value.trim();
+  const nmEl = document.getElementById('sf-name');
+  const emEl = document.getElementById('sf-email');
+  const ctEl = document.getElementById('sf-contact');
+  const cgEl = document.getElementById('sf-category');
+  const adEl = document.getElementById('sf-address');
+  if (!nmEl || !emEl || !ctEl || !cgEl || !adEl) { toast('Form not ready', 'error'); return; }
+  const name = nmEl.value.trim();
   if (!name) { toast('Name is required', 'error'); return; }
+  const email = emEl.value.trim();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast('Invalid email format', 'error'); return; }
   const obj = {
-    name, contact: document.getElementById('sf-contact').value.trim(),
-    email: document.getElementById('sf-email').value.trim(),
-    category: document.getElementById('sf-category').value.trim(),
-    address: document.getElementById('sf-address').value.trim()
+    name, contact: ctEl.value.trim(),
+    email,
+    category: cgEl.value.trim(),
+    address: adEl.value.trim()
   };
   if (id) { const existing = await dbGet('suppliers', id); if (existing) obj.createdAt = existing.createdAt; obj.id = id; await dbPut('suppliers', obj); toast('Supplier updated'); }
   else { obj.createdAt = now(); await dbAdd('suppliers', obj); toast('Supplier added'); }

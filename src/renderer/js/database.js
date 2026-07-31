@@ -19,11 +19,13 @@ function openDB() {
 function dbOp(store, mode, fn) {
   return new Promise((resolve, reject) => {
     if (!db) { reject(new Error('Database not opened')); return; }
-    const tx = db.transaction(store, mode);
-    const os = tx.objectStore(store);
-    const result = fn(os);
-    tx.oncomplete = () => resolve(result);
-    tx.onerror = () => reject(tx.error);
+    try {
+      const tx = db.transaction(store, mode);
+      const os = tx.objectStore(store);
+      const result = fn(os);
+      tx.oncomplete = () => resolve(result);
+      tx.onerror = () => reject(tx.error);
+    } catch (e) { reject(e); }
   });
 }
 

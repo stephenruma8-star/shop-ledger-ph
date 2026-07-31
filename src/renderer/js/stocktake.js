@@ -5,8 +5,8 @@ async function viewStockTake(root) {
       <div class="flex gap-2 flex-wrap items-center justify-between">
         <h3 class="font-bold text-lg">Stock Take</h3>
         <div class="flex gap-2">
-          <button onclick="startStockTake()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">+ New Count</button>
-          <button onclick="clearStockTake()" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">Clear</button>
+          <button onclick="startStockTake()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Count</button>
+          <button onclick="clearStockTake()" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Clear</button>
         </div>
       </div>
       <div id="st-counts" class="space-y-2"></div>
@@ -19,17 +19,28 @@ let stCounts = {};
 function startStockTake() {
   stCounts = {};
   const inv = state.inventory;
+  inv.forEach(i => { stCounts[i.id] = i.stock || 0; });
   const el = document.getElementById('st-counts');
   el.innerHTML = `<div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm glass-card">
-    <h4 class="font-bold text-sm mb-2">Enter Physical Counts</h4>
-    <table class="w-full text-sm"><thead><tr class="bg-gray-50 dark:bg-gray-700 text-left"><th class="p-2">Item</th><th class="p-2 text-right">System</th><th class="p-2 text-right">Physical</th><th class="p-2 text-right">Variance</th></tr></thead>
-    <tbody>${inv.map(i => {
-      const sys = i.stock || 0;
-      stCounts[i.id] = sys;
-      return `<tr class="border-b dark:border-gray-700"><td class="p-2 font-medium">${escapeHtml(i.name)}</td><td class="p-2 text-right">${sys}</td><td class="p-2 text-right"><input type="number" value="${sys}" data-invid="${i.id}" onchange="stCounts[${i.id}]=parseInt(this.value)||0;stUpdateVariance(${i.id})" class="w-20 px-2 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-right text-sm" /></td><td class="p-2 text-right" id="st-var-${i.id}">0</td></tr>`;
-    }).join('')}</tbody></table>
-    <button onclick="applyStockTake()" class="mt-3 w-full py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">Apply Adjustments</button>
+    <div class="flex items-center gap-2 mb-2"><h4 class="font-bold text-sm">Enter Physical Counts</h4><input id="st-search" type="text" placeholder="Search items..." class="flex-1 max-w-xs px-3 py-1.5 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" oninput="stRenderCounts()" /></div>
+    <div id="st-table-wrap"><table class="w-full text-sm"><thead><tr class="bg-gray-50 dark:bg-gray-700 text-left"><th class="p-2">Item</th><th class="p-2 text-right">System</th><th class="p-2 text-right">Physical</th><th class="p-2 text-right">Variance</th></tr></thead>
+    <tbody id="st-tbody"></tbody></table>
+    <button onclick="applyStockTake()" class="mt-3 w-full py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="20 6 9 17 4 12"/></svg>Apply Adjustments</button>
   </div>`;
+  stRenderCounts();
+}
+
+function stRenderCounts() {
+  const q = (document.getElementById('st-search')?.value || '').toLowerCase();
+  const filtered = state.inventory.filter(i => !q || i.name.toLowerCase().includes(q) || (i.sku||'').toLowerCase().includes(q));
+  const tbody = document.getElementById('st-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = filtered.map(i => {
+    const sys = i.stock || 0;
+    const phys = stCounts[i.id] ?? sys;
+    const varAmt = phys - sys;
+    return `<tr class="border-b dark:border-gray-700"><td class="p-2 font-medium">${escapeHtml(i.name)}</td><td class="p-2 text-right">${sys}</td><td class="p-2 text-right"><input type="number" value="${phys}" data-invid="${i.id}" onchange="stCounts[${i.id}]=parseInt(this.value)||0;stUpdateVariance(${i.id})" class="w-20 px-2 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-right text-sm" /></td><td class="p-2 text-right" id="st-var-${i.id}">${varAmt > 0 ? '+' + varAmt : String(varAmt)}</td></tr>`;
+  }).join('');
 }
 
 function stUpdateVariance(id) {
@@ -79,6 +90,8 @@ async function applyStockTake() {
 async function clearStockTake() {
   if (Object.keys(stCounts).length && !await confirmModal('Clear all entered counts?')) return;
   stCounts = {};
-  document.getElementById('st-counts').innerHTML = '<p class="text-gray-400 text-sm">Click "New Count" to start</p>';
-  document.getElementById('st-results').classList.add('hidden');
+  const sc = document.getElementById('st-counts');
+  if (sc) sc.innerHTML = '<p class="text-gray-400 text-sm">Click "New Count" to start</p>';
+  const sr = document.getElementById('st-results');
+  if (sr) sr.classList.add('hidden');
 }

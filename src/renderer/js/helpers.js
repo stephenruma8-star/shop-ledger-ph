@@ -1,0 +1,593 @@
+function dp(d) { const p = (d||'').split('-'); return { y: p[0]||'', m: p[1]||'', d: p[2]||'' }; }
+
+window.__app = window.__app || {};
+window.__app._suggestHide = null;
+window.__app._suggestIndex = -1;
+window.__app._suggestMatches = [];
+window.__app._pageState = { tx: 1, exp: 1, pay: 1 };
+const PAGE_SIZE = 50;
+
+function paginate(arr, key) {
+  const st = window.__app._pageState;
+  const totalPages = Math.ceil(arr.length / PAGE_SIZE) || 1;
+  if ((st[key] || 1) > totalPages) st[key] = totalPages;
+  const p = st[key] = st[key] || 1;
+  return { items: arr.slice((p-1)*PAGE_SIZE, p*PAGE_SIZE), page: p, totalPages };
+}
+
+function renderPagination(key, page, totalPages) {
+  if (totalPages <= 1) return '';
+  const prev = page > 1 ? `window.__app._pageState['${key}']=${page-1};renderPagedTable('${key}')` : '';
+  const next = page < totalPages ? `window.__app._pageState['${key}']=${page+1};renderPagedTable('${key}')` : '';
+  return `<div class="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-700 text-xs border-t dark:border-gray-700"><span>Page ${page} of ${totalPages}</span><div class="flex gap-1"><button onclick="${prev}" class="px-2 py-1 rounded ${page<=1?'text-gray-400 cursor-default':'bg-white dark:bg-gray-600 hover:bg-gray-200 dark:text-gray-200'}">Prev</button><button onclick="${next}" class="px-2 py-1 rounded ${page>=totalPages?'text-gray-400 cursor-default':'bg-white dark:bg-gray-600 hover:bg-gray-200 dark:text-gray-200'}">Next</button></div></div>`;
+}
+
+function renderPagedTable(key) {
+  if (key === 'tx') renderTxTable();
+  else if (key === 'exp') renderExpTable();
+  else if (key === 'pay') renderPayTable();
+}
+
+function showItemSuggestions(input, prefix, i) {
+  if (window.__app._suggestHide) { clearTimeout(window.__app._suggestHide); window.__app._suggestHide = null; }
+  const val = input.value.trim().toLowerCase();
+  let existing = document.getElementById('suggest-drop-' + prefix + '-' + i);
+  if (existing) existing.remove();
+  if (!val) { window.__app._suggestIndex = -1; window.__app._suggestMatches = []; return; }
+  window.__app._suggestMatches = [];
+  (state.quickItems || []).forEach(q => { if (q.name.toLowerCase().includes(val)) window.__app._suggestMatches.push({ name: q.name, price: q.price, invId: null }); });
+  (state.inventory || []).forEach(inv => { if (inv.name.toLowerCase().includes(val)) window.__app._suggestMatches.push({ name: inv.name, price: inv.sellPrice || inv.price || 0, invId: inv.id }); });
+  if (!window.__app._suggestMatches.length) { window.__app._suggestIndex = -1; return; }
+  window.__app._suggestIndex = -1;
+  const rect = input.getBoundingClientRect();
+  const div = document.createElement('div');
+  div.id = 'suggest-drop-' + prefix + '-' + i;
+  div.className = 'fixed z-[999] bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-xl max-h-48 overflow-auto text-sm';
+  div.style.left = rect.left + 'px';
+  div.style.top = (rect.bottom + 2) + 'px';
+  div.style.minWidth = Math.max(rect.width, 200) + 'px';
+  div.innerHTML = window.__app._suggestMatches.slice(0, 20).map((m, idx) => `<div class="suggest-item px-3 py-1.5 cursor-pointer border-b dark:border-gray-700 last:border-0" data-index="${idx}" onmouseenter="document.querySelectorAll('.suggest-item').forEach(e=>e.classList.remove('bg-blue-100','dark:bg-blue-900/30'));this.classList.add('bg-blue-100','dark:bg-blue-900/30');window.__app._suggestIndex=${idx}" onmousedown="event.preventDefault();selectItemSuggestion('${escapeHtml(m.name)}',${m.price},${m.invId ?? 'null'},'${prefix}',${i})">${escapeHtml(m.name)} <span class="text-gray-400">${peso(m.price)}</span></div>`).join('');
+  document.body.appendChild(div);
+  input.onkeydown = function(e) {
+    const items = div.querySelectorAll('.suggest-item');
+    if (!items.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      window.__app._suggestIndex = Math.min(window.__app._suggestIndex + 1, items.length - 1);
+      items.forEach((el, idx) => { el.classList.toggle('bg-blue-100', idx === window.__app._suggestIndex); el.classList.toggle('dark:bg-blue-900/30', idx === window.__app._suggestIndex); });
+      if (window.__app._suggestIndex >= 0) items[window.__app._suggestIndex].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      window.__app._suggestIndex = Math.max(window.__app._suggestIndex - 1, -1);
+      items.forEach((el, idx) => { el.classList.toggle('bg-blue-100', idx === window.__app._suggestIndex); el.classList.toggle('dark:bg-blue-900/30', idx === window.__app._suggestIndex); });
+      if (window.__app._suggestIndex >= 0) items[window.__app._suggestIndex].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter' && window.__app._suggestIndex >= 0) {
+      e.preventDefault();
+      const hit = window.__app._suggestMatches[window.__app._suggestIndex];
+      if (hit) selectItemSuggestion(hit.name, hit.price, hit.invId ?? null, prefix, i);
+    }
+  };
+}
+
+function clearItemSuggestions() {
+  document.querySelectorAll('[id^="suggest-drop-"]').forEach(el => el.remove());
+  window.__app._suggestIndex = -1;
+  window.__app._suggestMatches = [];
+}
+
+function selectItemSuggestion(name, price, invId, prefix, i) {
+  const d = document.getElementById('suggest-drop-' + prefix + '-' + i);
+  if (d) d.remove();
+  const descEl = document.getElementById(prefix + '-desc-' + i);
+  const qtyEl = document.getElementById(prefix + '-qty-' + i);
+  const costEl = document.getElementById(prefix + '-cost-' + i);
+  if (descEl) descEl.value = name;
+  if (qtyEl) qtyEl.value = '1';
+  if (costEl) costEl.value = price;
+  const cart = prefix === 'cf' ? cfCart : txCart;
+  cart[i].description = name;
+  cart[i].name = '1';
+  cart[i].unitCost = price;
+  cart[i].invId = invId;
+  cart[i].variantName = '';
+  const invItem = state.inventory.find(x => x.id === invId);
+  if (invItem && invItem.variants && invItem.variants.length > 0) {
+    cart[i].variantName = invItem.variants[0].name;
+    const existingPicker = document.getElementById('vpicker-' + prefix + '-' + i);
+    if (existingPicker) existingPicker.remove();
+    const picker = document.createElement('select');
+    picker.id = 'vpicker-' + prefix + '-' + i;
+    picker.className = 'ml-1 px-1 py-0.5 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs';
+    picker.style.maxWidth = '80px';
+    picker.innerHTML = invItem.variants.map((v, vi) => `<option value="${escapeHtml(v.name)}" ${vi === 0 ? 'selected' : ''}>${escapeHtml(v.name)} (${v.stock})</option>`).join('');
+    picker.onchange = function() { cart[i].variantName = this.value; };
+    if (descEl && descEl.parentNode) descEl.parentNode.appendChild(picker);
+  }
+  if (prefix === 'cf') { cfUpdateRowAmt(i); cfUpdateTotals(); }
+  else { updateCartRowAmt(i); updateTMTotals(); }
+}
+
+document.addEventListener('click', function(e) {
+  clearItemSuggestions();
+});
+
+function startClock() {
+  function tick() {
+    const el = document.getElementById('sidebar-clock');
+    if (!el) return;
+    const now = new Date();
+    const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const h = String(now.getHours()).padStart(2,'0');
+    const m = String(now.getMinutes()).padStart(2,'0');
+    const s = String(now.getSeconds()).padStart(2,'0');
+    el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>${days[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()} <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mx-1 -mt-0.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${h}:${m}:${s}`;
+  }
+  tick();
+  setInterval(tick, 1000);
+}
+
+function populateYearSelector() {
+  const sel = document.getElementById('year-selector');
+  if (!sel) return;
+  const years = new Set();
+  state.transactions.forEach(t => { if (t.date) years.add(t.date.split('-')[0]); });
+  state.payments.forEach(p => { if (p.date) years.add(p.date.split('-')[0]); });
+  state.expenses.forEach(e => { if (e.date) years.add(e.date.split('-')[0]); });
+  const currentYear = String(new Date().getFullYear());
+  years.add(currentYear);
+  const sorted = [...years].sort((a, b) => b - a);
+  sel.innerHTML = '<option value="all">All Years</option>' + sorted.map(y => `<option value="${y}" ${state.selectedYear === y ? 'selected' : ''}>${y}</option>`).join('');
+}
+
+function changeYear(year) {
+  state.selectedYear = year;
+  localStorage.setItem('selectedYear', year);
+  if (year === 'all') { showAllYearsSummary(); return; }
+  navigate(state.currentRoute);
+}
+
+function showAllYearsSummary() {
+  const years = new Set();
+  state.transactions.forEach(t => { if (t.date) years.add(t.date.split('-')[0]); });
+  state.expenses.forEach(e => { if (e.date) years.add(e.date.split('-')[0]); });
+  state.payments.forEach(p => { if (p.date) years.add(p.date.split('-')[0]); });
+  const currentYear = String(new Date().getFullYear());
+  years.add(currentYear);
+  const sortedYears = [...years].sort((a, b) => b - a);
+
+  let totalSales = 0, totalExpenses = 0, totalPayments = 0;
+  let yearRows = sortedYears.map(y => {
+    const sales = state.transactions.filter(t => (t.date||'').startsWith(y)).reduce((s, t) => s + (t.grandTotal || 0), 0);
+    const expenses = state.expenses.filter(e => (e.date||'').startsWith(y)).reduce((s, e) => s + (e.amount || 0), 0);
+    const payments = state.payments.filter(p => (p.date||'').startsWith(y)).reduce((s, p) => s + (p.amount || 0), 0);
+    totalSales += sales; totalExpenses += expenses; totalPayments += payments;
+    const net = sales - expenses - payments;
+    return `<tr class="border-b dark:border-gray-700"><td class="p-2 font-semibold">${y}</td><td class="p-2 text-right text-green-600">${peso(sales)}</td><td class="p-2 text-right text-red-500">${peso(expenses)}</td><td class="p-2 text-right text-blue-600">${peso(payments)}</td><td class="p-2 text-right font-bold ${net >= 0 ? 'text-green-600' : 'text-red-600'}">${peso(net)}</td></tr>`;
+  }).join('');
+
+  let clientRows = state.clients.filter(c => (c.balance || 0) > 0).map(c => {
+    const charged = state.transactions.filter(t => t.clientId === c.id).reduce((s, t) => s + (t.grandTotal || 0), 0);
+    const paid = state.payments.filter(p => p.clientId === c.id).reduce((s, p) => s + (p.amount || 0), 0);
+    const since = c.ledgerYear || (() => { const tx = state.transactions.filter(tx2 => tx2.clientId === c.id && tx2.date).sort((a, b) => a.date.localeCompare(b.date))[0]; return tx ? tx.date.split('-')[0] : '—'; })();
+    return `<tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer" onclick="closeModal();viewClientHistory(${c.id})"><td class="p-2 font-medium">${escapeHtml(c.name)}</td><td class="p-2 text-xs text-gray-400">${since}</td><td class="p-2 text-right">${peso(charged)}</td><td class="p-2 text-right text-green-600">${peso(paid)}</td><td class="p-2 text-right font-bold ${(c.balance||0)>0?'text-red-600':'text-green-600'}">${peso(c.balance)}</td></tr>`;
+  }).join('');
+
+  const totNet = totalSales - totalExpenses - totalPayments;
+  modal(`<div class="p-4 flex flex-col" style="min-height:70vh">
+    <div class="flex justify-between items-center mb-3 shrink-0">
+      <h3 class="text-xl font-bold">All Years Overview</h3>
+      <button onclick="closeModal();navigate(state.currentRoute)" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="mb-4">
+      <h4 class="font-semibold text-sm mb-1">Financial Summary</h4>
+      <div class="overflow-auto rounded-lg border dark:border-gray-700">
+        <table class="w-full text-sm"><thead><tr class="bg-gray-50 dark:bg-gray-700 text-xs uppercase tracking-wide"><th class="p-2 text-left">Year</th><th class="p-2 text-right">Sales</th><th class="p-2 text-right">Expenses</th><th class="p-2 text-right">Payments</th><th class="p-2 text-right">Net</th></tr></thead>
+        <tbody>${yearRows}<tr class="font-bold bg-blue-50 dark:bg-blue-900/20"><td class="p-2">Total</td><td class="p-2 text-right text-green-600">${peso(totalSales)}</td><td class="p-2 text-right text-red-500">${peso(totalExpenses)}</td><td class="p-2 text-right text-blue-600">${peso(totalPayments)}</td><td class="p-2 text-right ${totNet>=0?'text-green-600':'text-red-600'}">${peso(totNet)}</td></tr></tbody></table>
+      </div>
+    </div>
+    <div class="flex-1 min-h-0">
+      <h4 class="font-semibold text-sm mb-1">Clients with Outstanding Balance</h4>
+      <div class="overflow-auto max-h-[40vh] rounded-lg border dark:border-gray-700">
+        <table class="w-full text-sm"><thead><tr class="bg-gray-50 dark:bg-gray-700 text-xs uppercase tracking-wide sticky top-0"><th class="p-2 text-left">Name</th><th class="p-2 text-left">Since</th><th class="p-2 text-right">Charged</th><th class="p-2 text-right">Paid</th><th class="p-2 text-right">Balance</th></tr></thead>
+        <tbody>${clientRows || '<tr><td class="p-4 text-center text-gray-400" colspan="5">No outstanding balances</td></tr>'}</tbody></table>
+      </div>
+    </div>
+  </div>`);
+}
+
+function filterByYear(data, dateField) {
+  if (state.selectedYear === 'all' || !data || !data.length) return data;
+  const y = state.selectedYear;
+  return data.filter(d => {
+    const dStr = d[dateField];
+    if (!dStr) return true;
+    return dStr.startsWith(y) || dStr.startsWith(y + '-') || new Date(dStr).getFullYear().toString() === y;
+  });
+}
+
+function lookupItem(prefix, i) {
+  const input = document.getElementById(prefix + '-desc-' + i);
+  if (!input) return;
+  const val = input.value.trim().toLowerCase();
+  if (!val) return;
+  let match = state.quickItems.find(q => q.name.toLowerCase() === val);
+  if (!match) match = state.inventory.find(inv => inv.name.toLowerCase() === val);
+  if (!match) return;
+  const qtyEl = document.getElementById(prefix + '-qty-' + i);
+  const costEl = document.getElementById(prefix + '-cost-' + i);
+  const price = match.price || match.sellPrice || 0;
+  const cart = prefix === 'cf' ? cfCart : txCart;
+  cart[i].description = match.name;
+  cart[i].name = '1';
+  cart[i].unitCost = price;
+  cart[i].invId = match.id || null;
+  if (qtyEl) qtyEl.value = '1';
+  if (costEl) costEl.value = price;
+  if (prefix === 'cf') { cfUpdateRowAmt(i); cfUpdateTotals(); }
+  else { updateCartRowAmt(i); updateTMTotals(); }
+}
+
+function intRateOptions(selected) {
+  let opts = '<option value="0"' + (selected == 0 ? ' selected' : '') + '>0%</option>';
+  for (let r = 0.5; r <= 20; r += 0.5) {
+    const v = Math.round(r * 10) / 10;
+    opts += '<option value="' + v + '"' + (selected == v ? ' selected' : '') + '>' + v + '%</option>';
+  }
+  return opts;
+}
+
+function calcInterest(sub, ratePct, days) {
+  return sub === 0 || ratePct === 0 ? 0 : parseFloat((sub * (ratePct / 100) * (days / 30)).toFixed(2));
+}
+
+function toast(msg, type = 'info') {
+  const colors = { info: 'bg-blue-600', success: 'bg-green-600', error: 'bg-red-600', warning: 'bg-yellow-600' };
+  const c = document.getElementById('toasts');
+  if (!c) return;
+  const el = document.createElement('div');
+  el.className = `${colors[type] || colors.info} text-white px-4 py-3 rounded-lg shadow-lg slide-in text-sm max-w-sm`;
+  el.textContent = msg;
+  c.appendChild(el);
+  if (type === 'error') playSound('error');
+  else if (type === 'success') playSound('success');
+  setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 300); }, 3500);
+}
+
+// Sound effects
+let _audioCtx;
+function playSound(type) {
+  try {
+    if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = _audioCtx.createOscillator();
+    const gain = _audioCtx.createGain();
+    osc.connect(gain); gain.connect(_audioCtx.destination);
+    if (type === 'success') {
+      osc.frequency.setValueAtTime(523, _audioCtx.currentTime);
+      osc.frequency.setValueAtTime(659, _audioCtx.currentTime + 0.1);
+      osc.frequency.setValueAtTime(784, _audioCtx.currentTime + 0.2);
+      gain.gain.setValueAtTime(0.15, _audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, _audioCtx.currentTime + 0.4);
+      osc.start(_audioCtx.currentTime); osc.stop(_audioCtx.currentTime + 0.4);
+    } else if (type === 'error') {
+      osc.frequency.setValueAtTime(200, _audioCtx.currentTime);
+      osc.frequency.setValueAtTime(150, _audioCtx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.15, _audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, _audioCtx.currentTime + 0.3);
+      osc.start(_audioCtx.currentTime); osc.stop(_audioCtx.currentTime + 0.3);
+    } else if (type === 'payment') {
+      osc.frequency.setValueAtTime(440, _audioCtx.currentTime);
+      osc.frequency.setValueAtTime(554, _audioCtx.currentTime + 0.08);
+      osc.frequency.setValueAtTime(659, _audioCtx.currentTime + 0.16);
+      gain.gain.setValueAtTime(0.12, _audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, _audioCtx.currentTime + 0.3);
+      osc.start(_audioCtx.currentTime); osc.stop(_audioCtx.currentTime + 0.3);
+    } else if (type === 'alert') {
+      for (let i = 0; i < 3; i++) {
+        const o2 = _audioCtx.createOscillator();
+        const g2 = _audioCtx.createGain();
+        o2.connect(g2); g2.connect(_audioCtx.destination);
+        o2.frequency.setValueAtTime(660, _audioCtx.currentTime + i * 0.2);
+        g2.gain.setValueAtTime(0.15, _audioCtx.currentTime + i * 0.2);
+        g2.gain.exponentialRampToValueAtTime(0.001, _audioCtx.currentTime + i * 0.2 + 0.15);
+        o2.start(_audioCtx.currentTime + i * 0.2); o2.stop(_audioCtx.currentTime + i * 0.2 + 0.15);
+      }
+    }
+  } catch (e) { /* audio not available */ }
+}
+
+// Loading spinner
+function showSpinner(msg = 'Loading...') {
+  const v = document.getElementById('view');
+  if (v) v.innerHTML = `<div class="flex items-center justify-center h-64"><div class="text-center"><div class="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div><p class="text-gray-500 text-sm">${escapeHtml(msg)}</p></div></div>`;
+}
+
+// Confetti
+function confetti() {
+  const c = document.createElement('canvas');
+  c.className = 'fixed inset-0 pointer-events-none z-[200]';
+  c.width = window.innerWidth; c.height = window.innerHeight;
+  document.body.appendChild(c);
+  const ctx = c.getContext('2d');
+  const colors = ['#f56565','#ed8936','#ecc94b','#48bb78','#4299e1','#9f7aea','#ed64a6'];
+  const pieces = Array.from({length: 120}, () => ({
+    x: Math.random() * c.width, y: Math.random() * c.height - c.height,
+    w: Math.random() * 8 + 4, h: Math.random() * 6 + 3,
+    color: colors[Math.floor(Math.random() * colors.length)],
+    vx: (Math.random() - 0.5) * 4, vy: Math.random() * 3 + 2,
+    rot: Math.random() * 360, rv: (Math.random() - 0.5) * 10
+  }));
+  let frames = 0;
+  function draw() {
+    if (frames++ > 150) { c.remove(); return; }
+    ctx.clearRect(0, 0, c.width, c.height);
+    pieces.forEach(p => {
+      p.x += p.vx; p.vy += 0.05; p.y += p.vy; p.rot += p.rv;
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot * Math.PI / 180);
+      ctx.fillStyle = p.color; ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h); ctx.restore();
+    });
+    requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+function modal(html) {
+  const root = document.getElementById('modal-root');
+  if (!root) return;
+  root.innerHTML = `<div class="fixed inset-0 bg-black/50 z-50 flex items-start justify-center pt-4 overflow-auto fade-in" onclick="if(event.target===this)closeModal()"><div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-[90vw] mx-4 mb-4 slide-in max-h-[95vh] overflow-auto glass-strong" onclick="event.stopPropagation()">${html}</div></div>`;
+}
+
+function closeModal() {
+  if (_confirmResolve) { _confirmResolve(false); _confirmResolve = null; }
+  clearItemSuggestions();
+  const root = document.getElementById('modal-root');
+  if (root) root.innerHTML = '';
+}
+
+function toggleSidebar() {
+  const aside = document.querySelector('#app > aside');
+  const overlay = document.getElementById('sidebar-overlay');
+  if (!aside) return;
+  const isOpen = aside.classList.toggle('open');
+  if (overlay) overlay.classList.toggle('open', isOpen);
+}
+
+function toggleTheme() {
+  document.documentElement.classList.toggle('dark');
+  localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+}
+
+function showShortcuts() {
+  modal(`
+    <div class="p-6">
+      <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">⌨️ Keyboard Shortcuts</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+      <div class="space-y-2 text-sm">
+        <div class="grid grid-cols-2 gap-2">
+          <div class="p-2 bg-blue-50 dark:bg-blue-900/20 rounded col-span-2 font-semibold text-xs text-blue-600">Navigation</div>
+          <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>F1 / Ctrl+D</span><span class="text-gray-500">Dashboard</span></div>
+          <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>F2 / Ctrl+T</span><span class="text-gray-500">Sales</span></div>
+          <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>F3 / Ctrl+Shift+P</span><span class="text-gray-500">Payments</span></div>
+          <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>F4 / Ctrl+Shift+C</span><span class="text-gray-500">Clients</span></div>
+          <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>F5 / Ctrl+I</span><span class="text-gray-500">Inventory</span></div>
+          <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>F6 / Ctrl+E</span><span class="text-gray-500">Expenses</span></div>
+          <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>F7 / Ctrl+R</span><span class="text-gray-500">Reports</span></div>
+          <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>F8 / Ctrl+Shift+S</span><span class="text-gray-500">Settings</span></div>
+          <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>F9</span><span class="text-gray-500">Stock Take</span></div>
+          <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>F10</span><span class="text-gray-500">Suppliers</span></div>
+          <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>F11</span><span class="text-gray-500">Purchase Orders</span></div>
+          <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>Ctrl+U</span><span class="text-gray-500">Utang</span></div>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div class="p-2 bg-green-50 dark:bg-green-900/20 rounded col-span-2 font-semibold text-xs text-green-600">Actions</div>
+          <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>Esc</span><span class="text-gray-500">Close modal</span></div>
+          <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>Enter</span><span class="text-gray-500">Save modal form</span></div>
+          <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>Ctrl+Enter</span><span class="text-gray-500">Save (from textarea)</span></div>
+          <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>Ctrl+F</span><span class="text-gray-500">Focus search</span></div>
+          <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>Ctrl+/</span><span class="text-gray-500">Show shortcuts</span></div>
+          <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>Ctrl+Shift+T</span><span class="text-gray-500">Toggle dark mode</span></div>
+        </div>
+      </div>
+    </div>`);
+}
+
+function focusPageSearch() {
+  const searchInput = document.querySelector('#view input[placeholder*="Search"], #view input[type="search"], #txSearch, #paySearch, #expSearch, #utangSearch, #invSearch');
+  if (searchInput) { searchInput.focus(); searchInput.select(); }
+}
+
+function saveCurrentModal() {
+  const saveBtn = document.querySelector('#modal-root button.bg-blue-600:not([onclick*="closeModal"]), #modal-root button.bg-green-600');
+  if (saveBtn) saveBtn.click();
+}
+
+function validateNumber(v) { return !isNaN(parseFloat(v)) && isFinite(v) && parseFloat(v) >= 0; }
+
+function validateRequired(v) { return v !== null && v !== undefined && String(v).trim() !== ''; }
+
+function validatePhone(v) { return /^(\+63|0)?\d{10,11}$/.test(String(v).trim()); }
+
+function debounce(fn, ms = 250) { let timer; return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); }; }
+
+function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function dbLoad(store) {
+  if (state[store] && state[store].length > 0) return Promise.resolve(state[store]);
+  return dbAll(store).then(data => { state[store] = data; return data; });
+}
+
+async function hashPassword(pw) { const b = new TextEncoder().encode(pw); const h = await crypto.subtle.digest('SHA-256', b); return Array.from(new Uint8Array(h)).map(b => b.toString(16).padStart(2,'0')).join(''); }
+let _confirmResolve = null;
+function confirmModal(msg, label) {
+  if (_confirmResolve) { _confirmResolve(false); _confirmResolve = null; }
+  modal(`<div class="p-6"><h3 class="text-lg font-bold mb-3">${escapeHtml(msg)}</h3><div class="flex gap-2 justify-end"><button onclick="closeModal();_confirmResolve&&_confirmResolve(false)" class="px-4 py-2 border dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Cancel</button><button onclick="_confirmResolve&&_confirmResolve(true);closeModal()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>${escapeHtml(label||'Confirm')}</button></div></div>`);
+  return new Promise(r => { _confirmResolve = r; });
+}
+
+function parseCSVLine(line) {
+  const parts = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') { inQuotes = !inQuotes; }
+    else if (ch === ',' && !inQuotes) { parts.push(current.trim()); current = ''; }
+    else { current += ch; }
+  }
+  parts.push(current.trim());
+  return parts;
+}
+
+function searchData(arr, query, fields) {
+  if (!query || !query.trim()) return arr;
+  const q = query.toLowerCase().trim();
+  return arr.filter(item => fields.some(f => String(item[f] || '').toLowerCase().includes(q)));
+}
+
+function updateLowStockBadge() {
+  const badge = document.getElementById('lowStockBadge');
+  if (!badge) return;
+  const count = (state.inventory || []).filter(i => (i.stock || 0) <= (i.minStock || 5)).length;
+  if (count > 0) { badge.textContent = count; badge.classList.remove('hidden'); }
+  else badge.classList.add('hidden');
+}
+
+function updateNotifications() {
+  const badge = document.getElementById('notif-badge');
+  const panel = document.getElementById('notif-panel');
+  if (!badge) return;
+  const overdue = (state.clients || []).filter(c => (c.balance || 0) > 0 && c.dueDate && c.dueDate < today()).length;
+  const lowStock = (state.inventory || []).filter(i => (i.stock || 0) <= (i.minStock || 5)).length;
+  const recentPOs = (state.purchaseOrders || []).filter(po => po.status === 'Received' && po.receivedAt && new Date(po.receivedAt) > new Date(Date.now() - 86400000)).length;
+  const total = overdue + lowStock + recentPOs;
+  if (total > 0) { badge.textContent = total; badge.classList.remove('hidden'); }
+  else badge.classList.add('hidden');
+  if (panel) {
+    panel.innerHTML = `<div class="p-3 space-y-2 text-sm">
+      <div class="flex justify-between items-center border-b dark:border-gray-700 pb-2"><span class="font-bold">Notifications</span><button onclick="document.getElementById('notif-panel').classList.add('hidden')" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+      ${overdue > 0 ? `<div class="flex items-center gap-2 text-red-600"><span>⚠️</span><span>${overdue} overdue utang</span></div>` : ''}
+      ${lowStock > 0 ? `<div class="flex items-center gap-2 text-orange-600"><span>📦</span><span>${lowStock} low stock items</span></div>` : ''}
+      ${recentPOs > 0 ? `<div class="flex items-center gap-2 text-green-600"><span>📋</span><span>${recentPOs} POs received today</span></div>` : ''}
+      ${total === 0 ? '<div class="text-gray-400 text-center py-4">✓ All good!</div>' : ''}
+    </div>`;
+  }
+}
+
+function toggleNotifPanel() {
+  const panel = document.getElementById('notif-panel');
+  if (!panel) return;
+  panel.classList.toggle('hidden');
+  updateNotifications();
+}
+
+function hasInterestItems(clientId) {
+  return (state.transactions || []).some(t => t.clientId === clientId && (t.items || []).some(i => parseFloat(i.intRate) > 0));
+}
+
+function getInterestRate(clientId) {
+  const txns = (state.transactions || [])
+    .filter(t => t.clientId === clientId)
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  for (const t of txns) {
+    const item = (t.items || []).find(i => parseFloat(i.intRate) > 0);
+    if (item) return parseFloat(item.intRate);
+  }
+  return 0;
+}
+
+async function applyDailyInterest() {
+  const lastDateSetting = state.settings.find(s => s.key === 'lastInterestDate');
+  const lastDate = lastDateSetting?.value || '';
+  const todayStr = today();
+  if (lastDate === todayStr) return;
+  const clients = state.clients.filter(c => (c.balance || 0) > 0 && hasInterestItems(c.id));
+  if (clients.length === 0) return;
+  let fromDate = lastDate;
+  if (!fromDate) {
+    await dbAdd('settings', { key: 'lastInterestDate', value: todayStr });
+    return;
+  }
+  const fromTs = new Date(fromDate).getTime();
+  const todayTs = new Date(todayStr).getTime();
+  if (isNaN(fromTs) || isNaN(todayTs)) return;
+  const days = Math.floor((todayTs - fromTs) / 86400000);
+  if (days <= 0) return;
+  let applied = 0;
+  const snapshots = [];
+  for (const c of clients) {
+    const rate = getInterestRate(c.id);
+    if (rate <= 0) continue;
+    snapshots.push({ id: c.id, balance: c.balance });
+    try {
+      const interest = parseFloat((c.balance * (rate / 100) * days).toFixed(2));
+      if (interest <= 0) continue;
+      c.balance = parseFloat((c.balance + interest).toFixed(2));
+      await dbPut('clients', c);
+      applied++;
+    } catch (e) {
+      for (const snap of snapshots) {
+        const orig = state.clients.find(x => x.id === snap.id);
+        if (orig) orig.balance = snap.balance;
+      }
+      state.clients = await dbAll('clients');
+      toast('Interest application failed — balances rolled back', 'error');
+      return;
+    }
+  }
+  if (lastDateSetting) { lastDateSetting.value = todayStr; await dbPut('settings', lastDateSetting); }
+  else { await dbAdd('settings', { key: 'lastInterestDate', value: todayStr }); }
+  state.settings = await dbAll('settings');
+  state.clients = await dbAll('clients');
+  if (applied > 0) toast(`Interest applied: ${applied} client(s) over ${days} day(s)`, 'info');
+}
+
+async function runCloudBackup() {
+  if (!window.electronAPI) return;
+  const settingsMap = {};
+  state.settings.forEach(s => settingsMap[s.key] = s.value);
+  const pw = settingsMap['cloudBackupPassword'] || '';
+  if (!pw) return;
+  const folder = settingsMap['cloudBackupFolder'] || '';
+  if (!folder) return;
+  const users = state.users.map(u => { const { password, ...rest } = u; return rest; });
+  const data = {
+    clients: state.clients, transactions: state.transactions,
+    payments: state.payments, inventory: state.inventory,
+    quickItems: state.quickItems, expenses: state.expenses,
+    suppliers: state.suppliers, purchaseOrders: state.purchaseOrders,
+    notifications: state.notifications,
+    auditLogs: state.auditLogs, users,
+    settings: state.settings, exportedAt: now()
+  };
+  const filename = `shop-ledger-ph-backup-${today()}.enc`;
+  const result = await window.electronAPI.saveEncryptedBackupToPath(data, pw, filename, folder);
+  if (result.success) {
+    const existing = state.settings.find(s => s.key === 'lastCloudBackup');
+    if (existing) { existing.value = today(); await dbPut('settings', existing); }
+    else { await dbAdd('settings', { key: 'lastCloudBackup', value: today() }); }
+    state.settings = await dbAll('settings');
+    toast('Cloud backup saved', 'success');
+    await logAudit('backup', 'Auto cloud backup saved to ' + folder);
+  }
+}
+
+async function checkCloudBackupDue() {
+  const settingsMap = {};
+  state.settings.forEach(s => settingsMap[s.key] = s.value);
+  if (settingsMap['cloudBackupEnabled'] !== 'true') return;
+  const folder = settingsMap['cloudBackupFolder'] || '';
+  const pw = settingsMap['cloudBackupPassword'] || '';
+  if (!folder || !pw) return;
+  const lastBackup = settingsMap['lastCloudBackup'] || '';
+  const interval = settingsMap['cloudBackupInterval'] || 'daily';
+  const todayStr = today();
+  if (lastBackup === todayStr) return;
+  if (interval === 'daily') { await runCloudBackup(); return; }
+  if (interval === 'weekly') {
+    const daysSince = Math.floor((new Date(todayStr) - new Date(lastBackup || '2000-01-01')) / 86400000);
+    if (daysSince >= 7) await runCloudBackup();
+    return;
+  }
+  if (interval === 'monthly') {
+    const d = new Date(lastBackup || '2000-01-01');
+    if (d.getMonth() !== new Date().getMonth() || d.getFullYear() !== new Date().getFullYear()) await runCloudBackup();
+  }
+}

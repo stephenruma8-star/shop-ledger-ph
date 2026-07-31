@@ -10,16 +10,17 @@ async function viewSettings(root) {
           <div><label class="text-xs text-gray-500 block">Shop Name</label><input id="set-shopName" value="${escapeHtml(settingsMap['shopName'] || '')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
           <div><label class="text-xs text-gray-500 block">Contact Number</label><input id="set-shopContact" value="${escapeHtml(settingsMap['shopContact'] || '')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
            <div class="col-span-2"><label class="text-xs text-gray-500 block">Address</label><input id="set-shopAddress" value="${escapeHtml(settingsMap['shopAddress'] || '')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
-        </div>
-      </div>
+           <div><label class="text-xs text-gray-500 block">Weather Location</label><input id="set-weatherLocation" value="${escapeHtml(settingsMap['weatherLocation'] || 'Manila')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" placeholder="e.g. Manila, Quezon City, Cebu" /></div>
+         </div>
+       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
         <h3 class="font-bold text-lg mb-4">🖼️ Receipt Branding</h3>
         <div class="space-y-3">
           <div><label class="text-xs text-gray-500 block">Shop Logo</label>
             <div class="flex items-center gap-3">
               <div class="w-16 h-16 border-2 border-dashed dark:border-gray-600 rounded-lg flex items-center justify-center overflow-hidden bg-gray-50 dark:bg-gray-700" id="logo-preview">${settingsMap['receiptLogo'] ? `<img src="${escapeHtml(settingsMap['receiptLogo'])}" class="w-full h-full object-contain" />` : '<span class="text-2xl text-gray-300">📷</span>'}</div>
-              <label class="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 rounded-lg text-sm cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600">Choose File<input type="file" accept="image/*" class="hidden" onchange="uploadReceiptLogo(event)" /></label>
-              ${settingsMap['receiptLogo'] ? `<button onclick="removeReceiptLogo()" class="text-xs text-red-500">Remove</button>` : ''}
+              <label class="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 rounded-lg text-sm cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Choose File<input type="file" accept="image/*" class="hidden" onchange="uploadReceiptLogo(event)" /></label>
+              ${settingsMap['receiptLogo'] ? `<button onclick="removeReceiptLogo()" class="text-xs text-red-500"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Remove</button>` : ''}
             </div>
           </div>
           <div><label class="text-xs text-gray-500 block">Custom Header Text</label><textarea id="set-receiptHeaderText" rows="2" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm">${escapeHtml(settingsMap['receiptHeaderText'] || '')}</textarea></div>
@@ -50,14 +51,14 @@ async function viewSettings(root) {
           <div><label class="text-xs text-gray-500 block">API Key <span class="text-gray-400 font-normal">(leave blank for local)</span></label><input id="set-aiApiKey" type="password" value="${escapeHtml(settingsMap['aiApiKey'] || '')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 font-mono text-xs" placeholder="sk-... or empty for Ollama" /></div>
           <div><label class="text-xs text-gray-500 block">Provider</label><select id="set-aiModel" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"><option value="ollama" ${(settingsMap['aiModel']||'ollama') === 'ollama' ? 'selected' : ''}>Ollama (local, free)</option><option value="gpt-4o-mini" ${settingsMap['aiModel'] === 'gpt-4o-mini' ? 'selected' : ''}>OpenAI GPT-4o-mini</option><option value="gpt-4o" ${settingsMap['aiModel'] === 'gpt-4o' ? 'selected' : ''}>OpenAI GPT-4o</option></select></div>
         </div>
-        <p class="text-xs text-gray-400 mt-2">No API key? Use <strong>Ollama</strong> — free local AI. <a href="#" onclick="require('electron').shell.openExternal('https://ollama.ai/download')" class="text-blue-500 hover:underline">Download Ollama</a>, run <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">ollama pull llama3.2</code>, then select "Ollama" above.</p>
+        <p class="text-xs text-gray-400 mt-2">No API key? Use <strong>Ollama</strong> — free local AI. <a href="#" onclick="if(window.electronAPI)window.electronAPI.openExternal('https://ollama.ai/download')" class="text-blue-500 hover:underline">Download Ollama</a>, run <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">ollama pull llama3.2</code>, then select "Ollama" above.</p>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
         <h3 class="font-bold text-lg mb-4">☁️ Cloud Backup</h3>
         <div class="space-y-3">
           <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="set-cloudBackupEnabled" ${settingsMap['cloudBackupEnabled'] === 'true' ? 'checked' : ''} /> Enable auto cloud backup</label>
           <div><label class="text-xs text-gray-500 block">Backup Folder <span class="text-gray-400">(OneDrive / Google Drive / Dropbox)</span></label>
-            <div class="flex gap-2"><input id="set-cloudBackupFolder" value="${escapeHtml(settingsMap['cloudBackupFolder'] || '')}" class="flex-1 px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" placeholder="C:\Users\...\OneDrive\Shop Backups" /><button onclick="selectCloudFolder()" class="px-3 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg text-sm hover:bg-gray-300 dark:hover:bg-gray-600">Browse</button></div>
+            <div class="flex gap-2"><input id="set-cloudBackupFolder" value="${escapeHtml(settingsMap['cloudBackupFolder'] || '')}" class="flex-1 px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" placeholder="C:\Users\...\OneDrive\Shop Backups" /><button onclick="selectCloudFolder()" class="px-3 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg text-sm hover:bg-gray-300 dark:hover:bg-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Browse</button></div>
           </div>
           <div><label class="text-xs text-gray-500 block">Encryption Password</label><input id="set-cloudBackupPassword" type="password" value="${escapeHtml(settingsMap['cloudBackupPassword'] || '')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" placeholder="Password to protect your backup" /></div>
           <div><label class="text-xs text-gray-500 block">Backup Frequency</label><select id="set-cloudBackupInterval" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"><option value="daily" ${(settingsMap['cloudBackupInterval']||'daily') === 'daily' ? 'selected' : ''}>Daily</option><option value="weekly" ${settingsMap['cloudBackupInterval'] === 'weekly' ? 'selected' : ''}>Weekly</option><option value="monthly" ${settingsMap['cloudBackupInterval'] === 'monthly' ? 'selected' : ''}>Monthly</option></select></div>
@@ -67,23 +68,43 @@ async function viewSettings(root) {
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
         <h3 class="font-bold text-lg mb-4">📋 Quick Items</h3>
         <div class="space-y-2">
-          ${state.quickItems.map(q => `<div class="flex items-center gap-2 text-sm"><input class="flex-1 px-2 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800" value="${escapeHtml(q.name)}" data-qi-id="${q.id}" data-field="name" /><input class="w-24 px-2 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800" type="number" step="0.01" value="${q.price}" data-qi-id="${q.id}" data-field="price" /><button onclick="deleteQuickItem(${q.id})" class="text-red-500 text-xs">Del</button></div>`).join('')}
-          <div class="flex gap-2"><input id="new-qi-name" placeholder="Item name" class="flex-1 px-2 py-1.5 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-sm" /><input id="new-qi-price" type="number" step="0.01" placeholder="Price" class="w-24 px-2 py-1.5 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-sm" /><button onclick="addQuickItem()" class="px-3 py-1.5 bg-blue-600 text-white rounded text-sm">Add</button></div>
+          ${state.quickItems.map(q => `<div class="flex items-center gap-2 text-sm"><input class="flex-1 px-2 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800" value="${escapeHtml(q.name)}" data-qi-id="${q.id}" data-field="name" /><input class="w-24 px-2 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800" type="number" step="0.01" value="${q.price}" data-qi-id="${q.id}" data-field="price" /><button onclick="deleteQuickItem(${q.id})" class="text-red-500 text-xs"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Del</button></div>`).join('')}
+          <div class="flex gap-2"><input id="new-qi-name" placeholder="Item name" class="flex-1 px-2 py-1.5 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-sm" onkeydown="if(event.key==='Enter')addQuickItem()" /><input id="new-qi-price" type="number" step="0.01" placeholder="Price" class="w-24 px-2 py-1.5 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-sm" onkeydown="if(event.key==='Enter')addQuickItem()" /><button onclick="addQuickItem()" class="px-3 py-1.5 bg-blue-600 text-white rounded text-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add</button></div>
         </div>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
         <h3 class="font-bold text-lg mb-4">👥 Users</h3>
         <div class="overflow-auto mb-3">${state.users.length > 0 ? `<table class="w-full text-sm"><thead><tr class="bg-gray-50 dark:bg-gray-700"><th class="p-2 text-left">Username</th><th class="p-2 text-left">Name</th><th class="p-2 text-left">Role</th><th class="p-2 text-center">Actions</th></tr></thead>
           <tbody>${state.users.map(u => `<tr class="border-b dark:border-gray-700"><td class="p-2">${escapeHtml(u.username)}</td><td class="p-2">${escapeHtml(u.name||'')}</td><td class="p-2"><span class="px-2 py-0.5 rounded-full text-xs ${u.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}">${escapeHtml(u.role)}</span></td>
-          <td class="p-2 text-center"><button onclick="openUserModal(${u.id})" class="text-blue-600 text-xs">Edit</button></td></tr>`).join('')}</tbody></table>` : '<p class="text-gray-400 text-sm">No users</p>'}</div>
-        <button onclick="openUserModal()" class="px-3 py-1.5 bg-blue-600 text-white rounded text-sm">+ Add User</button>
+          <td class="p-2 text-center"><button onclick="openUserModal(${u.id})" class="text-blue-600 text-xs"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit</button></td></tr>`).join('')}</tbody></table>` : '<p class="text-gray-400 text-sm">No users</p>'}</div>
+        <button onclick="openUserModal()" class="px-3 py-1.5 bg-blue-600 text-white rounded text-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>Add User</button>
       </div>
-      <button onclick="saveSettings()" class="w-full py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-semibold">Save All Settings</button>
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
+        <h3 class="font-bold text-lg mb-4">🖨️ Print Appearance</h3>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="text-xs text-gray-500 block">Stripe Color 1 (even rows)</label><input id="set-printStripeColor1" type="color" value="${settingsMap['printStripeColor1'] || '#f8fafc'}" class="w-full h-9 px-1 py-1 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 cursor-pointer" /></div>
+          <div><label class="text-xs text-gray-500 block">Stripe Color 2 (odd rows)</label><input id="set-printStripeColor2" type="color" value="${settingsMap['printStripeColor2'] || '#ffffff'}" class="w-full h-9 px-1 py-1 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 cursor-pointer" /></div>
+        </div>
+        <p class="text-xs text-gray-400 mt-2">Used for alternating row colors on all printouts (client info, daily report, business report, debt forms).</p>
+      </div>
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-bold text-lg">⚙️ App Version</h3>
+          <span class="text-xs text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded" id="app-version-label">v${settingsMap['lastBuildVersion'] || '3.4.3'}</span>
+        </div>
+        <p class="text-xs text-gray-400 mb-3">Built from source at <code class="text-blue-500">C:\Users\CDH\Desktop\shop-ledger-ph</code></p>
+        <button id="btn-rebuild" onclick="rebuildApp()" class="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-xl hover:from-blue-700 hover:to-indigo-800 font-semibold flex items-center justify-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          <span id="rebuild-text">Rebuild &amp; Restart .exe</span>
+        </button>
+        <p id="rebuild-status" class="text-xs text-gray-400 mt-2 text-center hidden"></p>
+      </div>
+      <div class="sticky bottom-0 bg-white dark:bg-gray-800 -mx-6 px-6 py-3 border-t dark:border-gray-700"><button onclick="saveSettings()" class="w-full py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="20 6 9 17 4 12"/></svg>Save All Settings</button></div>
     </div>`;
 }
 
 async function saveSettings() {
-  const keys = ['shopName','shopContact','shopAddress','dailyInterestRate','cloudBackupFolder','cloudBackupPassword','cloudBackupInterval','smsApiKey','backupEmail','aiApiKey','aiModel','receiptFooter','receiptHeaderText'];
+  const keys = ['shopName','shopContact','shopAddress','weatherLocation','cloudBackupFolder','cloudBackupPassword','cloudBackupInterval','smsApiKey','backupEmail','aiApiKey','aiModel','receiptFooter','receiptHeaderText','printStripeColor1','printStripeColor2'];
   for (const key of keys) {
     const el = document.getElementById(`set-${key}`);
     if (el) {
@@ -119,13 +140,16 @@ async function updateQuickItemField(el) {
 }
 
 async function addQuickItem() {
-  const name = document.getElementById('new-qi-name').value.trim();
-  const price = parseFloat(document.getElementById('new-qi-price').value) || 0;
+  const nmEl = document.getElementById('new-qi-name');
+  const prEl = document.getElementById('new-qi-price');
+  if (!nmEl || !prEl) { toast('Form not ready', 'warning'); return; }
+  const name = nmEl.value.trim();
+  const price = parseFloat(prEl.value) || 0;
   if (!name) { toast('Enter item name', 'warning'); return; }
   await dbAdd('quickItems', { name, price });
   state.quickItems = await dbAll('quickItems');
-  document.getElementById('new-qi-name').value = '';
-  document.getElementById('new-qi-price').value = '';
+  nmEl.value = '';
+  prEl.value = '';
   viewSettings(document.getElementById('view'));
   toast('Quick item added');
 }
@@ -175,25 +199,30 @@ function openUserModal(id) {
   const u = isEdit ? state.users.find(x => x.id === id) : null;
   modal(`
     <div class="p-6">
-      <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">${isEdit ? 'Edit' : 'New'} User</h3><button onclick="closeModal()" class="text-gray-400 text-2xl">&times;</button></div>
+      <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">${isEdit ? 'Edit' : 'New'} User</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
       <div class="space-y-3">
         <div><label class="text-xs text-gray-500 block">Username *</label><input id="uf-username" value="${isEdit ? escapeHtml(u.username||'') : ''}" ${isEdit ? 'disabled' : ''} class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
         <div><label class="text-xs text-gray-500 block">Name</label><input id="uf-name" value="${isEdit ? escapeHtml(u.name||'') : ''}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
         <div><label class="text-xs text-gray-500 block">Password *${isEdit ? ' (leave blank to keep)' : ''}</label><input id="uf-password" type="password" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
         <div><label class="text-xs text-gray-500 block">Role</label><select id="uf-role" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"><option value="admin" ${isEdit && u.role === 'admin' ? 'selected' : ''}>Admin</option><option value="staff" ${isEdit && u.role === 'staff' ? 'selected' : ''}>Staff</option></select></div>
         <div class="flex gap-2 pt-2">
-          <button onclick="saveUser(${isEdit ? id : 'null'})" class="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">${isEdit ? 'Update' : 'Save'}</button>
-          <button onclick="closeModal()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg">Cancel</button>
+          <button onclick="saveUser(${isEdit ? id : 'null'})" class="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="20 6 9 17 4 12"/></svg>${isEdit ? 'Update' : 'Save'}</button>
+          <button onclick="closeModal()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Cancel</button>
         </div>
       </div>
     </div>`);
 }
 
 async function saveUser(id) {
-  const username = document.getElementById('uf-username').value.trim();
-  const password = document.getElementById('uf-password').value;
-  const name = document.getElementById('uf-name').value.trim();
-  const role = document.getElementById('uf-role').value;
+  const unEl = document.getElementById('uf-username');
+  const pwEl = document.getElementById('uf-password');
+  const nmEl = document.getElementById('uf-name');
+  const rlEl = document.getElementById('uf-role');
+  if (!unEl || !pwEl || !nmEl || !rlEl) { toast('Form not ready', 'error'); return; }
+  const username = unEl.value.trim();
+  const password = pwEl.value;
+  const name = nmEl.value.trim();
+  const role = rlEl.value;
   if (!username) { toast('Username required', 'error'); return; }
   if (!id && !password) { toast('Password required', 'error'); return; }
   if (id) {
@@ -209,4 +238,38 @@ async function saveUser(id) {
   closeModal();
   state.users = await dbAll('users');
   viewSettings(document.getElementById('view'));
+}
+
+async function rebuildApp() {
+  if (!window.electronAPI?.rebuildApp) { toast('Rebuild only available in desktop app', 'warning'); return; }
+  const btn = document.getElementById('btn-rebuild');
+  const text = document.getElementById('rebuild-text');
+  const status = document.getElementById('rebuild-status');
+  if (!btn || !text || !status) return;
+  btn.disabled = true;
+  text.textContent = 'Building...';
+  status.className = 'text-xs text-yellow-500 mt-2 text-center';
+  status.textContent = 'Running npm run build:win — this may take a minute...';
+  status.classList.remove('hidden');
+  try {
+    const result = await window.electronAPI.rebuildApp();
+    if (result.success) {
+      let version = '3.4.3';
+      const verRes = await fetch('version.json?' + Date.now());
+      if (verRes.ok) { try { const v = await verRes.json(); if (v.version) { version = v.version; const s = state.settings.find(x => x.key === 'lastBuildVersion'); if (s) { s.value = v.version; await dbPut('settings', s); } else { await dbAdd('settings', { key: 'lastBuildVersion', value: v.version }); } } } catch(e) {} }
+      status.className = 'text-xs text-green-500 mt-2 text-center';
+      status.textContent = `Build complete! Installer at build/Shop Ledger PH Setup ${version}.exe, portable at build/Shop-Ledger-PH-${version}-portable.exe`;
+      text.textContent = 'Rebuild Complete ✓';
+      btn.className = 'w-full py-3 bg-green-600 text-white rounded-xl font-semibold flex items-center justify-center gap-2';
+      toast('Build successful — run the new .exe to update');
+    } else {
+      throw new Error(result.error);
+    }
+  } catch (err) {
+    status.className = 'text-xs text-red-500 mt-2 text-center';
+    status.textContent = 'Build failed: ' + err.message;
+    text.textContent = 'Rebuild & Restart .exe';
+    btn.disabled = false;
+    btn.className = 'w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-xl hover:from-blue-700 hover:to-indigo-800 font-semibold flex items-center justify-center gap-2';
+  }
 }

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <meta name="theme-color" content="#3b82f6" />
 <title>Shop Ledger PH Mobile</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<script src="assets/vendor/tailwind.js"></script>
 <style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f3f4f6}</style>
 </head>
 <body class="min-h-screen">
@@ -91,7 +91,7 @@ function renderSaleItems() {
   const list = document.getElementById('sale-items-list');
   const total = saleItems.reduce((s, i) => s + (i.qty * i.unitCost), 0);
   list.innerHTML = saleItems.map((i, idx) =>
-    '<div class="flex justify-between items-center text-sm py-1 border-b"><span>' + esc(i.name) + ' x' + i.qty + '</span><span>' + peso(i.qty * i.unitCost) + ' <button onclick="saleItems.splice(' + idx + ',1);renderSaleItems()" class="text-red-500 ml-2">&times;</button></span></div>'
+    '<div class="flex justify-between items-center text-sm py-1 border-b"><span>' + esc(i.name) + ' x' + i.qty + '</span><span>' + peso(i.qty * i.unitCost) + ' <button onclick="saleItems.splice(' + idx + ',1);renderSaleItems()" class="text-red-500 hover:text-red-700 ml-2" title="Remove"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></span></div>'
   ).join('');
   document.getElementById('sale-total').textContent = peso(total);
 }

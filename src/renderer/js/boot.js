@@ -1,0 +1,221 @@
+window.__app = window.__app || {};
+if (window.electronAPI) {
+  window.__app.getDBDump = async () => {
+    const stores = ['clients','transactions','payments','inventory','quickItems','settings','users','expenses','suppliers','purchaseOrders','notifications','auditLogs'];
+    const results = await Promise.all(stores.map(s => dbAll(s).catch(() => [])));
+    const dump = {};
+    stores.forEach((s, i) => {
+      if (s === 'users') dump[s] = results[i].map(u => { const { password, ...rest } = u; return rest; });
+      else dump[s] = results[i];
+    });
+    return dump;
+  };
+  window.electronAPI.onShortcut((action) => {
+    if (action === 'new-sale') navigate('transactions');
+    else if (action === 'new-payment') navigate('payments');
+    else if (action === 'file-backup') { if (typeof fileBackupFlow === 'function') fileBackupFlow(); }
+    else if (action === 'email-backup') { if (typeof emailBackupFlow === 'function') emailBackupFlow(); }
+  });
+  window.electronAPI.onUpdateAvailable((info) => {
+    if (document.getElementById('app').classList.contains('hidden')) return;
+    const remindTs = localStorage.getItem('updateRemindLater');
+    if (remindTs && Date.now() < parseInt(remindTs)) return;
+    const version = info.version || info.name || 'new version';
+    modal(`
+      <div class="p-6">
+        <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">Update Available</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+        <p class="text-gray-600 dark:text-gray-300 mb-4">Version <strong>${version}</strong> is ready to download.</p>
+        <div class="flex gap-2">
+          <button onclick="localStorage.removeItem('updateRemindLater');window.electronAPI.downloadUpdate();closeModal()" class="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download Update</button>
+          <button onclick="localStorage.setItem('updateRemindLater',Date.now()+86400000);closeModal()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg">Later (24h)</button>
+        </div>
+      </div>`);
+  });
+  window.electronAPI.onUpdateDownloaded((info) => {
+    const version = info.version || info.name || 'new version';
+    modal(`
+      <div class="p-6">
+        <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">Update Ready</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+        <p class="text-gray-600 dark:text-gray-300 mb-4">Version <strong>${version}</strong> downloaded. Restart to apply?</p>
+        <div class="flex gap-2">
+          <button onclick="window.electronAPI.installUpdate()" class="flex-1 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Restart Now</button>
+          <button onclick="closeModal()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg">Later (24h)</button>
+        </div>
+      </div>`);
+  });
+  window.electronAPI.onLanUpdateSignal((info) => {
+    modal(`
+      <div class="p-6">
+        <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">LAN Update Signal</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+        <p class="text-gray-600 dark:text-gray-300 mb-4">Update signaled by <strong>${escapeHtml(info.from)}</strong>${info.version ? ' (v'+escapeHtml(info.version)+')' : ''}. Check for updates now?</p>
+        <div class="flex gap-2">
+          <button onclick="localStorage.removeItem('updateRemindLater');window.electronAPI.downloadUpdate();closeModal()" class="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download Update</button>
+          <button onclick="closeModal()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg">Later</button>
+        </div>
+      </div>`);
+  });
+  window.electronAPI.onConfirmExit(() => {
+    playSound('alert');
+    modal(`<div class="p-6"><h3 class="text-lg font-bold mb-3">Exit Shop Ledger PH?</h3><div class="flex gap-2 justify-end"><button onclick="closeModal()" class="px-4 py-2 border dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">No</button><button onclick="window.electronAPI.exitConfirmed();closeModal()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold">Yes</button></div></div>`);
+  });
+}
+
+async function seedIfEmpty() {
+  const [users, clients, inventory, quickItems, settings] = await Promise.all([
+    dbAll('users'), dbAll('clients'), dbAll('inventory'), dbAll('quickItems'), dbAll('settings')
+  ]);
+  if (users.length === 0) {
+    await dbAdd('users', { username: 'admin', password: await hashPassword('admin123'), name: 'Administrator', role: 'admin' });
+  }
+  if (settings.length === 0) {
+    await dbAdd('settings', { key: 'shopName', value: 'My Sari-Sari Store' });
+    await dbAdd('settings', { key: 'shopContact', value: '' });
+    await dbAdd('settings', { key: 'shopAddress', value: 'Philippines' });
+  }
+}
+
+async function checkForNewBuild() {
+  try {
+    const res = await fetch('version.json?' + Date.now());
+    if (!res.ok) return;
+    const ver = await res.json();
+    const existing = state.settings.find(s => s.key === 'lastBuildVersion');
+    const currentVer = existing ? existing.value : '';
+    if (ver.version && ver.version !== currentVer) {
+      if (currentVer) {
+        const notes = ver.notes ? ' — ' + ver.notes : '';
+        setTimeout(() => {
+          toast(`📦 New build v${ver.version} available${notes}. Go to Settings → Rebuild & Restart .exe`, 'info');
+        }, 2000);
+      }
+      if (existing) { existing.value = ver.version; await dbPut('settings', existing); }
+      else { await dbAdd('settings', { key: 'lastBuildVersion', value: ver.version }); }
+    }
+  } catch (e) { /* offline or no version.json */ }
+}
+
+async function boot() {
+  try {
+    await openDB();
+    await seedIfEmpty();
+    await loadAll();
+    const ls = document.getElementById('loading-screen');
+    if (ls) { ls.classList.add('fade-out'); await new Promise(r => setTimeout(r, 300)); ls.classList.add('hidden'); }
+    const savedUser = sessionStorage.getItem('shopUser');
+    if (savedUser) {
+      try { state.user = JSON.parse(savedUser); } catch (e) { sessionStorage.removeItem('shopUser'); }
+      document.getElementById('login-screen').classList.add('hidden');
+      document.getElementById('app').classList.remove('hidden');
+      document.getElementById('user-info').textContent = `${state.user.name} (${state.user.role})`;
+      startClock();
+      applyPermissions();
+    }
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') document.documentElement.classList.add('dark');
+    navigate(state.currentRoute);
+    checkForNewBuild();
+  } catch (e) {
+    console.error('Boot error:', e);
+    const ls = document.getElementById('loading-screen');
+    if (ls) { ls.classList.add('fade-out'); setTimeout(() => ls.classList.add('hidden'), 300); }
+    document.getElementById('login-screen')?.classList.remove('hidden');
+    const errEl = document.getElementById('login-error');
+    if (errEl) { errEl.textContent = 'Boot error: ' + e.message; errEl.classList.remove('hidden'); }
+  }
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey && e.shiftKey && e.key === 'B') {
+    const tmCart = document.getElementById('tm-cart');
+    if (tmCart && tmCart.offsetParent !== null) {
+      e.preventDefault();
+      txCart.push({date:today(),description:'',name:'1',unitCost:0,intRate:0,invId:null});
+      renderTMCart();
+      updateTMTotals();
+      return;
+    }
+    const cfCartEl = document.getElementById('cf-cart');
+    if (cfCartEl && cfCartEl.offsetParent !== null) {
+      e.preventDefault();
+      cfCart.push({date:today(),description:'',name:'1',unitCost:0,intRate:0,invId:null});
+      cfRenderCart();
+    }
+  }
+});
+
+document.addEventListener('click', (e) => {
+  const panel = document.getElementById('notif-panel');
+  const container = document.getElementById('notif-container');
+  if (panel && !panel.classList.contains('hidden') && container && !container.contains(e.target)) {
+    panel.classList.add('hidden');
+  }
+});
+let _loginParticleRAF = null;
+function initLoginParticles() {
+  try {
+    let canvas = document.getElementById('login-canvas');
+    if (!canvas) { canvas = document.createElement('canvas'); canvas.id = 'login-canvas'; }
+    const ls = document.getElementById('login-screen');
+    if (!ls) return;
+    canvas.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;z-index:0;pointer-events:none;display:block';
+    if (!canvas.parentNode) ls.insertBefore(canvas, ls.firstChild);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const W = window.innerWidth, H = window.innerHeight;
+    canvas.width = W; canvas.height = H;
+    const pts = [];
+    let mx = W / 2, my = H / 2;
+    for (let i = 0; i < 60; i++) pts.push({ x: Math.random() * W, y: Math.random() * H, vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3 });
+    document.addEventListener('mousemove', (e) => { mx = e.clientX; my = e.clientY; });
+    function frame() {
+      const visible = !document.getElementById('login-screen').classList.contains('hidden');
+      if (visible) {
+        ctx.clearRect(0, 0, W, H);
+        for (const p of pts) {
+          const dx = mx - p.x, dy = my - p.y, dt = Math.sqrt(dx * dx + dy * dy);
+          if (dt < 250) { p.vx += (dx / (dt || 1)) * 0.05; p.vy += (dy / (dt || 1)) * 0.05; }
+          for (const other of pts) {
+            if (other === p) continue;
+            const rdx = p.x - other.x, rdy = p.y - other.y, rdist = Math.sqrt(rdx * rdx + rdy * rdy);
+            if (rdist < 40 && rdist > 1) { p.vx += (rdx / rdist) * 0.03; p.vy += (rdy / rdist) * 0.03; }
+          }
+          p.vx += (Math.random() - 0.5) * 0.08; p.vy += (Math.random() - 0.5) * 0.08;
+          const sp = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+          if (sp > 1.2) { p.vx = (p.vx / sp) * 1.2; p.vy = (p.vy / sp) * 1.2; }
+          p.x += p.vx; p.y += p.vy;
+          if (p.x < 0) p.x = W; if (p.x > W) p.x = 0;
+          if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
+          ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fill();
+        }
+        for (let i = 0; i < pts.length; i++) {
+          for (let j = i + 1; j < pts.length; j++) {
+            const dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y, d = Math.sqrt(dx * dx + dy * dy);
+            if (d < 180) {
+              ctx.beginPath(); ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(pts[j].x, pts[j].y);
+              ctx.strokeStyle = `rgba(255,255,255,${(1 - d / 180) * 0.25})`; ctx.lineWidth = 0.5; ctx.stroke();
+            }
+          }
+          const cdx = mx - pts[i].x, cdy = my - pts[i].y, cd = Math.sqrt(cdx * cdx + cdy * cdy);
+          if (cd < 250 && cd > 5) {
+            ctx.beginPath(); ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(mx, my);
+            ctx.strokeStyle = `rgba(255,255,255,${(1 - cd / 250) * 0.5})`; ctx.lineWidth = 1; ctx.stroke();
+          }
+        }
+        _loginParticleRAF = requestAnimationFrame(frame);
+      } else {
+        _loginParticleRAF = null;
+      }
+    }
+    _loginParticleRAF = requestAnimationFrame(frame);
+    window.resumeLoginParticles = function() {
+      if (!_loginParticleRAF) _loginParticleRAF = requestAnimationFrame(frame);
+    };
+  } catch (e) { console.error('Login particle error:', e); }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  boot();
+  initLoginParticles();
+  if (typeof AppParticles !== 'undefined') AppParticles.init();
+});

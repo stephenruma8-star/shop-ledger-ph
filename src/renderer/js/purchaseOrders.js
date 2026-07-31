@@ -6,7 +6,7 @@ async function viewPurchaseOrders(root) {
     <div class="space-y-4 fade-in">
       <div class="flex gap-2 flex-wrap items-center">
         <input id="poSearch" placeholder="Search POs..." class="flex-1 min-w-[200px] px-4 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" oninput="debouncedRenderPOTable()" />
-        <button onclick="openPOModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">+ New PO</button>
+        <button onclick="openPOModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New PO</button>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden glass-card">
         <div class="overflow-auto" id="poTable"></div>
@@ -15,7 +15,7 @@ async function viewPurchaseOrders(root) {
   renderPOTable();
 }
 
-var debouncedRenderPOTable = debounce(renderPOTable, 250);
+let debouncedRenderPOTable = debounce(renderPOTable, 250);
 function renderPOTable() {
   const q = document.getElementById('poSearch')?.value || '';
   const filtered = searchData(state.purchaseOrders, q, ['poNo','supplierName','status']);
@@ -31,8 +31,8 @@ function renderPOTable() {
         <td class="p-3">${(po.items||[]).length}</td><td class="p-3 text-right font-bold">${peso(po.total||0)}</td>
         <td class="p-3"><span class="px-2 py-0.5 rounded-full text-xs ${statusColors[po.status] || 'bg-gray-100'}">${escapeHtml(po.status || 'Pending')}</span></td>
         <td class="p-3 text-center">
-          <button onclick="receivePO(${po.id})" class="text-green-600 hover:text-green-800 text-xs mr-2" ${po.status === 'Received' ? 'disabled' : ''}>Receive</button>
-          <button onclick="deletePO(${po.id})" class="text-red-600 hover:text-red-800 text-xs">Del</button>
+          <button onclick="receivePO(${po.id})" class="text-green-600 hover:text-green-800 text-xs mr-2" ${po.status === 'Received' ? 'disabled' : ''}><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Receive</button>
+          <button onclick="deletePO(${po.id})" class="text-red-600 hover:text-red-800 text-xs"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Del</button>
         </td></tr>`;
     }).join('')}</tbody></table>`;
 }
@@ -44,7 +44,7 @@ function openPOModal() {
   renderPOCart();
   modal(`
     <div class="p-6 max-w-3xl">
-      <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">New Purchase Order</h3><button onclick="closeModal()" class="text-gray-400 text-2xl">&times;</button></div>
+      <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">New Purchase Order</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
       <div class="space-y-3">
         <div class="grid grid-cols-2 gap-3">
           <div><label class="text-xs text-gray-500 block">Supplier</label><select id="po-supplier" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"><option value="">Select...</option>${suppliers.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('')}</select></div>
@@ -54,24 +54,27 @@ function openPOModal() {
           <div class="flex gap-2"><select id="po-item-select" class="flex-1 px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"><option value="">Select item...</option>${inv.map(i => `<option value="${i.id}" data-name="${escapeHtml(i.name)}" data-price="${i.costPrice||0}">${escapeHtml(i.name)} - ${peso(i.costPrice||0)}</option>`).join('')}</select>
           <input id="po-qty" type="number" value="1" min="1" class="w-16 px-2 text-center border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" />
           <input id="po-price" type="number" step="0.01" value="" placeholder="Price" class="w-24 px-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" />
-          <button onclick="addPOItem()" class="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm">+</button></div>
+          <button onclick="addPOItem()" class="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button></div>
         </div>
         <div><h4 class="font-semibold text-sm mb-1">Items</h4><div id="po-cart" class="max-h-40 overflow-auto border dark:border-gray-700 rounded-lg p-2"></div></div>
         <div class="flex justify-between font-bold">Total: <span id="po-total">${peso(0)}</span></div>
-        <button onclick="savePO()" class="w-full py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">Create Purchase Order</button>
+        <button onclick="savePO()" class="w-full py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="20 6 9 17 4 12"/></svg>Create Purchase Order</button>
       </div>
     </div>`);
 }
 
 function addPOItem() {
   const sel = document.getElementById('po-item-select');
+  const qtyEl = document.getElementById('po-qty');
+  const prEl = document.getElementById('po-price');
+  if (!sel || !qtyEl || !prEl) { toast('Form not ready', 'warning'); return; }
   const opt = sel.options[sel.selectedIndex];
   if (!opt || !opt.value) { toast('Select an item', 'warning'); return; }
   const invId = parseInt(opt.value);
   const name = opt.dataset.name;
   const defaultPrice = parseFloat(opt.dataset.price);
-  const qty = parseInt(document.getElementById('po-qty').value) || 1;
-  const price = parseFloat(document.getElementById('po-price').value) || defaultPrice;
+  const qty = parseInt(qtyEl.value) || 1;
+  const price = parseFloat(prEl.value) || defaultPrice;
   const existing = poItems.find(i => i.invId === invId);
   if (existing) { existing.qty += qty; existing.price = price; }
   else { poItems.push({ invId, name, price, qty }); }
@@ -87,7 +90,7 @@ function renderPOCart() {
   if (totalEl) totalEl.textContent = peso(total);
   el.innerHTML = poItems.map((item, i) => `<div class="flex justify-between items-center py-1 border-b dark:border-gray-700 last:border-0 text-sm">
     <span>${escapeHtml(item.name)} x${item.qty} @ ${peso(item.price)}</span>
-    <div><span class="font-medium">${peso(item.price * item.qty)}</span><button onclick="removePOItem(${i})" class="ml-2 text-red-500 text-xs">&times;</button></div>
+    <div><span class="font-medium">${peso(item.price * item.qty)}</span><button onclick="removePOItem(${i})" class="ml-2 text-red-500"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
   </div>`).join('');
 }
 
@@ -96,9 +99,11 @@ function removePOItem(i) { poItems.splice(i, 1); renderPOCart(); }
 async function savePO() {
   if (poItems.length === 0) { toast('Add at least one item', 'error'); return; }
   const supplierSel = document.getElementById('po-supplier');
+  const dtEl = document.getElementById('po-date');
+  if (!supplierSel || !dtEl) { toast('Form not ready', 'error'); return; }
   const supplierId = supplierSel.value ? parseInt(supplierSel.value) : null;
   const supplierName = supplierSel.options[supplierSel.selectedIndex]?.text || 'Unknown';
-  const date = document.getElementById('po-date').value || today();
+  const date = dtEl.value || today();
   const total = poItems.reduce((s, i) => s + (i.price * i.qty), 0);
   const existingPOs = state.purchaseOrders.filter(p => p.poNo?.startsWith('PO-'));
   const nextNo = existingPOs.length > 0 ? Math.max(...existingPOs.map(p => parseInt(p.poNo.replace('PO-','')) || 0)) + 1 : 1;
@@ -107,11 +112,11 @@ async function savePO() {
     poNo, supplierId, supplierName, date, items: poItems.map(i => ({...i})),
     total, status: 'Pending', createdAt: now()
   });
-  closeModal();
   state.purchaseOrders = await dbAll('purchaseOrders');
   renderPOTable();
-  toast(`PO ${poNo} created`, 'success');
   await logAudit('po', `PO ${poNo} created from ${supplierName}`);
+  toast(`PO ${poNo} created`, 'success');
+  closeModal();
 }
 
 async function receivePO(id) {

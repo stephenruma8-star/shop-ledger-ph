@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog, Menu, Tray, nativeImage, crashRepor
 
 // Single-instance lock — must run before anything else
 const gotLock = app.requestSingleInstanceLock();
-if (!gotLock) { app.exit(0); return; }
+if (!gotLock) { process.exit(0); }
 const lockPath = require('path').join(require('os').tmpdir(), 'shop-ledger-ph.lock');
 let lockFd = null;
 try {
@@ -13,14 +13,14 @@ try {
   try {
     const oldPid = parseInt(require('fs').readFileSync(lockPath, 'utf8').trim(), 10);
     process.kill(oldPid, 0);
-    app.exit(0); return; // PID still running
+    process.exit(0); // PID still running
   } catch (e2) {
     // PID not running — stale lock, remove and retry
     try { require('fs').unlinkSync(lockPath); } catch(e3) {}
     try {
       lockFd = require('fs').openSync(lockPath, 'wx');
       require('fs').writeFileSync(lockFd, String(process.pid));
-    } catch (e4) { app.exit(0); return; }
+    } catch (e4) { process.exit(0); }
   }
 }
 process.on('exit', () => { if (lockFd !== null) { try { require('fs').closeSync(lockFd); } catch(e){} try { require('fs').unlinkSync(lockPath); } catch(e){} } });
@@ -34,12 +34,16 @@ const _log = function(m) {
 };
 const origEmit = process.emit;
 process.emit = function(ev, ...a) {
-  if (ev === 'uncaughtException') { _log('UNCAUGHT: '+(a[0]?.message||a[0])+'\n'+(a[0]?.stack||'')); return true; }
+  if (ev === 'uncaughtException') {
+    const msg = 'UNCAUGHT: '+(a[0]?.message||a[0])+'\n'+(a[0]?.stack||'');
+    _log(msg);
+    try { dialog.showErrorBox('Shop Ledger PH - Error', msg); } catch(e) {}
+    return true;
+  }
   return origEmit.apply(this, [ev, ...a]);
 };
 process.on('unhandledRejection', function(e) { _log('UNHANDLED: '+(e?.message||e)); });
 try { crashReporter.start({ submitURL: '', uploadToServer: false, ignoreSystemCrashHandler: true }); } catch(e) {}
-try { dialog.showErrorBox = function(){}; } catch(e) {}
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -61,18 +65,28 @@ const UDP_PORT = 3457;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1400, height: 900, minWidth: 900, minHeight: 600,
+    width: 1920, height: 1080, minWidth: 900, minHeight: 600,
     title: 'Shop Ledger PH',
-    icon: path.join(__dirname, 'assets/icon.png'),
+    icon: path.join(__dirname, '../renderer/assets/icon.png'),
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true, nodeIntegration: false
     }
   });
-  mainWindow.loadFile('shop-ledger-ph.html');
+  if (process.env['ELECTRON_RENDERER_URL']) {
+    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL']);
+  } else {
+    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+  }
+  mainWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
+    if (permission === 'geolocation') { callback(true); }
+    else { callback(false); }
+  });
   mainWindow.setMenu(buildMenu());
   mainWindow.on('close', (e) => {
-    if (!isQuitting) { e.preventDefault(); mainWindow.hide(); }
+    if (isQuitting) return;
+    e.preventDefault();
+    mainWindow.webContents.send('confirm-exit');
   });
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
@@ -82,7 +96,7 @@ function createWindow() {
 
 function createTray() {
   try {
-    const iconPath = path.join(__dirname, 'assets/icon.png');
+    const iconPath = path.join(__dirname, '../renderer/assets/icon.png');
     const trayIcon = fs.existsSync(iconPath) ? nativeImage.createFromPath(iconPath) : nativeImage.createEmpty();
     if (trayIcon.isEmpty()) return;
     tray = new Tray(trayIcon);
@@ -143,13 +157,13 @@ function startLANServer() {
   });
 
   expressApp.get('/', (req, res) => {
-    res.type('html').send(fs.readFileSync(path.join(__dirname, 'mobile.html'), 'utf8'));
+    res.type('html').send(fs.readFileSync(path.join(__dirname, '../renderer/mobile.html'), 'utf8'));
   });
 
   expressApp.get('/api/clients', async (req, res) => {
     try {
       if (!mainWindow || mainWindow.isDestroyed()) return res.status(503).json({ error: 'Window not ready' });
-      const dump = await mainWindow.webContents.executeJavaScript('window.getDBDump()');
+      const dump = await mainWindow.webContents.executeJavaScript('window.__app.getDBDump()');
       res.json(dump.clients);
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
@@ -231,7 +245,7 @@ function broadcastUpdateSignal() {
   try {
     const msg = JSON.stringify({
       type: 'update-signal',
-      version: require('./package.json').version,
+      version: app.getVersion(),
       hostName: os.hostname()
     });
     udpBroadcast.send(msg, 0, msg.length, UDP_PORT, '255.255.255.255');
@@ -376,12 +390,36 @@ ipcMain.handle('select-folder', async () => {
   } catch (err) { return { success: false, error: err.message }; }
 });
 
+ipcMain.handle('open-external', async (event, url) => { require('electron').shell.openExternal(url); });
+ipcMain.handle('rebuild-app', async () => {
+  try {
+    const { execSync } = require('child_process');
+    const result = execSync('npm run build:win', { cwd: app.getAppPath(), timeout: 300000, windowsHide: true });
+    return { success: true, output: result.toString().trim() };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+ipcMain.on('exit-confirmed', () => { isQuitting = true; app.quit(); });
 ipcMain.handle('save-encrypted-backup-to-path', async (event, { data, password, filename, folder }) => {
   try {
     const filePath = path.join(folder, filename);
     const encrypted = encryptData(JSON.stringify(data), password);
     fs.writeFileSync(filePath, JSON.stringify(encrypted));
     return { success: true, path: filePath };
+  } catch (err) { return { success: false, error: err.message }; }
+});
+ipcMain.handle('print-receipt', async (event, { html, width }) => {
+  try {
+    const printWin = new BrowserWindow({
+      width: width || 380, height: 600, show: false, frame: false, webPreferences: { offscreen: true }
+    });
+    await printWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+    await new Promise(r => setTimeout(r, 500));
+    printWin.webContents.print({ silent: true, printBackground: true, margins: { marginType: 'none' } }, (success) => {
+      printWin.close();
+    });
+    return { success: true };
   } catch (err) { return { success: false, error: err.message }; }
 });
 

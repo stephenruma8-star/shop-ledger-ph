@@ -21,4 +21,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onLanUpdateSignal: (callback) => ipcRenderer.on('lan-update-signal', (_, info) => callback(info)),
   selectFolder: () => ipcRenderer.invoke('select-folder'),
   saveEncryptedBackupToPath: (data, password, filename, folder) => ipcRenderer.invoke('save-encrypted-backup-to-path', { data, password, filename, folder }),
+  openExternal: (url) => ipcRenderer.invoke('open-external', url),
+  rebuildApp: () => ipcRenderer.invoke('rebuild-app'),
+  onConfirmExit: (callback) => ipcRenderer.on('confirm-exit', () => callback()),
+  exitConfirmed: () => ipcRenderer.send('exit-confirmed'),
+  printReceipt: (config) => ipcRenderer.invoke('print-receipt', config),
 });
