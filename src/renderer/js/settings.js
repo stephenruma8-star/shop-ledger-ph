@@ -291,7 +291,7 @@ export async function rebuildApp() {
   try {
     const result = await window.electronAPI.rebuildApp();
     if (result.success) {
-      let version = '3.4.5';
+      let version = '3.4.6';
       const verRes = await fetch('version.json?' + Date.now());
       if (verRes.ok) { try { const v = await verRes.json(); if (v.version) { version = v.version; const s = state.settings.find(x => x.key === 'lastBuildVersion'); if (s) { s.value = v.version; await dbPut('settings', s); } else { await dbAdd('settings', { key: 'lastBuildVersion', value: v.version }); } } } catch(e) {} }
       status.className = 'text-xs text-green-500 mt-2 text-center';

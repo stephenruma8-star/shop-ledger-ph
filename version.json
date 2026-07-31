@@ -1,5 +1,5 @@
 {
-  "version": "3.4.5",
-  "buildDate": "2026-07-31T09:00:00.000Z",
-  "notes": "Renderer fully bundled as ES modules via electron-vite; strict-mode safety fix; earlier: auto-update check button, bulk inventory edit, returns, receipt printing, variants, exit confirmation"
+  "version": "3.4.6",
+  "buildDate": "2026-07-31T14:30:00.000Z",
+  "notes": "Inline field validation: red border + 'please fill out this field' messages on all required fields; earlier: ES-module bundling, auto-update check button, bulk inventory edit, returns, receipt printing, variants, exit confirmation"
 }
