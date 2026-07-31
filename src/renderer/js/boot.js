@@ -31,6 +31,12 @@ if (window.electronAPI) {
         </div>
       </div>`);
   });
+  window.electronAPI.onUpdateNotAvailable(() => {
+    toast('You are up to date', 'success');
+  });
+  window.electronAPI.onUpdateError((message) => {
+    toast('Update check failed: ' + message, 'warning');
+  });
   window.electronAPI.onUpdateDownloaded((info) => {
     const version = info.version || info.name || 'new version';
     modal(`

@@ -1,6 +1,6 @@
 {
   "name": "shop-ledger-ph",
-  "version": "3.4.3",
+  "version": "3.4.4",
   "description": "Shop Ledger PH - Complete POS & Inventory System for Philippine Sari-Sari Stores",
   "repository": "stephenruma8-star/shop-ledger-ph",
   "main": "out/main/index.js",
@@ -57,7 +57,8 @@
       "createDesktopShortcut": true,
       "perMachine": false,
       "installerIcon": "src/renderer/assets/icon.ico",
-      "uninstallerIcon": "src/renderer/assets/icon.ico"
+      "uninstallerIcon": "src/renderer/assets/icon.ico",
+      "artifactName": "Shop-Ledger-PH-Setup-${version}.exe"
     }
   }
 }

@@ -305,7 +305,7 @@ function showSpinner(msg = 'Loading...') {
 // Confetti
 function confetti() {
   const c = document.createElement('canvas');
-  c.className = 'fixed inset-0 pointer-events-none z-[200]';
+  c.className = 'fixed inset-0 pointer-events-none z-[500]';
   c.width = window.innerWidth; c.height = window.innerHeight;
   document.body.appendChild(c);
   const ctx = c.getContext('2d');
@@ -334,7 +334,7 @@ function confetti() {
 function modal(html) {
   const root = document.getElementById('modal-root');
   if (!root) return;
-  root.innerHTML = `<div class="fixed inset-0 bg-black/50 z-50 flex items-start justify-center pt-4 overflow-auto fade-in" onclick="if(event.target===this)closeModal()"><div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-[90vw] mx-4 mb-4 slide-in max-h-[95vh] overflow-auto glass-strong" onclick="event.stopPropagation()">${html}</div></div>`;
+  root.innerHTML = `<div class="fixed inset-0 bg-black/50 z-[400] flex items-start justify-center pt-4 overflow-auto fade-in" onclick="if(event.target===this)closeModal()"><div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-[90vw] mx-4 mb-4 slide-in max-h-[95vh] overflow-auto glass-strong" onclick="event.stopPropagation()">${html}</div></div>`;
 }
 
 function closeModal() {

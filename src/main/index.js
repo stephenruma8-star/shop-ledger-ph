@@ -126,13 +126,27 @@ function getLocalIP() {
 function setupAutoUpdater() {
   ipcMain.handle('download-update', () => { if (autoUpdater) autoUpdater.downloadUpdate(); });
   ipcMain.handle('install-update', () => { if (autoUpdater) { isQuitting = true; autoUpdater.quitAndInstall(); } });
+  ipcMain.handle('check-update', () => {
+    if (!autoUpdater || !app.isPackaged) {
+      return { success: false, error: 'Auto-update is only available in the installed app. Run the new installer instead.' };
+    }
+    checkForUpdates();
+    return { success: true };
+  });
   if (!autoUpdater || !app.isPackaged) return;
   autoUpdater.autoDownload = false;
   autoUpdater.on('update-available', (info) => {
     mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-available', info);
   });
+  autoUpdater.on('update-not-available', () => {
+    mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-not-available');
+  });
   autoUpdater.on('update-downloaded', (info) => {
     mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-downloaded', info);
+  });
+  autoUpdater.on('error', (err) => {
+    console.error('Auto-update error:', err && err.message || err);
+    mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-error', (err && err.message) || 'Update check failed');
   });
 }
 
