@@ -94,7 +94,7 @@ export async function viewSettings(root) {
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
         <div class="flex items-center justify-between mb-3">
           <h3 class="font-bold text-lg">⚙️ App Version</h3>
-          <span class="text-xs text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded" id="app-version-label">v${settingsMap['lastBuildVersion'] || '3.4.5'}</span>
+          <span class="text-xs text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded" id="app-version-label">v${settingsMap['lastBuildVersion'] || '3.4.6'}</span>
         </div>
         <p class="text-xs text-gray-400 mb-3">Built from source at <code class="text-blue-500">C:\Users\CDH\Desktop\shop-ledger-ph</code></p>
         <button id="btn-check-update" onclick="checkUpdates()" class="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-xl hover:from-blue-700 hover:to-indigo-800 font-semibold flex items-center justify-center gap-2">

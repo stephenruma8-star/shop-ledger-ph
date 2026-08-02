@@ -90,6 +90,15 @@ export async function seedIfEmpty() {
   }
 }
 
+export function updateVersionBadge() {
+  const version = ((state.settings || []).find(s => s.key === 'lastBuildVersion') || {}).value || '3.4.6';
+  const text = 'v' + version;
+  for (const id of ['sidebar-version', 'login-version', 'app-version-label']) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  }
+}
+
 export async function checkForNewBuild() {
   try {
     const res = await fetch('version.json?' + Date.now());
@@ -107,6 +116,7 @@ export async function checkForNewBuild() {
       if (existing) { existing.value = ver.version; await dbPut('settings', existing); }
       else { await dbAdd('settings', { key: 'lastBuildVersion', value: ver.version }); }
     }
+    updateVersionBadge();
   } catch (e) { /* offline or no version.json */ }
 }
 
@@ -129,6 +139,7 @@ export async function boot() {
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') document.documentElement.classList.add('dark');
     navigate(state.currentRoute);
+    updateVersionBadge();
     checkForNewBuild();
   } catch (e) {
     console.error('Boot error:', e);
@@ -240,6 +251,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
 Object.defineProperties(window, {
   seedIfEmpty: { get: () => seedIfEmpty, configurable: true },
+  updateVersionBadge: { get: () => updateVersionBadge, configurable: true },
   checkForNewBuild: { get: () => checkForNewBuild, configurable: true },
   boot: { get: () => boot, configurable: true },
   _loginParticleRAF: { get: () => _loginParticleRAF, set: (v) => { _loginParticleRAF = v; }, configurable: true },
