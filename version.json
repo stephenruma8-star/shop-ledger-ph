@@ -1,5 +1,5 @@
 {
-  "version": "3.4.6",
-  "buildDate": "2026-07-31T14:30:00.000Z",
-  "notes": "Inline field validation: red border + 'please fill out this field' messages on all required fields; earlier: ES-module bundling, auto-update check button, bulk inventory edit, returns, receipt printing, variants, exit confirmation"
+  "version": "3.4.7",
+  "buildDate": "2026-08-03T12:00:00.000Z",
+  "notes": "Version shown on login screen and sidebar (auto-filled from version.json); earlier: inline field validation, ES-module bundling, auto-update check button, bulk inventory edit, returns, receipt printing, variants, exit confirmation"
 }
