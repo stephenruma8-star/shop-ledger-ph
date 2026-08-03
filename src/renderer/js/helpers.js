@@ -143,7 +143,7 @@ let _connTimer = null;
 
 function _connApply(mode, label, icon) {
   const containers = document.querySelectorAll('.conn-status');
-  const svg = `<svg class="conn-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icon}</svg>`;
+  const svg = `<svg class="conn-icon inline-block" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icon}</svg>`;
   containers.forEach(el => {
     el.classList.remove('conn-online', 'conn-offline', 'conn-checking');
     el.classList.add('conn-' + mode);

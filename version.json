@@ -1,5 +1,5 @@
 {
-  "version": "3.4.9",
-  "buildDate": "2026-08-03T16:30:00.000Z",
-  "notes": "Internet connection indicator (wifi icon, online/offline/checking) on login and sidebar; earlier: effects, version badge, inline field validation, ES-module bundling, auto-update check button, bulk inventory edit, returns, receipt printing, variants, exit confirmation"
+  "version": "3.4.10",
+  "buildDate": "2026-08-03T18:00:00.000Z",
+  "notes": "Internet connection indicator moved to the header next to the notification bell (removed from login screen and sidebar); earlier: connection indicator, effects, version badge, inline field validation, ES-module bundling, auto-update check button, bulk inventory edit, returns, receipt printing, variants, exit confirmation"
 }

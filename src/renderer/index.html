@@ -84,8 +84,7 @@ header{padding:.5rem 1rem!important}
       <div class="text-5xl mb-2 text-glow">🏪</div>
       <h1 class="text-3xl font-bold text-glow">Shop Ledger PH</h1>
       <p class="text-gray-500 text-sm mt-1">Sign in to continue</p>
-      <p id="login-version" class="text-xs text-gray-400/80 mt-1.5">v3.4.9</p>
-      <p class="text-xs text-gray-400/70 mt-1 flex items-center justify-center gap-1 conn-status conn-checking" title="Internet connection status"><svg class="conn-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg><span class="conn-label">Checking…</span></p>
+      <p id="login-version" class="text-xs text-gray-400/80 mt-1.5">v3.4.10</p>
     </div>
     <div id="login-form">
       <div class="space-y-3" onkeydown="if(event.key==='Enter')doLogin()">
@@ -117,7 +116,6 @@ header{padding:.5rem 1rem!important}
       <p class="text-xs text-gray-400 mt-1" id="user-info">User</p>
       <p class="text-xs text-gray-400 mt-1" id="sidebar-clock"></p>
       <p class="text-xs text-gray-400/70 mt-1" id="sidebar-version"></p>
-      <p class="text-xs text-gray-400/70 mt-1 flex items-center gap-1 conn-status conn-checking" title="Internet connection status"><svg class="conn-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg><span class="conn-label">Checking…</span></p>
     </div>
     <nav class="flex-1 p-3 space-y-0.5 overflow-auto" id="main-nav">
       <button data-route="dashboard" title="F1 / Ctrl+D" class="nav-btn w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm flex items-center gap-2"><span>📊</span>Dashboard</button>
@@ -154,6 +152,7 @@ header{padding:.5rem 1rem!important}
           <button onclick="toggleNotifPanel()" class="text-xl relative hover:opacity-80 transition-opacity">🔔<span id="notif-badge" class="hidden absolute -top-1 -right-2 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold"></span></button>
           <div id="notif-panel" class="hidden absolute right-0 top-full mt-2 w-80 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border dark:border-gray-700 z-50 max-h-96 overflow-auto"></div>
         </div>
+        <p class="text-xs text-gray-400/70 flex items-center gap-1.5 conn-status conn-checking" title="Internet connection status"><svg class="conn-icon inline-block" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg><span class="conn-label">Checking…</span></p>
         <div id="header-actions"></div>
       </div>
     </header>
