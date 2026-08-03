@@ -136,6 +136,51 @@ export function startClock() {
   setInterval(tick, 1000);
 }
 
+const CONN_ICON_ON = `<path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/>`;
+const CONN_ICON_OFF = `<line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.58 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/>`;
+let _connChecking = false;
+let _connTimer = null;
+
+function _connApply(mode, label, icon) {
+  const containers = document.querySelectorAll('.conn-status');
+  const svg = `<svg class="conn-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icon}</svg>`;
+  containers.forEach(el => {
+    el.classList.remove('conn-online', 'conn-offline', 'conn-checking');
+    el.classList.add('conn-' + mode);
+    const lbl = el.querySelector('.conn-label');
+    if (lbl) lbl.textContent = label;
+    const ic = el.querySelector('.conn-icon');
+    if (ic) ic.outerHTML = svg;
+  });
+}
+
+export async function updateConnStatus() {
+  if (!navigator.onLine) { _connApply('offline', 'Offline', CONN_ICON_OFF); return; }
+  if (_connChecking) return;
+  _connChecking = true;
+  _connApply('checking', 'Checking…', CONN_ICON_ON);
+  try {
+    const ctrl = new AbortController();
+    const to = setTimeout(() => ctrl.abort(), 5000);
+    const res = await fetch('https://www.gstatic.com/generate_204', { cache: 'no-store', signal: ctrl.signal });
+    clearTimeout(to);
+    if (!res.ok) throw new Error('Bad status ' + res.status);
+    _connApply('online', 'Online', CONN_ICON_ON);
+  } catch (e) {
+    _connApply('offline', 'Offline', CONN_ICON_OFF);
+  } finally {
+    _connChecking = false;
+  }
+}
+
+export function initConnIndicator() {
+  updateConnStatus();
+  window.addEventListener('online', updateConnStatus);
+  window.addEventListener('offline', updateConnStatus);
+  if (_connTimer) clearInterval(_connTimer);
+  _connTimer = setInterval(updateConnStatus, 30000);
+}
+
 export function populateYearSelector() {
   const sel = document.getElementById('year-selector');
   if (!sel) return;
@@ -661,6 +706,8 @@ Object.defineProperties(window, {
   clearItemSuggestions: { get: () => clearItemSuggestions, configurable: true },
   selectItemSuggestion: { get: () => selectItemSuggestion, configurable: true },
   startClock: { get: () => startClock, configurable: true },
+  updateConnStatus: { get: () => updateConnStatus, configurable: true },
+  initConnIndicator: { get: () => initConnIndicator, configurable: true },
   populateYearSelector: { get: () => populateYearSelector, configurable: true },
   changeYear: { get: () => changeYear, configurable: true },
   showAllYearsSummary: { get: () => showAllYearsSummary, configurable: true },

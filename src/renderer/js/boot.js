@@ -1,7 +1,7 @@
 import { applyPermissions } from './auth.js'
 import { cfCart, cfRenderCart } from './clients.js'
 import { dbAdd, dbAll, dbPut, openDB } from './database.js'
-import { escapeHtml, hashPassword, modal, playSound, startClock, toast } from './helpers.js'
+import { escapeHtml, hashPassword, initConnIndicator, modal, playSound, startClock, toast } from './helpers.js'
 import { AppParticles } from './particles.js'
 import { emailBackupFlow, fileBackupFlow } from './reports.js'
 import { loadAll, navigate } from './router.js'
@@ -91,7 +91,7 @@ export async function seedIfEmpty() {
 }
 
 export function updateVersionBadge() {
-  const version = ((state.settings || []).find(s => s.key === 'lastBuildVersion') || {}).value || '3.4.6';
+  const version = ((state.settings || []).find(s => s.key === 'lastBuildVersion') || {}).value || '3.4.9';
   const text = 'v' + version;
   for (const id of ['sidebar-version', 'login-version', 'app-version-label']) {
     const el = document.getElementById(id);
@@ -141,6 +141,7 @@ export async function boot() {
     navigate(state.currentRoute);
     updateVersionBadge();
     checkForNewBuild();
+    initConnIndicator();
   } catch (e) {
     console.error('Boot error:', e);
     const ls = document.getElementById('loading-screen');

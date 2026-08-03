@@ -58,6 +58,11 @@ header{padding:.5rem 1rem!important}
 }
 @keyframes totalFlash{0%{background:rgba(34,197,94,.35)}100%{background:transparent}}
 .total-flash{animation:totalFlash .7s ease-out;border-radius:10px}
+.conn-status{color:#64748b}
+.conn-online{color:#22c55e}
+.conn-offline{color:#ef4444}
+.conn-checking{color:#f59e0b;animation:connPulse 1.2s ease-in-out infinite}
+@keyframes connPulse{0%,100%{opacity:1}50%{opacity:.45}}
 @media(min-width:769px){#mobile-menu-btn{display:none!important}}
 </style>
 </head>
@@ -79,7 +84,8 @@ header{padding:.5rem 1rem!important}
       <div class="text-5xl mb-2 text-glow">🏪</div>
       <h1 class="text-3xl font-bold text-glow">Shop Ledger PH</h1>
       <p class="text-gray-500 text-sm mt-1">Sign in to continue</p>
-      <p id="login-version" class="text-xs text-gray-400/80 mt-1.5">v3.4.6</p>
+      <p id="login-version" class="text-xs text-gray-400/80 mt-1.5">v3.4.9</p>
+      <p class="text-xs text-gray-400/70 mt-1 flex items-center justify-center gap-1 conn-status conn-checking" title="Internet connection status"><svg class="conn-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg><span class="conn-label">Checking…</span></p>
     </div>
     <div id="login-form">
       <div class="space-y-3" onkeydown="if(event.key==='Enter')doLogin()">
@@ -111,6 +117,7 @@ header{padding:.5rem 1rem!important}
       <p class="text-xs text-gray-400 mt-1" id="user-info">User</p>
       <p class="text-xs text-gray-400 mt-1" id="sidebar-clock"></p>
       <p class="text-xs text-gray-400/70 mt-1" id="sidebar-version"></p>
+      <p class="text-xs text-gray-400/70 mt-1 flex items-center gap-1 conn-status conn-checking" title="Internet connection status"><svg class="conn-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg><span class="conn-label">Checking…</span></p>
     </div>
     <nav class="flex-1 p-3 space-y-0.5 overflow-auto" id="main-nav">
       <button data-route="dashboard" title="F1 / Ctrl+D" class="nav-btn w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm flex items-center gap-2"><span>📊</span>Dashboard</button>

@@ -1,5 +1,5 @@
 {
-  "version": "3.4.8",
-  "buildDate": "2026-08-03T13:30:00.000Z",
-  "notes": "Effects: dashboard totals count up on load, cash-register chime on completed sale, cart total flashes green when it changes; earlier: version badge, inline field validation, ES-module bundling, auto-update check button, bulk inventory edit, returns, receipt printing, variants, exit confirmation"
+  "version": "3.4.9",
+  "buildDate": "2026-08-03T16:30:00.000Z",
+  "notes": "Internet connection indicator (wifi icon, online/offline/checking) on login and sidebar; earlier: effects, version badge, inline field validation, ES-module bundling, auto-update check button, bulk inventory edit, returns, receipt printing, variants, exit confirmation"
 }
