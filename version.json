@@ -1,5 +1,5 @@
 {
-  "version": "3.4.7",
-  "buildDate": "2026-08-03T12:00:00.000Z",
-  "notes": "Version shown on login screen and sidebar (auto-filled from version.json); earlier: inline field validation, ES-module bundling, auto-update check button, bulk inventory edit, returns, receipt printing, variants, exit confirmation"
+  "version": "3.4.8",
+  "buildDate": "2026-08-03T13:30:00.000Z",
+  "notes": "Effects: dashboard totals count up on load, cash-register chime on completed sale, cart total flashes green when it changes; earlier: version badge, inline field validation, ES-module bundling, auto-update check button, bulk inventory edit, returns, receipt printing, variants, exit confirmation"
 }
