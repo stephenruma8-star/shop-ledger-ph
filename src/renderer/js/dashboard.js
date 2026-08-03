@@ -1,5 +1,5 @@
 import { dbAdd, dbAll, dbPut } from './database.js'
-import { dbLoad, escapeHtml, modal, toast } from './helpers.js'
+import { animateCount, dbLoad, escapeHtml, modal, toast } from './helpers.js'
 import { escHtml, openPrintWindow } from './printLayout.js'
 import { fmtDate, fmtDateTime, peso, state, today } from './state.js'
 
@@ -32,26 +32,26 @@ export async function viewDashboard(root) {
       ${dw.summaryCards ? `<div class="grid grid-cols-4 gap-2">
         <div class="bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm border-l-4 border-green-500">
           <p class="text-xs text-gray-500">Today Sales</p>
-          <p class="text-lg font-bold text-green-600">${peso(todaySales)}</p>
+          <p class="text-lg font-bold text-green-600" id="dash-sales"></p>
           <p class="text-xs text-gray-400">${todayTx.length} txns</p>
         </div>
         <div class="bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm border-l-4 border-red-500">
           <p class="text-xs text-gray-500">Today Expenses</p>
-          <p class="text-lg font-bold text-red-600">${peso(todayExpTotal)}</p>
+          <p class="text-lg font-bold text-red-600" id="dash-expenses"></p>
         </div>
         <div class="bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm border-l-4 border-orange-500">
           <p class="text-xs text-gray-500">Total Utang</p>
-          <p class="text-lg font-bold text-orange-600">${peso(totalUtang)}</p>
+          <p class="text-lg font-bold text-orange-600" id="dash-utang"></p>
           <p class="text-xs text-gray-400">${state.clients.filter(c => (c.balance||0) > 0).length} clients</p>
         </div>
         <div class="bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm border-l-4 border-blue-500">
           <p class="text-xs text-gray-500">Today Collected</p>
-          <p class="text-lg font-bold text-blue-600">${peso(todayPayTotal)}</p>
+          <p class="text-lg font-bold text-blue-600" id="dash-collected"></p>
         </div>
       </div>` : ''}
       ${dw.profitBar ? `<div class="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-lg p-3 text-white shadow-sm">
         <div class="flex justify-between items-center">
-          <div><p class="text-xs opacity-80">Today's Profit</p><p class="text-xl font-bold">${peso(todayProfit)}</p></div>
+          <div><p class="text-xs opacity-80">Today's Profit</p><p class="text-xl font-bold" id="dash-profit"></p></div>
           <div class="text-right"><p class="text-xs opacity-80">Margin</p><p class="text-lg font-bold">${profitMargin}%</p></div>
         </div>
         <div class="mt-1 bg-white/20 rounded-full h-1.5"><div class="bg-white rounded-full h-1.5" style="width:${Math.min(profitMargin, 100)}%"></div></div>
@@ -114,6 +114,11 @@ export async function viewDashboard(root) {
   if (dw.chart) drawDashChart();
   if (dw.payMethod) drawPayMethodChart();
   if (dw.weather) { loadWeather(); loadNextHoliday(); loadHolidaysScroll(); }
+  animateCount(root.querySelector('#dash-sales'), todaySales, peso);
+  animateCount(root.querySelector('#dash-expenses'), todayExpTotal, peso);
+  animateCount(root.querySelector('#dash-utang'), totalUtang, peso);
+  animateCount(root.querySelector('#dash-collected'), todayPayTotal, peso);
+  animateCount(root.querySelector('#dash-profit'), todayProfit, peso);
 }
 
 export function getDashWidgets() {

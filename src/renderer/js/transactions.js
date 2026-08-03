@@ -103,7 +103,7 @@ export function openTransactionModal() {
 
 export function renderTransactionModal(editTxn) {
   const isEdit = !!editTxn;
-  if (!isEdit) { txCart = []; txEditingId = null; }
+  if (!isEdit) { txCart = []; txEditingId = null; _lastTmTotal = null; }
   const clients = state.clients;
   const inv = state.inventory.filter(i => (i.stock || 0) > 0);
   const qItems = state.quickItems;
@@ -193,6 +193,13 @@ export function renderTMCart() {
 
 export function removeCartItem(i) { txCart.splice(i, 1); renderTMCart(); updateTMTotals(); }
 
+let _lastTmTotal = null;
+export function flashTotal(el, total) {
+  if (!el || (_lastTmTotal !== null && _lastTmTotal === total)) return;
+  _lastTmTotal = total;
+  el.classList.remove('total-flash'); void el.offsetWidth; el.classList.add('total-flash');
+}
+
 export function updateTMTotals() {
   const el = document.getElementById('tm-totals');
   if (!el) return;
@@ -208,6 +215,7 @@ export function updateTMTotals() {
     ${scDiscount > 0 ? `<div class="flex justify-between text-green-600"><span>SC/PWD 20%</span><span>-${peso(scDiscount)}</span></div>` : ''}
     ${discount > 0 ? `<div class="flex justify-between text-orange-600"><span>Discount</span><span>-${peso(discount)}</span></div>` : ''}
     <div class="flex justify-between font-bold text-lg border-t dark:border-gray-700 pt-1"><span>Total</span><span class="text-green-600">${peso(grandTotal)}</span></div>`;
+  flashTotal(el, grandTotal);
 }
 
 export function toggleSC() { updateTMTotals(); }
@@ -318,6 +326,7 @@ export async function doSaveTransaction() {
       return;
     }
     toast(`Sale completed! Invoice: ${invoiceNo}`, 'success');
+    playSound('sale');
     await logAudit('sale', `Sale ${invoiceNo} - ${peso(grandTotal)}`);
   }
   [state.transactions, state.inventory, state.clients] = await Promise.all([

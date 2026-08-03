@@ -291,6 +291,16 @@ export function playSound(type) {
       gain.gain.setValueAtTime(0.12, _audioCtx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, _audioCtx.currentTime + 0.3);
       osc.start(_audioCtx.currentTime); osc.stop(_audioCtx.currentTime + 0.3);
+    } else if (type === 'sale') {
+      [659.25, 987.77, 1318.5].forEach((f, i) => {
+        const o2 = _audioCtx.createOscillator();
+        const g2 = _audioCtx.createGain();
+        o2.connect(g2); g2.connect(_audioCtx.destination);
+        o2.frequency.setValueAtTime(f, _audioCtx.currentTime + i * 0.09);
+        g2.gain.setValueAtTime(0.16, _audioCtx.currentTime + i * 0.09);
+        g2.gain.exponentialRampToValueAtTime(0.001, _audioCtx.currentTime + i * 0.09 + 0.35);
+        o2.start(_audioCtx.currentTime + i * 0.09); o2.stop(_audioCtx.currentTime + i * 0.09 + 0.35);
+      });
     } else if (type === 'alert') {
       for (let i = 0; i < 3; i++) {
         const o2 = _audioCtx.createOscillator();
@@ -303,6 +313,19 @@ export function playSound(type) {
       }
     }
   } catch (e) { /* audio not available */ }
+}
+
+export function animateCount(el, target, fmt) {
+  if (!el) return;
+  const dur = 900;
+  const start = performance.now();
+  function frame(now) {
+    const t = Math.min((now - start) / dur, 1);
+    const ease = 1 - Math.pow(1 - t, 3);
+    el.textContent = fmt ? fmt(target * ease) : String(Math.round(target * ease));
+    if (t < 1) requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
 }
 
 // Loading spinner
@@ -648,6 +671,7 @@ Object.defineProperties(window, {
   toast: { get: () => toast, configurable: true },
   _audioCtx: { get: () => _audioCtx, set: (v) => { _audioCtx = v; }, configurable: true },
   playSound: { get: () => playSound, configurable: true },
+  animateCount: { get: () => animateCount, configurable: true },
   showSpinner: { get: () => showSpinner, configurable: true },
   confetti: { get: () => confetti, configurable: true },
   modal: { get: () => modal, configurable: true },

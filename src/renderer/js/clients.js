@@ -77,6 +77,7 @@ export function openClientModal(c) {
   if (typeof c === 'number') c = state.clients.find(x => x.id === c);
   const isEdit = !!c;
   cfCart = [];
+  _lastCfTotal = null;
   const qItems = state.quickItems || [];
   const inv = (state.inventory || []).filter(i => (i.stock || 0) > 0);
   const draft = (!isEdit) ? JSON.parse(sessionStorage.getItem('clientFormDraft') || 'null') || {} : {};
@@ -147,6 +148,7 @@ export function cfRenderCart() {
   cfUpdateTotals();
 }
 
+let _lastCfTotal = null;
 export function cfUpdateTotals() {
   const el = document.getElementById('cf-totals');
   if (!el) return;
@@ -157,6 +159,10 @@ export function cfUpdateTotals() {
     <div class="flex justify-between"><span>Subtotal</span><span>${peso(subtotal)}</span></div>
     ${totalInt > 0 ? `<div class="flex justify-between text-amber-600"><span>Interest</span><span>${peso(totalInt)}</span></div>` : ''}
     <div class="flex justify-between font-bold"><span>Total</span><span class="text-green-600">${peso(grand)}</span></div>`;
+  if (_lastCfTotal !== null && _lastCfTotal !== grand) {
+    el.classList.remove('total-flash'); void el.offsetWidth; el.classList.add('total-flash');
+  }
+  _lastCfTotal = grand;
 }
 
 export async function saveClient(id) {
