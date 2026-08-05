@@ -16,9 +16,19 @@ function copyRendererStatic() {
   }
 }
 
+function copyMainStatic() {
+  return {
+    name: 'copy-main-static',
+    apply: 'build',
+    closeBundle() {
+      for (const name of ['wsServer.js']) cpSync(resolve('src/main', name), resolve('out/main', name))
+    }
+  }
+}
+
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
+    plugins: [externalizeDepsPlugin(), copyMainStatic()],
     build: {
       rollupOptions: {
         input: { index: resolve('src/main/index.js') }

@@ -74,6 +74,15 @@ if (window.electronAPI) {
     playSound('alert');
     modal(`<div class="p-6"><h3 class="text-lg font-bold mb-3">Exit Shop Ledger PH?</h3><div class="flex gap-2 justify-end"><button onclick="closeModal()" class="px-4 py-2 border dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">No</button><button onclick="window.electronAPI.exitConfirmed();closeModal()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold">Yes</button></div></div>`);
   });
+  window.electronAPI.onLanDataRefresh(async (info) => {
+    if (document.querySelector('.fixed.inset-0')) return;
+    try {
+      const route = state.currentRoute;
+      await loadAll();
+      if (route !== 'settings') navigate(route);
+      toast('Data refreshed from ' + (info?.source === 'mobile' ? 'mobile' : 'LAN'), 'info');
+    } catch (e) { /* ignore */ }
+  });
 }
 
 export async function seedIfEmpty() {
@@ -91,7 +100,7 @@ export async function seedIfEmpty() {
 }
 
 export function updateVersionBadge() {
-  const version = ((state.settings || []).find(s => s.key === 'lastBuildVersion') || {}).value || '3.4.11';
+  const version = ((state.settings || []).find(s => s.key === 'lastBuildVersion') || {}).value || '3.4.12';
   const text = 'v' + version;
   for (const id of ['sidebar-version', 'login-version', 'app-version-label']) {
     const el = document.getElementById(id);

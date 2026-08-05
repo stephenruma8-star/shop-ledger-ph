@@ -29,4 +29,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onConfirmExit: (callback) => ipcRenderer.on('confirm-exit', () => callback()),
   exitConfirmed: () => ipcRenderer.send('exit-confirmed'),
   printReceipt: (config) => ipcRenderer.invoke('print-receipt', config),
+  printThermal: (config) => ipcRenderer.invoke('print-thermal', config),
+  onLanDataRefresh: (callback) => ipcRenderer.on('lan-data-refresh', (_, info) => callback(info)),
 });

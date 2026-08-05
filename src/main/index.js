@@ -53,15 +53,18 @@ const cors = require('cors');
 const nodemailer = require('nodemailer');
 const QRCode = require('qrcode');
 const axios = require('axios');
+const net = require('net');
+const { startWsServer } = require('./wsServer.js');
 
 let autoUpdater = null;
 try { autoUpdater = require('electron-updater').autoUpdater; if (autoUpdater) autoUpdater.autoCheckUpdates = false; autoUpdater.autoDownload = false; } catch (e) { console.error('autoUpdater not available:', e.message); }
 
-let mainWindow, tray, lanServer, udpBroadcast;
+let mainWindow, tray, lanServer, udpBroadcast, wsServer;
 let isQuitting = false;
 let _lanToken = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
 const LAN_PORT = 3456;
 const UDP_PORT = 3457;
+const WS_PORT = 3458;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -197,6 +200,7 @@ function startLANServer() {
           return { success: true };
         })()
       `);
+      notifyDataChanged({ source: 'api', kind: 'payment' });
       res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
@@ -222,6 +226,7 @@ function startLANServer() {
         if (item.invId) await exec(`(async()=>{const i=await dbGet('inventory',${item.invId});if(i){i.stock=(i.stock||0)-${parseInt(item.qty)||1};await dbPut('inventory',i);}})()`);
       }
       if (clientId) await exec(`(async()=>{const c=await dbGet('clients',${JSON.stringify(clientId)});if(c){c.balance=(c.balance||0)+${grandTotal};await dbPut('clients',c);}})()`);
+      notifyDataChanged({ source: 'api', kind: 'sale' });
       res.json({ success: true, invoiceNo });
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
@@ -266,6 +271,16 @@ function broadcastUpdateSignal() {
   } catch (e) { console.error('broadcast error:', e.message); }
 }
 
+function notifyDataChanged(info) {
+  if (wsServer) {
+    try { wsServer.broadcast({ type: 'update', source: info?.source || 'app', kind: info?.kind || 'data' }); }
+    catch (e) { console.error('WS broadcast error:', e.message); }
+  }
+  try {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('lan-data-refresh', info || {});
+  } catch (e) {}
+}
+
 function encryptData(data, password) {
   const salt = crypto.randomBytes(16);
   const key = crypto.pbkdf2Sync(password, salt, 100000, 32, 'sha256');
@@ -288,6 +303,7 @@ function decryptData(encryptedObj, password) {
 
 ipcMain.handle('signal-lan-update', () => {
   broadcastUpdateSignal();
+  notifyDataChanged({ source: 'app', kind: 'signal' });
   return { success: true };
 });
 
@@ -373,9 +389,9 @@ ipcMain.handle('load-backup-file', async () => {
 });
 
 ipcMain.handle('generate-mobile-qr', async () => {
-  const url = `http://${getLocalIP()}:${LAN_PORT}`;
+  const url = `http://${getLocalIP()}:${LAN_PORT}?ws=${WS_PORT}`;
   const qr = await QRCode.toDataURL(url, { width: 300 });
-  return { url, qr, token: _lanToken };
+  return { url, qr, token: _lanToken, wsPort: WS_PORT };
 });
 
 ipcMain.handle('save-logo', async (event, { dataUrl }) => {
@@ -437,6 +453,44 @@ ipcMain.handle('print-receipt', async (event, { html, width }) => {
   } catch (err) { return { success: false, error: err.message }; }
 });
 
+function buildEscPos(lines) {
+  const parts = [Buffer.from([0x1b, 0x40])];
+  const align = (a) => Buffer.from([0x1b, 0x61, a]);
+  const bold = (on) => Buffer.from([0x1b, 0x45, on ? 1 : 0]);
+  const mode = (on) => Buffer.from([0x1d, 0x21, on ? 0x11 : 0x00]);
+  for (const ln of lines) {
+    if (typeof ln === 'string') { parts.push(Buffer.from(ln + '\n', 'utf8')); continue; }
+    if (ln.t === 'spacer') { parts.push(Buffer.from('\n', 'utf8')); continue; }
+    if (ln.t === 'divider') {
+      parts.push(Buffer.concat([align(0), Buffer.from((ln.text || '--------------------------------').slice(0, 48) + '\n', 'utf8')]));
+      continue;
+    }
+    const text = String(ln.text == null ? '' : ln.text);
+    let p = align(ln.t === 'center' ? 1 : ln.t === 'right' ? 2 : 0);
+    if (ln.bold) p = Buffer.concat([p, bold(true)]);
+    if (ln.size === 'double') p = Buffer.concat([p, mode(true)]);
+    p = Buffer.concat([p, Buffer.from(text + '\n', 'utf8')]);
+    if (ln.bold) p = Buffer.concat([p, bold(false)]);
+    if (ln.size === 'double') p = Buffer.concat([p, mode(false)]);
+    parts.push(p);
+  }
+  parts.push(Buffer.from([0x0a, 0x0a, 0x1d, 0x56, 0x00]));
+  return Buffer.concat(parts);
+}
+
+ipcMain.handle('print-thermal', async (event, { host, port, lines }) => {
+  return new Promise((resolve) => {
+    const sock = net.createConnection({ host, port: parseInt(port, 10) || 9100 }, () => {
+      sock.write(buildEscPos(lines || []), () => {
+        sock.end();
+        setTimeout(() => resolve({ success: true }), 300);
+      });
+    });
+    sock.on('error', (err) => resolve({ success: false, error: err.message }));
+    sock.setTimeout(10000, () => { sock.destroy(); resolve({ success: false, error: 'Timed out connecting to printer' }); });
+  });
+});
+
 function buildMenu() {
   return Menu.buildFromTemplate([
     { label: 'File', submenu: [
@@ -459,11 +513,19 @@ app.whenReady().then(() => {
     createTray();
     startLANServer();
     startUDPBroadcast();
+    wsServer = startWsServer({
+      port: WS_PORT,
+      token: _lanToken,
+      onMessage: (msg) => {
+        if (msg.type === 'update') notifyDataChanged({ source: 'mobile', kind: 'data' });
+      }
+    });
   } catch (e) { console.error('Startup error:', e); }
 }).catch(e => console.error('whenReady failed:', e));
 app.on('before-quit', () => { isQuitting = true; });
 app.on('window-all-closed', () => {
   if (lanServer) lanServer.close();
   if (udpBroadcast) try { udpBroadcast.close(); } catch(e) {}
+  if (wsServer) try { wsServer.close(); } catch(e) {}
   if (process.platform !== 'darwin') app.quit();
 });

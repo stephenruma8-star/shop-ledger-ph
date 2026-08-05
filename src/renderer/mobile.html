@@ -28,6 +28,9 @@ const API = window.location.origin;
 const peso = (n) => '₱' + (Number(n) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 });
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 let state = { clients: [] };
+let currentView = 'home';
+let ws = null;
+let wsAuthed = false;
 
 async function loadClients() {
   try { const r = await fetch(API + '/api/clients', { headers: { 'X-Auth-Token': getToken() } }); state.clients = await r.json(); }
@@ -39,7 +42,37 @@ function getToken() {
   return m ? m[1] : '';
 }
 
+function setConn(kind) {
+  const el = document.getElementById('conn-status');
+  if (el) el.textContent = kind === 'live' ? '● Live' : '● Connected';
+}
+
+function connectWS() {
+  const params = new URLSearchParams(window.location.search);
+  const wsPort = params.get('ws') || '3458';
+  const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  const url = proto + '://' + window.location.hostname + ':' + wsPort;
+  try { ws = new WebSocket(url); } catch (e) { setTimeout(connectWS, 5000); return; }
+  ws.onopen = () => { try { ws.send(JSON.stringify({ type: 'auth', token: getToken() })); } catch (e) {} };
+  ws.onmessage = (ev) => {
+    let msg;
+    try { msg = JSON.parse(ev.data); } catch (e) { return; }
+    if (msg.type === 'auth-ok') { wsAuthed = true; setConn('live'); }
+    else if (msg.type === 'auth-error') { wsAuthed = false; try { ws.close(); } catch (e) {} }
+    else if (msg.type === 'update') refreshAll();
+  };
+  ws.onclose = () => { wsAuthed = false; setConn('poll'); setTimeout(connectWS, 5000); };
+  ws.onerror = () => { try { ws.close(); } catch (e) {} };
+}
+
+async function refreshAll() {
+  await loadClients();
+  if (currentView === 'home') renderHome(document.getElementById('view'));
+  else if (currentView === 'clients') renderClients(document.getElementById('view'));
+}
+
 function showView(view, data) {
+  currentView = view;
   const v = document.getElementById('view');
   if (view === 'home') renderHome(v);
   else if (view === 'clients') renderClients(v);
@@ -178,7 +211,7 @@ async function submitPay() {
   } catch (e) { alert('Network error'); }
 }
 
-(async () => { await loadClients(); showView('home'); })();
+(async () => { await loadClients(); showView('home'); connectWS(); })();
 </script>
 </body>
 </html>

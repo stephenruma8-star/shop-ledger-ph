@@ -415,6 +415,7 @@ export async function saveClientPayment(id) {
   renderClientGrid();
   playSound('payment');
   if (!wasFullyPaid && c.balance <= 0) confetti();
+  if (window.electronAPI) window.electronAPI.signalLanUpdate();
   await viewClientHistory(id);
   toast('Payment recorded', 'success');
 }

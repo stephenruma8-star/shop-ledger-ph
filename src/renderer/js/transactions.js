@@ -333,6 +333,7 @@ export async function doSaveTransaction() {
     dbAll('transactions'), dbAll('inventory'), dbAll('clients')
   ]);
   updateLowStockBadge();
+  if (window.electronAPI) window.electronAPI.signalLanUpdate();
   closeModal();
   renderTxTable();
 }
@@ -382,6 +383,49 @@ export function buildReceiptHTML(t) {
   return lines.join('\n');
 }
 
+export async function printThermalReceipt(id) {
+  const t = state.transactions.find(x => x.id === id);
+  if (!t) { toast('Transaction not found', 'error'); return; }
+  if (!window.electronAPI?.printThermal) { toast('Thermal printing only available in desktop app', 'warning'); return; }
+  const settingsMap = {};
+  state.settings.forEach(s => settingsMap[s.key] = s.value);
+  const host = settingsMap['thermalHost'] || '';
+  const port = settingsMap['thermalPort'] || '9100';
+  if (!host) { toast('Set the Thermal Printer IP in Settings first', 'warning'); return; }
+  const lines = [];
+  lines.push({ t: 'center', bold: true, size: 'double', text: settingsMap['shopName'] || 'Shop Ledger PH' });
+  if (settingsMap['shopAddress']) lines.push({ t: 'center', text: settingsMap['shopAddress'] });
+  if (settingsMap['shopContact']) lines.push({ t: 'center', text: 'Contact: ' + settingsMap['shopContact'] });
+  if (settingsMap['receiptHeaderText']) settingsMap['receiptHeaderText'].split('\n').filter(Boolean).forEach(l => lines.push({ t: 'center', text: l }));
+  lines.push({ t: 'divider' });
+  lines.push({ t: 'center', bold: true, text: 'OFFICIAL RECEIPT' });
+  lines.push({ text: 'Invoice: ' + (t.invoiceNo || 'N/A') });
+  lines.push({ text: 'Date: ' + fmtDateTime(t.createdAt) });
+  if (t.clientName && t.clientName !== 'Walk-in') lines.push({ text: 'Client: ' + t.clientName });
+  lines.push({ t: 'divider' });
+  (t.items || []).forEach(item => {
+    const qt = getQty(item.name || String(item.qty || 1));
+    const sub = qt * (item.unitCost || item.price || 0);
+    const rate = item.intRate != null ? item.intRate : 0;
+    lines.push({ text: (item.description || item.name || 'Item') + (rate > 0 ? ' (' + rate + '%/mo)' : '') });
+    lines.push({ text: '  ' + qt + ' x ' + peso(item.unitCost || item.price) + '      ' + peso(sub) });
+  });
+  lines.push({ t: 'divider' });
+  lines.push({ text: 'Subtotal:             ' + peso(t.subtotal) });
+  if (t.totalInterest > 0) lines.push({ text: 'Interest:             ' + peso(t.totalInterest) });
+  if (t.scDiscount > 0) lines.push({ text: 'SC/PWD 20%:           -' + peso(t.scDiscount) });
+  if (t.discount > 0) lines.push({ text: 'Discount:             -' + peso(t.discount) });
+  lines.push({ bold: true, text: 'TOTAL:                ' + peso(t.grandTotal) });
+  lines.push({ t: 'divider' });
+  lines.push({ text: 'Payment: ' + (t.paymentMethod || 'Cash') });
+  lines.push({ t: 'spacer' });
+  lines.push({ t: 'center', text: settingsMap['receiptFooter'] || 'Thank you for your patronage!' });
+  lines.push({ t: 'spacer' });
+  const result = await window.electronAPI.printThermal({ host, port, lines });
+  if (result.success) toast('Receipt sent to thermal printer', 'success');
+  else toast('Thermal print failed: ' + (result.error || 'Unknown error'), 'error');
+}
+
 export function viewTransactionDetail(id) {
   const t = state.transactions.find(x => x.id === id);
   if (!t) { toast('Transaction not found', 'error'); return; }
@@ -408,6 +452,7 @@ export function viewTransactionDetail(id) {
       </div>
       <div class="flex gap-2 mt-4">
         <button onclick="closeModal();printReceipt(${t.id})" class="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print Receipt</button>
+        <button onclick="closeModal();printThermalReceipt(${t.id})" class="py-2 px-3 bg-gray-700 text-white rounded-lg hover:bg-gray-800 text-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Thermal</button>
         ${t.status !== 'voided' && t.status !== 'return' ? `<button onclick="closeModal();editTransaction(${t.id})" class="px-3 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit</button>` : ''}
         ${t.status !== 'voided' && t.status !== 'return' ? `<button onclick="closeModal();returnTransaction(${t.id})" class="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>Return</button>` : ''}
         ${t.status !== 'voided' && t.status !== 'return' ? `<button onclick="closeModal();voidTransaction(${t.id})" class="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>Void</button>` : ''}
@@ -688,6 +733,7 @@ Object.defineProperties(window, {
   deleteClientFromSale: { get: () => deleteClientFromSale, configurable: true },
   editTransaction: { get: () => editTransaction, configurable: true },
   printReceipt: { get: () => printReceipt, configurable: true },
+  printThermalReceipt: { get: () => printThermalReceipt, configurable: true },
   doPrintReceipt: { get: () => doPrintReceipt, configurable: true },
   toggleTxBulkBar: { get: () => toggleTxBulkBar, configurable: true },
   bulkDeleteTx: { get: () => bulkDeleteTx, configurable: true }

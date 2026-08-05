@@ -177,12 +177,36 @@ export function showReorderSuggestions() {
   }
   sec.classList.remove('hidden');
   sec.innerHTML = `<div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 shadow-sm">
-    <div class="flex justify-between items-center mb-2"><h3 class="font-bold text-sm text-amber-800 dark:text-amber-300">Reorder Suggestions</h3><button onclick="document.getElementById('reorderSection').classList.add('hidden')" class="text-amber-600 hover:text-amber-800 text-xs"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Close</button></div>
+    <div class="flex justify-between items-center mb-2"><h3 class="font-bold text-sm text-amber-800 dark:text-amber-300">Reorder Suggestions</h3>
+      <div class="flex gap-2 items-center">
+        <button onclick="sendLowStockSMS()" class="px-2 py-1 bg-amber-600 text-white rounded text-xs hover:bg-amber-700"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>SMS Alert</button>
+        <button onclick="document.getElementById('reorderSection').classList.add('hidden')" class="text-amber-600 hover:text-amber-800 text-xs"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Close</button>
+      </div>
+    </div>
     <table class="w-full text-xs"><thead><tr class="text-left text-amber-700 dark:text-amber-400"><th class="p-1">Item</th><th class="p-1 text-right">Stock</th><th class="p-1 text-right">Min</th><th class="p-1 text-right">Suggest</th><th class="p-1 text-right">Cost</th><th class="p-1 text-right">Total</th></tr></thead>
     <tbody>${needsReorder.map(i => {
       const suggest = Math.max((i.minStock||5) * 2 - (i.stock||0), (i.minStock||5));
       return `<tr class="border-b border-amber-200 dark:border-amber-800"><td class="p-1">${escapeHtml(i.name)}</td><td class="p-1 text-right text-red-600 font-bold">${i.stock||0}</td><td class="p-1 text-right">${i.minStock||5}</td><td class="p-1 text-right font-bold">${suggest}</td><td class="p-1 text-right">${peso(i.costPrice||0)}</td><td class="p-1 text-right">${peso((i.costPrice||0) * suggest)}</td></tr>`;
     }).join('')}</tbody></table></div>`;
+}
+
+export async function sendLowStockSMS() {
+  if (!window.electronAPI?.sendSMS) { toast('SMS only available in desktop app', 'warning'); return; }
+  const settingsMap = {};
+  state.settings.forEach(s => settingsMap[s.key] = s.value);
+  const apiKey = settingsMap['smsApiKey'] || '';
+  const number = settingsMap['smsAlertNumber'] || '';
+  if (!apiKey) { toast('Set Semaphore API key in Settings first', 'warning'); return; }
+  if (!number) { toast('Set SMS Alert Number in Settings first', 'warning'); return; }
+  const low = state.inventory.filter(i => (i.stock || 0) <= (i.minStock || 5)).sort((a, b) => ((a.stock||0)/(a.minStock||5)) - ((b.stock||0)/(b.minStock||5)));
+  if (low.length === 0) { toast('No low stock items', 'success'); return; }
+  const shop = settingsMap['shopName'] || 'Shop Ledger PH';
+  let message = shop + ' - LOW STOCK ALERT\n';
+  for (const i of low.slice(0, 15)) message += i.name + ': ' + (i.stock || 0) + '/' + (i.minStock || 5) + '\n';
+  if (low.length > 15) message += '+' + (low.length - 15) + ' more...';
+  const result = await window.electronAPI.sendSMS({ apiKey, number, message });
+  if (result.success) toast(`Low stock SMS sent (${low.length} item(s))`, 'success');
+  else toast('SMS failed: ' + (result.error || 'Unknown error'), 'error');
 }
 
 export function toggleInvBulkBar() {
@@ -290,6 +314,7 @@ Object.defineProperties(window, {
   saveInv: { get: () => saveInv, configurable: true },
   deleteInv: { get: () => deleteInv, configurable: true },
   showReorderSuggestions: { get: () => showReorderSuggestions, configurable: true },
+  sendLowStockSMS: { get: () => sendLowStockSMS, configurable: true },
   toggleInvBulkBar: { get: () => toggleInvBulkBar, configurable: true },
   bulkDeleteInv: { get: () => bulkDeleteInv, configurable: true },
   bulkEditInv: { get: () => bulkEditInv, configurable: true },

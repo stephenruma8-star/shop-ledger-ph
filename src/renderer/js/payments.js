@@ -128,6 +128,7 @@ export async function savePayment(id) {
   closeModal();
   state.payments = await dbAll('payments');
   state.clients = await dbAll('clients');
+  if (window.electronAPI) window.electronAPI.signalLanUpdate();
   renderPayTable();
 }
 

@@ -1,5 +1,5 @@
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
-import { closeModal, dbLoad, escapeHtml, hashPassword, modal, toast } from './helpers.js'
+import { closeModal, dbLoad, escapeHtml, hashPassword, modal, runCloudBackup, toast } from './helpers.js'
 import { state } from './state.js'
 
 export async function viewSettings(root) {
@@ -35,6 +35,11 @@ export async function viewSettings(root) {
         <h3 class="font-bold text-lg mb-4 flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>SMS &amp; Email</h3>
         <div class="space-y-3">
           <div><label class="text-xs text-gray-500 block">Semaphore API Key</label><input id="set-smsApiKey" value="${escapeHtml(settingsMap['smsApiKey'] || '')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" placeholder="From semaphore.co" /></div>
+          <div><label class="text-xs text-gray-500 block">SMS Alert Number</label><input id="set-smsAlertNumber" value="${escapeHtml(settingsMap['smsAlertNumber'] || '')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" placeholder="09xxxxxxxxx (owner for low-stock alerts)" /></div>
+          <div class="flex gap-2 items-center">
+            <button onclick="sendTestSMS()" class="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">Send Test SMS</button>
+            <span id="sms-test-status" class="text-xs text-gray-400"></span>
+          </div>
           <div><label class="text-xs text-gray-500 block">Backup Email (recipient)</label><input id="set-backupEmail" value="${escapeHtml(settingsMap['backupEmail'] || '')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
           <details class="text-sm"><summary class="cursor-pointer text-blue-600">SMTP Settings</summary>
             <div class="grid grid-cols-2 gap-2 mt-2 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
@@ -50,6 +55,18 @@ export async function viewSettings(root) {
         </div>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
+        <h3 class="font-bold text-lg mb-4 flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Thermal Printer</h3>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="text-xs text-gray-500 block">Printer IP / Host</label><input id="set-thermalHost" value="${escapeHtml(settingsMap['thermalHost'] || '')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" placeholder="192.168.1.100 (network ESC/POS)" /></div>
+          <div><label class="text-xs text-gray-500 block">Port</label><input id="set-thermalPort" value="${escapeHtml(settingsMap['thermalPort'] || '9100')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
+        </div>
+        <div class="flex gap-2 items-center mt-3">
+          <button onclick="testThermalPrint()" class="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">Print Test Receipt</button>
+          <span id="thermal-test-status" class="text-xs text-gray-400"></span>
+        </div>
+        <p class="text-xs text-gray-400 mt-2">For WiFi/Ethernet thermal receipt printers (ESC/POS). After saving, use the "Thermal" button in any sale's receipt view.</p>
+      </div>
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
         <h3 class="font-bold text-lg mb-4 flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>AI Assistant</h3>
         <div class="grid grid-cols-2 gap-3">
           <div><label class="text-xs text-gray-500 block">API Key <span class="text-gray-400 font-normal">(leave blank for local)</span></label><input id="set-aiApiKey" type="password" value="${escapeHtml(settingsMap['aiApiKey'] || '')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 font-mono text-xs" placeholder="sk-... or empty for Ollama" /></div>
@@ -58,7 +75,7 @@ export async function viewSettings(root) {
         <p class="text-xs text-gray-400 mt-2">No API key? Use <strong>Ollama</strong> — free local AI. <a href="#" onclick="if(window.electronAPI)window.electronAPI.openExternal('https://ollama.ai/download')" class="text-blue-500 hover:underline">Download Ollama</a>, run <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">ollama pull llama3.2</code>, then select "Ollama" above.</p>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
-        <h3 class="font-bold text-lg mb-4">☁️ Cloud Backup</h3>
+        <h3 class="font-bold text-lg mb-4 flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M21.5 17.5a5 5 0 0 0-4.7-7.5 7 7 0 0 0-13.1 2.5A5 5 0 0 0 6 21h12a4 4 0 0 0 3.5-3.5z"/></svg>Cloud Backup</h3>
         <div class="space-y-3">
           <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="set-cloudBackupEnabled" ${settingsMap['cloudBackupEnabled'] === 'true' ? 'checked' : ''} /> Enable auto cloud backup</label>
           <div><label class="text-xs text-gray-500 block">Backup Folder <span class="text-gray-400">(OneDrive / Google Drive / Dropbox)</span></label>
@@ -66,7 +83,11 @@ export async function viewSettings(root) {
           </div>
           <div><label class="text-xs text-gray-500 block">Encryption Password</label><input id="set-cloudBackupPassword" type="password" value="${escapeHtml(settingsMap['cloudBackupPassword'] || '')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" placeholder="Password to protect your backup" /></div>
           <div><label class="text-xs text-gray-500 block">Backup Frequency</label><select id="set-cloudBackupInterval" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"><option value="daily" ${(settingsMap['cloudBackupInterval']||'daily') === 'daily' ? 'selected' : ''}>Daily</option><option value="weekly" ${settingsMap['cloudBackupInterval'] === 'weekly' ? 'selected' : ''}>Weekly</option><option value="monthly" ${settingsMap['cloudBackupInterval'] === 'monthly' ? 'selected' : ''}>Monthly</option></select></div>
-          <p class="text-xs text-gray-400">Last backup: ${settingsMap['lastCloudBackup'] || 'Never'}</p>
+          <div class="flex gap-2 items-center">
+            <button onclick="runCloudBackupNow()" class="px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">Back Up Now</button>
+            <span id="cloud-backup-status" class="text-xs text-gray-400"></span>
+          </div>
+          <p class="text-xs text-gray-400">Last backup: <span id="last-backup-text">${settingsMap['lastCloudBackup'] ? new Date(settingsMap['lastCloudBackup']).toLocaleString() : 'Never'}</span></p>
         </div>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
@@ -113,7 +134,7 @@ export async function viewSettings(root) {
 }
 
 export async function saveSettings() {
-  const keys = ['shopName','shopContact','shopAddress','weatherLocation','cloudBackupFolder','cloudBackupPassword','cloudBackupInterval','smsApiKey','backupEmail','aiApiKey','aiModel','receiptFooter','receiptHeaderText','printStripeColor1','printStripeColor2'];
+  const keys = ['shopName','shopContact','shopAddress','weatherLocation','cloudBackupFolder','cloudBackupPassword','cloudBackupInterval','smsApiKey','smsAlertNumber','backupEmail','aiApiKey','aiModel','receiptFooter','receiptHeaderText','printStripeColor1','printStripeColor2','thermalHost','thermalPort'];
   for (const key of keys) {
     const el = document.getElementById(`set-${key}`);
     if (el) {
@@ -201,6 +222,69 @@ export async function selectCloudFolder() {
   if (result.success) {
     document.getElementById('set-cloudBackupFolder').value = result.path;
   }
+}
+
+export async function runCloudBackupNow() {
+  const status = document.getElementById('cloud-backup-status');
+  const setStatus = (msg, cls) => { if (status) { status.textContent = msg; status.className = 'text-xs ' + (cls || 'text-gray-400'); } };
+  if (typeof runCloudBackup !== 'function') { setStatus('Not available in this app', 'text-red-500'); return; }
+  await saveSettings();
+  setStatus('Backing up...', 'text-yellow-500');
+  try {
+    await runCloudBackup();
+    setStatus('Done', 'text-green-500');
+    const lb = document.getElementById('last-backup-text');
+    if (lb) lb.textContent = new Date().toLocaleString();
+    viewSettings(document.getElementById('view'));
+  } catch (err) {
+    setStatus('Failed: ' + err.message, 'text-red-500');
+  }
+}
+
+export async function sendTestSMS() {
+  const status = document.getElementById('sms-test-status');
+  const setStatus = (msg, cls) => { if (status) { status.textContent = msg; status.className = 'text-xs ' + (cls || 'text-gray-400'); } };
+  if (!window.electronAPI?.sendSMS) { setStatus('SMS only in desktop app', 'text-red-500'); return; }
+  const settingsMap = {};
+  state.settings.forEach(s => settingsMap[s.key] = s.value);
+  const apiKey = document.getElementById('set-smsApiKey')?.value || settingsMap['smsApiKey'] || '';
+  const number = document.getElementById('set-smsAlertNumber')?.value || settingsMap['smsAlertNumber'] || '';
+  if (!apiKey) { setStatus('Enter Semaphore API key first', 'text-red-500'); return; }
+  if (!number) { setStatus('Enter SMS Alert Number first', 'text-red-500'); return; }
+  setStatus('Sending...', 'text-yellow-500');
+  const result = await window.electronAPI.sendSMS({ apiKey, number, message: 'Shop Ledger PH test message — your SMS alerts are working!' });
+  if (result.success) setStatus('Sent!', 'text-green-500');
+  else setStatus('Failed: ' + (result.error || 'Unknown error'), 'text-red-500');
+}
+
+export async function testThermalPrint() {
+  const status = document.getElementById('thermal-test-status');
+  const setStatus = (msg, cls) => { if (status) { status.textContent = msg; status.className = 'text-xs ' + (cls || 'text-gray-400'); } };
+  if (!window.electronAPI?.printThermal) { setStatus('Thermal printing only in desktop app', 'text-red-500'); return; }
+  const settingsMap = {};
+  state.settings.forEach(s => settingsMap[s.key] = s.value);
+  const host = document.getElementById('set-thermalHost')?.value || settingsMap['thermalHost'] || '';
+  const port = document.getElementById('set-thermalPort')?.value || settingsMap['thermalPort'] || '9100';
+  if (!host) { setStatus('Enter printer IP first', 'text-red-500'); return; }
+  const shop = settingsMap['shopName'] || 'Shop Ledger PH';
+  setStatus('Printing...', 'text-yellow-500');
+  const result = await window.electronAPI.printThermal({
+    host, port,
+    lines: [
+      { t: 'center', bold: true, size: 'double', text: shop },
+      { t: 'center', text: 'TEST RECEIPT' },
+      { t: 'divider' },
+      { text: 'Date: ' + new Date().toLocaleString() },
+      { t: 'divider' },
+      { text: 'If you can read this, your' },
+      { text: 'thermal printer is ready!' },
+      { t: 'spacer' },
+      { t: 'center', text: 'Thank you for your patronage!' },
+      { t: 'spacer' }
+    ]
+  });
+  if (result.success) setStatus('Printed!', 'text-green-500');
+  else setStatus('Failed: ' + (result.error || 'Unknown error'), 'text-red-500');
 }
 
 export function openUserModal(id) {
@@ -322,6 +406,9 @@ Object.defineProperties(window, {
   uploadReceiptLogo: { get: () => uploadReceiptLogo, configurable: true },
   removeReceiptLogo: { get: () => removeReceiptLogo, configurable: true },
   selectCloudFolder: { get: () => selectCloudFolder, configurable: true },
+  runCloudBackupNow: { get: () => runCloudBackupNow, configurable: true },
+  sendTestSMS: { get: () => sendTestSMS, configurable: true },
+  testThermalPrint: { get: () => testThermalPrint, configurable: true },
   openUserModal: { get: () => openUserModal, configurable: true },
   saveUser: { get: () => saveUser, configurable: true },
   checkUpdates: { get: () => checkUpdates, configurable: true },

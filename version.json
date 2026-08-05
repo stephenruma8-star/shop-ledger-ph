@@ -1,5 +1,5 @@
 {
-  "version": "3.4.11",
-  "buildDate": "2026-08-04T06:00:00.000Z",
-  "notes": "Frontend polish: all emoji icons replaced with consistent SVG icons (sidebar, header, dashboard, settings, reports), Content-Security-Policy header added, vendor scripts bundled as modules (removed unused CryptoJS), build warnings eliminated; earlier: connection indicator moved to header, effects, version badge, inline field validation, ES-module bundling"
+  "version": "3.4.12",
+  "buildDate": "2026-08-05T06:00:00.000Z",
+  "notes": "Backend expansion: real-time LAN sync via WebSocket (mobile updates instantly, auto-refresh on PC), network thermal receipt printing (ESC/POS), SMS low-stock alerts via Semaphore, test SMS + thermal test in Settings, one-click Cloud Backup now button"
 }
