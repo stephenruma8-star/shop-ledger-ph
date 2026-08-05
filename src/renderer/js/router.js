@@ -2,7 +2,7 @@ import { viewClients } from './clients.js'
 import { viewDashboard } from './dashboard.js'
 import { dbAll } from './database.js'
 import { viewExpenses } from './expenses.js'
-import { applyDailyInterest, checkCloudBackupDue, closeModal, focusPageSearch, populateYearSelector, saveCurrentModal, showShortcuts, toggleTheme, updateLowStockBadge, updateNotifications } from './helpers.js'
+import { applyDailyInterest, checkCloudBackupDue, checkSmsReminderDue, closeModal, focusPageSearch, populateYearSelector, saveCurrentModal, showShortcuts, toggleTheme, updateLowStockBadge, updateNotifications } from './helpers.js'
 import { viewInventory } from './inventory.js'
 import { AppParticles } from './particles.js'
 import { viewPayments } from './payments.js'
@@ -72,6 +72,7 @@ export async function loadAll() {
   updateNotifications();
   await applyDailyInterest();
   await checkCloudBackupDue();
+  checkSmsReminderDue();
   populateYearSelector();
 }
 

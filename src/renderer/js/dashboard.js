@@ -17,6 +17,7 @@ export async function viewDashboard(root) {
   const topUtang = [...state.clients].filter(c => (c.balance || 0) > 0).sort((a, b) => (b.balance || 0) - (a.balance || 0));
   const todayProfit = todaySales - todayExpTotal;
   const profitMargin = todaySales > 0 ? ((todayProfit / todaySales) * 100).toFixed(1) : 0;
+  const profitData = getProfitData();
 
   const dw = getDashWidgets();
   root.innerHTML = `
@@ -55,6 +56,35 @@ export async function viewDashboard(root) {
           <div class="text-right"><p class="text-xs opacity-80">Margin</p><p class="text-lg font-bold">${profitMargin}%</p></div>
         </div>
         <div class="mt-1 bg-white/20 rounded-full h-1.5"><div class="bg-white rounded-full h-1.5" style="width:${Math.min(profitMargin, 100)}%"></div></div>
+      </div>` : ''}
+      ${dw.profitAnalytics ? `<div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm">
+        <details open>
+          <summary class="p-3 cursor-pointer font-bold text-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Profit Analytics <span class="text-xs font-normal text-gray-400 ml-auto">Gross profit = sales − cost of goods</span></summary>
+          <div class="px-3 pb-3 space-y-3">
+            <div class="grid grid-cols-3 gap-2 text-sm">
+              ${['today','month','year'].map(k => { const p = profitData.periods[k]; return `<div class="p-2 rounded-lg bg-gray-50 dark:bg-gray-700/40">
+                <p class="text-[10px] text-gray-500 uppercase tracking-wide">${p.label} Profit</p>
+                <p class="text-base font-bold ${p.profit >= 0 ? 'text-green-600' : 'text-red-600'}">${peso(p.profit)}</p>
+                <p class="text-[10px] text-gray-400">Margin ${p.margin.toFixed(1)}%</p>
+                <p class="text-[10px] text-gray-400">Sales ${peso(p.revenue)} · Cost ${peso(p.cogs)}</p>
+              </div>`; }).join('')}
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <p class="font-semibold text-xs mb-1">Top Items (this month)</p>
+                <div class="max-h-40 overflow-y-auto">${profitData.topItems.length === 0 ? '<p class="text-gray-400 text-xs">No sales this month</p>' : profitData.topItems.map(x => `
+                  <div class="flex justify-between py-0.5 text-xs border-b dark:border-gray-700 last:border-0">
+                    <span class="truncate mr-2">${escapeHtml(x.name)} <span class="text-gray-400">×${x.qty}</span></span>
+                    <span class="font-semibold ${x.profit >= 0 ? 'text-green-600' : 'text-red-600'} shrink-0">${peso(x.profit)}</span>
+                  </div>`).join('')}</div>
+              </div>
+              <div>
+                <p class="font-semibold text-xs mb-1">6-Month Gross Profit</p>
+                <canvas id="profitChart" height="120"></canvas>
+              </div>
+            </div>
+          </div>
+        </details>
       </div>` : ''}
       ${dw.weather ? `<div class="grid grid-cols-3 gap-2">
         <div class="bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm">
@@ -113,6 +143,7 @@ export async function viewDashboard(root) {
     </div>`;
   if (dw.chart) drawDashChart();
   if (dw.payMethod) drawPayMethodChart();
+  if (dw.profitAnalytics) drawProfitChart(profitData);
   if (dw.weather) { loadWeather(); loadNextHoliday(); loadHolidaysScroll(); }
   animateCount(root.querySelector('#dash-sales'), todaySales, peso);
   animateCount(root.querySelector('#dash-expenses'), todayExpTotal, peso);
@@ -125,7 +156,7 @@ export function getDashWidgets() {
   const ls = (() => { try { return JSON.parse(localStorage.getItem('dashWidgets')); } catch(e) { return null; } })();
   const setting = state.settings.find(s => s.key === 'dashWidgetConfig');
   const stored = setting ? (() => { try { return JSON.parse(setting.value); } catch(e) { return null; } })() : null;
-  const defaults = { summaryCards: true, profitBar: true, weather: true, chart: true, payMethod: true, topUtang: true, lowStock: true, aiInsights: true };
+  const defaults = { summaryCards: true, profitBar: true, profitAnalytics: true, weather: true, chart: true, payMethod: true, topUtang: true, lowStock: true, aiInsights: true };
   if (ls && !stored) {
     const s = state.settings.find(x => x.key === 'dashWidgetConfig');
     if (s) { s.value = JSON.stringify(ls); dbPut('settings', s).catch(() => {}); }
@@ -138,7 +169,7 @@ export function getDashWidgets() {
 
 export function dashCustomize() {
   const w = getDashWidgets();
-  const items = { summaryCards: 'Summary Cards', profitBar: 'Profit Bar', weather: 'Weather & Holidays', chart: '7-Day Chart', payMethod: 'Payment Methods', topUtang: 'Top Utang', lowStock: 'Low Stock', aiInsights: 'AI Insights' };
+  const items = { summaryCards: 'Summary Cards', profitBar: 'Profit Bar', profitAnalytics: 'Profit Analytics', weather: 'Weather & Holidays', chart: '7-Day Chart', payMethod: 'Payment Methods', topUtang: 'Top Utang', lowStock: 'Low Stock', aiInsights: 'AI Insights' };
   modal(`<div class="p-6"><div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">Customize Dashboard</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
     <div class="space-y-2">${Object.entries(items).map(([k,v]) => `<label class="flex items-center gap-3 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg cursor-pointer"><input type="checkbox" ${w[k]!==false?'checked':''} onchange="dashToggle('${k}',this.checked)" class="w-4 h-4 text-blue-600 rounded" /><span class="text-sm">${v}</span></label>`).join('')}</div>
     <div class="flex gap-2 pt-4"><button onclick="closeModal();viewDashboard(document.getElementById('view'))" class="flex-1 py-2 bg-blue-600 text-white rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Apply & Reload</button><button onclick="closeModal()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg">Close</button></div></div>`);
@@ -585,6 +616,85 @@ export function drawPayMethodChart() {
   });
 }
 
+function qtyOf(it) { const m = String(it.name || it.qty || '1').match(/^[\d.]+/); return m ? parseFloat(m[0]) : 1; }
+
+export function getProfitData() {
+  const invCost = new Map((state.inventory || []).map(i => [i.id, i.costPrice || 0]));
+  const invName = new Map((state.inventory || []).map(i => [i.id, i.name]));
+  const ymKey = d => (d || '').slice(0, 7);
+  const curYm = ymKey(today());
+  const curYear = curYm.slice(0, 4);
+  const todayStr = today();
+  const monthProfit = new Map();
+  const itemMap = new Map();
+  let tRev = 0, tCogs = 0, tDisc = 0;
+  for (const t of state.transactions || []) {
+    const itms = t.items || [];
+    const tot = itms.reduce((s, i) => s + (Number(i.amount) || 0), 0);
+    const disc = (t.discount || 0) + (t.scDiscount || 0);
+    const ym = ymKey(t.date);
+    const mp = monthProfit.get(ym) || { rev: 0, cogs: 0, disc: 0 };
+    const isToday = t.date === todayStr;
+    for (const it of itms) {
+      const qty = qtyOf(it);
+      const rev = Number(it.amount) || 0;
+      const cost = it.invId != null ? (invCost.get(it.invId) || 0) : 0;
+      const share = tot > 0 ? ((disc * rev) / tot) : 0;
+      mp.rev += rev; mp.cogs += qty * cost; mp.disc += share;
+      if (isToday) { tRev += rev; tCogs += qty * cost; tDisc += share; }
+      if (ym === curYm) {
+        const key = it.invId != null ? 'id' + it.invId : (it.description || 'misc');
+        const prev = itemMap.get(key) || { name: it.description || (it.invId != null ? (invName.get(it.invId) || 'Item') : 'Misc'), qty: 0, rev: 0, cogs: 0 };
+        prev.qty += qty; prev.rev += rev; prev.cogs += qty * cost;
+        itemMap.set(key, prev);
+      }
+    }
+    monthProfit.set(ym, mp);
+  }
+  const ymStats = ym => {
+    const s = monthProfit.get(ym) || { rev: 0, cogs: 0, disc: 0 };
+    const revenue = s.rev - s.disc;
+    const profit = revenue - s.cogs;
+    return { revenue, cogs: s.cogs, profit, margin: revenue > 0 ? ((profit / revenue) * 100) : 0 };
+  };
+  const todayRevenue = tRev - tDisc;
+  const periods = {
+    today: { label: 'Today', revenue: todayRevenue, cogs: tCogs, profit: todayRevenue - tCogs, margin: todayRevenue > 0 ? (((todayRevenue - tCogs) / todayRevenue) * 100) : 0 },
+    month: { label: 'This Month', ...ymStats(curYm) }
+  };
+  let yRev = 0, yCogs = 0, yDisc = 0;
+  for (const [ym, s] of monthProfit) { if (ym.slice(0, 4) === curYear) { yRev += s.rev; yCogs += s.cogs; yDisc += s.disc; } }
+  const yearRevenue = yRev - yDisc;
+  periods.year = { label: 'This Year', revenue: yearRevenue, cogs: yCogs, profit: yearRevenue - yCogs, margin: yearRevenue > 0 ? (((yearRevenue - yCogs) / yearRevenue) * 100) : 0 };
+  const topItems = [...itemMap.values()].map(x => ({ name: x.name, qty: x.qty, profit: x.rev - x.cogs })).sort((a, b) => b.profit - a.profit).slice(0, 5);
+  const trend = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - i);
+    const ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    trend.push({ label: d.toLocaleDateString('en-PH', { month: 'short' }), ...ymStats(ym) });
+  }
+  return { periods, topItems, trend };
+}
+
+export function drawProfitChart(profitData) {
+  if (typeof Chart === 'undefined') { setTimeout(() => drawProfitChart(profitData), 200); return; }
+  const ctx = document.getElementById('profitChart');
+  if (!ctx) return;
+  if (window.__app.chartInstances.profit) window.__app.chartInstances.profit.destroy();
+  window.__app.chartInstances.profit = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: profitData.trend.map(t => t.label),
+      datasets: [{ data: profitData.trend.map(t => t.profit), backgroundColor: profitData.trend.map(t => t.profit >= 0 ? '#10b981' : '#ef4444'), borderRadius: 3 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      scales: { y: { beginAtZero: true, ticks: { callback: v => '₱' + Number(v).toFixed(0) } } },
+      plugins: { legend: { display: false } }
+    }
+  });
+}
+
 
 // expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
 Object.defineProperties(window, {
@@ -607,5 +717,7 @@ Object.defineProperties(window, {
   loadNextHoliday: { get: () => loadNextHoliday, configurable: true },
   showPHHolidays: { get: () => showPHHolidays, configurable: true },
   drawDashChart: { get: () => drawDashChart, configurable: true },
-  drawPayMethodChart: { get: () => drawPayMethodChart, configurable: true }
+  drawPayMethodChart: { get: () => drawPayMethodChart, configurable: true },
+  getProfitData: { get: () => getProfitData, configurable: true },
+  drawProfitChart: { get: () => drawProfitChart, configurable: true }
 });

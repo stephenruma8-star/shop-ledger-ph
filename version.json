@@ -1,5 +1,5 @@
 {
-  "version": "3.4.12",
-  "buildDate": "2026-08-05T06:00:00.000Z",
-  "notes": "Backend expansion: real-time LAN sync via WebSocket (mobile updates instantly, auto-refresh on PC), network thermal receipt printing (ESC/POS), SMS low-stock alerts via Semaphore, test SMS + thermal test in Settings, one-click Cloud Backup now button"
+  "version": "3.4.13",
+  "buildDate": "2026-08-05T08:00:00.000Z",
+  "notes": "Profit analytics dashboard widget (today/month/year gross profit + margin, top items this month, 6-month trend chart), automated overdue utang SMS reminders (daily/weekly/monthly schedule, editable day-of-month, 'Send Reminders Now' in Settings)"
 }

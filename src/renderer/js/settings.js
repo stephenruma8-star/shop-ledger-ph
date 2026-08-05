@@ -1,5 +1,5 @@
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
-import { closeModal, dbLoad, escapeHtml, hashPassword, modal, runCloudBackup, toast } from './helpers.js'
+import { closeModal, dbLoad, escapeHtml, hashPassword, modal, runCloudBackup, sendOverdueReminders, toast } from './helpers.js'
 import { state } from './state.js'
 
 export async function viewSettings(root) {
@@ -39,6 +39,22 @@ export async function viewSettings(root) {
           <div class="flex gap-2 items-center">
             <button onclick="sendTestSMS()" class="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">Send Test SMS</button>
             <span id="sms-test-status" class="text-xs text-gray-400"></span>
+          </div>
+          <div class="border-t dark:border-gray-700 pt-3 mt-1">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-sm font-semibold flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Auto Overdue Reminders</span>
+              <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" id="set-smsAutoReminderEnabled" ${settingsMap['smsAutoReminderEnabled'] === 'true' ? 'checked' : ''} class="w-4 h-4 text-blue-600 rounded" /> Enabled</label>
+            </div>
+            <p class="text-xs text-gray-500 mb-2">Automatically SMS a balance reminder to overdue utang clients (past due date + phone number). Sends when the app opens.</p>
+            <div class="grid grid-cols-2 gap-2">
+              <div><label class="text-xs text-gray-500 block">Frequency</label><select id="set-smsAutoReminderFreq" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"><option value="monthly" ${(settingsMap['smsAutoReminderFreq']||'monthly') === 'monthly' ? 'selected' : ''}>Monthly</option><option value="weekly" ${settingsMap['smsAutoReminderFreq'] === 'weekly' ? 'selected' : ''}>Weekly</option><option value="daily" ${settingsMap['smsAutoReminderFreq'] === 'daily' ? 'selected' : ''}>Daily</option></select></div>
+              <div><label class="text-xs text-gray-500 block">Day of Month <span class="text-gray-400">(monthly)</span></label><input id="set-smsAutoReminderDay" type="number" min="1" max="28" value="${escapeHtml(settingsMap['smsAutoReminderDay'] || '1')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" /></div>
+            </div>
+            <div class="flex gap-2 items-center mt-2">
+              <button onclick="sendRemindersNow()" class="px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">Send Reminders Now</button>
+              <span id="sms-reminder-status" class="text-xs text-gray-400"></span>
+            </div>
+            <p class="text-xs text-gray-400 mt-2">Last sent: <span id="last-reminder-text">${settingsMap['lastSmsReminder'] ? new Date(settingsMap['lastSmsReminder']).toLocaleString() : 'Never'}</span></p>
           </div>
           <div><label class="text-xs text-gray-500 block">Backup Email (recipient)</label><input id="set-backupEmail" value="${escapeHtml(settingsMap['backupEmail'] || '')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
           <details class="text-sm"><summary class="cursor-pointer text-blue-600">SMTP Settings</summary>
@@ -134,7 +150,7 @@ export async function viewSettings(root) {
 }
 
 export async function saveSettings() {
-  const keys = ['shopName','shopContact','shopAddress','weatherLocation','cloudBackupFolder','cloudBackupPassword','cloudBackupInterval','smsApiKey','smsAlertNumber','backupEmail','aiApiKey','aiModel','receiptFooter','receiptHeaderText','printStripeColor1','printStripeColor2','thermalHost','thermalPort'];
+  const keys = ['shopName','shopContact','shopAddress','weatherLocation','cloudBackupFolder','cloudBackupPassword','cloudBackupInterval','smsApiKey','smsAlertNumber','smsAutoReminderFreq','smsAutoReminderDay','backupEmail','aiApiKey','aiModel','receiptFooter','receiptHeaderText','printStripeColor1','printStripeColor2','thermalHost','thermalPort'];
   for (const key of keys) {
     const el = document.getElementById(`set-${key}`);
     if (el) {
@@ -149,6 +165,13 @@ export async function saveSettings() {
     const existing = state.settings.find(s => s.key === 'cloudBackupEnabled');
     if (existing) { existing.value = val; await dbPut('settings', existing); }
     else { await dbAdd('settings', { key: 'cloudBackupEnabled', value: val }); }
+  }
+  const remindCb = document.getElementById('set-smsAutoReminderEnabled');
+  if (remindCb) {
+    const val = remindCb.checked ? 'true' : 'false';
+    const existing = state.settings.find(s => s.key === 'smsAutoReminderEnabled');
+    if (existing) { existing.value = val; await dbPut('settings', existing); }
+    else { await dbAdd('settings', { key: 'smsAutoReminderEnabled', value: val }); }
   }
   const smtp = { host: document.getElementById('set-smtp-host')?.value || '', port: document.getElementById('set-smtp-port')?.value || '587', user: document.getElementById('set-smtp-user')?.value || '', pass: document.getElementById('set-smtp-pass')?.value || '', fromName: document.getElementById('set-smtp-fromName')?.value || '' };
   const smtpExisting = state.settings.find(s => s.key === 'smtpConfig');
@@ -255,6 +278,25 @@ export async function sendTestSMS() {
   const result = await window.electronAPI.sendSMS({ apiKey, number, message: 'Shop Ledger PH test message — your SMS alerts are working!' });
   if (result.success) setStatus('Sent!', 'text-green-500');
   else setStatus('Failed: ' + (result.error || 'Unknown error'), 'text-red-500');
+}
+
+export async function sendRemindersNow() {
+  const status = document.getElementById('sms-reminder-status');
+  const setStatus = (msg, cls) => { if (status) { status.textContent = msg; status.className = 'text-xs ' + (cls || 'text-gray-400'); } };
+  if (!window.electronAPI?.sendSMS) { setStatus('SMS only in desktop app', 'text-red-500'); return; }
+  await saveSettings();
+  setStatus('Sending...', 'text-yellow-500');
+  try {
+    const res = await sendOverdueReminders();
+    if (res.error) { setStatus(res.error, 'text-red-500'); return; }
+    if (res.total === 0) setStatus('No overdue clients with phone numbers', 'text-gray-400');
+    else if (res.failed > 0) setStatus(`Sent ${res.sent}/${res.total} · ${res.failed} failed`, 'text-yellow-500');
+    else setStatus(`Sent to ${res.sent} client(s)!`, 'text-green-500');
+    const lb = document.getElementById('last-reminder-text');
+    if (lb) lb.textContent = new Date().toLocaleString();
+  } catch (err) {
+    setStatus('Failed: ' + err.message, 'text-red-500');
+  }
 }
 
 export async function testThermalPrint() {
@@ -408,6 +450,7 @@ Object.defineProperties(window, {
   selectCloudFolder: { get: () => selectCloudFolder, configurable: true },
   runCloudBackupNow: { get: () => runCloudBackupNow, configurable: true },
   sendTestSMS: { get: () => sendTestSMS, configurable: true },
+  sendRemindersNow: { get: () => sendRemindersNow, configurable: true },
   testThermalPrint: { get: () => testThermalPrint, configurable: true },
   openUserModal: { get: () => openUserModal, configurable: true },
   saveUser: { get: () => saveUser, configurable: true },

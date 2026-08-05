@@ -694,6 +694,59 @@ export async function checkCloudBackupDue() {
   }
 }
 
+export async function sendOverdueReminders() {
+  if (!window.electronAPI?.sendSMS) return { sent: 0, failed: 0, total: 0 };
+  const settingsMap = {};
+  state.settings.forEach(s => settingsMap[s.key] = s.value);
+  const apiKey = settingsMap['smsApiKey'] || '';
+  if (!apiKey) return { sent: 0, failed: 0, total: 0, error: 'SMS API key not configured in Settings' };
+  const overdue = state.clients.filter(c => (c.balance || 0) > 0 && c.dueDate && c.dueDate < today() && c.phone);
+  if (overdue.length === 0) return { sent: 0, failed: 0, total: 0 };
+  const shopName = settingsMap['shopName'] || 'Shop';
+  const targets = overdue.slice(0, 100);
+  let sent = 0, failed = 0;
+  for (const c of targets) {
+    const msg = `Hi ${c.name}, this is a friendly reminder from ${shopName}. Your balance of ${peso(c.balance)} is overdue. Please settle at your earliest convenience. Thank you!`;
+    try {
+      const r = await window.electronAPI.sendSMS({ apiKey, number: c.phone, message: msg });
+      if (r.success) sent++; else failed++;
+    } catch (e) { failed++; }
+    await new Promise(res => setTimeout(res, 250));
+  }
+  const existing = state.settings.find(s => s.key === 'lastSmsReminder');
+  if (existing) { existing.value = today(); await dbPut('settings', existing); }
+  else { await dbAdd('settings', { key: 'lastSmsReminder', value: today() }); }
+  state.settings = await dbAll('settings');
+  await logAudit('auto-sms', `SMS reminders sent to ${sent} overdue client(s)`);
+  return { sent, failed, total: targets.length };
+}
+
+export async function checkSmsReminderDue() {
+  const settingsMap = {};
+  state.settings.forEach(s => settingsMap[s.key] = s.value);
+  if (settingsMap['smsAutoReminderEnabled'] !== 'true') return;
+  if (!settingsMap['smsApiKey']) return;
+  const lastRun = settingsMap['lastSmsReminder'] || '';
+  const todayStr = today();
+  if (lastRun === todayStr) return;
+  const freq = settingsMap['smsAutoReminderFreq'] || 'monthly';
+  if (freq === 'daily') {
+    await sendOverdueReminders();
+    return;
+  }
+  if (freq === 'weekly') {
+    if (!lastRun) { await sendOverdueReminders(); return; }
+    const daysSince = Math.floor((new Date(todayStr) - new Date(lastRun)) / 86400000);
+    if (daysSince >= 7) await sendOverdueReminders();
+    return;
+  }
+  const last = lastRun ? new Date(lastRun) : null;
+  const cur = new Date(todayStr);
+  if (last && last.getMonth() === cur.getMonth() && last.getFullYear() === cur.getFullYear()) return;
+  const day = parseInt(settingsMap['smsAutoReminderDay'] || '1') || 1;
+  if (parseInt(todayStr.split('-')[2]) === day) await sendOverdueReminders();
+}
+
 
 // expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
 Object.defineProperties(window, {
@@ -747,6 +800,8 @@ Object.defineProperties(window, {
   hasInterestItems: { get: () => hasInterestItems, configurable: true },
   getInterestRate: { get: () => getInterestRate, configurable: true },
   applyDailyInterest: { get: () => applyDailyInterest, configurable: true },
+  sendOverdueReminders: { get: () => sendOverdueReminders, configurable: true },
+  checkSmsReminderDue: { get: () => checkSmsReminderDue, configurable: true },
   runCloudBackup: { get: () => runCloudBackup, configurable: true },
   checkCloudBackupDue: { get: () => checkCloudBackupDue, configurable: true }
 });
