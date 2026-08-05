@@ -33,6 +33,7 @@ const win = new Proxy({
     generateMobileQR: async () => ({ url: 'http://192.168.1.50:3456?ws=3458&token=abc123xyz', qr: 'data:image/png;base64,FAKEQRDATA', token: 'abc123xyz', wsPort: 3458 }),
     onShortcut: noop, onUpdateAvailable: noop, onUpdateNotAvailable: noop, onUpdateError: noop,
     onUpdateDownloaded: noop, onLanUpdateSignal: noop, onConfirmExit: noop, onLanDataRefresh: noop,
+    onHiddenToTray: noop,
     sendSMS: async () => ({ success: true }),
   },
   location: { origin: 'http://localhost', href: 'http://localhost/index.html', search: '' },

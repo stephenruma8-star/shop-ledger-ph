@@ -1,5 +1,5 @@
 {
-  "version": "3.4.14",
-  "buildDate": "2026-08-05T09:00:00.000Z",
-  "notes": "Mobile Access button in sidebar - scan QR with phone camera to open the LAN mobile page (token now embedded in the URL, view clients + log payments from your phone)"
+  "version": "3.4.15",
+  "buildDate": "2026-08-05T10:00:00.000Z",
+  "notes": "Startup & Tray options in Settings: launch app with Windows (background server), and close button hides to tray so LAN/mobile access keeps working while the window is closed"
 }

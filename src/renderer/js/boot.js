@@ -83,6 +83,9 @@ if (window.electronAPI) {
       toast('Data refreshed from ' + (info?.source === 'mobile' ? 'mobile' : 'LAN'), 'info');
     } catch (e) { /* ignore */ }
   });
+  window.electronAPI.onHiddenToTray(() => {
+    toast('Hidden to tray — LAN/mobile server still running', 'info');
+  });
 }
 
 export async function seedIfEmpty() {
@@ -100,7 +103,7 @@ export async function seedIfEmpty() {
 }
 
 export function updateVersionBadge() {
-  const version = ((state.settings || []).find(s => s.key === 'lastBuildVersion') || {}).value || '3.4.14';
+  const version = ((state.settings || []).find(s => s.key === 'lastBuildVersion') || {}).value || '3.4.15';
   const text = 'v' + version;
   for (const id of ['sidebar-version', 'login-version', 'app-version-label']) {
     const el = document.getElementById(id);

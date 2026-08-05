@@ -65,6 +65,10 @@ let _lanToken = Math.random().toString(36).slice(2) + Math.random().toString(36)
 const LAN_PORT = 3456;
 const UDP_PORT = 3457;
 const WS_PORT = 3458;
+const APP_CONFIG_PATH = path.join(app.getPath('userData'), 'app-prefs.json');
+function readAppPrefs() {
+  try { return JSON.parse(fs.readFileSync(APP_CONFIG_PATH, 'utf8')); } catch (e) { return {}; }
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -89,7 +93,12 @@ function createWindow() {
   mainWindow.on('close', (e) => {
     if (isQuitting) return;
     e.preventDefault();
-    mainWindow.webContents.send('confirm-exit');
+    if (readAppPrefs().closeToTray) {
+      mainWindow.hide();
+      mainWindow.webContents.send('hidden-to-tray');
+    } else {
+      mainWindow.webContents.send('confirm-exit');
+    }
   });
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
@@ -392,6 +401,19 @@ ipcMain.handle('generate-mobile-qr', async () => {
   const url = `http://${getLocalIP()}:${LAN_PORT}?ws=${WS_PORT}&token=${_lanToken}`;
   const qr = await QRCode.toDataURL(url, { width: 300 });
   return { url, qr, token: _lanToken, wsPort: WS_PORT };
+});
+
+ipcMain.handle('get-app-preferences', () => readAppPrefs());
+
+ipcMain.handle('set-app-preferences', async (event, prefs) => {
+  const next = { ...readAppPrefs(), ...(prefs || {}) };
+  try { fs.writeFileSync(APP_CONFIG_PATH, JSON.stringify(next, null, 2)); } catch (e) { console.error('Failed to save app prefs:', e.message); }
+  if (typeof next.launchAtStartup === 'boolean') {
+    try {
+      app.setLoginItemSettings({ openAtLogin: next.launchAtStartup, path: process.execPath });
+    } catch (e) { console.error('setLoginItemSettings failed:', e.message); }
+  }
+  return next;
 });
 
 ipcMain.handle('save-logo', async (event, { dataUrl }) => {

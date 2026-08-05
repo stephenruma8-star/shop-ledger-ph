@@ -6,6 +6,10 @@ export async function viewSettings(root) {
   await Promise.all([dbLoad('settings'), dbLoad('users'), dbLoad('quickItems')]);
   const settingsMap = {};
   state.settings.forEach(s => settingsMap[s.key] = s.value);
+  let appPrefs = {};
+  if (window.electronAPI?.getAppPreferences) {
+    try { appPrefs = await window.electronAPI.getAppPreferences(); } catch (e) {}
+  }
   root.innerHTML = `
     <div class="space-y-6 fade-in max-w-4xl">
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
@@ -129,6 +133,15 @@ export async function viewSettings(root) {
         <p class="text-xs text-gray-400 mt-2">Used for alternating row colors on all printouts (client info, daily report, business report, debt forms).</p>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
+        <h3 class="font-bold text-lg mb-4 flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Startup &amp; Tray</h3>
+        <div class="space-y-3">
+          <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" id="set-launchAtStartup" ${appPrefs.launchAtStartup ? 'checked' : ''} class="w-4 h-4 text-blue-600 rounded" /> Start with Windows</label>
+          <p class="text-xs text-gray-400 -mt-2">Launches the app in the background when the PC starts, so the LAN / mobile server is always available.</p>
+          <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" id="set-closeToTray" ${appPrefs.closeToTray ? 'checked' : ''} class="w-4 h-4 text-blue-600 rounded" /> Close button hides to tray</label>
+          <p class="text-xs text-gray-400 -mt-2">Clicking X keeps the app running in the system tray — mobile access keeps working. Use "Quit" in the tray menu (right-click the tray icon) to fully exit.</p>
+        </div>
+      </div>
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
         <div class="flex items-center justify-between mb-3">
           <h3 class="font-bold text-lg">⚙️ App Version</h3>
           <span class="text-xs text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded" id="app-version-label">v${settingsMap['lastBuildVersion'] || '3.4.6'}</span>
@@ -177,6 +190,16 @@ export async function saveSettings() {
   const smtpExisting = state.settings.find(s => s.key === 'smtpConfig');
   if (smtpExisting) { smtpExisting.value = JSON.stringify(smtp); await dbPut('settings', smtpExisting); }
   else { await dbAdd('settings', { key: 'smtpConfig', value: JSON.stringify(smtp) }); }
+  if (window.electronAPI?.setAppPreferences) {
+    const closeEl = document.getElementById('set-closeToTray');
+    const launchEl = document.getElementById('set-launchAtStartup');
+    if (closeEl || launchEl) {
+      await window.electronAPI.setAppPreferences({
+        closeToTray: !!(closeEl && closeEl.checked),
+        launchAtStartup: !!(launchEl && launchEl.checked)
+      });
+    }
+  }
   for (const el of document.querySelectorAll('[data-qi-id]')) await updateQuickItemField(el);
   state.settings = await dbAll('settings');
   const shop = state.settings.find(x => x.key === 'shopName');
