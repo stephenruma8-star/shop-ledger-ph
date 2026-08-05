@@ -389,7 +389,7 @@ ipcMain.handle('load-backup-file', async () => {
 });
 
 ipcMain.handle('generate-mobile-qr', async () => {
-  const url = `http://${getLocalIP()}:${LAN_PORT}?ws=${WS_PORT}`;
+  const url = `http://${getLocalIP()}:${LAN_PORT}?ws=${WS_PORT}&token=${_lanToken}`;
   const qr = await QRCode.toDataURL(url, { width: 300 });
   return { url, qr, token: _lanToken, wsPort: WS_PORT };
 });

@@ -1,5 +1,5 @@
 {
-  "version": "3.4.13",
-  "buildDate": "2026-08-05T08:00:00.000Z",
-  "notes": "Profit analytics dashboard widget (today/month/year gross profit + margin, top items this month, 6-month trend chart), automated overdue utang SMS reminders (daily/weekly/monthly schedule, editable day-of-month, 'Send Reminders Now' in Settings)"
+  "version": "3.4.14",
+  "buildDate": "2026-08-05T09:00:00.000Z",
+  "notes": "Mobile Access button in sidebar - scan QR with phone camera to open the LAN mobile page (token now embedded in the URL, view clients + log payments from your phone)"
 }
