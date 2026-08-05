@@ -9,7 +9,7 @@ export async function viewSettings(root) {
   root.innerHTML = `
     <div class="space-y-6 fade-in max-w-4xl">
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
-        <h3 class="font-bold text-lg mb-4">🏪 Business Information</h3>
+        <h3 class="font-bold text-lg mb-4 flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>Business Information</h3>
         <div class="grid grid-cols-2 gap-3">
           <div><label class="text-xs text-gray-500 block">Shop Name</label><input id="set-shopName" value="${escapeHtml(settingsMap['shopName'] || '')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
           <div><label class="text-xs text-gray-500 block">Contact Number</label><input id="set-shopContact" value="${escapeHtml(settingsMap['shopContact'] || '')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
@@ -18,11 +18,11 @@ export async function viewSettings(root) {
          </div>
        </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
-        <h3 class="font-bold text-lg mb-4">🖼️ Receipt Branding</h3>
+        <h3 class="font-bold text-lg mb-4 flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Receipt Branding</h3>
         <div class="space-y-3">
           <div><label class="text-xs text-gray-500 block">Shop Logo</label>
             <div class="flex items-center gap-3">
-              <div class="w-16 h-16 border-2 border-dashed dark:border-gray-600 rounded-lg flex items-center justify-center overflow-hidden bg-gray-50 dark:bg-gray-700" id="logo-preview">${settingsMap['receiptLogo'] ? `<img src="${escapeHtml(settingsMap['receiptLogo'])}" class="w-full h-full object-contain" />` : '<span class="text-2xl text-gray-300">📷</span>'}</div>
+              <div class="w-16 h-16 border-2 border-dashed dark:border-gray-600 rounded-lg flex items-center justify-center overflow-hidden bg-gray-50 dark:bg-gray-700" id="logo-preview">${settingsMap['receiptLogo'] ? `<img src="${escapeHtml(settingsMap['receiptLogo'])}" class="w-full h-full object-contain" />` : '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-gray-300 mx-auto"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>'}</div>
               <label class="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 rounded-lg text-sm cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Choose File<input type="file" accept="image/*" class="hidden" onchange="uploadReceiptLogo(event)" /></label>
               ${settingsMap['receiptLogo'] ? `<button onclick="removeReceiptLogo()" class="text-xs text-red-500"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Remove</button>` : ''}
             </div>
@@ -32,7 +32,7 @@ export async function viewSettings(root) {
         </div>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
-        <h3 class="font-bold text-lg mb-4">📱 SMS &amp; Email</h3>
+        <h3 class="font-bold text-lg mb-4 flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>SMS &amp; Email</h3>
         <div class="space-y-3">
           <div><label class="text-xs text-gray-500 block">Semaphore API Key</label><input id="set-smsApiKey" value="${escapeHtml(settingsMap['smsApiKey'] || '')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" placeholder="From semaphore.co" /></div>
           <div><label class="text-xs text-gray-500 block">Backup Email (recipient)</label><input id="set-backupEmail" value="${escapeHtml(settingsMap['backupEmail'] || '')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
@@ -50,7 +50,7 @@ export async function viewSettings(root) {
         </div>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
-        <h3 class="font-bold text-lg mb-4">🤖 AI Assistant</h3>
+        <h3 class="font-bold text-lg mb-4 flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>AI Assistant</h3>
         <div class="grid grid-cols-2 gap-3">
           <div><label class="text-xs text-gray-500 block">API Key <span class="text-gray-400 font-normal">(leave blank for local)</span></label><input id="set-aiApiKey" type="password" value="${escapeHtml(settingsMap['aiApiKey'] || '')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 font-mono text-xs" placeholder="sk-... or empty for Ollama" /></div>
           <div><label class="text-xs text-gray-500 block">Provider</label><select id="set-aiModel" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"><option value="ollama" ${(settingsMap['aiModel']||'ollama') === 'ollama' ? 'selected' : ''}>Ollama (local, free)</option><option value="gpt-4o-mini" ${settingsMap['aiModel'] === 'gpt-4o-mini' ? 'selected' : ''}>OpenAI GPT-4o-mini</option><option value="gpt-4o" ${settingsMap['aiModel'] === 'gpt-4o' ? 'selected' : ''}>OpenAI GPT-4o</option></select></div>
@@ -70,21 +70,21 @@ export async function viewSettings(root) {
         </div>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
-        <h3 class="font-bold text-lg mb-4">📋 Quick Items</h3>
+        <h3 class="font-bold text-lg mb-4 flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>Quick Items</h3>
         <div class="space-y-2">
           ${state.quickItems.map(q => `<div class="flex items-center gap-2 text-sm"><input class="flex-1 px-2 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800" value="${escapeHtml(q.name)}" data-qi-id="${q.id}" data-field="name" /><input class="w-24 px-2 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800" type="number" step="0.01" value="${q.price}" data-qi-id="${q.id}" data-field="price" /><button onclick="deleteQuickItem(${q.id})" class="text-red-500 text-xs"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Del</button></div>`).join('')}
           <div class="flex gap-2"><input id="new-qi-name" placeholder="Item name" class="flex-1 px-2 py-1.5 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-sm" onkeydown="if(event.key==='Enter')addQuickItem()" /><input id="new-qi-price" type="number" step="0.01" placeholder="Price" class="w-24 px-2 py-1.5 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-sm" onkeydown="if(event.key==='Enter')addQuickItem()" /><button onclick="addQuickItem()" class="px-3 py-1.5 bg-blue-600 text-white rounded text-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add</button></div>
         </div>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
-        <h3 class="font-bold text-lg mb-4">👥 Users</h3>
+        <h3 class="font-bold text-lg mb-4 flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Users</h3>
         <div class="overflow-auto mb-3">${state.users.length > 0 ? `<table class="w-full text-sm"><thead><tr class="bg-gray-50 dark:bg-gray-700"><th class="p-2 text-left">Username</th><th class="p-2 text-left">Name</th><th class="p-2 text-left">Role</th><th class="p-2 text-center">Actions</th></tr></thead>
           <tbody>${state.users.map(u => `<tr class="border-b dark:border-gray-700"><td class="p-2">${escapeHtml(u.username)}</td><td class="p-2">${escapeHtml(u.name||'')}</td><td class="p-2"><span class="px-2 py-0.5 rounded-full text-xs ${u.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}">${escapeHtml(u.role)}</span></td>
           <td class="p-2 text-center"><button onclick="openUserModal(${u.id})" class="text-blue-600 text-xs"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit</button></td></tr>`).join('')}</tbody></table>` : '<p class="text-gray-400 text-sm">No users</p>'}</div>
         <button onclick="openUserModal()" class="px-3 py-1.5 bg-blue-600 text-white rounded text-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>Add User</button>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
-        <h3 class="font-bold text-lg mb-4">🖨️ Print Appearance</h3>
+        <h3 class="font-bold text-lg mb-4 flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print Appearance</h3>
         <div class="grid grid-cols-2 gap-3">
           <div><label class="text-xs text-gray-500 block">Stripe Color 1 (even rows)</label><input id="set-printStripeColor1" type="color" value="${settingsMap['printStripeColor1'] || '#f8fafc'}" class="w-full h-9 px-1 py-1 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 cursor-pointer" /></div>
           <div><label class="text-xs text-gray-500 block">Stripe Color 2 (odd rows)</label><input id="set-printStripeColor2" type="color" value="${settingsMap['printStripeColor2'] || '#ffffff'}" class="w-full h-9 px-1 py-1 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 cursor-pointer" /></div>
@@ -191,7 +191,7 @@ export async function removeReceiptLogo() {
   if (existing) { await dbDel('settings', existing.id); }
   state.settings = await dbAll('settings');
   const preview = document.getElementById('logo-preview');
-  if (preview) preview.innerHTML = '<span class="text-2xl text-gray-300">📷</span>';
+  if (preview) preview.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-gray-300 mx-auto"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
   toast('Logo removed');
 }
 

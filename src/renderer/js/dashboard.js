@@ -71,12 +71,12 @@ export async function viewDashboard(root) {
         </div>
       </div>` : ''}
       ${dw.chart ? `<details open class="bg-white dark:bg-gray-800 rounded-lg shadow-sm" id="chart-section">
-        <summary class="p-3 cursor-pointer font-bold text-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg">📊 7-Day Trend <span id="chart-toggle" class="text-xs font-normal text-gray-400 ml-auto">Hide chart</span></summary>
+        <summary class="p-3 cursor-pointer font-bold text-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>7-Day Trend <span id="chart-toggle" class="text-xs font-normal text-gray-400 ml-auto">Hide chart</span></summary>
         <div class="px-3 pb-3"><canvas id="dashChart" height="120"></canvas></div>
       </details>` : ''}
       ${dw.payMethod ? `<div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm">
         <details open>
-          <summary class="p-3 cursor-pointer font-bold text-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg">💳 Payment Methods <span class="text-xs font-normal text-gray-400 ml-auto">Today's breakdown</span></summary>
+          <summary class="p-3 cursor-pointer font-bold text-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>Payment Methods <span class="text-xs font-normal text-gray-400 ml-auto">Today's breakdown</span></summary>
           <div class="px-3 pb-3"><canvas id="payMethodChart" height="70"></canvas></div>
         </details>
       </div>` : ''}
@@ -98,7 +98,7 @@ export async function viewDashboard(root) {
       </div>
       ${dw.aiInsights ? `<div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm">
         <details id="ai-panel" class="group">
-          <summary class="p-3 cursor-pointer font-bold text-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg">🤖 AI Insights <span class="text-xs font-normal text-gray-400 ml-auto" id="ai-status">Ask about your business</span></summary>
+          <summary class="p-3 cursor-pointer font-bold text-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>AI Insights <span class="text-xs font-normal text-gray-400 ml-auto" id="ai-status">Ask about your business</span></summary>
           <div class="px-3 pb-3 space-y-2">
             <div id="ai-chat" class="max-h-32 overflow-auto space-y-1 text-xs border dark:border-gray-700 rounded p-2 bg-gray-50 dark:bg-gray-900 min-h-[60px]">
               <div class="text-gray-400 text-xs text-center py-2">Ask about sales, inventory, clients...</div>
@@ -305,11 +305,11 @@ export async function loadWeather() {
   try { cache = JSON.parse(localStorage.getItem('weatherCache')); } catch (_) {}
   if (cache) {
     const ago = Math.round((Date.now() - cache.ts) / 60000);
-    el.innerHTML = `<div class="flex items-center gap-2"><div class="text-2xl">${getWeatherEmoji(cache.ic)}</div><div><p class="text-lg font-bold leading-tight">${cache.temp}°C</p><p class="text-xs text-gray-500">${cache.desc}</p><p class="text-xs text-gray-400">💧${cache.hum}% 🌬${cache.wind}</p><p class="text-xs text-gray-400">${escapeHtml(cache.city)}${ago > 30 ? ` <span class="text-amber-500">⏳${ago}m ago</span>` : ''}</p></div></div>`;
+    el.innerHTML = `<div class="flex items-center gap-2"><div class="text-2xl">${getWeatherEmoji(cache.ic)}</div><div><p class="text-lg font-bold leading-tight">${cache.temp}°C</p><p class="text-xs text-gray-500">${cache.desc}</p><p class="text-xs text-gray-400"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-0.5 -mt-0.5"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>${cache.hum}% <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-0.5 -mt-0.5"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg>${cache.wind}</p><p class="text-xs text-gray-400">${escapeHtml(cache.city)}${ago > 30 ? ` <span class="text-amber-500"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-0.5 -mt-0.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${ago}m ago</span>` : ''}</p></div></div>`;
     if (ago < 5) return;
     el.innerHTML += '<p class="text-xs text-gray-400 mt-1"><span class="pulse-soft">↻ refreshing...</span></p>';
   } else {
-    el.innerHTML = '<p class="text-gray-400 text-xs py-2"><span class="pulse-soft">📍 Loading weather...</span></p>';
+    el.innerHTML = '<p class="text-gray-400 text-xs py-2"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5 pulse-soft"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Loading weather...</p>';
   }
   try {
     const settingsMap = {};
@@ -346,7 +346,7 @@ export async function loadWeather() {
       }
     }
     try { localStorage.setItem('weatherCache', JSON.stringify({ temp, desc, hum, wind, ic: iconCode, city, ts: Date.now() })); } catch (_) {}
-    el.innerHTML = `<div class="flex items-center gap-2"><div class="text-2xl">${getWeatherEmoji(iconCode)}</div><div><p class="text-lg font-bold leading-tight">${temp}°C</p><p class="text-xs text-gray-500">${desc}</p><p class="text-xs text-gray-400">💧${hum}% 🌬${wind}</p><p class="text-xs text-gray-400">${escapeHtml(city)}</p></div></div>`;
+    el.innerHTML = `<div class="flex items-center gap-2"><div class="text-2xl">${getWeatherEmoji(iconCode)}</div><div><p class="text-lg font-bold leading-tight">${temp}°C</p><p class="text-xs text-gray-500">${desc}</p><p class="text-xs text-gray-400"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-0.5 -mt-0.5"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>${hum}% <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-0.5 -mt-0.5"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg>${wind}</p><p class="text-xs text-gray-400">${escapeHtml(city)}</p></div></div>`;
   } catch (e) {
     if (cache) {
       el.innerHTML = el.innerHTML.replace('<p class="text-xs text-gray-400 mt-1"><span class="pulse-soft">↻ refreshing...</span></p>', '');

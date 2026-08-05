@@ -1,5 +1,5 @@
 {
-  "version": "3.4.10",
-  "buildDate": "2026-08-03T18:00:00.000Z",
-  "notes": "Internet connection indicator moved to the header next to the notification bell (removed from login screen and sidebar); earlier: connection indicator, effects, version badge, inline field validation, ES-module bundling, auto-update check button, bulk inventory edit, returns, receipt printing, variants, exit confirmation"
+  "version": "3.4.11",
+  "buildDate": "2026-08-04T06:00:00.000Z",
+  "notes": "Frontend polish: all emoji icons replaced with consistent SVG icons (sidebar, header, dashboard, settings, reports), Content-Security-Policy header added, vendor scripts bundled as modules (removed unused CryptoJS), build warnings eliminated; earlier: connection indicator moved to header, effects, version badge, inline field validation, ES-module bundling"
 }

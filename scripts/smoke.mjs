@@ -54,6 +54,11 @@ Object.defineProperty(globalThis, 'indexedDB', { value: {
 }, configurable: true });
 Object.defineProperty(globalThis, 'navigator', { value: {}, configurable: true });
 globalThis.fetch = async () => ({ json: async () => ({}), ok: true, text: async () => '' });
+globalThis.MutationObserver = class { observe() {} unobserve() {} disconnect() {} takeRecords() { return []; } };
+globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+for (const g of ['tailwind', 'Chart', 'XLSX', 'JsBarcode']) {
+  Object.defineProperty(globalThis, g, { get: () => win[g], configurable: true });
+}
 
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
