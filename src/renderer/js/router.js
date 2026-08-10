@@ -1,3 +1,4 @@
+import { viewCatalog } from './catalog.js'
 import { viewClients } from './clients.js'
 import { viewDashboard } from './dashboard.js'
 import { dbAll } from './database.js'
@@ -22,7 +23,7 @@ export async function navigate(route) {
   state.currentRoute = route;
   const titles = {
     dashboard: 'Dashboard', clients: 'Clients', utang: 'Utang',
-    transactions: 'Sales', inventory: 'Inventory', stocktake: 'Stock Take', expenses: 'Expenses',
+    transactions: 'Sales', catalog: 'Catalog', inventory: 'Inventory', stocktake: 'Stock Take', expenses: 'Expenses',
     suppliers: 'Suppliers', payments: 'Payments', 'purchase-orders': 'Purchase Orders',
     reports: 'Reports', settings: 'Settings'
   };
@@ -47,6 +48,7 @@ export async function navigate(route) {
     case 'clients': await viewClients(root); break;
     case 'utang': await viewUtang(root); break;
     case 'transactions': await viewTransactions(root); break;
+    case 'catalog': await viewCatalog(root); break;
     case 'inventory': await viewInventory(root); break;
     case 'stocktake': await viewStockTake(root); break;
     case 'expenses': await viewExpenses(root); break;
@@ -116,7 +118,7 @@ document.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && key === 'P') { e.preventDefault(); navigate('payments'); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && key === 'C') { e.preventDefault(); navigate('clients'); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && key === 'S') { e.preventDefault(); navigate('settings'); }
-    const routes = ['dashboard','clients','utang','transactions','inventory','stocktake','expenses','suppliers','payments','purchase-orders','reports','settings'];
+    const routes = ['dashboard','clients','utang','transactions','catalog','inventory','stocktake','expenses','suppliers','payments','purchase-orders','reports','settings'];
     const idx = routes.indexOf(state.currentRoute);
     if (key === 'ArrowDown' || key === 'ArrowRight') { if (idx < routes.length - 1) { e.preventDefault(); navigate(routes[idx + 1]); } }
     else if (key === 'ArrowUp' || key === 'ArrowLeft') { if (idx > 0) { e.preventDefault(); navigate(routes[idx - 1]); } }

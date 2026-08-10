@@ -1,5 +1,5 @@
 {
-  "version": "3.4.20",
-  "buildDate": "2026-08-10T14:00:00.000Z",
-  "notes": "Mobile Access now shows two QR codes: the Network QR (same Wi-Fi) and an Anywhere QR (works from mobile data or any Wi-Fi via Tailscale) - scan once, no more typing long addresses"
+  "version": "3.4.21",
+  "buildDate": "2026-08-11T14:00:00.000Z",
+  "notes": "New Catalog view: every item shown as a photo tile with price and stock, tap a photo for a Quick Sale (qty, client, payment, discount) and print the receipt straight from the sale"
 }
