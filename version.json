@@ -1,5 +1,5 @@
 {
-  "version": "3.4.15",
-  "buildDate": "2026-08-05T10:00:00.000Z",
-  "notes": "Startup & Tray options in Settings: launch app with Windows (background server), and close button hides to tray so LAN/mobile access keeps working while the window is closed"
+  "version": "3.4.16",
+  "buildDate": "2026-08-10T10:00:00.000Z",
+  "notes": "Phone home-screen app icon: PWA manifest + icon so 'Add to Home Screen' shows the Shop Ledger PH logo; LAN token now persists across restarts so the icon keeps working"
 }

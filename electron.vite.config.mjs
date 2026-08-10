@@ -11,6 +11,7 @@ function copyRendererStatic() {
       const out = resolve('out/renderer')
       for (const name of ['assets']) cpSync(resolve(src, name), resolve(out, name), { recursive: true })
       cpSync(resolve(src, 'mobile.html'), resolve(out, 'mobile.html'))
+      cpSync(resolve(src, 'manifest.webmanifest'), resolve(out, 'manifest.webmanifest'))
       cpSync(resolve('version.json'), resolve(out, 'version.json'))
     }
   }

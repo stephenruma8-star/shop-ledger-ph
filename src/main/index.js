@@ -61,13 +61,20 @@ try { autoUpdater = require('electron-updater').autoUpdater; if (autoUpdater) au
 
 let mainWindow, tray, lanServer, udpBroadcast, wsServer;
 let isQuitting = false;
-let _lanToken = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
 const LAN_PORT = 3456;
 const UDP_PORT = 3457;
 const WS_PORT = 3458;
 const APP_CONFIG_PATH = path.join(app.getPath('userData'), 'app-prefs.json');
 function readAppPrefs() {
   try { return JSON.parse(fs.readFileSync(APP_CONFIG_PATH, 'utf8')); } catch (e) { return {}; }
+}
+const _savedToken = readAppPrefs().lanToken;
+let _lanToken = _savedToken || (Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2));
+if (!_savedToken) {
+  try {
+    const prefs = { ...readAppPrefs(), lanToken: _lanToken };
+    fs.writeFileSync(APP_CONFIG_PATH, JSON.stringify(prefs, null, 2));
+  } catch (e) { console.error('Failed to persist LAN token:', e.message); }
 }
 
 function createWindow() {
@@ -176,7 +183,7 @@ function startLANServer() {
   expressApp.use(cors());
   expressApp.use(express.json({ limit: '100mb' }));
   expressApp.use((req, res, next) => {
-    if (req.path === '/api/health' || req.path === '/') return next();
+    if (req.path === '/api/health' || req.path === '/' || req.path === '/manifest.webmanifest' || req.path.startsWith('/assets/')) return next();
     const token = req.headers['x-auth-token'] || req.query.token;
     if (token === _lanToken) return next();
     res.status(401).json({ error: 'Unauthorized' });
@@ -184,6 +191,18 @@ function startLANServer() {
 
   expressApp.get('/', (req, res) => {
     res.type('html').send(fs.readFileSync(path.join(__dirname, '../renderer/mobile.html'), 'utf8'));
+  });
+
+  expressApp.get('/manifest.webmanifest', (req, res) => {
+    res.type('application/manifest+json').send(fs.readFileSync(path.join(__dirname, '../renderer/manifest.webmanifest'), 'utf8'));
+  });
+
+  expressApp.get('/assets/:file', (req, res) => {
+    const name = path.basename(req.params.file);
+    if (!/^[a-zA-Z0-9._-]+$/.test(name)) return res.status(400).end();
+    const p = path.join(__dirname, '../renderer/assets', name);
+    if (!fs.existsSync(p)) return res.status(404).end();
+    res.type(name.endsWith('.png') ? 'image/png' : 'application/octet-stream').send(fs.readFileSync(p));
   });
 
   expressApp.get('/api/clients', async (req, res) => {
