@@ -133,13 +133,34 @@ function createTray() {
 }
 
 function getLocalIP() {
-  const interfaces = os.networkInterfaces();
-  for (const name of Object.keys(interfaces)) {
-    for (const iface of interfaces[name]) {
-      if (iface.family === 'IPv4' && !iface.internal) return iface.address;
+  const candidates = [];
+  for (const name of Object.keys(os.networkInterfaces())) {
+    for (const iface of os.networkInterfaces()[name]) {
+      if (iface.family !== 'IPv4' || iface.internal) continue;
+      const [x, y] = iface.address.split('.').map(Number);
+      if (x === 169 && y === 254) continue;
+      if (x === 100 && y >= 64 && y <= 127) continue;
+      candidates.push(iface.address);
     }
   }
-  return '127.0.0.1';
+  return candidates[0] || '127.0.0.1';
+}
+
+function ensureFirewallRules() {
+  if (!app.isPackaged) return;
+  const cp = require('child_process');
+  for (const [name, port] of [['Shop Ledger PH LAN 3456', String(LAN_PORT)], ['Shop Ledger PH WS 3458', String(WS_PORT)]]) {
+    let exists = false;
+    try {
+      const out = cp.execFileSync('netsh', ['advfirewall', 'firewall', 'show', 'rule', `name=${name}`], { encoding: 'utf8', timeout: 10000 });
+      exists = out.includes(name);
+    } catch (e) {}
+    if (exists) continue;
+    try {
+      cp.execFileSync('netsh', ['advfirewall', 'firewall', 'add', 'rule', `name=${name}`, 'dir=in', 'action=allow', 'protocol=TCP', `localport=${port}`, 'profile=any'], { encoding: 'utf8', timeout: 10000, stdio: 'ignore' });
+      console.log(`Firewall rule added: ${name}`);
+    } catch (e) { console.error('Firewall rule add failed:', e.message); }
+  }
 }
 
 function setupAutoUpdater() {
@@ -552,6 +573,7 @@ app.whenReady().then(() => {
     setupAutoUpdater();
     createWindow();
     createTray();
+    ensureFirewallRules();
     startLANServer();
     startUDPBroadcast();
     wsServer = startWsServer({

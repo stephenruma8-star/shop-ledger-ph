@@ -1,5 +1,5 @@
 {
-  "version": "3.4.16",
-  "buildDate": "2026-08-10T10:00:00.000Z",
-  "notes": "Phone home-screen app icon: PWA manifest + icon so 'Add to Home Screen' shows the Shop Ledger PH logo; LAN token now persists across restarts so the icon keeps working"
+  "version": "3.4.17",
+  "buildDate": "2026-08-10T11:00:00.000Z",
+  "notes": "Fix mobile 'webpage not available': LAN URL now uses the real Wi-Fi IP (ignores Tailscale/VPN and dead adapters), and the app auto-creates Windows Firewall allow rules for ports 3456/3458 so phones can connect"
 }
