@@ -132,7 +132,10 @@ export function renderTransactionModal(editTxn) {
             <input id="tm-qty" type="number" value="1" min="1" class="w-14 px-2 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm text-center" />
             <button onclick="addToCart()" class="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm whitespace-nowrap"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Item</button>
           </div>
-          ${qItems.length > 0 ? `<div><label class="text-xs text-gray-500 block">Quick Items (click to add row)</label><div class="flex flex-wrap gap-1">${qItems.map(q => `<button data-qiname="${escapeHtml(q.name)}" data-qiprice="${q.price}" onclick="quickAddToCart(this.dataset.qiname, parseFloat(this.dataset.qiprice))" class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs hover:bg-gray-200 dark:hover:bg-gray-600">${escapeHtml(q.name)} ${peso(q.price)}</button>`).join('')}</div></div>` : ''}
+          ${qItems.length > 0 ? `<div><label class="text-xs text-gray-500 block">Quick Items (click to add row)</label><div class="flex flex-wrap gap-1">${qItems.map(q => {
+            const qInv = state.inventory.find(i => i.name === q.name);
+            return `<button data-qiname="${escapeHtml(q.name)}" data-qiprice="${q.price}" onclick="quickAddToCart(this.dataset.qiname, parseFloat(this.dataset.qiprice))" class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center gap-1.5">${qInv && qInv.image ? `<img src="${qInv.image}" alt="" class="w-5 h-5 object-cover rounded" />` : ''}${escapeHtml(q.name)} ${peso(q.price)}</button>`;
+          }).join('')}</div></div>` : ''}
         </div>
         <div>
           <div class="flex justify-between items-center mb-2"><h4 class="font-semibold text-sm">Items</h4><button onclick="txCart.push({date:today(),description:'',name:'1',unitCost:0,intRate:0,invId:null});renderTMCart();updateTMTotals()" class="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs hover:bg-green-700"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Blank Row</button></div>
@@ -175,7 +178,7 @@ export function renderTMCart() {
   if (!el) return;
   if (txCart.length === 0) { el.innerHTML = '<p class="text-gray-400 text-xs p-2">No items added yet</p>'; return; }
   el.innerHTML = `<table class="w-full text-xs"><thead><tr class="bg-gray-50 dark:bg-gray-700 sticky top-0"><th class="p-1 text-left">Date</th><th class="p-1 text-left">Description</th><th class="p-1 text-center">Qty/Name</th><th class="p-1 text-center">Variant</th><th class="p-1 text-right">Unit Cost</th><th class="p-1 text-right">Int. Rate</th><th class="p-1 text-right">Amount</th><th class="p-1"></th></tr></thead><tbody>${txCart.map((item, i) => {
-    const invItem = item.invId ? state.inventory.find(x => x.id === item.invId) : null;
+    const invItem = item.invId ? state.inventory.find(x => x.id === item.invId) : (item.description ? state.inventory.find(x => x.name === item.description) : null);
     const variants = invItem?.variants || [];
     const varOpts = variants.length ? `<select onchange="txCart[${i}].variantName=this.value" class="w-16 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs text-center">${variants.map((v,vi) => `<option value="${escapeHtml(v.name)}" ${item.variantName===v.name||vi===0?'selected':''}>${escapeHtml(v.name)}</option>`).join('')}</select>` : `<span class="text-gray-400 text-xs">${escapeHtml(item.variantName||'—')}</span>`;
     return `<tr class="border-b dark:border-gray-700">

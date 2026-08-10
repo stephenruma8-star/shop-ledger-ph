@@ -103,7 +103,7 @@ export async function seedIfEmpty() {
 }
 
 export function updateVersionBadge() {
-  const version = ((state.settings || []).find(s => s.key === 'lastBuildVersion') || {}).value || '3.4.18';
+  const version = ((state.settings || []).find(s => s.key === 'lastBuildVersion') || {}).value || '3.4.19';
   const text = 'v' + version;
   for (const id of ['sidebar-version', 'login-version', 'app-version-label']) {
     const el = document.getElementById(id);

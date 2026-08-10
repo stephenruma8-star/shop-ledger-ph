@@ -50,7 +50,7 @@ export function showItemSuggestions(input, prefix, i) {
   if (existing) existing.remove();
   if (!val) { window.__app._suggestIndex = -1; window.__app._suggestMatches = []; return; }
   window.__app._suggestMatches = [];
-  (state.quickItems || []).forEach(q => { if (q.name.toLowerCase().includes(val)) window.__app._suggestMatches.push({ name: q.name, price: q.price, invId: null }); });
+  (state.quickItems || []).forEach(q => { if (q.name.toLowerCase().includes(val)) window.__app._suggestMatches.push({ name: q.name, price: q.price, invId: null, image: (state.inventory.find(i => i.name === q.name) || {}).image || null }); });
   (state.inventory || []).forEach(inv => { if (inv.name.toLowerCase().includes(val)) window.__app._suggestMatches.push({ name: inv.name, price: inv.sellPrice || inv.price || 0, invId: inv.id, image: inv.image || null }); });
   if (!window.__app._suggestMatches.length) { window.__app._suggestIndex = -1; return; }
   window.__app._suggestIndex = -1;

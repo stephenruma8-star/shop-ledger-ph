@@ -1,5 +1,5 @@
 {
-  "version": "3.4.18",
-  "buildDate": "2026-08-10T12:00:00.000Z",
-  "notes": "Item pictures: add a photo when creating/editing an inventory item, see thumbnails in the inventory list, search suggestions, sale cart, purchase orders and stock take - easier to identify items when searching"
+  "version": "3.4.19",
+  "buildDate": "2026-08-10T13:00:00.000Z",
+  "notes": "Quick items now show the item photo automatically: if a quick item has the same name as an inventory item with a picture, the picture appears on the quick-item button, in search suggestions and in the sale cart"
 }
