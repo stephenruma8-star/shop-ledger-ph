@@ -103,7 +103,7 @@ export async function seedIfEmpty() {
 }
 
 export function updateVersionBadge() {
-  const version = ((state.settings || []).find(s => s.key === 'lastBuildVersion') || {}).value || '3.4.19';
+  const version = ((state.settings || []).find(s => s.key === 'lastBuildVersion') || {}).value || '3.4.20';
   const text = 'v' + version;
   for (const id of ['sidebar-version', 'login-version', 'app-version-label']) {
     const el = document.getElementById(id);
@@ -115,19 +115,30 @@ export async function showMobileAccess() {
   if (!window.electronAPI?.generateMobileQR) { toast('Mobile access only available in the desktop app', 'warning'); return; }
   try {
     const info = await window.electronAPI.generateMobileQR();
+    const ts = info.tailscale || null;
     modal(`
       <div class="p-6">
         <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">Mobile Access</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
-        <p class="text-sm text-gray-500 mb-3">Scan with your phone camera (phone must be on the same Wi-Fi network), or type the address into your phone's browser.</p>
-        <div class="flex justify-center mb-3"><img src="${info.qr}" alt="Mobile access QR code" class="w-56 h-56 rounded-lg border dark:border-gray-700 bg-white p-2" /></div>
+        <p class="text-sm text-gray-500 mb-3">Scan the QR with your phone camera. <strong>Network QR</strong> works on the same Wi-Fi — <strong>Anywhere QR</strong> works from any network (Tailscale).</p>
+        <div class="flex justify-center mb-1"><img src="${info.qr}" alt="Network QR code" class="w-56 h-56 rounded-lg border dark:border-gray-700 bg-white p-2" /></div>
+        <p class="text-xs text-center text-gray-400 mb-3">📶 Network QR — same Wi-Fi only</p>
         <div class="flex gap-2 mb-2">
           <input id="mobile-url" readonly value="${escapeHtml(info.url)}" onclick="this.select()" class="flex-1 px-3 py-2 border dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-sm font-mono" />
-          <button onclick="copyMobileUrl()" class="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy</button>
+          <button onclick="copyMobileUrl('mobile-url')" class="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy</button>
         </div>
+        ${ts ? `
+        <div class="my-4 border-t dark:border-gray-700"></div>
+        <div class="flex justify-center mb-1"><img src="${ts.qr}" alt="Anywhere QR code" class="w-56 h-56 rounded-lg border dark:border-gray-700 bg-white p-2" /></div>
+        <p class="text-xs text-center text-gray-400 mb-3">🌐 Anywhere QR — works on mobile data or any Wi-Fi (Tailscale)</p>
+        <div class="flex gap-2 mb-2">
+          <input id="mobile-url-ts" readonly value="${escapeHtml(ts.url)}" onclick="this.select()" class="flex-1 px-3 py-2 border dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-sm font-mono" />
+          <button onclick="copyMobileUrl('mobile-url-ts')" class="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy</button>
+        </div>` : ''}
         <div class="text-xs text-gray-400 space-y-1">
           <p>• Open the page on your phone to view clients and log payments.</p>
           <p>• Keep this app running — it hosts the mobile page on port 3456.</p>
-          <p>• The security token changes every app restart — reopen this window and rescan.</p>
+          <p>• New phones: install Tailscale (free) and sign in to this account to use the Anywhere QR.</p>
+          <p>• If the address is ever rejected, reopen this window and rescan to get the current code.</p>
         </div>
       </div>`);
   } catch (err) {
@@ -135,8 +146,8 @@ export async function showMobileAccess() {
   }
 }
 
-export async function copyMobileUrl() {
-  const el = document.getElementById('mobile-url');
+export async function copyMobileUrl(id) {
+  const el = document.getElementById(id || 'mobile-url');
   if (!el) return;
   try {
     await navigator.clipboard.writeText(el.value);

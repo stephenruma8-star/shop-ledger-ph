@@ -146,6 +146,17 @@ function getLocalIP() {
   return candidates[0] || '127.0.0.1';
 }
 
+function getTailscaleIP() {
+  for (const name of Object.keys(os.networkInterfaces())) {
+    for (const iface of os.networkInterfaces()[name]) {
+      if (iface.family !== 'IPv4' || iface.internal) continue;
+      const [x, y] = iface.address.split('.').map(Number);
+      if (x === 100 && y >= 64 && y <= 127) return iface.address;
+    }
+  }
+  return null;
+}
+
 function ensureFirewallRules() {
   if (!app.isPackaged) return;
   const cp = require('child_process');
@@ -440,7 +451,13 @@ ipcMain.handle('load-backup-file', async () => {
 ipcMain.handle('generate-mobile-qr', async () => {
   const url = `http://${getLocalIP()}:${LAN_PORT}?ws=${WS_PORT}&token=${_lanToken}`;
   const qr = await QRCode.toDataURL(url, { width: 300 });
-  return { url, qr, token: _lanToken, wsPort: WS_PORT };
+  const tsIp = getTailscaleIP();
+  let tailscale = null;
+  if (tsIp) {
+    const tsUrl = `http://${tsIp}:${LAN_PORT}?ws=${WS_PORT}&token=${_lanToken}`;
+    tailscale = { url: tsUrl, qr: await QRCode.toDataURL(tsUrl, { width: 300 }) };
+  }
+  return { url, qr, token: _lanToken, wsPort: WS_PORT, tailscale };
 });
 
 ipcMain.handle('get-app-preferences', () => readAppPrefs());

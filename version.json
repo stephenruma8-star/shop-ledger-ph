@@ -1,5 +1,5 @@
 {
-  "version": "3.4.19",
-  "buildDate": "2026-08-10T13:00:00.000Z",
-  "notes": "Quick items now show the item photo automatically: if a quick item has the same name as an inventory item with a picture, the picture appears on the quick-item button, in search suggestions and in the sale cart"
+  "version": "3.4.20",
+  "buildDate": "2026-08-10T14:00:00.000Z",
+  "notes": "Mobile Access now shows two QR codes: the Network QR (same Wi-Fi) and an Anywhere QR (works from mobile data or any Wi-Fi via Tailscale) - scan once, no more typing long addresses"
 }

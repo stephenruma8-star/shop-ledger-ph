@@ -30,7 +30,7 @@ const fakeDB = {
 const win = new Proxy({
   __app: {},
   electronAPI: {
-    generateMobileQR: async () => ({ url: 'http://192.168.1.50:3456?ws=3458&token=abc123xyz', qr: 'data:image/png;base64,FAKEQRDATA', token: 'abc123xyz', wsPort: 3458 }),
+    generateMobileQR: async () => ({ url: 'http://192.168.1.50:3456?ws=3458&token=abc123xyz', qr: 'data:image/png;base64,FAKEQRDATA', token: 'abc123xyz', wsPort: 3458, tailscale: { url: 'http://100.76.155.97:3456?ws=3458&token=abc123xyz', qr: 'data:image/png;base64,FAKETSQR' } }),
     onShortcut: noop, onUpdateAvailable: noop, onUpdateNotAvailable: noop, onUpdateError: noop,
     onUpdateDownloaded: noop, onLanUpdateSignal: noop, onConfirmExit: noop, onLanDataRefresh: noop,
     onHiddenToTray: noop,
@@ -88,8 +88,10 @@ try {
     'has title': html.includes('Mobile Access'),
     'has QR image': html.includes('data:image/png;base64,FAKEQRDATA'),
     'has tokenized URL': html.includes('http://192.168.1.50:3456?ws=3458&amp;token=abc123xyz'),
-    'has copy button': html.includes('copyMobileUrl()'),
+    'has copy button': html.includes('copyMobileUrl('),
     'has instructions': html.includes('same Wi-Fi'),
+    'has anywhere QR': html.includes('data:image/png;base64,FAKETSQR'),
+    'has tailscale URL': html.includes('http://100.76.155.97:3456?ws=3458&amp;token=abc123xyz'),
   };
   let ok = true;
   for (const [k, v] of Object.entries(checks)) { console.log((v ? 'PASS' : 'FAIL') + ' - ' + k); if (!v) ok = false; }
