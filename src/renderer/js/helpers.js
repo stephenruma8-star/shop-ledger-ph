@@ -9,6 +9,12 @@ import { renderTxTable, txCart, updateCartRowAmt, updateTMTotals } from './trans
 
 export function dp(d) { const p = (d||'').split('-'); return { y: p[0]||'', m: p[1]||'', d: p[2]||'' }; }
 
+export function itemThumbHtml(item, cls) {
+  const size = cls || 'w-9 h-9';
+  if (item && item.image) return `<img src="${item.image}" alt="" class="${size} object-cover rounded-md shrink-0" />`;
+  return `<div class="${size} rounded-md bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-base shrink-0">📦</div>`;
+}
+
 window.__app = window.__app || {};
 window.__app._suggestHide = null;
 window.__app._suggestIndex = -1;
@@ -45,7 +51,7 @@ export function showItemSuggestions(input, prefix, i) {
   if (!val) { window.__app._suggestIndex = -1; window.__app._suggestMatches = []; return; }
   window.__app._suggestMatches = [];
   (state.quickItems || []).forEach(q => { if (q.name.toLowerCase().includes(val)) window.__app._suggestMatches.push({ name: q.name, price: q.price, invId: null }); });
-  (state.inventory || []).forEach(inv => { if (inv.name.toLowerCase().includes(val)) window.__app._suggestMatches.push({ name: inv.name, price: inv.sellPrice || inv.price || 0, invId: inv.id }); });
+  (state.inventory || []).forEach(inv => { if (inv.name.toLowerCase().includes(val)) window.__app._suggestMatches.push({ name: inv.name, price: inv.sellPrice || inv.price || 0, invId: inv.id, image: inv.image || null }); });
   if (!window.__app._suggestMatches.length) { window.__app._suggestIndex = -1; return; }
   window.__app._suggestIndex = -1;
   const rect = input.getBoundingClientRect();
@@ -55,7 +61,7 @@ export function showItemSuggestions(input, prefix, i) {
   div.style.left = rect.left + 'px';
   div.style.top = (rect.bottom + 2) + 'px';
   div.style.minWidth = Math.max(rect.width, 200) + 'px';
-  div.innerHTML = window.__app._suggestMatches.slice(0, 20).map((m, idx) => `<div class="suggest-item px-3 py-1.5 cursor-pointer border-b dark:border-gray-700 last:border-0" data-index="${idx}" onmouseenter="document.querySelectorAll('.suggest-item').forEach(e=>e.classList.remove('bg-blue-100','dark:bg-blue-900/30'));this.classList.add('bg-blue-100','dark:bg-blue-900/30');window.__app._suggestIndex=${idx}" onmousedown="event.preventDefault();selectItemSuggestion('${escapeHtml(m.name)}',${m.price},${m.invId ?? 'null'},'${prefix}',${i})">${escapeHtml(m.name)} <span class="text-gray-400">${peso(m.price)}</span></div>`).join('');
+  div.innerHTML = window.__app._suggestMatches.slice(0, 20).map((m, idx) => `<div class="suggest-item px-3 py-1.5 cursor-pointer border-b dark:border-gray-700 last:border-0" data-index="${idx}" onmouseenter="document.querySelectorAll('.suggest-item').forEach(e=>e.classList.remove('bg-blue-100','dark:bg-blue-900/30'));this.classList.add('bg-blue-100','dark:bg-blue-900/30');window.__app._suggestIndex=${idx}" onmousedown="event.preventDefault();selectItemSuggestion('${escapeHtml(m.name)}',${m.price},${m.invId ?? 'null'},'${prefix}',${i})">${m.image ? `<img src="${m.image}" alt="" class="w-6 h-6 object-cover rounded inline-block align-middle mr-1.5" />` : ''}${escapeHtml(m.name)} <span class="text-gray-400">${peso(m.price)}</span></div>`).join('');
   document.body.appendChild(div);
   input.onkeydown = function(e) {
     const items = div.querySelectorAll('.suggest-item');

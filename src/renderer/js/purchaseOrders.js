@@ -1,6 +1,6 @@
 import { logAudit } from './auth.js'
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
-import { closeModal, confirmModal, dbLoad, debounce, escapeHtml, modal, searchData, toast } from './helpers.js'
+import { closeModal, confirmModal, dbLoad, debounce, escapeHtml, itemThumbHtml, modal, searchData, toast } from './helpers.js'
 import { fmtDate, now, peso, state, today } from './state.js'
 
 export let poItems = [];
@@ -93,10 +93,13 @@ export function renderPOCart() {
   if (poItems.length === 0) { el.innerHTML = '<p class="text-gray-400 text-xs">No items added</p>'; if (totalEl) totalEl.textContent = peso(0); return; }
   const total = poItems.reduce((s, i) => s + (i.price * i.qty), 0);
   if (totalEl) totalEl.textContent = peso(total);
-  el.innerHTML = poItems.map((item, i) => `<div class="flex justify-between items-center py-1 border-b dark:border-gray-700 last:border-0 text-sm">
-    <span>${escapeHtml(item.name)} x${item.qty} @ ${peso(item.price)}</span>
+  el.innerHTML = poItems.map((item, i) => {
+  const invItem = item.invId ? state.inventory.find(x => x.id === item.invId) : null;
+  return `<div class="flex justify-between items-center py-1 border-b dark:border-gray-700 last:border-0 text-sm">
+    <span class="flex items-center gap-2">${invItem ? itemThumbHtml(invItem, 'w-6 h-6') : ''}<span>${escapeHtml(item.name)} x${item.qty} @ ${peso(item.price)}</span></span>
     <div><span class="font-medium">${peso(item.price * item.qty)}</span><button onclick="removePOItem(${i})" class="ml-2 text-red-500"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
-  </div>`).join('');
+  </div>`;
+}).join('');
 }
 
 export function removePOItem(i) { poItems.splice(i, 1); renderPOCart(); }

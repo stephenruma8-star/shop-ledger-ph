@@ -1,6 +1,6 @@
 import { logAudit } from './auth.js'
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
-import { closeModal, confirmModal, dbLoad, debounce, escapeHtml, modal, searchData, toast, updateLowStockBadge } from './helpers.js'
+import { closeModal, confirmModal, dbLoad, debounce, escapeHtml, itemThumbHtml, modal, searchData, toast, updateLowStockBadge } from './helpers.js'
 import { escHtml } from './printLayout.js'
 import { now, peso, state } from './state.js'
 import { getQty } from './transactions.js'
@@ -29,11 +29,12 @@ export function renderInvTable() {
   const container = document.getElementById('invTable');
   if (!container) return;
   if (sorted.length === 0) { container.innerHTML = '<div class="p-6 text-center text-gray-400">No inventory items</div>'; return; }
-  container.innerHTML = `<table class="w-full text-sm"><thead><tr class="bg-gray-50 dark:bg-gray-700 text-left"><th class="p-3 w-10"><input type="checkbox" onchange="document.querySelectorAll('.inv-check').forEach(c=>c.checked=this.checked);toggleInvBulkBar()" /></th><th class="p-3">Name</th><th class="p-3">SKU</th><th class="p-3">Category</th><th class="p-3 text-right">Price</th>        <th class="p-3 text-right">Cost</th><th class="p-3 text-center">Stock</th><th class="p-3 text-left">Unit</th><th class="p-3 text-center">Actions</th></tr></thead>
+  container.innerHTML = `<table class="w-full text-sm"><thead><tr class="bg-gray-50 dark:bg-gray-700 text-left"><th class="p-3 w-10"><input type="checkbox" onchange="document.querySelectorAll('.inv-check').forEach(c=>c.checked=this.checked);toggleInvBulkBar()" /></th><th class="p-3 w-12">Photo</th><th class="p-3">Name</th><th class="p-3">SKU</th><th class="p-3">Category</th><th class="p-3 text-right">Price</th>        <th class="p-3 text-right">Cost</th><th class="p-3 text-center">Stock</th><th class="p-3 text-left">Unit</th><th class="p-3 text-center">Actions</th></tr></thead>
     <tbody>${sorted.map(i => {
       const low = (i.stock || 0) <= (i.minStock || 5);
       return `<tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
         <td class="p-3 w-10"><input type="checkbox" value="${i.id}" class="inv-check" onchange="toggleInvBulkBar()" /></td>
+        <td class="p-3">${itemThumbHtml(i)}</td>
         <td class="p-3 font-medium">${escapeHtml(i.name)}</td><td class="p-3 text-gray-500">${escapeHtml(i.sku || '-')}</td>
         <td class="p-3">${escapeHtml(i.category || '-')}</td><td class="p-3 text-right">${peso(i.sellPrice||i.price||0)}</td>
         <td class="p-3 text-right text-gray-500">${peso(i.costPrice||0)}</td>
@@ -62,9 +63,52 @@ export function addVariantRow() {
 
 export let debouncedRenderInvTable = debounce(renderInvTable, 250);
 
+let _invImage = null;
+
+export function invPickImage() {
+  const el = document.getElementById('if-image-input');
+  if (el) el.click();
+}
+
+export function invImageChanged(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  if (!/^image\//.test(file.type)) { toast('Please choose an image file', 'error'); input.value = ''; return; }
+  const fr = new FileReader();
+  fr.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 320;
+      const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      _invImage = canvas.toDataURL('image/jpeg', 0.8);
+      renderInvImagePreview();
+    };
+    img.onerror = () => { toast('Could not read the image', 'error'); input.value = ''; };
+    img.src = e.target.result;
+  };
+  fr.readAsDataURL(file);
+}
+
+export function invClearImage() { _invImage = null; renderInvImagePreview(); }
+
+export function renderInvImagePreview() {
+  const wrap = document.getElementById('if-image-preview');
+  if (!wrap) return;
+  wrap.innerHTML = _invImage
+    ? `<img src="${_invImage}" alt="" class="w-20 h-20 object-cover rounded-lg border dark:border-gray-700" />`
+    : `<div class="w-20 h-20 rounded-lg border border-dashed dark:border-gray-600 flex items-center justify-center text-3xl text-gray-400">📦</div>`;
+  const rm = document.getElementById('if-image-remove');
+  if (rm) rm.classList.toggle('hidden', !_invImage);
+}
+
 export function openInventoryModal(id) {
   const isEdit = !!id;
   const i = isEdit ? state.inventory.find(x => x.id === id) : null;
+  _invImage = isEdit ? (i.image || null) : null;
   modal(`
     <div class="p-6">
       <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">${isEdit ? 'Edit' : 'New'} Inventory Item</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
@@ -74,6 +118,17 @@ export function openInventoryModal(id) {
           <div><label class="text-xs text-gray-500 block">SKU</label><input id="if-sku" value="${isEdit ? escapeHtml(i.sku||'') : ''}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
         </div>
         <div><label class="text-xs text-gray-500 block">Category</label><input id="if-category" value="${isEdit ? escapeHtml(i.category||'') : ''}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
+        <div>
+          <label class="text-xs text-gray-500 block">Picture (optional)</label>
+          <div class="flex items-center gap-3 mt-1">
+            <div id="if-image-preview" class="w-20 h-20 rounded-lg overflow-hidden"></div>
+            <div class="flex flex-col gap-1">
+              <button type="button" onclick="invPickImage()" class="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700">📷 Upload</button>
+              <button type="button" id="if-image-remove" onclick="invClearImage()" class="text-xs px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 hidden">Remove</button>
+            </div>
+            <input type="file" id="if-image-input" accept="image/*" class="hidden" onchange="invImageChanged(this)" />
+          </div>
+        </div>
         <div class="grid grid-cols-2 gap-3">
           <div><label class="text-xs text-gray-500 block">Sell Price *</label><input id="if-price" type="number" step="0.01" value="${isEdit ? (i.sellPrice||i.price||0) : '0'}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
           <div><label class="text-xs text-gray-500 block">Cost Price</label><input id="if-cost" type="number" step="0.01" value="${isEdit ? (i.costPrice||0) : '0'}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
@@ -96,6 +151,7 @@ export function openInventoryModal(id) {
         </div>
       </div>
     </div>`);
+  renderInvImagePreview();
 }
 
 export async function saveInv(id) {
@@ -135,7 +191,8 @@ export async function saveInv(id) {
     stock: totalStock,
     minStock: parseInt(mnEl.value) || 5,
     unit: (unEl ? unEl.value.trim() : '') || 'pcs',
-    variants: variants.length > 0 ? variants : undefined
+    variants: variants.length > 0 ? variants : undefined,
+    image: _invImage || undefined
   };
   if (id) {
     const existing = await dbGet('inventory', id);
@@ -293,7 +350,7 @@ export function viewItemHistory(id) {
 
   modal(`<div class="p-4 flex flex-col" style="min-height:60vh">
     <div class="flex justify-between items-center mb-3 shrink-0">
-      <div><h3 class="text-xl font-bold">${escHtml(item.name)}</h3><p class="text-xs text-gray-500">SKU: ${escHtml(item.sku || '—')} · Current Stock: <strong class="${(item.stock||0) <= (item.minStock||5) ? 'text-red-600' : 'text-green-600'}">${item.stock || 0}</strong> · Price: ${peso(item.sellPrice||item.price||0)}</p></div>
+      <div class="flex items-center gap-3">${itemThumbHtml(item, 'w-16 h-16')}<div><h3 class="text-xl font-bold">${escHtml(item.name)}</h3><p class="text-xs text-gray-500">SKU: ${escHtml(item.sku || '—')} · Current Stock: <strong class="${(item.stock||0) <= (item.minStock||5) ? 'text-red-600' : 'text-green-600'}">${item.stock || 0}</strong> · Price: ${peso(item.sellPrice||item.price||0)}</p></div></div>
       <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
     <div class="flex-1 overflow-auto min-h-0">
@@ -311,6 +368,9 @@ Object.defineProperties(window, {
   addVariantRow: { get: () => addVariantRow, configurable: true },
   debouncedRenderInvTable: { get: () => debouncedRenderInvTable, configurable: true },
   openInventoryModal: { get: () => openInventoryModal, configurable: true },
+  invPickImage: { get: () => invPickImage, configurable: true },
+  invImageChanged: { get: () => invImageChanged, configurable: true },
+  invClearImage: { get: () => invClearImage, configurable: true },
   saveInv: { get: () => saveInv, configurable: true },
   deleteInv: { get: () => deleteInv, configurable: true },
   showReorderSuggestions: { get: () => showReorderSuggestions, configurable: true },

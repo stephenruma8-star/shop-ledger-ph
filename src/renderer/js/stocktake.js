@@ -1,6 +1,6 @@
 import { logAudit } from './auth.js'
 import { dbAll, dbGet, dbPut } from './database.js'
-import { confirmModal, dbLoad, escapeHtml, toast, updateLowStockBadge } from './helpers.js'
+import { confirmModal, dbLoad, escapeHtml, itemThumbHtml, toast, updateLowStockBadge } from './helpers.js'
 import { state } from './state.js'
 
 export async function viewStockTake(root) {
@@ -44,7 +44,7 @@ export function stRenderCounts() {
     const sys = i.stock || 0;
     const phys = stCounts[i.id] ?? sys;
     const varAmt = phys - sys;
-    return `<tr class="border-b dark:border-gray-700"><td class="p-2 font-medium">${escapeHtml(i.name)}</td><td class="p-2 text-right">${sys}</td><td class="p-2 text-right"><input type="number" value="${phys}" data-invid="${i.id}" onchange="stCounts[${i.id}]=parseInt(this.value)||0;stUpdateVariance(${i.id})" class="w-20 px-2 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-right text-sm" /></td><td class="p-2 text-right" id="st-var-${i.id}">${varAmt > 0 ? '+' + varAmt : String(varAmt)}</td></tr>`;
+    return `<tr class="border-b dark:border-gray-700"><td class="p-2"><span class="flex items-center gap-2">${itemThumbHtml(i, 'w-7 h-7')}<span class="font-medium">${escapeHtml(i.name)}</span></span></td><td class="p-2 text-right">${sys}</td><td class="p-2 text-right"><input type="number" value="${phys}" data-invid="${i.id}" onchange="stCounts[${i.id}]=parseInt(this.value)||0;stUpdateVariance(${i.id})" class="w-20 px-2 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-right text-sm" /></td><td class="p-2 text-right" id="st-var-${i.id}">${varAmt > 0 ? '+' + varAmt : String(varAmt)}</td></tr>`;
   }).join('');
 }
 

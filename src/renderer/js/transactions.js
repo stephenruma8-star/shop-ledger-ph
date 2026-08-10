@@ -1,7 +1,7 @@
 import { logAudit } from './auth.js'
 import { renderClientGrid } from './clients.js'
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
-import { calcInterest, closeModal, confirmModal, dbLoad, debounce, escapeHtml, filterByYear, modal, paginate, renderPagination, searchData, toast, updateLowStockBadge } from './helpers.js'
+import { calcInterest, closeModal, confirmModal, dbLoad, debounce, escapeHtml, filterByYear, itemThumbHtml, modal, paginate, renderPagination, searchData, toast, updateLowStockBadge } from './helpers.js'
 import { openPrintWindow } from './printLayout.js'
 import { fmtDate, fmtDateTime, now, peso, state, today } from './state.js'
 
@@ -180,7 +180,7 @@ export function renderTMCart() {
     const varOpts = variants.length ? `<select onchange="txCart[${i}].variantName=this.value" class="w-16 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs text-center">${variants.map((v,vi) => `<option value="${escapeHtml(v.name)}" ${item.variantName===v.name||vi===0?'selected':''}>${escapeHtml(v.name)}</option>`).join('')}</select>` : `<span class="text-gray-400 text-xs">${escapeHtml(item.variantName||'—')}</span>`;
     return `<tr class="border-b dark:border-gray-700">
       <td class="p-1 whitespace-nowrap text-center"><input type="date" value="${item.date || ''}" class="w-32 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs" onchange="txCart[${i}].date=this.value;updateCartRowAmt(${i});updateTMTotals()" /></td>
-      <td class="p-1"><input type="text" id="tx-desc-${i}" value="${escapeHtml(item.description)}" placeholder="Item..." oninput="txCart[${i}].description=this.value;showItemSuggestions(this,'tx',${i})" class="w-full px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs" /></td>
+      <td class="p-1">${invItem ? itemThumbHtml(invItem, 'w-6 h-6 inline-block align-middle mr-1') : ''}<input type="text" id="tx-desc-${i}" value="${escapeHtml(item.description)}" placeholder="Item..." oninput="txCart[${i}].description=this.value;showItemSuggestions(this,'tx',${i})" class="w-full px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs" /></td>
       <td class="p-1 text-center"><input type="text" id="tx-qty-${i}" value="${escapeHtml(item.name)}" placeholder="Qty" oninput="txCart[${i}].name=this.value;updateCartRowAmt(${i});updateTMTotals()" class="w-14 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs text-center" /></td>
       <td class="p-1 text-center">${varOpts}</td>
       <td class="p-1 text-right"><input type="number" id="tx-cost-${i}" value="${item.unitCost}" min="0" step="0.01" oninput="txCart[${i}].unitCost=Math.max(0,parseFloat(this.value)||0);updateCartRowAmt(${i});updateTMTotals()" class="w-16 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs text-right" /></td>
