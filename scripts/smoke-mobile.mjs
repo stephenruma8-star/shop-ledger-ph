@@ -32,7 +32,7 @@ const win = new Proxy({
   electronAPI: {
     generateMobileQR: async () => ({ url: 'http://192.168.1.50:3456?ws=3458&token=abc123xyz', qr: 'data:image/png;base64,FAKEQRDATA', token: 'abc123xyz', wsPort: 3458, tailscale: { url: 'http://100.76.155.97:3456?ws=3458&token=abc123xyz', qr: 'data:image/png;base64,FAKETSQR' } }),
     onShortcut: noop, onUpdateAvailable: noop, onUpdateNotAvailable: noop, onUpdateError: noop,
-    onUpdateDownloaded: noop, onLanUpdateSignal: noop, onConfirmExit: noop, onLanDataRefresh: noop,
+    onUpdateDownloaded: noop, onUpdateProgress: noop, onLanUpdateSignal: noop, onConfirmExit: noop, onLanDataRefresh: noop,
     onHiddenToTray: noop,
     sendSMS: async () => ({ success: true }),
   },

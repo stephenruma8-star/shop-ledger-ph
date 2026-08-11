@@ -66,6 +66,7 @@ const fakeDB = {
 const domListeners = {};
 const printed = [];
 let lanSignals = 0;
+let capturedUpdateProgress = null;
 const win = new Proxy({
   __app: {},
   location: { origin: 'http://localhost', href: 'http://localhost/index.html', search: '' },
@@ -76,7 +77,7 @@ const win = new Proxy({
     signalLanUpdate: () => { lanSignals++; },
     printReceipt: async (p) => { printed.push(p); },
     onShortcut: noop, onUpdateAvailable: noop, onUpdateNotAvailable: noop,
-    onUpdateError: noop, onUpdateDownloaded: noop, onLanUpdateSignal: noop,
+    onUpdateError: noop, onUpdateDownloaded: noop, onUpdateProgress: (cb) => { capturedUpdateProgress = cb; }, onLanUpdateSignal: noop,
     onConfirmExit: noop, onHiddenToTray: noop, onLanDataRefresh: noop,
     generateMobileQR: async () => ({ qr: '', url: '', tailscale: null }),
   },
@@ -267,6 +268,16 @@ try {
   const inv2c = await win.dbGet('inventory', invId2);
   eq(inv1c.stock, 6, 'item1 stock 7 -> 6');
   eq(inv2c.stock, 1, 'item2 stock 2 -> 1');
+
+  // --- update download progress modal (boot.js) ---
+  win.showUpdateProgress('Starting download…');
+  ok(document.getElementById('modal-root').innerHTML.includes('Downloading Update'), 'download progress modal shown');
+  ok(document.getElementById('modal-root').innerHTML.includes('update-progress-bar'), 'progress bar element present');
+  ok(typeof capturedUpdateProgress === 'function', 'main sends download-progress to renderer');
+  capturedUpdateProgress({ percent: 42, bytesPerSecond: 1048576, transferred: 10485760, total: 24956160 });
+  eq(getEl('update-progress-bar').style.width, '42%', 'progress bar reflects 42%');
+  eq(getEl('update-progress-text').textContent, 'Downloading… 42%', 'progress text shows 42%');
+  eq(getEl('update-progress-meta').textContent, '10.0 MB of 23.8 MB · 1.0 MB/s', 'progress meta shows transferred/total/speed');
 
   if (failures === 0) {
     console.log('QUICK CART FLOW OK: single sale + multi-item cart + SC/PWD + interest + paper sizes + client balance + stock + print all verified');

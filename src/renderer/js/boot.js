@@ -8,6 +8,30 @@ import { loadAll, navigate } from './router.js'
 import { state, today } from './state.js'
 import { renderTMCart, txCart, updateTMTotals } from './transactions.js'
 
+function _formatBytes(n) {
+  const v = Number(n) || 0;
+  if (v <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.min(Math.floor(Math.log(v) / Math.log(1024)), units.length - 1);
+  return (v / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1) + ' ' + units[i];
+}
+
+export function showUpdateProgress(msg = 'Starting download…') {
+  modal(`
+    <div class="p-6 w-[360px] max-w-full">
+      <div class="flex justify-between items-center mb-3"><h3 class="text-xl font-bold">Downloading Update</h3></div>
+      <div class="flex items-center gap-3 mb-3">
+        <svg class="animate-spin text-blue-600 shrink-0" width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" opacity="0.25"/><path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+        <span id="update-progress-text" class="text-sm text-gray-600 dark:text-gray-300">${escapeHtml(msg)}</span>
+      </div>
+      <div class="h-2.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+        <div id="update-progress-bar" class="h-full bg-gradient-to-r from-blue-600 to-indigo-600 transition-all duration-300" style="width:0%"></div>
+      </div>
+      <p id="update-progress-meta" class="text-xs text-gray-400 mt-2 min-h-[1em]"></p>
+      <div class="flex justify-end mt-3"><button onclick="closeModal()" class="px-3 py-1.5 text-xs border dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">Hide</button></div>
+    </div>`);
+}
+
 window.__app = window.__app || {};
 if (window.electronAPI) {
   window.__app.getDBDump = async () => {
@@ -36,7 +60,7 @@ if (window.electronAPI) {
         <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">Update Available</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
         <p class="text-gray-600 dark:text-gray-300 mb-4">Version <strong>${version}</strong> is ready to download.</p>
         <div class="flex gap-2">
-          <button onclick="localStorage.removeItem('updateRemindLater');window.electronAPI.downloadUpdate();closeModal()" class="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download Update</button>
+          <button onclick="localStorage.removeItem('updateRemindLater');window.electronAPI.downloadUpdate();closeModal();showUpdateProgress()" class="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download Update</button>
           <button onclick="localStorage.setItem('updateRemindLater',Date.now()+86400000);closeModal()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg">Later (24h)</button>
         </div>
       </div>`);
@@ -59,13 +83,26 @@ if (window.electronAPI) {
         </div>
       </div>`);
   });
+  window.electronAPI.onUpdateProgress((info) => {
+    const bar = document.getElementById('update-progress-bar');
+    const text = document.getElementById('update-progress-text');
+    const meta = document.getElementById('update-progress-meta');
+    if (!bar && !text && !meta) return;
+    const pct = Math.min(100, Math.max(0, Number(info.percent) || 0));
+    if (bar) bar.style.width = pct + '%';
+    if (text) text.textContent = `Downloading… ${Math.round(pct)}%`;
+    const speed = _formatBytes(info.bytesPerSecond) + '/s';
+    const transferred = _formatBytes(info.transferred);
+    const total = info.total ? _formatBytes(info.total) : '';
+    if (meta) meta.textContent = total ? `${transferred} of ${total} · ${speed}` : `${transferred} · ${speed}`;
+  });
   window.electronAPI.onLanUpdateSignal((info) => {
     modal(`
       <div class="p-6">
         <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">LAN Update Signal</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
         <p class="text-gray-600 dark:text-gray-300 mb-4">Update signaled by <strong>${escapeHtml(info.from)}</strong>${info.version ? ' (v'+escapeHtml(info.version)+')' : ''}. Check for updates now?</p>
         <div class="flex gap-2">
-          <button onclick="localStorage.removeItem('updateRemindLater');window.electronAPI.downloadUpdate();closeModal()" class="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download Update</button>
+          <button onclick="localStorage.removeItem('updateRemindLater');window.electronAPI.downloadUpdate();closeModal();showUpdateProgress()" class="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download Update</button>
           <button onclick="closeModal()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg">Later</button>
         </div>
       </div>`);
@@ -316,6 +353,7 @@ Object.defineProperties(window, {
   showMobileAccess: { get: () => showMobileAccess, configurable: true },
   copyMobileUrl: { get: () => copyMobileUrl, configurable: true },
   checkForNewBuild: { get: () => checkForNewBuild, configurable: true },
+  showUpdateProgress: { get: () => showUpdateProgress, configurable: true },
   boot: { get: () => boot, configurable: true },
   _loginParticleRAF: { get: () => _loginParticleRAF, set: (v) => { _loginParticleRAF = v; }, configurable: true },
   initLoginParticles: { get: () => initLoginParticles, configurable: true }

@@ -195,6 +195,15 @@ function setupAutoUpdater() {
   autoUpdater.on('update-downloaded', (info) => {
     mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-downloaded', info);
   });
+  autoUpdater.on('download-progress', (p) => {
+    if (mainWindow?.isDestroyed()) return;
+    mainWindow.webContents.send('update-progress', {
+      percent: Math.min(100, Math.max(0, Number(p && p.percent) || 0)),
+      bytesPerSecond: (p && p.bytesPerSecond) || 0,
+      transferred: (p && p.transferred) || 0,
+      total: (p && p.total) || 0
+    });
+  });
   autoUpdater.on('error', (err) => {
     console.error('Auto-update error:', err && err.message || err);
     mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-error', (err && err.message) || 'Update check failed');
