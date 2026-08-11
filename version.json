@@ -1,5 +1,5 @@
 {
-  "version": "3.4.27",
-  "buildDate": "2026-08-11T16:00:00.000Z",
-  "notes": "Version badge now shows the real installed app version (was stuck on lastBuildVersion, so it never changed after an auto-update). Update downloads show live progress (modal with percent + speed + transferred/total)."
+  "version": "3.4.28",
+  "buildDate": "2026-08-11T17:30:00.000Z",
+  "notes": "Mobile PWA rebuilt for a modern feel: every bottom-nav button opens its own full-screen sheet modal (title, subtitle, grabber, close) with the tab bar staying reachable; aligned buttons/text/icons with consistent 44px touch targets, tabular-nums money, equal-width nav tabs and safe-area insets so it fits phones properly; bottom-sheet Quick Sale and Manual Item modals (native prompt removed), switch-style toggles, status chips, skeleton loaders, blurred sticky header."
 }
