@@ -1,5 +1,5 @@
 {
-  "version": "3.4.21",
+  "version": "3.4.22",
   "buildDate": "2026-08-11T14:00:00.000Z",
-  "notes": "New Catalog view: every item shown as a photo tile with price and stock, tap a photo for a Quick Sale (qty, client, payment, discount) and print the receipt straight from the sale"
+  "notes": "Quick Sale now offers SC/PWD 20% discount with per-month interest, receipt paper-size selector, and an Add-to-Cart flow that lets you bundle many items into one receipt and one client balance"
 }
