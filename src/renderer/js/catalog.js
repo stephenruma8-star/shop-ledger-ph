@@ -419,7 +419,7 @@ async function sellItems(items, opts, printSize) {
   updateLowStockBadge();
   if (window.electronAPI) window.electronAPI.signalLanUpdate();
   closeModal();
-  if (toPrint && newId) await printTx(newId, printSize);
+  if (printSize && newId) await printTx(newId, printSize);
   return newId;
 }
 
