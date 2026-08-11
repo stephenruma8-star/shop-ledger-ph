@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="en-PH">
+<html lang="en-PH" class="dark">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
-<meta name="theme-color" content="#3b82f6" />
+<meta name="theme-color" content="#0f172a" />
+<meta name="description" content="Shop Ledger PH - Mobile companion for sari-sari stores" />
 <link rel="manifest" href="/manifest.webmanifest" />
 <link rel="icon" type="image/png" sizes="192x192" href="/assets/pwa-192.png" />
 <link rel="apple-touch-icon" href="/assets/pwa-192.png" />
@@ -13,52 +14,90 @@
 <meta name="apple-mobile-web-app-title" content="Shop Ledger" />
 <title>Shop Ledger PH</title>
 <script src="assets/vendor/tailwind.js"></script>
+<script type="module">tailwind.config={darkMode:'class',theme:{extend:{colors:{phblue:{50:'#eff6ff',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8'}}}}};</script>
 <style>
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f3f4f6}
-.nav-btn.active{color:#2563eb}
-.card-hover:active{transform:scale(.99)}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f172a;color:#f1f5f9}
+.fade-in{animation:fadeIn .2s ease-out}@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.slide-in{animation:slideIn .25s ease-out}@keyframes slideIn{from{transform:translateY(10px);opacity:0}to{transform:translateY(0);opacity:1}}
+.scale-in{animation:scaleIn .2s ease-out}@keyframes scaleIn{from{transform:scale(.95);opacity:0}to{transform:scale(1);opacity:1}}
+.glow{animation:glow 2s ease-in-out infinite alternate}@keyframes glow{from{box-shadow:0 0 4px rgba(59,130,246,.3)}to{box-shadow:0 0 12px rgba(59,130,246,.5)}}
+.text-glow{animation:textGlow 2s ease-in-out infinite alternate}@keyframes textGlow{from{text-shadow:0 0 4px rgba(59,130,246,.3)}to{text-shadow:0 0 12px rgba(59,130,246,.6),0 0 20px rgba(59,130,246,.2)}}
+.pulse-soft{animation:pulseSoft 2s ease-in-out infinite}@keyframes pulseSoft{0%,100%{opacity:1}50%{opacity:.7}}
+.shimmer{background:linear-gradient(90deg,transparent,rgba(255,255,255,.08),transparent);background-size:200% 100%;animation:shimmer 2s infinite}@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.card-hover{transition:transform .2s ease,box-shadow .2s ease}.card-hover:active{transform:scale(.99)}
+.login-bg{background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 50%,#1d4ed8 100%)}
+.glass{background:rgba(30,41,59,.88)!important;border:1px solid rgba(255,255,255,.08)!important}
+.glass-nav{background:rgba(15,23,42,.95)!important;border-right:1px solid rgba(255,255,255,.06)!important}
+.glass-header{background:rgba(15,23,42,.9)!important;border-bottom:1px solid rgba(255,255,255,.06)!important}
+.glass-card{background:rgba(30,41,59,.8)!important;border:1px solid rgba(255,255,255,.06)!important}
+.glass-input{background:rgba(30,41,59,.6)!important;border:1px solid rgba(255,255,255,.08)!important}
+.glass-input:focus{background:rgba(30,41,59,.75)!important;border-color:rgba(59,130,246,.5)!important}
+.btn-glass{background:rgba(37,99,235,.85)!important;border:1px solid rgba(59,130,246,.4)!important}
+.btn-glass:hover{background:rgba(37,99,235,.95)!important;border-color:rgba(59,130,246,.6)!important}
+.stat-card{background:rgba(30,41,59,.8)!important;border:1px solid rgba(255,255,255,.06)!important}
+.nav-btn.active{background:rgba(59,130,246,.18)!important;color:#60a5fa!important}
+.bnav-btn.active{color:#60a5fa!important}
+.bnav-btn.active::before{content:'';position:absolute;top:-1px;left:50%;transform:translateX(-50%);width:24px;height:3px;border-radius:9999px;background:#3b82f6;box-shadow:0 0 8px rgba(59,130,246,.7)}
+.conn-online{color:#22c55e}.conn-offline{color:#ef4444}.conn-checking{color:#f59e0b;animation:connPulse 1.2s ease-in-out infinite}
+@keyframes connPulse{0%,100%{opacity:1}50%{opacity:.45}}
 @keyframes slideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}
 .sheet{animation:slideUp .25s ease}
 ::-webkit-scrollbar{width:0;height:0}
+body{background-image:radial-gradient(ellipse 80% 50% at 50% -20%,rgba(59,130,246,.15),transparent),radial-gradient(ellipse 60% 40% at 90% 110%,rgba(29,78,216,.12),transparent)}
 </style>
 </head>
-<body class="min-h-screen">
-<header class="bg-blue-600 text-white px-4 py-3 sticky top-0 z-20 shadow-md">
+<body class="bg-gray-900 text-gray-100 min-h-screen">
+
+<div id="loading-screen" class="fixed inset-0 z-[300] login-bg flex items-center justify-center">
+  <div class="text-center text-white fade-in">
+    <div class="mb-4 text-glow"><svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></div>
+    <div class="text-xl font-semibold mb-2">Shop Ledger PH</div>
+    <div class="text-sm opacity-80 mb-4">Connecting to store...</div>
+    <div class="w-48 h-1.5 bg-white/20 rounded-full mx-auto overflow-hidden"><div class="w-full h-full bg-white rounded-full shimmer"></div></div>
+  </div>
+</div>
+
+<header class="glass-header sticky top-0 z-20 px-4 py-3">
   <div class="max-w-5xl mx-auto flex items-center justify-between">
-    <div class="flex items-center gap-2">
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
-      <div><h1 class="text-lg font-bold leading-tight">Shop Ledger PH</h1><p id="conn-status" class="text-[10px] text-white/80 leading-none">● Connected</p></div>
+    <div class="flex items-center gap-2.5">
+      <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="text-glow shrink-0"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+      <div>
+        <h1 class="text-lg font-bold leading-tight text-glow">Shop Ledger PH</h1>
+        <p class="text-[10px] leading-none flex items-center gap-1"><span id="conn-dot" class="w-1.5 h-1.5 rounded-full bg-green-400 inline-block"></span><span id="conn-status" class="text-gray-300">● Connected</span></p>
+      </div>
     </div>
     <div class="flex items-center gap-2">
-      <button onclick="showView('sale')" class="relative bg-white text-blue-600 text-xs font-bold px-3 py-1.5 rounded-lg shadow" id="cart-btn">🛒 <span id="cart-count">0</span></button>
-      <button onclick="showView('home')" class="bg-white/15 hover:bg-white/25 text-xs font-semibold px-3 py-1.5 rounded-lg">Refresh</button>
+      <button onclick="showView('sale')" class="relative btn-glass text-white text-xs font-bold px-3 py-2 rounded-lg shadow-lg flex items-center gap-1.5" id="cart-btn"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg><span id="cart-count">0</span></button>
+      <button onclick="showView('home')" class="bg-white/10 hover:bg-white/20 text-xs font-semibold px-3 py-2 rounded-lg border border-white/10" title="Refresh"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
     </div>
   </div>
 </header>
 
-<div class="max-w-5xl mx-auto p-3 sm:p-4 pb-24 md:pb-6">
-  <nav id="tabnav" class="hidden md:flex gap-1 flex-wrap mb-3 bg-white rounded-xl shadow-sm p-1">
-    <button data-nav="home" onclick="showView('home')" class="nav-btn flex-1 min-w-[90px] text-sm font-semibold px-3 py-2 rounded-lg hover:bg-gray-100">🏠 Dashboard</button>
-    <button data-nav="catalog" onclick="showView('catalog')" class="nav-btn flex-1 min-w-[90px] text-sm font-semibold px-3 py-2 rounded-lg hover:bg-gray-100">🛍️ Catalog</button>
-    <button data-nav="clients" onclick="showView('clients')" class="nav-btn flex-1 min-w-[90px] text-sm font-semibold px-3 py-2 rounded-lg hover:bg-gray-100">👥 Clients</button>
-    <button data-nav="sale" onclick="showView('sale')" class="nav-btn flex-1 min-w-[90px] text-sm font-semibold px-3 py-2 rounded-lg hover:bg-gray-100">➕ New Sale</button>
-    <button data-nav="pay" onclick="showView('pay')" class="nav-btn flex-1 min-w-[90px] text-sm font-semibold px-3 py-2 rounded-lg hover:bg-gray-100">💵 Bayad</button>
-    <button data-nav="inventory" onclick="showView('inventory')" class="nav-btn flex-1 min-w-[90px] text-sm font-semibold px-3 py-2 rounded-lg hover:bg-gray-100">📦 Inventory</button>
-    <button data-nav="transactions" onclick="showView('transactions')" class="nav-btn flex-1 min-w-[90px] text-sm font-semibold px-3 py-2 rounded-lg hover:bg-gray-100">🧾 Sales</button>
+<div class="max-w-5xl mx-auto p-3 sm:p-4 pb-28 md:pb-6">
+  <nav id="tabnav" class="hidden md:flex gap-1 flex-wrap mb-3 glass rounded-xl p-1.5">
+    <button data-nav="home" onclick="showView('home')" class="nav-btn flex-1 min-w-[90px] text-sm font-semibold px-3 py-2 rounded-lg hover:bg-gray-700/40 flex items-center justify-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Dashboard</button>
+    <button data-nav="catalog" onclick="showView('catalog')" class="nav-btn flex-1 min-w-[90px] text-sm font-semibold px-3 py-2 rounded-lg hover:bg-gray-700/40 flex items-center justify-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Catalog</button>
+    <button data-nav="clients" onclick="showView('clients')" class="nav-btn flex-1 min-w-[90px] text-sm font-semibold px-3 py-2 rounded-lg hover:bg-gray-700/40 flex items-center justify-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Clients</button>
+    <button data-nav="sale" onclick="showView('sale')" class="nav-btn flex-1 min-w-[90px] text-sm font-semibold px-3 py-2 rounded-lg hover:bg-gray-700/40 flex items-center justify-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>New Sale</button>
+    <button data-nav="pay" onclick="showView('pay')" class="nav-btn flex-1 min-w-[90px] text-sm font-semibold px-3 py-2 rounded-lg hover:bg-gray-700/40 flex items-center justify-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>Bayad</button>
+    <button data-nav="inventory" onclick="showView('inventory')" class="nav-btn flex-1 min-w-[90px] text-sm font-semibold px-3 py-2 rounded-lg hover:bg-gray-700/40 flex items-center justify-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>Inventory</button>
+    <button data-nav="transactions" onclick="showView('transactions')" class="nav-btn flex-1 min-w-[90px] text-sm font-semibold px-3 py-2 rounded-lg hover:bg-gray-700/40 flex items-center justify-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Sales</button>
   </nav>
-  <main id="view"></main>
+  <main id="view" class="slide-in"></main>
 </div>
 
-<nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t flex shadow-lg z-20">
-  <button data-nav="home" onclick="showView('home')" class="nav-btn flex-1 py-2 text-center text-[10px] font-medium"><div class="text-xl">🏠</div>Home</button>
-  <button data-nav="catalog" onclick="showView('catalog')" class="nav-btn flex-1 py-2 text-center text-[10px] font-medium"><div class="text-xl">🛍️</div>Catalog</button>
-  <button data-nav="sale" onclick="showView('sale')" class="nav-btn flex-1 py-2 text-center text-[10px] font-medium"><div class="text-xl bg-blue-600 text-white w-10 h-10 rounded-full mx-auto -mt-5 flex items-center justify-center shadow-lg relative"><span id="cart-badge" class="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] w-4 h-4 rounded-full hidden items-center justify-center">0</span>🛒</div>Sale</button>
-  <button data-nav="pay" onclick="showView('pay')" class="nav-btn flex-1 py-2 text-center text-[10px] font-medium"><div class="text-xl">💵</div>Bayad</button>
-  <button data-nav="clients" onclick="showView('clients')" class="nav-btn flex-1 py-2 text-center text-[10px] font-medium"><div class="text-xl">👥</div>Clients</button>
+<nav class="md:hidden fixed bottom-0 left-0 right-0 glass-nav border-t border-white/10 flex z-20 pb-[env(safe-area-inset-bottom)]">
+  <button data-nav="home" onclick="showView('home')" class="bnav-btn relative flex-1 py-2.5 text-center text-[10px] font-medium text-gray-400"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-0.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Home</button>
+  <button data-nav="catalog" onclick="showView('catalog')" class="bnav-btn relative flex-1 py-2.5 text-center text-[10px] font-medium text-gray-400"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-0.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Catalog</button>
+  <button data-nav="sale" onclick="showView('sale')" class="bnav-btn relative flex-1 pt-1 text-center text-[10px] font-medium text-gray-400">
+    <span class="relative mx-auto w-12 h-12 -mt-5 rounded-full btn-glass border-white/20 flex items-center justify-center shadow-lg glow"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg><span id="cart-badge" class="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] w-4 h-4 rounded-full hidden items-center justify-center font-bold">0</span></span>Sale
+  </button>
+  <button data-nav="pay" onclick="showView('pay')" class="bnav-btn relative flex-1 py-2.5 text-center text-[10px] font-medium text-gray-400"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-0.5"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>Bayad</button>
+  <button data-nav="clients" onclick="showView('clients')" class="bnav-btn relative flex-1 py-2.5 text-center text-[10px] font-medium text-gray-400"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-0.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Clients</button>
 </nav>
 
 <div id="modal-root"></div>
-<div id="toast-root" class="fixed top-14 left-1/2 -translate-x-1/2 z-50 space-y-2 w-[92%] max-w-sm"></div>
+<div id="toast-root" class="fixed top-16 left-1/2 -translate-x-1/2 z-50 space-y-2 w-[92%] max-w-sm"></div>
 
 <script>
 const API = window.location.origin;
@@ -87,7 +126,7 @@ const HDR = () => ({ 'X-Auth-Token': getToken() });
 function toast(msg, type) {
   const root = document.getElementById('toast-root');
   const el = document.createElement('div');
-  el.className = (type === 'err' ? 'bg-red-600' : type === 'ok' ? 'bg-green-600' : 'bg-blue-600') + ' text-white text-sm px-4 py-3 rounded-xl shadow-lg';
+  el.className = (type === 'err' ? 'bg-red-600' : type === 'ok' ? 'bg-green-600' : 'bg-blue-600') + ' text-white text-sm px-4 py-3 rounded-xl shadow-xl border border-white/10 slide-in';
   el.textContent = msg;
   root.appendChild(el);
   setTimeout(() => { el.style.transition = 'opacity .3s'; el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 2600);
@@ -123,6 +162,8 @@ async function loadClients() {
 function setConn(ok) {
   const el = document.getElementById('conn-status');
   if (el) el.textContent = ok ? '● Live' : '⚠ Offline — pulling latest data...';
+  const dot = document.getElementById('conn-dot');
+  if (dot) { dot.className = 'w-1.5 h-1.5 rounded-full inline-block ' + (ok ? 'bg-green-400' : 'bg-red-500'); }
 }
 
 // ---------- WebSocket live updates ----------
@@ -176,52 +217,52 @@ function updateCartUI() {
 // ---------- HOME ----------
 async function renderHome() {
   const v = document.getElementById('view');
-  v.innerHTML = '<div class="text-center text-gray-400 py-16">Loading dashboard...</div>';
+  v.innerHTML = '<div class="text-center text-gray-400 py-16 fade-in"><div class="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>Loading dashboard...</div>';
   if (!data.stats) await loadAll();
   const s = data.stats || {};
   const lowStockTop = data.inventory.filter(i => (i.stock || 0) <= (i.lowStock || 5)).sort((a, b) => a.stock - b.stock).slice(0, 4);
   const recent = (s.recent || []).slice(0, 4);
   v.innerHTML = `
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
-      <div class="bg-white p-3 sm:p-4 rounded-xl shadow-sm card-hover hover:ring-2 hover:ring-green-500/40">
-        <div class="text-xs text-gray-500">Today's Sales</div>
-        <div class="text-xl md:text-2xl font-bold text-green-600">${peso(s.todaySales)}</div>
-        <div class="text-[11px] text-orange-600 font-medium">Profit ${peso(s.todayProfit)}</div>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 fade-in">
+      <div class="stat-card p-3 sm:p-4 rounded-xl card-hover hover:ring-2 hover:ring-green-500/40">
+        <div class="text-xs text-gray-400">Today's Sales</div>
+        <div class="text-xl md:text-2xl font-bold text-green-400">${peso(s.todaySales)}</div>
+        <div class="text-[11px] text-orange-400 font-medium">Profit ${peso(s.todayProfit)}</div>
       </div>
-      <div class="bg-white p-3 sm:p-4 rounded-xl shadow-sm card-hover hover:ring-2 hover:ring-red-500/40">
-        <div class="text-xs text-gray-500">Total Utang</div>
-        <div class="text-xl md:text-2xl font-bold text-orange-600">${peso(s.totalUtang)}</div>
-        <div class="text-[11px] text-green-600 font-medium">Collected ${peso(s.todayCollected)}</div>
+      <div class="stat-card p-3 sm:p-4 rounded-xl card-hover hover:ring-2 hover:ring-red-500/40">
+        <div class="text-xs text-gray-400">Total Utang</div>
+        <div class="text-xl md:text-2xl font-bold text-orange-400">${peso(s.totalUtang)}</div>
+        <div class="text-[11px] text-green-400 font-medium">Collected ${peso(s.todayCollected)}</div>
       </div>
-      <div class="bg-white p-3 sm:p-4 rounded-xl shadow-sm card-hover hover:ring-2 hover:ring-blue-500/40">
-        <div class="text-xs text-gray-500">Month Sales</div>
-        <div class="text-xl md:text-2xl font-bold text-blue-600">${peso(s.monthSales)}</div>
-        <div class="text-[11px] text-red-500 font-medium">Expenses ${peso(s.monthExpenses)}</div>
+      <div class="stat-card p-3 sm:p-4 rounded-xl card-hover hover:ring-2 hover:ring-blue-500/40">
+        <div class="text-xs text-gray-400">Month Sales</div>
+        <div class="text-xl md:text-2xl font-bold text-blue-400">${peso(s.monthSales)}</div>
+        <div class="text-[11px] text-red-400 font-medium">Expenses ${peso(s.monthExpenses)}</div>
       </div>
-      <div class="bg-white p-3 sm:p-4 rounded-xl shadow-sm card-hover cursor-pointer hover:ring-2 hover:ring-amber-500/40" onclick="showView('inventory')">
-        <div class="text-xs text-gray-500">Low Stock</div>
-        <div class="text-xl md:text-2xl font-bold ${s.lowStockCount > 0 ? 'text-amber-600' : 'text-green-600'}">${s.lowStockCount}</div>
-        <div class="text-[11px] text-gray-400">items to restock</div>
+      <div class="stat-card p-3 sm:p-4 rounded-xl card-hover cursor-pointer hover:ring-2 hover:ring-amber-500/40" onclick="showView('inventory')">
+        <div class="text-xs text-gray-400">Low Stock</div>
+        <div class="text-xl md:text-2xl font-bold ${s.lowStockCount > 0 ? 'text-amber-400' : 'text-green-400'}">${s.lowStockCount}</div>
+        <div class="text-[11px] text-gray-500">items to restock</div>
       </div>
     </div>
 
     <div class="grid md:grid-cols-2 gap-3 mt-3">
-      <div class="bg-white rounded-xl shadow-sm p-3">
-        <div class="flex justify-between items-center mb-2"><h3 class="font-bold text-sm">⚠️ Low Stock</h3><button onclick="showView('inventory')" class="text-xs text-blue-600">View all →</button></div>
+      <div class="glass-card rounded-xl p-3">
+        <div class="flex justify-between items-center mb-2"><h3 class="font-bold text-sm text-gray-200 flex items-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>Low Stock</h3><button onclick="showView('inventory')" class="text-xs text-blue-400 hover:text-blue-300">View all →</button></div>
         ${lowStockTop.length ? lowStockTop.map(i => `
-          <div class="flex items-center gap-2 py-1.5 border-b last:border-0">
-            <span class="w-8 h-8 rounded overflow-hidden flex items-center justify-center bg-gray-100 shrink-0">${i.image ? '<img src="' + i.image + '" class="w-full h-full object-cover" />' : '<span class="text-base">📦</span>'}</span>
-            <div class="flex-1 min-w-0"><div class="text-sm font-medium truncate">${esc(i.name)}</div><div class="text-[11px] ${i.stock <= 0 ? 'text-red-600 font-semibold' : 'text-amber-600'}">${i.stock <= 0 ? 'Out of stock' : i.stock + ' left'}</div></div>
-            <button onclick="openQuick(${i.id})" class="text-xs px-2.5 py-1.5 bg-blue-600 text-white rounded-lg">Sell</button>
-          </div>`).join('') : '<p class="text-sm text-gray-400 text-center py-6">✅ All stocked up</p>'}
+          <div class="flex items-center gap-2 py-1.5 border-b border-white/5 last:border-0">
+            <span class="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center bg-gray-800 shrink-0 border border-white/10">${i.image ? '<img src="' + i.image + '" class="w-full h-full object-cover" />' : '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>'}</span>
+            <div class="flex-1 min-w-0"><div class="text-sm font-medium truncate text-gray-200">${esc(i.name)}</div><div class="text-[11px] ${i.stock <= 0 ? 'text-red-400 font-semibold' : 'text-amber-400'}">${i.stock <= 0 ? 'Out of stock' : i.stock + ' left'}</div></div>
+            <button onclick="openQuick(${i.id})" class="text-xs px-2.5 py-1.5 btn-glass text-white rounded-lg shadow">Sell</button>
+          </div>`).join('') : '<p class="text-sm text-gray-500 text-center py-6">✅ All stocked up</p>'}
       </div>
-      <div class="bg-white rounded-xl shadow-sm p-3">
-        <div class="flex justify-between items-center mb-2"><h3 class="font-bold text-sm">🧾 Recent Sales</h3><button onclick="showView('transactions')" class="text-xs text-blue-600">View all →</button></div>
+      <div class="glass-card rounded-xl p-3">
+        <div class="flex justify-between items-center mb-2"><h3 class="font-bold text-sm text-gray-200 flex items-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Recent Sales</h3><button onclick="showView('transactions')" class="text-xs text-blue-400 hover:text-blue-300">View all →</button></div>
         ${recent.length ? recent.map(t => `
-          <div class="flex items-center justify-between py-1.5 border-b last:border-0">
-            <div><div class="text-sm font-medium">${esc(t.clientName || 'Walk-in')}</div><div class="text-[11px] text-gray-400">${esc(t.invoiceNo)} · ${fmtDate(t.date)}</div></div>
-            <div class="text-sm font-bold">${peso(t.grandTotal)}</div>
-          </div>`).join('') : '<p class="text-sm text-gray-400 text-center py-6">No sales yet</p>'}
+          <div class="flex items-center justify-between py-1.5 border-b border-white/5 last:border-0">
+            <div><div class="text-sm font-medium text-gray-200">${esc(t.clientName || 'Walk-in')}</div><div class="text-[11px] text-gray-500">${esc(t.invoiceNo)} · ${fmtDate(t.date)}</div></div>
+            <div class="text-sm font-bold text-green-400">${peso(t.grandTotal)}</div>
+          </div>`).join('') : '<p class="text-sm text-gray-500 text-center py-6">No sales yet</p>'}
       </div>
     </div>`;
 }
@@ -229,31 +270,32 @@ async function renderHome() {
 // ---------- CLIENTS ----------
 async function renderClients() {
   const v = document.getElementById('view');
-  v.innerHTML = '<div class="text-center text-gray-400 py-16">Loading clients...</div>';
+  v.innerHTML = '<div class="text-center text-gray-400 py-16 fade-in"><div class="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>Loading clients...</div>';
   if (!data.clients.length) await loadClients();
   const total = data.clients.reduce((s, c) => s + (c.balance || 0), 0);
   v.innerHTML = `
-    <div class="bg-white rounded-xl shadow-sm p-3 mb-3">
-      <div class="flex items-center justify-between">
-        <div class="text-sm text-gray-500">Total clients</div><div class="text-lg font-bold text-blue-600">${data.clients.length}</div>
+    <div class="glass-card rounded-xl p-3 mb-3 fade-in">
+      <div class="grid grid-cols-2 gap-2 text-center">
+        <div class="stat-card p-3 rounded-xl"><div class="text-sm text-gray-400">Total clients</div><div class="text-lg font-bold text-blue-400">${data.clients.length}</div></div>
+        <div class="stat-card p-3 rounded-xl"><div class="text-sm text-gray-400">Total utang</div><div class="text-lg font-bold text-orange-400">${peso(total)}</div></div>
       </div>
-      <div class="flex items-center justify-between mt-1">
-        <div class="text-sm text-gray-500">Total utang</div><div class="text-lg font-bold text-orange-600">${peso(total)}</div>
+      <div class="relative mt-3">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="search" type="text" placeholder="Search clients..." oninput="filterClients(this.value)" class="w-full pl-10 pr-4 py-3 rounded-xl glass-input text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
       </div>
-      <input id="search" type="text" placeholder="🔍 Search clients..." oninput="filterClients(this.value)" class="mt-3 w-full px-4 py-3 rounded-xl border bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
     </div>
-    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3" id="client-grid">${clientListHTML(data.clients)}</div>`;
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 fade-in" id="client-grid">${clientListHTML(data.clients)}</div>`;
 }
 function clientListHTML(clients) {
   return clients.map(c => `
-    <div class="bg-white p-3 rounded-xl shadow-sm flex items-center justify-between card-hover">
+    <div class="glass-card p-3 rounded-xl flex items-center justify-between card-hover">
       <div class="min-w-0">
-        <div class="font-semibold text-sm truncate">${esc(c.name)}</div>
+        <div class="font-semibold text-sm text-gray-200 truncate">${esc(c.name)}</div>
         <div class="text-xs text-gray-500">${esc(c.phone || '—')}</div>
       </div>
       <div class="flex items-center gap-2 shrink-0">
-        <div class="font-bold text-sm ${c.balance <= 0 ? 'text-green-600' : 'text-orange-600'}">${peso(c.balance)}</div>
-        <button onclick="showView('pay', ${c.id})" class="text-xs px-2.5 py-1.5 bg-green-600 text-white rounded-lg">Bayad</button>
+        <div class="font-bold text-sm ${c.balance <= 0 ? 'text-green-400' : 'text-orange-400'}">${peso(c.balance)}</div>
+        <button onclick="showView('pay', ${c.id})" class="text-xs px-2.5 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-500">Bayad</button>
       </div>
     </div>`).join('');
 }
@@ -269,12 +311,15 @@ function renderCatalog(q) {
   const query = (q == null ? '' : q).toLowerCase();
   const items = data.inventory.filter(i => !query || (i.name || '').toLowerCase().includes(query));
   v.innerHTML = `
-    <div class="flex items-center gap-2 mb-3">
-      <input id="cat-search" type="text" placeholder="🔍 Search items..." value="${esc(query)}" oninput="searchCatalog(this.value)" class="flex-1 px-4 py-2.5 rounded-xl border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-      <span class="text-xs text-gray-400 whitespace-nowrap">${items.length} item${items.length === 1 ? '' : 's'}</span>
+    <div class="flex items-center gap-2 mb-3 fade-in">
+      <div class="relative flex-1">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="cat-search" type="text" placeholder="Search items..." value="${esc(query)}" oninput="searchCatalog(this.value)" class="w-full pl-10 pr-4 py-2.5 rounded-xl glass-input text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+      <span class="text-xs text-gray-500 whitespace-nowrap px-2 py-1 glass rounded-full">${items.length} item${items.length === 1 ? '' : 's'}</span>
     </div>
     ${items.length ? `
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 fade-in">
       ${items.map((i, idx) => {
         const stock = i.stock || 0;
         const badge = stock <= 0
@@ -283,19 +328,19 @@ function renderCatalog(q) {
             ? '<span class="absolute top-1.5 left-1.5 bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">LOW</span>'
             : '';
         return `
-        <button onclick="openQuick(${i.id}, ${idx})" class="bg-white rounded-xl shadow-sm overflow-hidden text-left card-hover hover:ring-2 hover:ring-blue-500/40 relative">
+        <button onclick="openQuick(${i.id}, ${idx})" class="glass-card rounded-xl overflow-hidden text-left card-hover hover:ring-2 hover:ring-blue-500/50 relative">
           ${badge}
-          <div class="h-24 sm:h-28 bg-gray-100 flex items-center justify-center overflow-hidden">
-            ${i.image ? '<img src="' + i.image + '" alt="' + esc(i.name) + '" class="w-full h-full object-cover" />' : '<span class="text-4xl">📦</span>'}
+          <div class="h-24 sm:h-28 bg-gray-800/70 flex items-center justify-center overflow-hidden">
+            ${i.image ? '<img src="' + i.image + '" alt="' + esc(i.name) + '" class="w-full h-full object-cover" />' : '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>'}
           </div>
           <div class="p-2">
-            <div class="font-medium text-xs sm:text-sm truncate">${esc(i.name)}</div>
-            <div class="text-green-600 font-bold text-sm">${peso(i.price)}</div>
-            <div class="text-[10px] ${stock <= 0 ? 'text-red-600 font-semibold' : stock <= (i.lowStock || 5) ? 'text-amber-600' : 'text-gray-500'}">${stock <= 0 ? 'Out of stock' : stock + ' in stock'}</div>
+            <div class="font-medium text-xs sm:text-sm truncate text-gray-200">${esc(i.name)}</div>
+            <div class="text-green-400 font-bold text-sm">${peso(i.price)}</div>
+            <div class="text-[10px] ${stock <= 0 ? 'text-red-400 font-semibold' : stock <= (i.lowStock || 5) ? 'text-amber-400' : 'text-gray-500'}">${stock <= 0 ? 'Out of stock' : stock + ' in stock'}</div>
           </div>
         </button>`;
       }).join('')}
-    </div>` : '<div class="text-center text-gray-400 py-16">' + (query ? 'No items match your search' : 'No items yet') + '</div>'}`;
+    </div>` : '<div class="text-center text-gray-500 py-16 fade-in">' + (query ? 'No items match your search' : 'No items yet') + '</div>'}`;
 }
 function searchCatalog(q) { renderCatalog(q); }
 
@@ -309,29 +354,33 @@ function openQuick(id, idx) {
   const existing = cart.find(c => c.invId === id);
   const qty = existing ? existing.qty : 1;
   document.getElementById('modal-root').innerHTML = `
-    <div class="fixed inset-0 bg-black/50 z-40 flex items-end sm:items-center justify-center" onclick="if(event.target===this)closeQuick()">
-      <div class="sheet bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md shadow-2xl p-4" onclick="event.stopPropagation()">
+    <div class="fixed inset-0 bg-black/70 z-40 flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
+      <div class="sheet glass bg-gray-900/95 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md shadow-2xl p-4 border-t border-white/10 sm:border" onclick="event.stopPropagation()">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-bold text-gray-100 text-sm uppercase tracking-wide text-gray-400">Quick Sale</h3>
+          <button onclick="closeQuick()" class="p-1.5 rounded-lg hover:bg-gray-700/50 text-gray-400"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        </div>
         <div class="flex gap-3 items-center">
-          <div class="w-16 h-16 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center shrink-0">${item.image ? '<img src="' + item.image + '" class="w-full h-full object-cover" />' : '<span class="text-3xl">📦</span>'}</div>
+          <div class="w-16 h-16 rounded-xl overflow-hidden bg-gray-800 flex items-center justify-center shrink-0 border border-white/10">${item.image ? '<img src="' + item.image + '" class="w-full h-full object-cover" />' : '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>'}</div>
           <div class="flex-1 min-w-0">
-            <div class="font-bold truncate">${esc(item.name)}</div>
-            <div class="text-green-600 font-bold text-lg">${peso(item.price)}</div>
-            <div class="text-[11px] ${stock <= (item.lowStock || 5) ? 'text-amber-600' : 'text-gray-500'}">${stock} in stock</div>
+            <div class="font-bold text-gray-100 truncate">${esc(item.name)}</div>
+            <div class="text-green-400 font-bold text-lg">${peso(item.price)}</div>
+            <div class="text-[11px] ${stock <= (item.lowStock || 5) ? 'text-amber-400' : 'text-gray-500'}">${stock} in stock</div>
           </div>
         </div>
         <div class="flex items-center justify-between mt-4">
           <div class="flex items-center gap-2">
-            <button onclick="quickStep(-1, ${id})" class="w-10 h-10 rounded-xl border text-xl font-bold hover:bg-gray-100">−</button>
-            <span id="q-qty" class="w-10 text-center text-lg font-bold">${qty}</span>
-            <button onclick="quickStep(1, ${id})" class="w-10 h-10 rounded-xl border text-xl font-bold hover:bg-gray-100">+</button>
+            <button onclick="quickStep(-1, ${id})" class="w-10 h-10 rounded-xl glass-input text-xl font-bold hover:bg-gray-700 text-gray-200">−</button>
+            <span id="q-qty" class="w-10 text-center text-lg font-bold text-gray-100">${qty}</span>
+            <button onclick="quickStep(1, ${id})" class="w-10 h-10 rounded-xl glass-input text-xl font-bold hover:bg-gray-700 text-gray-200">+</button>
           </div>
-          <div class="text-right"><div class="text-xs text-gray-400">Subtotal</div><div class="text-xl font-bold text-green-600" id="q-sub">${peso(item.price * qty)}</div></div>
+          <div class="text-right"><div class="text-xs text-gray-500">Subtotal</div><div class="text-xl font-bold text-green-400" id="q-sub">${peso(item.price * qty)}</div></div>
         </div>
         <div class="grid grid-cols-2 gap-2 mt-4">
-          <button onclick="quickAdd(${id})" class="py-3 bg-blue-600 text-white rounded-xl font-semibold">🛒 Add to Cart</button>
-          <button onclick="quickSell(${id})" class="py-3 bg-green-600 text-white rounded-xl font-semibold">Sell Now</button>
+          <button onclick="quickAdd(${id})" class="py-3 btn-glass text-white rounded-xl font-semibold shadow-lg flex items-center justify-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>Add to Cart</button>
+          <button onclick="quickSell(${id})" class="py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-semibold shadow-lg flex items-center justify-center gap-1.5">Sell Now</button>
         </div>
-        <button onclick="closeQuick()" class="w-full mt-2 py-2 text-gray-500 text-sm">Close</button>
+        <button onclick="closeQuick()" class="w-full mt-2 py-2 text-gray-500 text-sm hover:text-gray-300">Close</button>
       </div>
     </div>`;
 }
@@ -378,46 +427,46 @@ function renderSale() {
   const v = document.getElementById('view');
   const sub = cart.reduce((s, i) => s + i.qty * i.price, 0);
   v.innerHTML = `
-    <div class="flex items-center justify-between mb-3">
-      <h2 class="text-xl font-bold">🛒 New Sale</h2>
-      <button onclick="showView('catalog')" class="text-sm px-3 py-2 bg-blue-600 text-white rounded-lg shadow">＋ Add Items</button>
+    <div class="flex items-center justify-between mb-3 fade-in">
+      <h2 class="text-xl font-bold text-gray-100 flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>New Sale</h2>
+      <button onclick="showView('catalog')" class="text-sm px-3 py-2 btn-glass text-white rounded-lg shadow flex items-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Items</button>
     </div>
-    <div class="bg-white rounded-xl shadow-sm p-3 mb-3">
+    <div class="glass-card rounded-xl p-3 mb-3 fade-in">
       ${cart.length ? cart.map((i, idx) => `
-        <div class="flex items-center gap-2 py-2 border-b last:border-0">
-          <span class="w-8 h-8 rounded overflow-hidden flex items-center justify-center bg-gray-100 shrink-0">${itemById(i.invId) && itemById(i.invId).image ? '<img src="' + itemById(i.invId).image + '" class="w-full h-full object-cover" />' : '<span class="text-base">📦</span>'}</span>
+        <div class="flex items-center gap-2 py-2 border-b border-white/5 last:border-0">
+          <span class="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center bg-gray-800 shrink-0 border border-white/10">${itemById(i.invId) && itemById(i.invId).image ? '<img src="' + itemById(i.invId).image + '" class="w-full h-full object-cover" />' : '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>'}</span>
           <div class="flex-1 min-w-0">
-            <div class="text-sm font-medium truncate">${esc(i.name)}</div>
-            <div class="text-[11px] text-gray-400">${peso(i.price)} each</div>
+            <div class="text-sm font-medium truncate text-gray-200">${esc(i.name)}</div>
+            <div class="text-[11px] text-gray-500">${peso(i.price)} each</div>
           </div>
           <div class="flex items-center gap-1">
-            <button onclick="cartStep(${idx},-1)" class="w-7 h-7 rounded-lg border font-bold hover:bg-gray-100">−</button>
-            <span class="w-7 text-center text-sm font-bold">${i.qty}</span>
-            <button onclick="cartStep(${idx},1)" class="w-7 h-7 rounded-lg border font-bold hover:bg-gray-100">+</button>
+            <button onclick="cartStep(${idx},-1)" class="w-7 h-7 rounded-lg glass-input font-bold hover:bg-gray-700 text-gray-200">−</button>
+            <span class="w-7 text-center text-sm font-bold text-gray-100">${i.qty}</span>
+            <button onclick="cartStep(${idx},1)" class="w-7 h-7 rounded-lg glass-input font-bold hover:bg-gray-700 text-gray-200">+</button>
           </div>
-          <div class="text-sm font-bold w-16 text-right">${peso(i.qty * i.price)}</div>
-          <button onclick="cartRemove(${idx})" class="text-red-500 text-xs px-1">✕</button>
+          <div class="text-sm font-bold w-16 text-right text-gray-100">${peso(i.qty * i.price)}</div>
+          <button onclick="cartRemove(${idx})" class="text-red-400 hover:text-red-300 text-xs px-1"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
         </div>`).join('')
-      : '<p class="text-center text-gray-400 py-8">Cart is empty — add items from the Catalog or <button class="text-blue-600 underline" onclick="manualItem()">add a manual item</button></p>'}
+      : '<p class="text-center text-gray-500 py-8">Cart is empty — add items from the Catalog or <button class="text-blue-400 underline" onclick="manualItem()">add a manual item</button></p>'}
     </div>
-    <div class="bg-white rounded-xl shadow-sm p-3 space-y-3">
-      <div class="flex justify-between text-sm text-gray-500"><span>Subtotal</span><span id="sale-sub">${peso(sub)}</span></div>
+    <div class="glass-card rounded-xl p-3 space-y-3 fade-in">
+      <div class="flex justify-between text-sm text-gray-400"><span>Subtotal</span><span class="text-gray-200" id="sale-sub">${peso(sub)}</span></div>
       <div class="grid grid-cols-2 gap-2">
         <div><label class="text-xs text-gray-500 block mb-1">Client</label>
-          <select id="sale-client" class="w-full px-3 py-2.5 border rounded-xl text-sm bg-white">${clientOptions()}</select>
+          <select id="sale-client" class="w-full px-3 py-2.5 rounded-xl glass-input text-sm bg-gray-900">${clientOptions()}</select>
         </div>
         <div><label class="text-xs text-gray-500 block mb-1">Payment</label>
-          <select id="sale-payment" class="w-full px-3 py-2.5 border rounded-xl text-sm bg-white"><option>Cash</option><option>GCash</option><option>Maya</option><option>Bank Transfer</option></select>
+          <select id="sale-payment" class="w-full px-3 py-2.5 rounded-xl glass-input text-sm bg-gray-900"><option>Cash</option><option>GCash</option><option>Maya</option><option>Bank Transfer</option></select>
         </div>
         <div><label class="text-xs text-gray-500 block mb-1">Interest (%/mo)</label>
-          <select id="sale-interest" onchange="saleTotals()" class="w-full px-3 py-2.5 border rounded-xl text-sm bg-white">${[0,5,10,15,20,25,30,40,50].map(r => '<option value="' + r + '"' + (r === 0 ? ' selected' : '') + '>' + (r === 0 ? '0 (Cash)' : r + '%') + '</option>').join('')}</select>
+          <select id="sale-interest" onchange="saleTotals()" class="w-full px-3 py-2.5 rounded-xl glass-input text-sm bg-gray-900">${[0,5,10,15,20,25,30,40,50].map(r => '<option value="' + r + '"' + (r === 0 ? ' selected' : '') + '>' + (r === 0 ? '0 (Cash)' : r + '%') + '</option>').join('')}</select>
         </div>
-        <div><label class="text-xs text-gray-500 block mb-1">Discount (₱)</label><input id="sale-discount" type="number" min="0" step="0.01" value="0" oninput="saleTotals()" class="w-full px-3 py-2.5 border rounded-xl text-sm" /></div>
+        <div><label class="text-xs text-gray-500 block mb-1">Discount (₱)</label><input id="sale-discount" type="number" min="0" step="0.01" value="0" oninput="saleTotals()" class="w-full px-3 py-2.5 rounded-xl glass-input text-sm" /></div>
       </div>
-      <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="sale-sc" onchange="saleTotals()" /> SC/PWD 20% Discount</label>
-      <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="sale-charge" /> Charge to client (utang)</label>
-      <div class="flex justify-between items-center font-bold text-lg border-t pt-3"><span>Total</span><span class="text-green-600" id="sale-total">${peso(sub)}</span></div>
-      <button onclick="submitSale()" class="w-full py-4 bg-green-600 text-white rounded-xl font-bold text-lg shadow-lg" id="sale-btn">✓ Save Sale</button>
+      <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer"><input type="checkbox" id="sale-sc" onchange="saleTotals()" class="rounded accent-blue-500" /> SC/PWD 20% Discount</label>
+      <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer"><input type="checkbox" id="sale-charge" class="rounded accent-blue-500" /> Charge to client (utang)</label>
+      <div class="flex justify-between items-center font-bold text-lg border-t border-white/10 pt-3"><span class="text-gray-200">Total</span><span class="text-green-400" id="sale-total">${peso(sub)}</span></div>
+      <button onclick="submitSale()" class="w-full py-4 btn-glass text-white rounded-xl font-bold text-lg shadow-xl flex items-center justify-center gap-2" id="sale-btn"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Save Sale</button>
     </div>`;
   saleTotals();
 }
@@ -475,28 +524,28 @@ async function submitSale() {
 // ---------- PAY ----------
 async function renderPay(preselectedId) {
   const v = document.getElementById('view');
-  v.innerHTML = '<div class="text-center text-gray-400 py-16">Loading...</div>';
+  v.innerHTML = '<div class="text-center text-gray-400 py-16 fade-in"><div class="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>Loading...</div>';
   if (!data.clients.length) await loadClients();
   v.innerHTML = `
-    <div class="max-w-md mx-auto bg-white rounded-xl shadow-sm p-4">
-      <h2 class="text-xl font-bold mb-3">💵 Record Bayad</h2>
+    <div class="max-w-md mx-auto glass-card rounded-xl p-4 fade-in">
+      <h2 class="text-xl font-bold text-gray-100 mb-3 flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>Record Bayad</h2>
       <div class="space-y-3">
         <div><label class="text-xs text-gray-500 block mb-1">Client</label>
-          <select id="pay-client" class="w-full px-3 py-3 border rounded-xl text-sm bg-white">${data.clients.map(c => '<option value="' + c.id + '"' + (c.id === preselectedId ? ' selected' : '') + '>' + esc(c.name) + ' — ' + peso(c.balance) + '</option>').join('')}</select>
+          <select id="pay-client" class="w-full px-3 py-3 rounded-xl glass-input text-sm bg-gray-900">${data.clients.map(c => '<option value="' + c.id + '"' + (c.id === preselectedId ? ' selected' : '') + '>' + esc(c.name) + ' — ' + peso(c.balance) + '</option>').join('')}</select>
         </div>
         <div><label class="text-xs text-gray-500 block mb-1">Amount</label>
-          <input id="pay-amount" type="number" step="0.01" placeholder="0.00" class="w-full px-3 py-3 border rounded-xl text-2xl font-bold text-center" />
+          <input id="pay-amount" type="number" step="0.01" placeholder="0.00" class="w-full px-3 py-3 rounded-xl glass-input text-2xl font-bold text-center text-gray-100" />
         </div>
         <div class="grid grid-cols-4 gap-2">
-          <button onclick="setAmt(100)" class="py-2.5 bg-gray-100 rounded-xl text-sm font-semibold">+₱100</button>
-          <button onclick="setAmt(500)" class="py-2.5 bg-gray-100 rounded-xl text-sm font-semibold">+₱500</button>
-          <button onclick="setAmt(1000)" class="py-2.5 bg-gray-100 rounded-xl text-sm font-semibold">+₱1000</button>
-          <button onclick="setAmt('full')" class="py-2.5 bg-blue-100 text-blue-700 rounded-xl text-sm font-bold">Full</button>
+          <button onclick="setAmt(100)" class="py-2.5 glass-input rounded-xl text-sm font-semibold text-gray-300 hover:bg-gray-700">+₱100</button>
+          <button onclick="setAmt(500)" class="py-2.5 glass-input rounded-xl text-sm font-semibold text-gray-300 hover:bg-gray-700">+₱500</button>
+          <button onclick="setAmt(1000)" class="py-2.5 glass-input rounded-xl text-sm font-semibold text-gray-300 hover:bg-gray-700">+₱1000</button>
+          <button onclick="setAmt('full')" class="py-2.5 bg-blue-600/25 text-blue-300 rounded-xl text-sm font-bold hover:bg-blue-600/40">Full</button>
         </div>
         <div><label class="text-xs text-gray-500 block mb-1">Method</label>
-          <select id="pay-type" class="w-full px-3 py-3 border rounded-xl text-sm bg-white"><option>Cash</option><option>GCash</option><option>Maya</option><option>Bank Transfer</option></select>
+          <select id="pay-type" class="w-full px-3 py-3 rounded-xl glass-input text-sm bg-gray-900"><option>Cash</option><option>GCash</option><option>Maya</option><option>Bank Transfer</option></select>
         </div>
-        <button onclick="submitPay()" class="w-full py-4 bg-green-600 text-white rounded-xl font-bold text-lg shadow-lg">✓ Record Bayad</button>
+        <button onclick="submitPay()" class="w-full py-4 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold text-lg shadow-xl flex items-center justify-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Record Bayad</button>
       </div>
     </div>`;
 }
@@ -520,28 +569,31 @@ async function submitPay() {
 // ---------- INVENTORY ----------
 async function renderInventory() {
   const v = document.getElementById('view');
-  if (!data.inventory.length) { v.innerHTML = '<div class="text-center text-gray-400 py-16">Loading...</div>'; await loadAll(); }
+  if (!data.inventory.length) { v.innerHTML = '<div class="text-center text-gray-400 py-16 fade-in"><div class="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>Loading...</div>'; await loadAll(); }
   const low = data.inventory.filter(i => (i.stock || 0) <= (i.lowStock || 5)).length;
   v.innerHTML = `
-    <div class="flex items-center justify-between mb-3">
-      <h2 class="text-xl font-bold">📦 Inventory <span class="text-sm text-gray-400 font-normal">(${data.inventory.length} items)</span></h2>
-      <span class="text-xs font-bold ${low > 0 ? 'bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full' : 'bg-green-100 text-green-700 px-2.5 py-1 rounded-full'}">${low > 0 ? low + ' low stock' : 'All stocked'}</span>
+    <div class="flex items-center justify-between mb-3 fade-in">
+      <h2 class="text-xl font-bold text-gray-100 flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>Inventory <span class="text-sm text-gray-500 font-normal">(${data.inventory.length} items)</span></h2>
+      <span class="text-xs font-bold ${low > 0 ? 'bg-amber-500/15 text-amber-400 px-2.5 py-1 rounded-full border border-amber-500/30' : 'bg-green-500/15 text-green-400 px-2.5 py-1 rounded-full border border-green-500/30'}">${low > 0 ? low + ' low stock' : 'All stocked'}</span>
     </div>
-    <input id="inv-search" type="text" placeholder="🔍 Search..." oninput="filterInventory(this.value)" class="w-full px-4 py-2.5 rounded-xl border bg-white text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3" id="inv-grid">${invListHTML(data.inventory)}</div>`;
+    <div class="relative mb-3 fade-in">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="inv-search" type="text" placeholder="Search..." oninput="filterInventory(this.value)" class="w-full pl-10 pr-4 py-2.5 rounded-xl glass-input text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+    </div>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 fade-in" id="inv-grid">${invListHTML(data.inventory)}</div>`;
 }
 function invListHTML(items) {
   return items.map(i => {
     const stock = i.stock || 0;
     return `
-    <div class="bg-white rounded-xl shadow-sm p-3 flex items-center gap-3 card-hover">
-      <span class="w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center bg-gray-100 shrink-0">${i.image ? '<img src="' + i.image + '" class="w-full h-full object-cover" />' : '<span class="text-2xl">📦</span>'}</span>
+    <div class="glass-card rounded-xl p-3 flex items-center gap-3 card-hover">
+      <span class="w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center bg-gray-800 shrink-0 border border-white/10">${i.image ? '<img src="' + i.image + '" class="w-full h-full object-cover" />' : '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>'}</span>
       <div class="flex-1 min-w-0">
-        <div class="font-semibold text-sm truncate">${esc(i.name)}</div>
-        <div class="text-[11px] text-gray-400">${peso(i.price)} each</div>
-        <div class="text-xs font-bold ${stock <= 0 ? 'text-red-600' : stock <= (i.lowStock || 5) ? 'text-amber-600' : 'text-green-600'}">${stock <= 0 ? 'OUT OF STOCK' : stock + ' left'}</div>
+        <div class="font-semibold text-sm text-gray-200 truncate">${esc(i.name)}</div>
+        <div class="text-[11px] text-gray-500">${peso(i.price)} each</div>
+        <div class="text-xs font-bold ${stock <= 0 ? 'text-red-400' : stock <= (i.lowStock || 5) ? 'text-amber-400' : 'text-green-400'}">${stock <= 0 ? 'OUT OF STOCK' : stock + ' left'}</div>
       </div>
-      <button onclick="openQuick(${i.id})" class="text-xs px-3 py-2 ${stock <= 0 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white rounded-lg'}">Sell</button>
+      <button onclick="openQuick(${i.id})" class="text-xs px-3 py-2 ${stock <= 0 ? 'bg-gray-700 text-gray-500 cursor-not-allowed' : 'btn-glass text-white rounded-lg shadow'}">Sell</button>
     </div>`;
   }).join('');
 }
@@ -554,23 +606,23 @@ function filterInventory(q) {
 // ---------- TRANSACTIONS ----------
 async function renderTransactions() {
   const v = document.getElementById('view');
-  if (!data.transactions.length) { v.innerHTML = '<div class="text-center text-gray-400 py-16">Loading...</div>'; await loadAll(); }
+  if (!data.transactions.length) { v.innerHTML = '<div class="text-center text-gray-400 py-16 fade-in"><div class="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>Loading...</div>'; await loadAll(); }
   const total = data.transactions.reduce((s, t) => s + (t.grandTotal || 0), 0);
   v.innerHTML = `
-    <div class="flex items-center justify-between mb-3">
-      <h2 class="text-xl font-bold">🧾 Recent Sales</h2>
-      <span class="text-sm font-bold text-gray-500">${peso(total)} total</span>
+    <div class="flex items-center justify-between mb-3 fade-in">
+      <h2 class="text-xl font-bold text-gray-100 flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Recent Sales</h2>
+      <span class="text-sm font-bold text-gray-400 px-2 py-1 glass rounded-full">${peso(total)} total</span>
     </div>
-    <div class="grid md:grid-cols-2 gap-2 sm:gap-3">
+    <div class="grid md:grid-cols-2 gap-2 sm:gap-3 fade-in">
       ${data.transactions.map(t => `
-        <div class="bg-white rounded-xl shadow-sm p-3 flex items-center justify-between card-hover">
+        <div class="glass-card rounded-xl p-3 flex items-center justify-between card-hover">
           <div class="min-w-0">
-            <div class="font-semibold text-sm">${esc(t.clientName || 'Walk-in')}</div>
-            <div class="text-[11px] text-gray-400">${esc(t.invoiceNo || '')} · ${fmtDate(t.date)} · ${esc(t.paymentMethod || 'Cash')}${t.items ? ' · ' + t.items + ' item' + (t.items === 1 ? '' : 's') : ''}</div>
+            <div class="font-semibold text-sm text-gray-200">${esc(t.clientName || 'Walk-in')}</div>
+            <div class="text-[11px] text-gray-500">${esc(t.invoiceNo || '')} · ${fmtDate(t.date)} · ${esc(t.paymentMethod || 'Cash')}${t.items ? ' · ' + t.items + ' item' + (t.items === 1 ? '' : 's') : ''}</div>
           </div>
           <div class="text-right shrink-0">
-            <div class="font-bold text-sm text-green-600">${peso(t.grandTotal)}</div>
-            <div class="text-[10px] ${(t.status || '') === 'pending' ? 'text-amber-600' : 'text-gray-400'}">${esc(t.status == null ? '' : t.status === 'pending' ? 'Utang' : 'Paid')}</div>
+            <div class="font-bold text-sm text-green-400">${peso(t.grandTotal)}</div>
+            <div class="text-[10px] ${(t.status || '') === 'pending' ? 'text-amber-400' : 'text-gray-500'}">${esc(t.status == null ? '' : t.status === 'pending' ? 'Utang' : 'Paid')}</div>
           </div>
         </div>`).join('')}
     </div>`;
@@ -579,6 +631,8 @@ async function renderTransactions() {
 // ---------- init ----------
 (async () => {
   await loadAll();
+  const ls = document.getElementById('loading-screen');
+  if (ls) ls.classList.add('hidden');
   showView('home');
   connectWS();
   setInterval(() => { /* keep WS alive */ }, 25000);
