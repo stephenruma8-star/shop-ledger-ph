@@ -2,7 +2,7 @@
 <html lang="en-PH">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
 <meta name="theme-color" content="#3b82f6" />
 <link rel="manifest" href="/manifest.webmanifest" />
 <link rel="icon" type="image/png" sizes="192x192" href="/assets/pwa-192.png" />
@@ -11,38 +11,69 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Shop Ledger" />
-<title>Shop Ledger PH Mobile</title>
+<title>Shop Ledger PH</title>
 <script src="assets/vendor/tailwind.js"></script>
-<style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f3f4f6}</style>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f3f4f6}
+.nav-btn.active{color:#2563eb}
+.card-hover:active{transform:scale(.99)}
+@keyframes slideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}
+.sheet{animation:slideUp .25s ease}
+::-webkit-scrollbar{width:0;height:0}
+</style>
 </head>
 <body class="min-h-screen">
-<header class="bg-blue-600 text-white px-4 py-3 sticky top-0 z-10 shadow-md">
-  <div class="flex items-center justify-between">
-    <h1 class="text-lg font-bold">🏪 Shop Ledger PH</h1>
-    <span id="conn-status" class="text-xs bg-white/20 px-2 py-0.5 rounded-full">● Connected</span>
+<header class="bg-blue-600 text-white px-4 py-3 sticky top-0 z-20 shadow-md">
+  <div class="max-w-5xl mx-auto flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+      <div><h1 class="text-lg font-bold leading-tight">Shop Ledger PH</h1><p id="conn-status" class="text-[10px] text-white/80 leading-none">● Connected</p></div>
+    </div>
+    <div class="flex items-center gap-2">
+      <button onclick="showView('sale')" class="relative bg-white text-blue-600 text-xs font-bold px-3 py-1.5 rounded-lg shadow" id="cart-btn">🛒 <span id="cart-count">0</span></button>
+      <button onclick="showView('home')" class="bg-white/15 hover:bg-white/25 text-xs font-semibold px-3 py-1.5 rounded-lg">Refresh</button>
+    </div>
   </div>
 </header>
-<main id="view" class="p-4 pb-24"></main>
-<nav class="fixed bottom-0 left-0 right-0 bg-white border-t flex shadow-lg z-10">
-  <button onclick="showView('home')" class="flex-1 py-3 text-center text-xs"><div class="text-xl">🏠</div>Home</button>
-  <button onclick="showView('clients')" class="flex-1 py-3 text-center text-xs"><div class="text-xl">👥</div>Clients</button>
-  <button onclick="showView('sale')" class="flex-1 py-3 text-center text-xs"><div class="text-xl">🛒</div>Sale</button>
-  <button onclick="showView('pay')" class="flex-1 py-3 text-center text-xs bg-blue-50 text-blue-600 rounded-t-xl"><div class="text-xl bg-blue-600 text-white w-10 h-10 rounded-full mx-auto -mt-6 flex items-center justify-center shadow-lg">💵</div>Bayad</button>
+
+<div class="max-w-5xl mx-auto p-3 sm:p-4 pb-24 md:pb-6">
+  <nav id="tabnav" class="hidden md:flex gap-1 flex-wrap mb-3 bg-white rounded-xl shadow-sm p-1">
+    <button data-nav="home" onclick="showView('home')" class="nav-btn flex-1 min-w-[90px] text-sm font-semibold px-3 py-2 rounded-lg hover:bg-gray-100">🏠 Dashboard</button>
+    <button data-nav="catalog" onclick="showView('catalog')" class="nav-btn flex-1 min-w-[90px] text-sm font-semibold px-3 py-2 rounded-lg hover:bg-gray-100">🛍️ Catalog</button>
+    <button data-nav="clients" onclick="showView('clients')" class="nav-btn flex-1 min-w-[90px] text-sm font-semibold px-3 py-2 rounded-lg hover:bg-gray-100">👥 Clients</button>
+    <button data-nav="sale" onclick="showView('sale')" class="nav-btn flex-1 min-w-[90px] text-sm font-semibold px-3 py-2 rounded-lg hover:bg-gray-100">➕ New Sale</button>
+    <button data-nav="pay" onclick="showView('pay')" class="nav-btn flex-1 min-w-[90px] text-sm font-semibold px-3 py-2 rounded-lg hover:bg-gray-100">💵 Bayad</button>
+    <button data-nav="inventory" onclick="showView('inventory')" class="nav-btn flex-1 min-w-[90px] text-sm font-semibold px-3 py-2 rounded-lg hover:bg-gray-100">📦 Inventory</button>
+    <button data-nav="transactions" onclick="showView('transactions')" class="nav-btn flex-1 min-w-[90px] text-sm font-semibold px-3 py-2 rounded-lg hover:bg-gray-100">🧾 Sales</button>
+  </nav>
+  <main id="view"></main>
+</div>
+
+<nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t flex shadow-lg z-20">
+  <button data-nav="home" onclick="showView('home')" class="nav-btn flex-1 py-2 text-center text-[10px] font-medium"><div class="text-xl">🏠</div>Home</button>
+  <button data-nav="catalog" onclick="showView('catalog')" class="nav-btn flex-1 py-2 text-center text-[10px] font-medium"><div class="text-xl">🛍️</div>Catalog</button>
+  <button data-nav="sale" onclick="showView('sale')" class="nav-btn flex-1 py-2 text-center text-[10px] font-medium"><div class="text-xl bg-blue-600 text-white w-10 h-10 rounded-full mx-auto -mt-5 flex items-center justify-center shadow-lg relative"><span id="cart-badge" class="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] w-4 h-4 rounded-full hidden items-center justify-center">0</span>🛒</div>Sale</button>
+  <button data-nav="pay" onclick="showView('pay')" class="nav-btn flex-1 py-2 text-center text-[10px] font-medium"><div class="text-xl">💵</div>Bayad</button>
+  <button data-nav="clients" onclick="showView('clients')" class="nav-btn flex-1 py-2 text-center text-[10px] font-medium"><div class="text-xl">👥</div>Clients</button>
 </nav>
+
+<div id="modal-root"></div>
+<div id="toast-root" class="fixed top-14 left-1/2 -translate-x-1/2 z-50 space-y-2 w-[92%] max-w-sm"></div>
 
 <script>
 const API = window.location.origin;
-const peso = (n) => '₱' + (Number(n) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 });
-function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-let state = { clients: [] };
-let currentView = 'home';
-let ws = null;
-let wsAuthed = false;
-
-async function loadClients() {
-  try { const r = await fetch(API + '/api/clients', { headers: { 'X-Auth-Token': getToken() } }); state.clients = await r.json(); }
-  catch (e) { document.getElementById('conn-status').textContent = '⚠ Error'; }
+const peso = (n) => '₱' + (Number(n) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+function fmtDate(d) {
+  if (!d) return '';
+  const dt = new Date(d);
+  if (isNaN(dt)) return d;
+  return dt.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
 }
+let data = { stats: null, clients: [], inventory: [], transactions: [] };
+let cart = []; // {invId, name, qty, price}
+let currentView = 'home';
+let cacheBust = 0;
 
 function getToken() {
   const m = window.location.search.match(/token=([^&]+)/);
@@ -51,12 +82,51 @@ function getToken() {
   if (urlToken) return urlToken;
   try { return localStorage.getItem('slpToken') || ''; } catch (e) { return ''; }
 }
+const HDR = () => ({ 'X-Auth-Token': getToken() });
 
-function setConn(kind) {
-  const el = document.getElementById('conn-status');
-  if (el) el.textContent = kind === 'live' ? '● Live' : '● Connected';
+function toast(msg, type) {
+  const root = document.getElementById('toast-root');
+  const el = document.createElement('div');
+  el.className = (type === 'err' ? 'bg-red-600' : type === 'ok' ? 'bg-green-600' : 'bg-blue-600') + ' text-white text-sm px-4 py-3 rounded-xl shadow-lg';
+  el.textContent = msg;
+  root.appendChild(el);
+  setTimeout(() => { el.style.transition = 'opacity .3s'; el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 2600);
 }
 
+async function apiGet(path) {
+  const r = await fetch(API + path, { headers: HDR() });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+async function apiPost(path, body) {
+  const r = await fetch(API + path, { method: 'POST', headers: { 'Content-Type': 'application/json', ...HDR() }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.success) throw new Error(j.error || 'HTTP ' + r.status);
+  return j;
+}
+
+async function loadAll() {
+  try {
+    const [stats, inventory, transactions] = await Promise.all([
+      apiGet('/api/stats'), apiGet('/api/inventory'), apiGet('/api/transactions?limit=100')
+    ]);
+    data.stats = stats; data.inventory = inventory; data.transactions = transactions;
+    await loadClients();
+    return true;
+  } catch (e) { setConn(false); return false; }
+}
+let lastClientsLoad = 0;
+async function loadClients() {
+  try { data.clients = await apiGet('/api/clients'); setConn(true); }
+  catch (e) { setConn(false); }
+}
+function setConn(ok) {
+  const el = document.getElementById('conn-status');
+  if (el) el.textContent = ok ? '● Live' : '⚠ Offline — pulling latest data...';
+}
+
+// ---------- WebSocket live updates ----------
+let ws = null; let wsAuthed = false;
 function connectWS() {
   const params = new URLSearchParams(window.location.search);
   const wsPort = params.get('ws') || '3458';
@@ -65,163 +135,454 @@ function connectWS() {
   try { ws = new WebSocket(url); } catch (e) { setTimeout(connectWS, 5000); return; }
   ws.onopen = () => { try { ws.send(JSON.stringify({ type: 'auth', token: getToken() })); } catch (e) {} };
   ws.onmessage = (ev) => {
-    let msg;
-    try { msg = JSON.parse(ev.data); } catch (e) { return; }
-    if (msg.type === 'auth-ok') { wsAuthed = true; setConn('live'); }
-    else if (msg.type === 'auth-error') { wsAuthed = false; try { ws.close(); } catch (e) {} }
+    let msg; try { msg = JSON.parse(ev.data); } catch (e) { return; }
+    if (msg.type === 'auth-ok') { wsAuthed = true; setConn(true); }
     else if (msg.type === 'update') refreshAll();
   };
-  ws.onclose = () => { wsAuthed = false; setConn('poll'); setTimeout(connectWS, 5000); };
+  ws.onclose = () => { wsAuthed = false; setTimeout(connectWS, 5000); };
   ws.onerror = () => { try { ws.close(); } catch (e) {} };
 }
 
+let refreshBusy = false;
 async function refreshAll() {
-  await loadClients();
-  if (currentView === 'home') renderHome(document.getElementById('view'));
-  else if (currentView === 'clients') renderClients(document.getElementById('view'));
+  if (refreshBusy) return; refreshBusy = true;
+  try { await loadAll(); if (currentView === 'home') renderHome(); else if (currentView === 'clients') renderClients(); else if (currentView === 'inventory') renderInventory(); else if (currentView === 'transactions') renderTransactions(); else if (currentView === 'catalog') renderCatalog(null); }
+  catch (e) { /* keep current view */ }
+  refreshBusy = false;
 }
 
-function showView(view, data) {
+function showView(view, arg) {
   currentView = view;
+  document.querySelectorAll('[data-nav]').forEach(b => b.classList.toggle('active', b.getAttribute('data-nav') === view));
   const v = document.getElementById('view');
-  if (view === 'home') renderHome(v);
-  else if (view === 'clients') renderClients(v);
-  else if (view === 'sale') renderSale(v);
-  else if (view === 'pay') renderPay(v, data);
+  if (view === 'home') renderHome();
+  else if (view === 'clients') renderClients();
+  else if (view === 'catalog') renderCatalog(null);
+  else if (view === 'sale') renderSale();
+  else if (view === 'pay') renderPay(arg);
+  else if (view === 'inventory') renderInventory();
+  else if (view === 'transactions') renderTransactions();
+  window.scrollTo(0, 0);
 }
 
-let saleItems = [];
-
-function renderSale(root) {
-  loadClients().then(() => {
-    root.innerHTML = `
-      <h2 class="text-xl font-bold mb-3">🛒 Add Sale</h2>
-      <div class="bg-white p-4 rounded-xl shadow-sm space-y-3">
-        <select id="sale-client" class="w-full px-3 py-3 border rounded-lg">
-          <option value="">Walk-in (no client)</option>
-          ${state.clients.map(c => '<option value="' + c.id + '">' + esc(c.name) + ' - ' + peso(c.balance) + '</option>').join('')}
-        </select>
-        <div class="flex gap-2">
-          <input id="sale-item-name" type="text" placeholder="Item name" class="flex-1 px-3 py-2 border rounded-lg" />
-          <input id="sale-item-qty" type="number" value="1" min="1" class="w-16 px-2 py-2 border rounded-lg text-center" />
-          <input id="sale-item-cost" type="number" step="0.01" placeholder="Price" class="w-24 px-3 py-2 border rounded-lg" />
-          <button onclick="addSaleItem()" class="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm">+</button>
-        </div>
-        <div id="sale-items-list" class="space-y-1"></div>
-        <div class="text-right text-sm font-bold">Total: <span id="sale-total">₱0.00</span></div>
-        <div class="grid grid-cols-2 gap-2">
-          <select id="sale-payment" class="px-3 py-3 border rounded-lg"><option>Cash</option><option>GCash</option><option>Maya</option><option>Bank Transfer</option><option>Installment</option></select>
-          <select id="sale-client-charge" class="px-3 py-3 border rounded-lg"><option value="no">No charge</option><option value="yes">Charge to client</option></select>
-        </div>
-        <button onclick="submitSale()" class="w-full py-4 bg-blue-500 text-white rounded-xl font-bold text-lg">✓ Save Sale</button>
-      </div>`;
-  });
+function updateCartUI() {
+  const c = cart.reduce((s, i) => s + i.qty, 0);
+  const btn = document.getElementById('cart-count');
+  if (btn) btn.textContent = c;
+  const badge = document.getElementById('cart-badge');
+  if (badge) { badge.textContent = c; badge.classList.toggle('hidden', c === 0); badge.classList.toggle('flex', c > 0); }
 }
 
-function addSaleItem() {
-  const name = document.getElementById('sale-item-name').value.trim();
-  const qty = parseInt(document.getElementById('sale-item-qty').value) || 1;
-  const unitCost = parseFloat(document.getElementById('sale-item-cost').value);
-  if (!name || !unitCost) return alert('Enter item name and price');
-  saleItems.push({ name, qty, unitCost, intRate: 0, invId: null });
-  document.getElementById('sale-item-name').value = '';
-  document.getElementById('sale-item-cost').value = '';
-  document.getElementById('sale-item-qty').value = '1';
-  renderSaleItems();
-}
-
-function renderSaleItems() {
-  const list = document.getElementById('sale-items-list');
-  const total = saleItems.reduce((s, i) => s + (i.qty * i.unitCost), 0);
-  list.innerHTML = saleItems.map((i, idx) =>
-    '<div class="flex justify-between items-center text-sm py-1 border-b"><span>' + esc(i.name) + ' x' + i.qty + '</span><span>' + peso(i.qty * i.unitCost) + ' <button onclick="saleItems.splice(' + idx + ',1);renderSaleItems()" class="text-red-500 hover:text-red-700 ml-2" title="Remove"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></span></div>'
-  ).join('');
-  document.getElementById('sale-total').textContent = peso(total);
-}
-
-async function submitSale() {
-  const clientId = parseInt(document.getElementById('sale-client').value) || null;
-  const paymentMethod = document.getElementById('sale-payment').value;
-  const chargeClient = document.getElementById('sale-client-charge').value === 'yes';
-  if (!saleItems.length) return alert('Add at least one item');
-  if (chargeClient && !clientId) return alert('Select a client to charge');
-  const postItems = saleItems.map(i => ({ ...i }));
-  try {
-    const r = await fetch(API + '/api/sales', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Auth-Token': getToken() },
-      body: JSON.stringify({ clientId: chargeClient ? clientId : null, items: postItems, paymentMethod, discount: 0 })
-    });
-    const result = await r.json();
-    if (result.success) { alert('✅ Sale recorded! Invoice: ' + result.invoiceNo); saleItems = []; showView('home'); }
-    else alert('Error: ' + result.error);
-  } catch (e) { alert('Network error'); }
-}
-
-async function renderHome(root) {
-  await loadClients();
-  const total = state.clients.reduce((s, c) => s + (c.balance || 0), 0);
-  root.innerHTML = `
-    <div class="grid grid-cols-2 gap-3 mb-4">
-      <div class="bg-white p-4 rounded-xl shadow-sm text-center"><div class="text-2xl font-bold text-blue-600">${state.clients.length}</div><div class="text-xs text-gray-500">Clients</div></div>
-      <div class="bg-white p-4 rounded-xl shadow-sm text-center"><div class="text-2xl font-bold text-orange-600">${peso(total)}</div><div class="text-xs text-gray-500">Total Utang</div></div>
+// ---------- HOME ----------
+async function renderHome() {
+  const v = document.getElementById('view');
+  v.innerHTML = '<div class="text-center text-gray-400 py-16">Loading dashboard...</div>';
+  if (!data.stats) await loadAll();
+  const s = data.stats || {};
+  const lowStockTop = data.inventory.filter(i => (i.stock || 0) <= (i.lowStock || 5)).sort((a, b) => a.stock - b.stock).slice(0, 4);
+  const recent = (s.recent || []).slice(0, 4);
+  v.innerHTML = `
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
+      <div class="bg-white p-3 sm:p-4 rounded-xl shadow-sm card-hover hover:ring-2 hover:ring-green-500/40">
+        <div class="text-xs text-gray-500">Today's Sales</div>
+        <div class="text-xl md:text-2xl font-bold text-green-600">${peso(s.todaySales)}</div>
+        <div class="text-[11px] text-orange-600 font-medium">Profit ${peso(s.todayProfit)}</div>
+      </div>
+      <div class="bg-white p-3 sm:p-4 rounded-xl shadow-sm card-hover hover:ring-2 hover:ring-red-500/40">
+        <div class="text-xs text-gray-500">Total Utang</div>
+        <div class="text-xl md:text-2xl font-bold text-orange-600">${peso(s.totalUtang)}</div>
+        <div class="text-[11px] text-green-600 font-medium">Collected ${peso(s.todayCollected)}</div>
+      </div>
+      <div class="bg-white p-3 sm:p-4 rounded-xl shadow-sm card-hover hover:ring-2 hover:ring-blue-500/40">
+        <div class="text-xs text-gray-500">Month Sales</div>
+        <div class="text-xl md:text-2xl font-bold text-blue-600">${peso(s.monthSales)}</div>
+        <div class="text-[11px] text-red-500 font-medium">Expenses ${peso(s.monthExpenses)}</div>
+      </div>
+      <div class="bg-white p-3 sm:p-4 rounded-xl shadow-sm card-hover cursor-pointer hover:ring-2 hover:ring-amber-500/40" onclick="showView('inventory')">
+        <div class="text-xs text-gray-500">Low Stock</div>
+        <div class="text-xl md:text-2xl font-bold ${s.lowStockCount > 0 ? 'text-amber-600' : 'text-green-600'}">${s.lowStockCount}</div>
+        <div class="text-[11px] text-gray-400">items to restock</div>
+      </div>
     </div>
-    <h2 class="font-bold text-lg mb-2">Top Utang</h2>
-    <div class="space-y-2">
-      ${state.clients.filter(c => c.balance > 0).sort((a, b) => b.balance - a.balance).slice(0, 10).map(c => `
-        <div class="bg-white p-3 rounded-xl shadow-sm flex justify-between items-center">
-          <div><div class="font-semibold">${esc(c.name)}</div><div class="text-xs text-gray-500">${esc(c.phone || '')}</div></div>
-          <div class="text-right"><div class="font-bold text-orange-600">${peso(c.balance)}</div>
-          <button onclick="showView('pay', ${c.id})" class="text-xs text-blue-600">💵 Bayad</button></div>
-        </div>`).join('') || '<p class="text-gray-500 text-center py-8">🎉 Walang utang!</p>'}
+
+    <div class="grid md:grid-cols-2 gap-3 mt-3">
+      <div class="bg-white rounded-xl shadow-sm p-3">
+        <div class="flex justify-between items-center mb-2"><h3 class="font-bold text-sm">⚠️ Low Stock</h3><button onclick="showView('inventory')" class="text-xs text-blue-600">View all →</button></div>
+        ${lowStockTop.length ? lowStockTop.map(i => `
+          <div class="flex items-center gap-2 py-1.5 border-b last:border-0">
+            <span class="w-8 h-8 rounded overflow-hidden flex items-center justify-center bg-gray-100 shrink-0">${i.image ? '<img src="' + i.image + '" class="w-full h-full object-cover" />' : '<span class="text-base">📦</span>'}</span>
+            <div class="flex-1 min-w-0"><div class="text-sm font-medium truncate">${esc(i.name)}</div><div class="text-[11px] ${i.stock <= 0 ? 'text-red-600 font-semibold' : 'text-amber-600'}">${i.stock <= 0 ? 'Out of stock' : i.stock + ' left'}</div></div>
+            <button onclick="openQuick(${i.id})" class="text-xs px-2.5 py-1.5 bg-blue-600 text-white rounded-lg">Sell</button>
+          </div>`).join('') : '<p class="text-sm text-gray-400 text-center py-6">✅ All stocked up</p>'}
+      </div>
+      <div class="bg-white rounded-xl shadow-sm p-3">
+        <div class="flex justify-between items-center mb-2"><h3 class="font-bold text-sm">🧾 Recent Sales</h3><button onclick="showView('transactions')" class="text-xs text-blue-600">View all →</button></div>
+        ${recent.length ? recent.map(t => `
+          <div class="flex items-center justify-between py-1.5 border-b last:border-0">
+            <div><div class="text-sm font-medium">${esc(t.clientName || 'Walk-in')}</div><div class="text-[11px] text-gray-400">${esc(t.invoiceNo)} · ${fmtDate(t.date)}</div></div>
+            <div class="text-sm font-bold">${peso(t.grandTotal)}</div>
+          </div>`).join('') : '<p class="text-sm text-gray-400 text-center py-6">No sales yet</p>'}
+      </div>
+    </div>`;
+}
+
+// ---------- CLIENTS ----------
+async function renderClients() {
+  const v = document.getElementById('view');
+  v.innerHTML = '<div class="text-center text-gray-400 py-16">Loading clients...</div>';
+  if (!data.clients.length) await loadClients();
+  const total = data.clients.reduce((s, c) => s + (c.balance || 0), 0);
+  v.innerHTML = `
+    <div class="bg-white rounded-xl shadow-sm p-3 mb-3">
+      <div class="flex items-center justify-between">
+        <div class="text-sm text-gray-500">Total clients</div><div class="text-lg font-bold text-blue-600">${data.clients.length}</div>
+      </div>
+      <div class="flex items-center justify-between mt-1">
+        <div class="text-sm text-gray-500">Total utang</div><div class="text-lg font-bold text-orange-600">${peso(total)}</div>
+      </div>
+      <input id="search" type="text" placeholder="🔍 Search clients..." oninput="filterClients(this.value)" class="mt-3 w-full px-4 py-3 rounded-xl border bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
     </div>
-  `;
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3" id="client-grid">${clientListHTML(data.clients)}</div>`;
 }
-
-async function renderClients(root) {
-  await loadClients();
-  root.innerHTML = '<input id="search" type="text" placeholder="Search..." class="w-full px-4 py-3 rounded-xl border mb-3 bg-white" oninput="filterClients(this.value)" /><div id="list" class="space-y-2">' + clientListHTML(state.clients) + '</div>';
-}
-
 function clientListHTML(clients) {
-  return clients.map(c => '<div class="bg-white p-3 rounded-xl shadow-sm flex justify-between items-center"><div><div class="font-semibold">' + esc(c.name) + '</div><div class="text-xs text-gray-500">' + esc(c.phone || '') + '</div></div><div class="font-bold ' + (c.balance <= 0 ? 'text-green-600' : 'text-orange-600') + '">' + peso(c.balance) + '</div></div>').join('');
+  return clients.map(c => `
+    <div class="bg-white p-3 rounded-xl shadow-sm flex items-center justify-between card-hover">
+      <div class="min-w-0">
+        <div class="font-semibold text-sm truncate">${esc(c.name)}</div>
+        <div class="text-xs text-gray-500">${esc(c.phone || '—')}</div>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <div class="font-bold text-sm ${c.balance <= 0 ? 'text-green-600' : 'text-orange-600'}">${peso(c.balance)}</div>
+        <button onclick="showView('pay', ${c.id})" class="text-xs px-2.5 py-1.5 bg-green-600 text-white rounded-lg">Bayad</button>
+      </div>
+    </div>`).join('');
 }
-
 function filterClients(q) {
-  q = q.toLowerCase();
-  document.getElementById('list').innerHTML = clientListHTML(state.clients.filter(c => c.name.toLowerCase().includes(q) || (c.phone || '').includes(q)));
+  q = (q || '').toLowerCase();
+  const grid = document.getElementById('client-grid');
+  if (grid) grid.innerHTML = clientListHTML(data.clients.filter(c => (c.name || '').toLowerCase().includes(q) || (c.phone || '').includes(q)));
 }
 
-async function renderPay(root, preselectedId) {
-  await loadClients();
-  root.innerHTML = '<h2 class="text-xl font-bold mb-3">💵 Record Bayad</h2><div class="bg-white p-4 rounded-xl shadow-sm space-y-3"><select id="pay-client" class="w-full px-3 py-3 border rounded-lg">' +
-    state.clients.map(c => '<option value="' + c.id + '" ' + (c.id === preselectedId ? 'selected' : '') + '>' + esc(c.name) + ' - ' + peso(c.balance) + '</option>').join('') +
-    '</select><input id="pay-amount" type="number" step="0.01" placeholder="Amount" class="w-full px-3 py-3 border rounded-lg text-2xl font-bold text-center" />' +
-    '<div class="grid grid-cols-4 gap-2"><button onclick="setAmt(100)" class="py-2 bg-gray-100 rounded-lg text-sm">+₱100</button><button onclick="setAmt(500)" class="py-2 bg-gray-100 rounded-lg text-sm">+₱500</button><button onclick="setAmt(1000)" class="py-2 bg-gray-100 rounded-lg text-sm">+₱1000</button><button onclick="setAmt(\'full\')" class="py-2 bg-blue-100 text-blue-700 rounded-lg text-sm font-semibold">Full</button></div>' +
-    '<select id="pay-type" class="w-full px-3 py-3 border rounded-lg"><option>Cash</option><option>GCash</option><option>Maya</option><option>Bank Transfer</option></select>' +
-    '<button onclick="submitPay()" class="w-full py-4 bg-green-500 text-white rounded-xl font-bold text-lg">✓ Record Bayad</button></div>';
+// ---------- CATALOG ----------
+function renderCatalog(q) {
+  const v = document.getElementById('view');
+  const query = (q == null ? '' : q).toLowerCase();
+  const items = data.inventory.filter(i => !query || (i.name || '').toLowerCase().includes(query));
+  v.innerHTML = `
+    <div class="flex items-center gap-2 mb-3">
+      <input id="cat-search" type="text" placeholder="🔍 Search items..." value="${esc(query)}" oninput="searchCatalog(this.value)" class="flex-1 px-4 py-2.5 rounded-xl border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      <span class="text-xs text-gray-400 whitespace-nowrap">${items.length} item${items.length === 1 ? '' : 's'}</span>
+    </div>
+    ${items.length ? `
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
+      ${items.map((i, idx) => {
+        const stock = i.stock || 0;
+        const badge = stock <= 0
+          ? '<span class="absolute top-1.5 left-1.5 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">OUT</span>'
+          : stock <= (i.lowStock || 5)
+            ? '<span class="absolute top-1.5 left-1.5 bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">LOW</span>'
+            : '';
+        return `
+        <button onclick="openQuick(${i.id}, ${idx})" class="bg-white rounded-xl shadow-sm overflow-hidden text-left card-hover hover:ring-2 hover:ring-blue-500/40 relative">
+          ${badge}
+          <div class="h-24 sm:h-28 bg-gray-100 flex items-center justify-center overflow-hidden">
+            ${i.image ? '<img src="' + i.image + '" alt="' + esc(i.name) + '" class="w-full h-full object-cover" />' : '<span class="text-4xl">📦</span>'}
+          </div>
+          <div class="p-2">
+            <div class="font-medium text-xs sm:text-sm truncate">${esc(i.name)}</div>
+            <div class="text-green-600 font-bold text-sm">${peso(i.price)}</div>
+            <div class="text-[10px] ${stock <= 0 ? 'text-red-600 font-semibold' : stock <= (i.lowStock || 5) ? 'text-amber-600' : 'text-gray-500'}">${stock <= 0 ? 'Out of stock' : stock + ' in stock'}</div>
+          </div>
+        </button>`;
+      }).join('')}
+    </div>` : '<div class="text-center text-gray-400 py-16">' + (query ? 'No items match your search' : 'No items yet') + '</div>'}`;
+}
+function searchCatalog(q) { renderCatalog(q); }
+
+function itemById(id) { return data.inventory.find(i => i.id === id); }
+
+function openQuick(id, idx) {
+  const item = itemById(id);
+  if (!item) { toast('Item not found', 'err'); return; }
+  const stock = item.stock || 0;
+  if (stock <= 0) { toast('Out of stock', 'err'); return; }
+  const existing = cart.find(c => c.invId === id);
+  const qty = existing ? existing.qty : 1;
+  document.getElementById('modal-root').innerHTML = `
+    <div class="fixed inset-0 bg-black/50 z-40 flex items-end sm:items-center justify-center" onclick="if(event.target===this)closeQuick()">
+      <div class="sheet bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md shadow-2xl p-4" onclick="event.stopPropagation()">
+        <div class="flex gap-3 items-center">
+          <div class="w-16 h-16 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center shrink-0">${item.image ? '<img src="' + item.image + '" class="w-full h-full object-cover" />' : '<span class="text-3xl">📦</span>'}</div>
+          <div class="flex-1 min-w-0">
+            <div class="font-bold truncate">${esc(item.name)}</div>
+            <div class="text-green-600 font-bold text-lg">${peso(item.price)}</div>
+            <div class="text-[11px] ${stock <= (item.lowStock || 5) ? 'text-amber-600' : 'text-gray-500'}">${stock} in stock</div>
+          </div>
+        </div>
+        <div class="flex items-center justify-between mt-4">
+          <div class="flex items-center gap-2">
+            <button onclick="quickStep(-1, ${id})" class="w-10 h-10 rounded-xl border text-xl font-bold hover:bg-gray-100">−</button>
+            <span id="q-qty" class="w-10 text-center text-lg font-bold">${qty}</span>
+            <button onclick="quickStep(1, ${id})" class="w-10 h-10 rounded-xl border text-xl font-bold hover:bg-gray-100">+</button>
+          </div>
+          <div class="text-right"><div class="text-xs text-gray-400">Subtotal</div><div class="text-xl font-bold text-green-600" id="q-sub">${peso(item.price * qty)}</div></div>
+        </div>
+        <div class="grid grid-cols-2 gap-2 mt-4">
+          <button onclick="quickAdd(${id})" class="py-3 bg-blue-600 text-white rounded-xl font-semibold">🛒 Add to Cart</button>
+          <button onclick="quickSell(${id})" class="py-3 bg-green-600 text-white rounded-xl font-semibold">Sell Now</button>
+        </div>
+        <button onclick="closeQuick()" class="w-full mt-2 py-2 text-gray-500 text-sm">Close</button>
+      </div>
+    </div>`;
+}
+let qStepQty = 1;
+function quickStep(delta, id) {
+  const item = itemById(id);
+  if (!item) return;
+  const max = item.stock || 0;
+  qStepQty = Math.max(1, Math.min((qStepQty || 1) + delta, Math.max(1, max)));
+  const q = document.getElementById('q-qty'); if (q) q.textContent = qStepQty;
+  const s = document.getElementById('q-sub'); if (s) s.textContent = peso(item.price * qStepQty);
+}
+function closeQuick() { document.getElementById('modal-root').innerHTML = ''; qStepQty = 1; }
+function quickAdd(id) {
+  const item = itemById(id);
+  if (!item) return;
+  const qty = Math.max(1, Math.min(qStepQty || 1, item.stock || 1));
+  const existing = cart.find(c => c.invId === id);
+  if (existing) existing.qty = Math.min(existing.qty + qty, item.stock || existing.qty);
+  else cart.push({ invId: id, name: item.name, qty, price: item.price });
+  closeQuick();
+  updateCartUI();
+  toast('Added ' + item.name + ' ×' + (existing ? existing.qty : qty) + ' to cart', 'ok');
+}
+async function quickSell(id) {
+  const item = itemById(id);
+  if (!item) return;
+  const stock = item.stock || 0;
+  if (stock <= 0) return toast('Out of stock', 'err');
+  const qty = Math.max(1, Math.min(qStepQty || 1, stock));
+  try {
+    const r = await apiPost('/api/sales', {
+      clientId: null, items: [{ name: String(qty), description: item.name, qty, unitCost: item.price, intRate: 0, invId: id }],
+      paymentMethod: 'Cash', discount: 0
+    });
+    closeQuick();
+    toast('✅ Sale saved! ' + r.invoiceNo, 'ok');
+    await refreshAll();
+  } catch (e) { toast('Sale failed: ' + e.message, 'err'); }
 }
 
+// ---------- NEW SALE (cart-based) ----------
+function renderSale() {
+  const v = document.getElementById('view');
+  const sub = cart.reduce((s, i) => s + i.qty * i.price, 0);
+  v.innerHTML = `
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-xl font-bold">🛒 New Sale</h2>
+      <button onclick="showView('catalog')" class="text-sm px-3 py-2 bg-blue-600 text-white rounded-lg shadow">＋ Add Items</button>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-3 mb-3">
+      ${cart.length ? cart.map((i, idx) => `
+        <div class="flex items-center gap-2 py-2 border-b last:border-0">
+          <span class="w-8 h-8 rounded overflow-hidden flex items-center justify-center bg-gray-100 shrink-0">${itemById(i.invId) && itemById(i.invId).image ? '<img src="' + itemById(i.invId).image + '" class="w-full h-full object-cover" />' : '<span class="text-base">📦</span>'}</span>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium truncate">${esc(i.name)}</div>
+            <div class="text-[11px] text-gray-400">${peso(i.price)} each</div>
+          </div>
+          <div class="flex items-center gap-1">
+            <button onclick="cartStep(${idx},-1)" class="w-7 h-7 rounded-lg border font-bold hover:bg-gray-100">−</button>
+            <span class="w-7 text-center text-sm font-bold">${i.qty}</span>
+            <button onclick="cartStep(${idx},1)" class="w-7 h-7 rounded-lg border font-bold hover:bg-gray-100">+</button>
+          </div>
+          <div class="text-sm font-bold w-16 text-right">${peso(i.qty * i.price)}</div>
+          <button onclick="cartRemove(${idx})" class="text-red-500 text-xs px-1">✕</button>
+        </div>`).join('')
+      : '<p class="text-center text-gray-400 py-8">Cart is empty — add items from the Catalog or <button class="text-blue-600 underline" onclick="manualItem()">add a manual item</button></p>'}
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-3 space-y-3">
+      <div class="flex justify-between text-sm text-gray-500"><span>Subtotal</span><span id="sale-sub">${peso(sub)}</span></div>
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="text-xs text-gray-500 block mb-1">Client</label>
+          <select id="sale-client" class="w-full px-3 py-2.5 border rounded-xl text-sm bg-white">${clientOptions()}</select>
+        </div>
+        <div><label class="text-xs text-gray-500 block mb-1">Payment</label>
+          <select id="sale-payment" class="w-full px-3 py-2.5 border rounded-xl text-sm bg-white"><option>Cash</option><option>GCash</option><option>Maya</option><option>Bank Transfer</option></select>
+        </div>
+        <div><label class="text-xs text-gray-500 block mb-1">Interest (%/mo)</label>
+          <select id="sale-interest" onchange="saleTotals()" class="w-full px-3 py-2.5 border rounded-xl text-sm bg-white">${[0,5,10,15,20,25,30,40,50].map(r => '<option value="' + r + '"' + (r === 0 ? ' selected' : '') + '>' + (r === 0 ? '0 (Cash)' : r + '%') + '</option>').join('')}</select>
+        </div>
+        <div><label class="text-xs text-gray-500 block mb-1">Discount (₱)</label><input id="sale-discount" type="number" min="0" step="0.01" value="0" oninput="saleTotals()" class="w-full px-3 py-2.5 border rounded-xl text-sm" /></div>
+      </div>
+      <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="sale-sc" onchange="saleTotals()" /> SC/PWD 20% Discount</label>
+      <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="sale-charge" /> Charge to client (utang)</label>
+      <div class="flex justify-between items-center font-bold text-lg border-t pt-3"><span>Total</span><span class="text-green-600" id="sale-total">${peso(sub)}</span></div>
+      <button onclick="submitSale()" class="w-full py-4 bg-green-600 text-white rounded-xl font-bold text-lg shadow-lg" id="sale-btn">✓ Save Sale</button>
+    </div>`;
+  saleTotals();
+}
+function clientOptions() {
+  return '<option value="">Walk-in (no client)</option>' + data.clients.map(c => '<option value="' + c.id + '">' + esc(c.name) + ' — ' + peso(c.balance) + '</option>').join('');
+}
+function saleTotals() {
+  const sub = cart.reduce((s, i) => s + i.qty * i.price, 0);
+  const rate = parseFloat(document.getElementById('sale-interest')?.value) || 0;
+  const interest = sub * (rate / 100);
+  const sc = (document.getElementById('sale-sc')?.checked) ? sub * 0.2 : 0;
+  const disc = Math.max(0, parseFloat(document.getElementById('sale-discount')?.value) || 0) + sc;
+  const total = Math.max(0, sub + interest - disc);
+  const el = document.getElementById('sale-total'); if (el) el.textContent = peso(total);
+  const se = document.getElementById('sale-sub'); if (se) se.textContent = peso(sub);
+}
+function cartStep(idx, delta) {
+  const c = cart[idx]; if (!c) return;
+  const stock = (itemById(c.invId)?.stock) || 9999;
+  c.qty = Math.min(Math.max(1, c.qty + delta), Math.max(1, stock));
+  updateCartUI();
+  renderSale();
+}
+function cartRemove(idx) { cart.splice(idx, 1); updateCartUI(); renderSale(); }
+function manualItem() {
+  const form = prompt('Enter: Name, Price, Qty (e.g. "Candies, 5, 2")');
+  if (!form) return;
+  const parts = form.split(',').map(s => s.trim());
+  const name = parts[0]; const price = parseFloat(parts[1]); const qty = parseInt(parts[2]) || 1;
+  if (!name || !price) { toast('Invalid format', 'err'); return; }
+  cart.push({ invId: null, name, qty, price });
+  updateCartUI();
+  renderSale();
+}
+async function submitSale() {
+  if (!cart.length) return toast('Add at least one item', 'err');
+  const clientSel = document.getElementById('sale-client');
+  const clientId = clientSel && clientSel.value ? parseInt(clientSel.value) : null;
+  const charge = document.getElementById('sale-charge')?.checked;
+  if (charge && !clientId) return toast('Select a client to charge', 'err');
+  const rate = parseFloat(document.getElementById('sale-interest')?.value) || 0;
+  const sc = (document.getElementById('sale-sc')?.checked) ? true : false;
+  const discount = Math.max(0, parseFloat(document.getElementById('sale-discount')?.value) || 0);
+  const paymentMethod = document.getElementById('sale-payment')?.value || 'Cash';
+  const items = cart.map(i => ({ name: String(i.qty), description: i.name, qty: i.qty, unitCost: i.price, intRate: rate, invId: i.invId }));
+  try {
+    const disc = discount + (sc ? (items.reduce((s, i) => s + i.qty * i.unitCost, 0) * 0.2) : 0);
+    const r = await apiPost('/api/sales', { clientId: charge ? clientId : null, items, paymentMethod, discount: disc });
+    toast('✅ Sale saved! ' + r.invoiceNo, 'ok');
+    cart = []; updateCartUI();
+    showView('home'); await refreshAll();
+  } catch (e) { toast('Sale failed: ' + e.message, 'err'); }
+}
+
+// ---------- PAY ----------
+async function renderPay(preselectedId) {
+  const v = document.getElementById('view');
+  v.innerHTML = '<div class="text-center text-gray-400 py-16">Loading...</div>';
+  if (!data.clients.length) await loadClients();
+  v.innerHTML = `
+    <div class="max-w-md mx-auto bg-white rounded-xl shadow-sm p-4">
+      <h2 class="text-xl font-bold mb-3">💵 Record Bayad</h2>
+      <div class="space-y-3">
+        <div><label class="text-xs text-gray-500 block mb-1">Client</label>
+          <select id="pay-client" class="w-full px-3 py-3 border rounded-xl text-sm bg-white">${data.clients.map(c => '<option value="' + c.id + '"' + (c.id === preselectedId ? ' selected' : '') + '>' + esc(c.name) + ' — ' + peso(c.balance) + '</option>').join('')}</select>
+        </div>
+        <div><label class="text-xs text-gray-500 block mb-1">Amount</label>
+          <input id="pay-amount" type="number" step="0.01" placeholder="0.00" class="w-full px-3 py-3 border rounded-xl text-2xl font-bold text-center" />
+        </div>
+        <div class="grid grid-cols-4 gap-2">
+          <button onclick="setAmt(100)" class="py-2.5 bg-gray-100 rounded-xl text-sm font-semibold">+₱100</button>
+          <button onclick="setAmt(500)" class="py-2.5 bg-gray-100 rounded-xl text-sm font-semibold">+₱500</button>
+          <button onclick="setAmt(1000)" class="py-2.5 bg-gray-100 rounded-xl text-sm font-semibold">+₱1000</button>
+          <button onclick="setAmt('full')" class="py-2.5 bg-blue-100 text-blue-700 rounded-xl text-sm font-bold">Full</button>
+        </div>
+        <div><label class="text-xs text-gray-500 block mb-1">Method</label>
+          <select id="pay-type" class="w-full px-3 py-3 border rounded-xl text-sm bg-white"><option>Cash</option><option>GCash</option><option>Maya</option><option>Bank Transfer</option></select>
+        </div>
+        <button onclick="submitPay()" class="w-full py-4 bg-green-600 text-white rounded-xl font-bold text-lg shadow-lg">✓ Record Bayad</button>
+      </div>
+    </div>`;
+}
 function setAmt(val) {
   const input = document.getElementById('pay-amount');
-  if (val === 'full') { const id = parseInt(document.getElementById('pay-client').value); const c = state.clients.find(x => x.id === id); input.value = c ? c.balance.toFixed(2) : ''; }
+  if (val === 'full') { const id = parseInt(document.getElementById('pay-client').value); const c = data.clients.find(x => x.id === id); input.value = c ? (c.balance || 0).toFixed(2) : ''; }
   else input.value = ((parseFloat(input.value) || 0) + val).toFixed(2);
 }
-
 async function submitPay() {
   const clientId = parseInt(document.getElementById('pay-client').value);
   const amount = parseFloat(document.getElementById('pay-amount').value);
   const type = document.getElementById('pay-type').value;
-  if (!clientId || !amount) return alert('Fill all fields');
+  if (!clientId || !amount) return toast('Fill in client and amount', 'err');
   try {
-    const r = await fetch(API + '/api/payments', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Auth-Token': getToken() }, body: JSON.stringify({ clientId, amount, type, date: new Date().toISOString().split('T')[0] }) });
-    const result = await r.json();
-    if (result.success) { alert('✅ Bayad recorded!'); showView('home'); }
-    else alert('Error: ' + result.error);
-  } catch (e) { alert('Network error'); }
+    await apiPost('/api/payments', { clientId, amount, type, date: new Date().toISOString().split('T')[0] });
+    toast('✅ Bayad recorded!', 'ok');
+    showView('home'); await refreshAll();
+  } catch (e) { toast('Error: ' + e.message, 'err'); }
 }
 
-(async () => { await loadClients(); showView('home'); connectWS(); })();
+// ---------- INVENTORY ----------
+async function renderInventory() {
+  const v = document.getElementById('view');
+  if (!data.inventory.length) { v.innerHTML = '<div class="text-center text-gray-400 py-16">Loading...</div>'; await loadAll(); }
+  const low = data.inventory.filter(i => (i.stock || 0) <= (i.lowStock || 5)).length;
+  v.innerHTML = `
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-xl font-bold">📦 Inventory <span class="text-sm text-gray-400 font-normal">(${data.inventory.length} items)</span></h2>
+      <span class="text-xs font-bold ${low > 0 ? 'bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full' : 'bg-green-100 text-green-700 px-2.5 py-1 rounded-full'}">${low > 0 ? low + ' low stock' : 'All stocked'}</span>
+    </div>
+    <input id="inv-search" type="text" placeholder="🔍 Search..." oninput="filterInventory(this.value)" class="w-full px-4 py-2.5 rounded-xl border bg-white text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3" id="inv-grid">${invListHTML(data.inventory)}</div>`;
+}
+function invListHTML(items) {
+  return items.map(i => {
+    const stock = i.stock || 0;
+    return `
+    <div class="bg-white rounded-xl shadow-sm p-3 flex items-center gap-3 card-hover">
+      <span class="w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center bg-gray-100 shrink-0">${i.image ? '<img src="' + i.image + '" class="w-full h-full object-cover" />' : '<span class="text-2xl">📦</span>'}</span>
+      <div class="flex-1 min-w-0">
+        <div class="font-semibold text-sm truncate">${esc(i.name)}</div>
+        <div class="text-[11px] text-gray-400">${peso(i.price)} each</div>
+        <div class="text-xs font-bold ${stock <= 0 ? 'text-red-600' : stock <= (i.lowStock || 5) ? 'text-amber-600' : 'text-green-600'}">${stock <= 0 ? 'OUT OF STOCK' : stock + ' left'}</div>
+      </div>
+      <button onclick="openQuick(${i.id})" class="text-xs px-3 py-2 ${stock <= 0 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white rounded-lg'}">Sell</button>
+    </div>`;
+  }).join('');
+}
+function filterInventory(q) {
+  q = (q || '').toLowerCase();
+  const g = document.getElementById('inv-grid');
+  if (g) g.innerHTML = invListHTML(data.inventory.filter(i => (i.name || '').toLowerCase().includes(q)));
+}
+
+// ---------- TRANSACTIONS ----------
+async function renderTransactions() {
+  const v = document.getElementById('view');
+  if (!data.transactions.length) { v.innerHTML = '<div class="text-center text-gray-400 py-16">Loading...</div>'; await loadAll(); }
+  const total = data.transactions.reduce((s, t) => s + (t.grandTotal || 0), 0);
+  v.innerHTML = `
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-xl font-bold">🧾 Recent Sales</h2>
+      <span class="text-sm font-bold text-gray-500">${peso(total)} total</span>
+    </div>
+    <div class="grid md:grid-cols-2 gap-2 sm:gap-3">
+      ${data.transactions.map(t => `
+        <div class="bg-white rounded-xl shadow-sm p-3 flex items-center justify-between card-hover">
+          <div class="min-w-0">
+            <div class="font-semibold text-sm">${esc(t.clientName || 'Walk-in')}</div>
+            <div class="text-[11px] text-gray-400">${esc(t.invoiceNo || '')} · ${fmtDate(t.date)} · ${esc(t.paymentMethod || 'Cash')}${t.items ? ' · ' + t.items + ' item' + (t.items === 1 ? '' : 's') : ''}</div>
+          </div>
+          <div class="text-right shrink-0">
+            <div class="font-bold text-sm text-green-600">${peso(t.grandTotal)}</div>
+            <div class="text-[10px] ${(t.status || '') === 'pending' ? 'text-amber-600' : 'text-gray-400'}">${esc(t.status == null ? '' : t.status === 'pending' ? 'Utang' : 'Paid')}</div>
+          </div>
+        </div>`).join('')}
+    </div>`;
+}
+
+// ---------- init ----------
+(async () => {
+  await loadAll();
+  showView('home');
+  connectWS();
+  setInterval(() => { /* keep WS alive */ }, 25000);
+})();
 </script>
 </body>
 </html>

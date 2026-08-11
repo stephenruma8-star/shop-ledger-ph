@@ -1,5 +1,5 @@
 {
-  "version": "3.4.23",
-  "buildDate": "2026-08-11T14:00:00.000Z",
-  "notes": "Hotfix: selling from the Catalog (single item or Quick Cart) no longer throws an error after saving — the cart now clears, the catalog refreshes, and Sell & Print actually prints (v3.4.22 saved the sale but broke the screen afterward)"
+  "version": "3.4.24",
+  "buildDate": "2026-08-11T15:00:00.000Z",
+  "notes": "Rebuilt mobile PWA: full dashboard (today's sales/profit, total utang, month sales, recent sales), Catalog photo tiles with Quick Sale, cart-based New Sale (client, interest, SC/PWD, discount), clients, inventory and transactions views, plus 3 new LAN endpoints (/api/inventory, /api/transactions, /api/stats). Fixed Quick Sell letting out-of-stock items through (stock now clamps to 0 and blocks the sell). Added a functional mobile-page harness (7 views + endpoints + cart/sale/pay flows) to CI."
 }

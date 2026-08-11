@@ -245,6 +245,71 @@ function startLANServer() {
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
+  expressApp.get('/api/inventory', async (req, res) => {
+    try {
+      if (!mainWindow || mainWindow.isDestroyed()) return res.status(503).json({ error: 'Window not ready' });
+      const dump = await mainWindow.webContents.executeJavaScript('window.__app.getDBDump()');
+      res.json((dump.inventory || []).map(i => ({
+        id: i.id, name: i.name, price: parseFloat(i.sellPrice || i.price || 0) || 0,
+        stock: i.stock || 0, lowStock: i.lowStock ?? i.minStock ?? 5, image: i.image || null,
+        variants: i.variants || [], createdAt: i.createdAt
+      })).sort((a, b) => (a.name || '').localeCompare(b.name || '')));
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  expressApp.get('/api/transactions', async (req, res) => {
+    try {
+      if (!mainWindow || mainWindow.isDestroyed()) return res.status(503).json({ error: 'Window not ready' });
+      const dump = await mainWindow.webContents.executeJavaScript('window.__app.getDBDump()');
+      const limit = Math.min(parseInt(req.query.limit) || 200, 500);
+      const list = (dump.transactions || [])
+        .sort((a, b) => String(b.date || b.createdAt || '').localeCompare(String(a.date || a.createdAt || '')))
+        .slice(0, limit)
+        .map(t => ({
+          id: t.id, invoiceNo: t.invoiceNo, clientName: t.clientName, paymentMethod: t.paymentMethod,
+          date: t.date, createdAt: t.createdAt, grandTotal: t.grandTotal, subtotal: t.subtotal,
+          totalInterest: t.totalInterest, discount: t.discount, scDiscount: t.scDiscount,
+          status: t.status, items: (t.items || []).length
+        }));
+      res.json(list);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  expressApp.get('/api/stats', async (req, res) => {
+    try {
+      if (!mainWindow || mainWindow.isDestroyed()) return res.status(503).json({ error: 'Window not ready' });
+      const dump = await mainWindow.webContents.executeJavaScript('window.__app.getDBDump()');
+      const todayStr = new Date().toISOString().split('T')[0];
+      const todayTx = (dump.transactions || []).filter(t => t.date === todayStr);
+      const todaySales = todayTx.reduce((s, t) => s + (t.grandTotal || 0), 0);
+      const todayExp = (dump.expenses || []).filter(e => e.date === todayStr);
+      const todayExpTotal = todayExp.reduce((s, e) => s + (e.amount || 0), 0);
+      const todayPay = (dump.payments || []).filter(p => p.date === todayStr);
+      const todayPayTotal = todayPay.reduce((s, p) => s + (p.amount || 0), 0);
+      const totalUtang = (dump.clients || []).reduce((s, c) => s + (c.balance || 0), 0);
+      const lowStock = (dump.inventory || []).filter(i => (i.stock || 0) <= (i.lowStock ?? i.minStock ?? 5));
+      const monthSales = (dump.transactions || []).filter(t => (t.date || '').startsWith(todayStr.slice(0, 7)))
+        .reduce((s, t) => s + (t.grandTotal || 0), 0);
+      const monthPay = (dump.payments || []).filter(p => (p.date || '').startsWith(todayStr.slice(0, 7)))
+        .reduce((s, p) => s + (p.amount || 0), 0);
+      const monthExp = (dump.expenses || []).filter(e => (e.date || '').startsWith(todayStr.slice(0, 7)))
+        .reduce((s, e) => s + (e.amount || 0), 0);
+      res.json({
+        clients: (dump.clients || []).length,
+        inventory: (dump.inventory || []).length,
+        totalUtang, lowStockCount: lowStock.length,
+        todaySales, todayExpenses: todayExpTotal, todayCollected: todayPayTotal,
+        todayProfit: todaySales - todayExpTotal,
+        monthSales, monthCollected: monthPay, monthExpenses: monthExp,
+        monthProfit: monthSales - monthExp,
+        recent: (dump.transactions || [])
+          .sort((a, b) => String(b.date || b.createdAt || '').localeCompare(String(a.date || a.createdAt || '')))
+          .slice(0, 5)
+          .map(t => ({ invoiceNo: t.invoiceNo, clientName: t.clientName, grandTotal: t.grandTotal, date: t.date }))
+      });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
   expressApp.post('/api/payments', async (req, res) => {
     try {
       if (!mainWindow || mainWindow.isDestroyed()) return res.status(503).json({ error: 'Window not ready' });
