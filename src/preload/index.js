@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   generateMobileQR: () => ipcRenderer.invoke('generate-mobile-qr'),
   getAppPreferences: () => ipcRenderer.invoke('get-app-preferences'),
   setAppPreferences: (prefs) => ipcRenderer.invoke('set-app-preferences', prefs),
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   onHiddenToTray: (callback) => ipcRenderer.on('hidden-to-tray', () => callback()),
   saveLogo: (dataUrl) => ipcRenderer.invoke('save-logo', { dataUrl }),
   getLogo: () => ipcRenderer.invoke('get-logo'),

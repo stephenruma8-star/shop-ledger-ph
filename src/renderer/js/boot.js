@@ -139,8 +139,15 @@ export async function seedIfEmpty() {
   }
 }
 
-export function updateVersionBadge() {
-  const version = ((state.settings || []).find(s => s.key === 'lastBuildVersion') || {}).value || '3.4.23';
+export async function updateVersionBadge() {
+  let version = ((state.settings || []).find(s => s.key === 'lastBuildVersion') || {}).value || '';
+  if (window.electronAPI?.getAppVersion) {
+    try {
+      const v = await window.electronAPI.getAppVersion();
+      if (v) version = v;
+    } catch (e) { /* keep fallback */ }
+  }
+  if (!version) version = '3.4.27';
   const text = 'v' + version;
   for (const id of ['sidebar-version', 'login-version', 'app-version-label']) {
     const el = document.getElementById(id);
@@ -236,7 +243,7 @@ export async function boot() {
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') document.documentElement.classList.add('dark');
     navigate(state.currentRoute);
-    updateVersionBadge();
+    await updateVersionBadge();
     checkForNewBuild();
     initConnIndicator();
   } catch (e) {

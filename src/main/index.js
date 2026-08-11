@@ -536,6 +536,8 @@ ipcMain.handle('generate-mobile-qr', async () => {
 
 ipcMain.handle('get-app-preferences', () => readAppPrefs());
 
+ipcMain.handle('get-app-version', () => { try { return app.getVersion(); } catch (e) { return ''; } });
+
 ipcMain.handle('set-app-preferences', async (event, prefs) => {
   const next = { ...readAppPrefs(), ...(prefs || {}) };
   try { fs.writeFileSync(APP_CONFIG_PATH, JSON.stringify(next, null, 2)); } catch (e) { console.error('Failed to save app prefs:', e.message); }
