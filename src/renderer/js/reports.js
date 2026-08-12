@@ -7,21 +7,40 @@ import { fmtDate, now, peso, state, today } from './state.js'
 
 let _restoreResolve = null;
 
+function cogsOf(txList, invCost) {
+  let cogs = 0;
+  for (const t of txList) {
+    for (const it of (t.items || [])) {
+      if (it.invId == null) continue;
+      const m = String(it.name || it.qty || '1').match(/^-?[\d.]+/);
+      const qty = m ? parseFloat(m[0]) : 1;
+      cogs += qty * (invCost.get(it.invId) || 0);
+    }
+  }
+  return cogs;
+}
+
 export async function viewReports(root) {
-  await Promise.all([dbLoad('transactions'), dbLoad('payments'), dbLoad('expenses')]);
-  const rTx = filterByYear(state.transactions, 'date');
+  await Promise.all([dbLoad('transactions'), dbLoad('payments'), dbLoad('expenses'), dbLoad('inventory')]);
+  const rTx = filterByYear(state.transactions, 'date').filter(t => t.status !== 'voided');
   const rEx = filterByYear(state.expenses, 'date');
   const rPay = filterByYear(state.payments, 'date');
+  const invCost = new Map((state.inventory || []).map(i => [i.id, i.costPrice || 0]));
   const totalRevenue = rTx.reduce((s, t) => s + (t.grandTotal || 0), 0);
+  const totalCOGS = cogsOf(rTx, invCost);
   const totalExpenses = rEx.reduce((s, e) => s + (e.amount || 0), 0);
-  const netProfit = totalRevenue - totalExpenses;
+  const netProfit = totalRevenue - totalCOGS - totalExpenses;
   const profitMargin = totalRevenue > 0 ? ((netProfit / totalRevenue) * 100).toFixed(1) : 0;
   root.innerHTML = `
     <div class="space-y-4 fade-in">
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border-l-4 stat-card border-green-500">
           <p class="text-xs text-gray-500 uppercase">Total Revenue</p>
           <p class="text-2xl font-bold text-green-600">${peso(totalRevenue)}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border-l-4 stat-card border-amber-500">
+          <p class="text-xs text-gray-500 uppercase">Cost of Goods</p>
+          <p class="text-2xl font-bold text-amber-600">${peso(totalCOGS)}</p>
         </div>
         <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border-l-4 stat-card border-red-500">
           <p class="text-xs text-gray-500 uppercase">Total Expenses</p>
@@ -62,7 +81,7 @@ export function showMonthlyOverview() {
     d.setMonth(d.getMonth() - i);
     const monthKey = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
     labels.push(d.toLocaleDateString('en-PH', { month: 'short', year: 'numeric' }));
-    const monthRev = state.transactions.filter(t => (t.date || '').startsWith(monthKey));
+    const monthRev = state.transactions.filter(t => (t.date || '').startsWith(monthKey) && t.status !== 'voided');
     const monthExp = state.expenses.filter(e => (e.date || '').startsWith(monthKey));
     revData.push(monthRev.reduce((s, t) => s + (t.grandTotal || 0), 0));
     expData.push(monthExp.reduce((s, e) => s + (e.amount || 0), 0));
@@ -148,17 +167,20 @@ export async function exportExcel() {
     html += `<tr><td colspan="20" style="padding:14px 10px;border:1px solid #cbd5e1;background:#0f172a;color:#fff;font-size:18px;font-weight:700;text-align:center">${esc(shopName)} ${shopAddr ? '&mdash; '+esc(shopAddr) : ''}</td></tr>`;
 
     // Summary row
-    const expTx = filterByYear(state.transactions, 'date');
+    const expTx = filterByYear(state.transactions, 'date').filter(t => t.status !== 'voided');
     const expEx = filterByYear(state.expenses, 'date');
     const expPay = filterByYear(state.payments, 'date');
     const totalRevenue = expTx.reduce((s, t) => s + (t.grandTotal || 0), 0);
+    const invCost = new Map((state.inventory || []).map(i => [i.id, i.costPrice || 0]));
+    const totalCOGS = cogsOf(expTx, invCost);
     const totalExpenses = expEx.reduce((s, e) => s + (e.amount || 0), 0);
-    const netProfit = totalRevenue - totalExpenses;
+    const netProfit = totalRevenue - totalCOGS - totalExpenses;
     const totalUtang = state.clients.reduce((s, c) => s + (c.balance || 0), 0);
     const totalPayments = expPay.reduce((s, p) => s + (p.amount || 0), 0);
     const sumColor = netProfit >= 0 ? '#059669' : '#dc2626';
     html += `<tr><td colspan="20" style="padding:8px 10px;border:1px solid #cbd5e1;background:#f8fafc">
       <span style="margin-right:24px"><strong>Revenue:</strong> ₱${pesoVal(totalRevenue)}</span>
+      <span style="margin-right:24px"><strong>COGS:</strong> ₱${pesoVal(totalCOGS)}</span>
       <span style="margin-right:24px"><strong>Expenses:</strong> ₱${pesoVal(totalExpenses)}</span>
       <span style="margin-right:24px"><strong style="color:${sumColor}">Net Profit:</strong> <span style="color:${sumColor}">₱${pesoVal(netProfit)}</span></span>
       <span style="margin-right:24px"><strong>Utang:</strong> ₱${pesoVal(totalUtang)}</span>
@@ -280,12 +302,14 @@ export async function exportExcel() {
 
 export async function exportPDF() {
   await Promise.all([dbLoad('clients'), dbLoad('transactions'), dbLoad('payments'), dbLoad('expenses'), dbLoad('inventory'), dbLoad('suppliers'), dbLoad('purchaseOrders')]);
-  const pdfTx = filterByYear(state.transactions, 'date');
+  const pdfTx = filterByYear(state.transactions, 'date').filter(t => t.status !== 'voided');
   const pdfEx = filterByYear(state.expenses, 'date');
   const pdfPay = filterByYear(state.payments, 'date');
   const totalRevenue = pdfTx.reduce((s, t) => s + (t.grandTotal || 0), 0);
+  const invCost = new Map((state.inventory || []).map(i => [i.id, i.costPrice || 0]));
+  const totalCOGS = cogsOf(pdfTx, invCost);
   const totalExpenses = pdfEx.reduce((s, e) => s + (e.amount || 0), 0);
-  const netProfit = totalRevenue - totalExpenses;
+  const netProfit = totalRevenue - totalCOGS - totalExpenses;
   const totalUtang = state.clients.reduce((s, c) => s + (c.balance || 0), 0);
   const totalPayments = pdfPay.reduce((s, p) => s + (p.amount || 0), 0);
 
@@ -293,6 +317,7 @@ export async function exportPDF() {
 
   let html = `<div class="print-summary">
     <div class="card green"><span class="lbl">Revenue</span><span class="val">${fmt(totalRevenue)}</span></div>
+    <div class="card orange"><span class="lbl">Cost of Goods</span><span class="val">${fmt(totalCOGS)}</span></div>
     <div class="card red"><span class="lbl">Expenses</span><span class="val">${fmt(totalExpenses)}</span></div>
     <div class="card ${netProfit>=0?'blue':'red'}"><span class="lbl">Net Profit</span><span class="val">${fmt(netProfit)}</span></div>
     <div class="card orange"><span class="lbl">Outstanding Utang</span><span class="val">${fmt(totalUtang)}</span></div>

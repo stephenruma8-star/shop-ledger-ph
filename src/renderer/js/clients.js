@@ -1,8 +1,9 @@
+import { logAudit } from './auth.js'
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
 import { calcInterest, closeModal, confetti, confirmModal, debounce, escapeHtml, filterByYear, modal, parseCSVLine, playSound, searchData, toast, validatePhone } from './helpers.js'
 import { escHtml, openPrintWindow } from './printLayout.js'
 import { fmtDate, fmtDateTime, now, peso, state, today } from './state.js'
-import { getQty } from './transactions.js'
+import { adjustStock, getQty, resolveInvIds, undoSale } from './transactions.js'
 
 export async function viewClients(root) {
   state.clients = await dbAll('clients');
@@ -184,9 +185,11 @@ export async function saveClient(id) {
     c.dueDate = ddEl.value || '';
     c.ledgerYear = lyEl ? lyEl.value || '' : '';
     await dbPut('clients', c);
+    await logAudit('client-edit', `Updated client ${name}`);
     if (cfCart.length > 0) {
+      await resolveInvIds(cfCart);
       const existingTx = state.transactions.find(t => t.clientId === id && t.date === today() && t.status !== 'voided');
-      const items = cfCart.map(i => ({ date: i.date, description: i.description, name: i.name, unitCost: i.unitCost, intRate: i.intRate, amount: cfLineAmt(i), invId: null }));
+      const items = cfCart.map(i => ({ date: i.date, description: i.description, name: i.name, unitCost: i.unitCost, intRate: i.intRate, amount: cfLineAmt(i), invId: i.invId }));
       const newSub = cfCart.reduce((s, i) => s + cfLineSub(i), 0);
       const newInt = cfCart.reduce((s, i) => s + cfLineInt(i), 0);
       const newGT = newSub + newInt;
@@ -196,13 +199,16 @@ export async function saveClient(id) {
         existingTx.totalInterest = (existingTx.totalInterest || 0) + newInt;
         existingTx.grandTotal = (existingTx.grandTotal || 0) + newGT;
         await dbPut('transactions', existingTx);
+        await logAudit('sale', `Sale ${existingTx.invoiceNo} - ${peso(newGT)}`);
       } else {
         const invNos = state.transactions.filter(t => t.invoiceNo?.startsWith('INV-')).map(t => parseInt(t.invoiceNo.replace('INV-','')) || 0);
         const nextNo = invNos.length > 0 ? Math.max(...invNos) + 1 : 1;
         const invoiceNo = 'INV-' + String(nextNo).padStart(5,'0');
         const cfPay = document.getElementById('cf-payment')?.value || 'Cash';
         await dbAdd('transactions', { invoiceNo, clientId: id, clientName: name, date: today(), createdAt: now(), items, subtotal: newSub, totalInterest: newInt, discount: 0, scDiscount: 0, grandTotal: newGT, paymentMethod: cfPay, status: newGT <= 0 ? 'paid' : 'pending' });
+        await logAudit('sale', `Sale ${invoiceNo} - ${peso(newGT)}`);
       }
+      for (const i of cfCart) if (i.invId) await adjustStock(i.invId, i, -1);
       c.balance = (c.balance || 0) + newGT;
       await dbPut('clients', c);
     }
@@ -210,18 +216,22 @@ export async function saveClient(id) {
     sessionStorage.removeItem('clientFormDraft');
   } else {
     const clientId = await dbAdd('clients', { name, phone, address, balance: 0, dueDate: ddEl.value || '', createdAt: now(), ledgerYear: lyEl ? lyEl.value || '' : '' });
+    await logAudit('client-add', `Added client ${name}`);
     if (cfCart.length > 0) {
+      await resolveInvIds(cfCart);
       const subtotal = cfCart.reduce((s, i) => s + cfLineSub(i), 0);
       const totalInterest = cfCart.reduce((s, i) => s + cfLineInt(i), 0);
       const grandTotal = subtotal + totalInterest;
       const invNos = state.transactions.filter(t => t.invoiceNo?.startsWith('INV-')).map(t => parseInt(t.invoiceNo.replace('INV-','')) || 0);
       const nextNo = invNos.length > 0 ? Math.max(...invNos) + 1 : 1;
       const invoiceNo = 'INV-' + String(nextNo).padStart(5,'0');
-      const items = cfCart.map(i => ({ date: i.date, description: i.description, name: i.name, unitCost: i.unitCost, intRate: i.intRate, amount: cfLineAmt(i), invId: null }));
+      const items = cfCart.map(i => ({ date: i.date, description: i.description, name: i.name, unitCost: i.unitCost, intRate: i.intRate, amount: cfLineAmt(i), invId: i.invId }));
       const cfPay = document.getElementById('cf-payment')?.value || 'Cash';
       await dbAdd('transactions', { invoiceNo, clientId, clientName: name, date: today(), createdAt: now(), items, subtotal, totalInterest, discount: 0, scDiscount: 0, grandTotal, paymentMethod: cfPay, status: grandTotal <= 0 ? 'paid' : 'pending' });
+      for (const i of cfCart) if (i.invId) await adjustStock(i.invId, i, -1);
       const c = await dbGet('clients', clientId);
       if (c) { c.balance = (c.balance || 0) + grandTotal; await dbPut('clients', c); }
+      await logAudit('sale', `Sale ${invoiceNo} - ${peso(grandTotal)}`);
     }
     toast('Client added');
   }
@@ -409,6 +419,7 @@ export async function saveClientPayment(id) {
   c.balance = Math.max(0, (c.balance || 0) - amount);
   await dbPut('clients', c);
   await dbAdd('payments', { clientId: id, clientName: c.name, amount, date: dtEl.value || today(), type: amount >= (c.balance + amount) ? 'Full' : 'Partial', notes: ntEl.value.trim(), createdAt: now() });
+  await logAudit('payment', `${c.name} - ${peso(amount)}`);
   state.payments = await dbAll('payments');
   state.clients = await dbAll('clients');
   closeModal();
@@ -424,12 +435,9 @@ export async function deleteClientSale(txnId, clientId) {
   if (!await confirmModal('Delete this sale? Client balance will be adjusted.')) return;
   const t = state.transactions.find(x => x.id === txnId);
   if (!t) { toast('Transaction not found', 'error'); return; }
-  const c = await dbGet('clients', clientId);
+  await undoSale(t);
   await dbDel('transactions', txnId);
-  if (c) {
-    c.balance = Math.max(0, (c.balance || 0) - (t.grandTotal || 0));
-    await dbPut('clients', c);
-  }
+  await logAudit('sale-delete', `Deleted sale ${t.invoiceNo}`);
   state.transactions = await dbAll('transactions');
   state.clients = await dbAll('clients');
   closeModal();
@@ -457,6 +465,7 @@ export function importClients() {
     }
   state.clients = await dbAll('clients');
     renderClientGrid();
+    await logAudit('client-import', `Imported ${count} clients from CSV`);
     toast(`Imported ${count} clients`);
   };
   input.click();
@@ -471,9 +480,12 @@ export async function deleteClient(id) {
   if (txCount > 0 || payCount > 0) msg = `"${c.name}" has ${txCount} sale(s) and ${payCount} payment(s). All history will be removed. Continue?`;
   else if ((c.balance || 0) > 0) msg = `"${c.name}" owes ${peso(c.balance)}. Deleting will lose this debt. Continue?`;
   if (!await confirmModal(msg)) return;
+  const txs = state.transactions.filter(t => t.clientId === id);
+  for (const t of txs) await undoSale(t);
   await dbDel('clients', id);
-  await Promise.all(state.transactions.filter(t => t.clientId === id).map(t => dbDel('transactions', t.id)));
+  await Promise.all(txs.map(t => dbDel('transactions', t.id)));
   await Promise.all(state.payments.filter(p => p.clientId === id).map(p => dbDel('payments', p.id)));
+  await logAudit('client-delete', `Deleted client "${c.name}" (${txCount} sale(s), ${payCount} payment(s))`);
   state.clients = state.clients.filter(x => x.id !== id);
   state.transactions = state.transactions.filter(t => t.clientId !== id);
   state.payments = state.payments.filter(p => p.clientId !== id);

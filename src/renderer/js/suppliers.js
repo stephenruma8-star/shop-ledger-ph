@@ -1,3 +1,4 @@
+import { logAudit } from './auth.js'
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
 import { closeModal, confirmModal, dbLoad, debounce, escapeHtml, modal, searchData, toast } from './helpers.js'
 import { now, state } from './state.js'
@@ -73,18 +74,20 @@ export async function saveSup(id) {
     category: cgEl.value.trim(),
     address: adEl.value.trim()
   };
-  if (id) { const existing = await dbGet('suppliers', id); if (existing) obj.createdAt = existing.createdAt; obj.id = id; await dbPut('suppliers', obj); toast('Supplier updated'); }
-  else { obj.createdAt = now(); await dbAdd('suppliers', obj); toast('Supplier added'); }
+  if (id) { const existing = await dbGet('suppliers', id); if (existing) obj.createdAt = existing.createdAt; obj.id = id; await dbPut('suppliers', obj); await logAudit('supplier-edit', `Updated supplier ${name}`); toast('Supplier updated'); }
+  else { obj.createdAt = now(); await dbAdd('suppliers', obj); await logAudit('supplier-add', `Added supplier ${name}`); toast('Supplier added'); }
   closeModal();
   state.suppliers = await dbAll('suppliers');
   renderSupTable();
 }
 
 export async function deleteSup(id) {
+  const s = state.suppliers.find(x => x.id === id);
   if (!await confirmModal('Delete this supplier?')) return;
   await dbDel('suppliers', id);
   state.suppliers = await dbAll('suppliers');
   renderSupTable();
+  await logAudit('supplier-delete', `Deleted supplier ${s ? s.name : id}`);
   toast('Supplier deleted');
 }
 

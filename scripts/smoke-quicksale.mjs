@@ -114,6 +114,7 @@ Object.defineProperty(globalThis, 'navigator', { value: {}, configurable: true }
 globalThis.fetch = async () => ({ json: async () => ({ current_condition: [{ temp_C: 0, weatherDesc: [{ value: '' }], humidity: 0, windspeedKmph: 0 }], nearest_area: [{ areaName: [{ value: '' }] }] }), ok: true, text: async () => '' });
 globalThis.requestAnimationFrame = () => 0;
 globalThis.cancelAnimationFrame = () => {}
+globalThis.playSound = () => {};
 process.on('unhandledRejection', () => {});
 process.on('uncaughtException', () => {});
 globalThis.MutationObserver = class { observe() {} unobserve() {} disconnect() {} takeRecords() { return []; } };
@@ -268,6 +269,44 @@ try {
   const inv2c = await win.dbGet('inventory', invId2);
   eq(inv1c.stock, 6, 'item1 stock 7 -> 6');
   eq(inv2c.stock, 1, 'item2 stock 2 -> 1');
+
+  // --- blank row: typed description auto-links to matching inventory item and deducts stock ---
+  getEl('tm-client').options = [{ text: 'Walk-in' }];
+  getEl('tm-client').selectedIndex = 0;
+  getEl('tm-payment').value = 'Cash';
+  getEl('tm-sc').checked = false;
+  getEl('tm-discount').value = '0';
+  win.txCart = [{ date: new Date().toISOString().split('T')[0], description: 'Coke 500ml', name: '1', unitCost: 100, intRate: 0, invId: null }];
+  await win.doSaveTransaction();
+  const tx4 = await win.dbGet('transactions', 4);
+  eq(tx4.invoiceNo, 'INV-00004', 'blank-row sale saved as INV-00004');
+  eq(tx4.items[0].invId, invId1, 'typed description auto-linked to matching inventory item');
+  const inv1d = await win.dbGet('inventory', invId1);
+  eq(inv1d.stock, 5, 'linked item stock 6 -> 5');
+
+  // --- blank row: unknown description auto-creates an inventory item ---
+  win.txCart = [{ date: new Date().toISOString().split('T')[0], description: 'Pancit Canton', name: '2', unitCost: 30, intRate: 0, invId: null }];
+  await win.doSaveTransaction();
+  const tx5 = await win.dbGet('transactions', 5);
+  eq(tx5.invoiceNo, 'INV-00005', 'auto-create sale saved as INV-00005');
+  const newInv = (await win.dbAll('inventory')).find(i => i.name === 'Pancit Canton');
+  ok(!!newInv, 'unknown description auto-created inventory item');
+  eq(newInv.stock, 0, 'auto-created item stock = qty sold (2) - 2');
+  eq(tx5.items[0].invId, newInv.id, 'auto-created item linked on transaction line');
+  const audits2 = await win.dbAll('auditLogs');
+  ok(audits2.some(a => a.action === 'inventory' && (a.details || '').includes('Pancit Canton')), 'inventory audit written for auto-created item');
+
+  // --- variants: sale with variantName deducts variant + parent stock ---
+  const varId = await win.dbAdd('inventory', { name: 'Shirt', price: 200, sellPrice: 200, stock: 10, minStock: 2, variants: [{ name: 'M', stock: 6 }, { name: 'L', stock: 4 }], createdAt: new Date().toISOString() });
+  win.txCart = [{ date: new Date().toISOString().split('T')[0], description: 'Shirt', name: '1', unitCost: 200, intRate: 0, invId: varId, variantName: 'L' }];
+  await win.doSaveTransaction();
+  const varInv = await win.dbGet('inventory', varId);
+  eq(varInv.stock, 9, 'variant sale: parent stock 10 -> 9');
+  eq(varInv.variants.find(v => v.name === 'L').stock, 3, 'variant sale: L stock 4 -> 3');
+  eq(varInv.variants.find(v => v.name === 'M').stock, 6, 'variant sale: M stock untouched');
+  eq((await win.dbGet('transactions', 6)).invoiceNo, 'INV-00006', 'variant sale invoice INV-00006');
+  eq(win.getQty('-2'), -2, 'getQty parses negative qty (return lines)');
+  eq(win.getQty('3 pieces'), 3, 'getQty still parses plain qty with suffix');
 
   // --- update download progress modal (boot.js) ---
   win.showUpdateProgress('Starting download…');

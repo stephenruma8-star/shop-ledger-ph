@@ -76,6 +76,18 @@ export async function applyStockTake() {
     const inv = await dbGet('inventory', d.item.id);
     if (inv) {
       inv.stock = d.phys;
+      if (inv.variants && inv.variants.length) {
+        if (d.sys > 0) {
+          const factor = d.phys / d.sys;
+          inv.variants = inv.variants.map(v => ({ ...v, stock: Math.round(v.stock * factor) }));
+        } else if (d.phys > 0) {
+          const base = Math.floor(d.phys / inv.variants.length);
+          let rem = d.phys - base * inv.variants.length;
+          inv.variants = inv.variants.map((v, i) => ({ ...v, stock: base + (i < rem ? 1 : 0) }));
+        } else {
+          inv.variants = inv.variants.map(v => ({ ...v, stock: 0 }));
+        }
+      }
       await dbPut('inventory', inv);
       await logAudit('stocktake', `${d.item.name}: ${d.sys} → ${d.phys} (${d.diff > 0 ? '+' : ''}${d.diff})`);
     }

@@ -5,7 +5,7 @@ import { calcInterest, closeModal, confirmModal, dbLoad, debounce, escapeHtml, f
 import { openPrintWindow } from './printLayout.js'
 import { fmtDate, fmtDateTime, now, peso, state, today } from './state.js'
 
-export function getQty(name) { const m = String(name||'1').match(/^[\d.]+/); return m ? parseFloat(m[0]) : 1; }
+export function getQty(name) { const m = String(name||'1').match(/^-?[\d.]+/); return m ? parseFloat(m[0]) : 1; }
 export async function adjustStock(invId, item, delta) {
   if (!invId) return;
   const inv = await dbGet('inventory', invId);
@@ -134,7 +134,9 @@ export function renderTransactionModal(editTxn) {
           </div>
           ${qItems.length > 0 ? `<div><label class="text-xs text-gray-500 block">Quick Items (click to add row)</label><div class="flex flex-wrap gap-1">${qItems.map(q => {
             const qInv = state.inventory.find(i => i.name === q.name);
-            return `<button data-qiname="${escapeHtml(q.name)}" data-qiprice="${q.price}" onclick="quickAddToCart(this.dataset.qiname, parseFloat(this.dataset.qiprice))" class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center gap-1.5">${qInv && qInv.image ? `<img src="${qInv.image}" alt="" class="w-5 h-5 object-cover rounded" />` : ''}${escapeHtml(q.name)} ${peso(q.price)}</button>`;
+            const qStock = qInv ? (qInv.stock || 0) : null;
+            const qBadge = qStock === null ? '' : qStock <= 0 ? `<span class="text-red-500 font-bold"> (OUT)</span>` : qStock <= (qInv.minStock || 5) ? `<span class="text-amber-600 font-bold"> (${qStock})</span>` : `<span class="text-green-600 font-bold"> (${qStock})</span>`;
+            return `<button data-qiname="${escapeHtml(q.name)}" data-qiprice="${q.price}" onclick="quickAddToCart(this.dataset.qiname, parseFloat(this.dataset.qiprice))" class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center gap-1.5">${qInv && qInv.image ? `<img src="${qInv.image}" alt="" class="w-5 h-5 object-cover rounded" />` : ''}${escapeHtml(q.name)} ${peso(q.price)}${qBadge}</button>`;
           }).join('')}</div></div>` : ''}
         </div>
         <div>
@@ -168,7 +170,9 @@ export function addToCart() {
 }
 
 export function quickAddToCart(name, price) {
-  txCart.push({ date: today(), description: name, name: '1', unitCost: price, intRate: 0, invId: null });
+  const qInv = state.inventory.find(i => i.name === name);
+  if (qInv && (qInv.stock || 0) <= 0) { toast('Not enough stock for ' + name, 'error'); return; }
+  txCart.push({ date: today(), description: name, name: '1', unitCost: price, intRate: 0, invId: qInv ? qInv.id : null });
   renderTMCart();
   updateTMTotals();
 }
@@ -179,6 +183,7 @@ export function renderTMCart() {
   if (txCart.length === 0) { el.innerHTML = '<p class="text-gray-400 text-xs p-2">No items added yet</p>'; return; }
   el.innerHTML = `<table class="w-full text-xs"><thead><tr class="bg-gray-50 dark:bg-gray-700 sticky top-0"><th class="p-1 text-left">Date</th><th class="p-1 text-left">Description</th><th class="p-1 text-center">Qty/Name</th><th class="p-1 text-center">Variant</th><th class="p-1 text-right">Unit Cost</th><th class="p-1 text-right">Int. Rate</th><th class="p-1 text-right">Amount</th><th class="p-1"></th></tr></thead><tbody>${txCart.map((item, i) => {
     const invItem = item.invId ? state.inventory.find(x => x.id === item.invId) : (item.description ? state.inventory.find(x => x.name === item.description) : null);
+    if (!item.variantName && invItem && invItem.variants && invItem.variants.length) item.variantName = invItem.variants[0].name;
     const variants = invItem?.variants || [];
     const varOpts = variants.length ? `<select onchange="txCart[${i}].variantName=this.value" class="w-16 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs text-center">${variants.map((v,vi) => `<option value="${escapeHtml(v.name)}" ${item.variantName===v.name||vi===0?'selected':''}>${escapeHtml(v.name)}</option>`).join('')}</select>` : `<span class="text-gray-400 text-xs">${escapeHtml(item.variantName||'—')}</span>`;
     return `<tr class="border-b dark:border-gray-700">
@@ -244,7 +249,43 @@ export async function saveTransaction() {
   } finally { window.__app._savingTx = false; }
 }
 
+export async function resolveInvIds(items) {
+  for (const item of items) {
+    if (item.invId) continue;
+    const desc = String(item.description || '').trim();
+    if (!desc) continue;
+    const qty = getQty(item.name || item.qty || '1');
+    const existing = state.inventory.find(i => String(i.name || '').trim().toLowerCase() === desc.toLowerCase());
+    if (existing) { item.invId = existing.id; continue; }
+    const inv = {
+      name: desc, description: '', sku: '', category: '',
+      stock: Math.max(1, qty), minStock: 5, lowStock: 5,
+      costPrice: 0, sellPrice: item.unitCost || 0, price: item.unitCost || 0,
+      image: null, variants: [], createdAt: now()
+    };
+    const id = await dbAdd('inventory', inv);
+    inv.id = id;
+    state.inventory.push(inv);
+    item.invId = id;
+    await logAudit('inventory', 'Auto-created from sale: ' + desc);
+  }
+}
+
+export async function linkCartToInventory() { return resolveInvIds(txCart); }
+
+export async function undoSale(t) {
+  if (!t || t.status === 'voided') return;
+  for (const item of (t.items || [])) {
+    if (item.invId) await adjustStock(item.invId, item, 1);
+  }
+  if (t.clientId) {
+    const c = await dbGet('clients', t.clientId);
+    if (c) { c.balance = Math.max(0, (c.balance || 0) - (t.grandTotal || 0)); await dbPut('clients', c); }
+  }
+}
+
 export async function doSaveTransaction() {
+  await linkCartToInventory();
   const subtotal = txCart.reduce((s, i) => s + lineSub(i), 0);
   const totalInterest = txCart.reduce((s, i) => s + lineInt(i), 0);
   const scCheck = document.getElementById('tm-sc');
@@ -556,8 +597,11 @@ export async function deleteClientFromSale(id) {
   else if ((c.balance || 0) > 0) msg = `"${c.name}" owes ${peso(c.balance)}. Deleting will lose this debt. Continue?`;
   if (!await confirmModal(msg)) return;
   await dbDel('clients', id);
-  await Promise.all(state.transactions.filter(t => t.clientId === id).map(t => dbDel('transactions', t.id)));
+  const txs = state.transactions.filter(t => t.clientId === id);
+  for (const t of txs) await undoSale(t);
+  await Promise.all(txs.map(t => dbDel('transactions', t.id)));
   await Promise.all(state.payments.filter(p => p.clientId === id).map(p => dbDel('payments', p.id)));
+  await logAudit('client-delete', `Deleted client "${c.name}" (${txCount} sale(s), ${payCount} payment(s))`);
   [state.clients, state.transactions, state.payments] = await Promise.all([dbAll('clients'), dbAll('transactions'), dbAll('payments')]);
   renderTxTable();
   if (document.getElementById('clientGrid')) renderClientGrid();
@@ -692,11 +736,9 @@ export async function bulkDeleteTx() {
     const id = parseInt(cb.value);
     const t = await dbGet('transactions', id);
     if (!t) continue;
-    if (t.clientId) {
-      const c = await dbGet('clients', t.clientId);
-      if (c) { c.balance = Math.max(0, (c.balance || 0) - (t.grandTotal || 0)); await dbPut('clients', c); }
-    }
+    await undoSale(t);
     await dbDel('transactions', id);
+    await logAudit('sale-delete', `Deleted sale ${t.invoiceNo} - ${peso(t.grandTotal || 0)}`);
   }
   [state.transactions, state.clients] = await Promise.all([dbAll('transactions'), dbAll('clients')]);
   renderTxTable();
@@ -728,6 +770,7 @@ Object.defineProperties(window, {
   toggleSC: { get: () => toggleSC, configurable: true },
   saveTransaction: { get: () => saveTransaction, configurable: true },
   doSaveTransaction: { get: () => doSaveTransaction, configurable: true },
+  linkCartToInventory: { get: () => linkCartToInventory, configurable: true },
   buildReceiptHTML: { get: () => buildReceiptHTML, configurable: true },
   viewTransactionDetail: { get: () => viewTransactionDetail, configurable: true },
   voidTransaction: { get: () => voidTransaction, configurable: true },

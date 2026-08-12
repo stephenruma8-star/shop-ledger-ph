@@ -71,7 +71,7 @@ export function renderCatalog() {
     const stock = inv.stock || 0;
     const stockHtml = stock <= 0
       ? '<span class="text-red-600 font-semibold">Out of stock</span>'
-      : stock <= (inv.lowStock || 5)
+      : stock <= (inv.lowStock ?? inv.minStock ?? 5)
         ? '<span class="text-amber-600 font-semibold">Low stock: ' + stock + ' left</span>'
         : '<span class="text-gray-500">Stock: <span class="font-semibold text-green-600">' + stock + '</span></span>';
     return `<button onclick="openQuickSaleModal(${inv.id})" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden text-left card-hover hover:ring-2 hover:ring-blue-500/50 group">
@@ -170,7 +170,7 @@ export function qsRender() {
   if (stockEl) {
     stockEl.innerHTML = stock <= 0
       ? '<span class="text-red-600 font-semibold">Out of stock</span>'
-      : stock <= (inv.lowStock || 5)
+      : stock <= (inv.lowStock ?? inv.minStock ?? 5)
         ? '<span class="text-amber-600 font-semibold">Low stock: ' + stock + ' left</span>'
         : '<span class="text-green-600 font-semibold">Stock: ' + stock + '</span>';
   }

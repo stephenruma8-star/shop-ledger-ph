@@ -644,7 +644,10 @@ export async function applyDailyInterest() {
   else { await dbAdd('settings', { key: 'lastInterestDate', value: todayStr }); }
   state.settings = await dbAll('settings');
   state.clients = await dbAll('clients');
-  if (applied > 0) toast(`Interest applied: ${applied} client(s) over ${days} day(s)`, 'info');
+  if (applied > 0) {
+    await logAudit('interest', `Daily interest applied to ${applied} client(s) over ${days} day(s)`);
+    toast(`Interest applied: ${applied} client(s) over ${days} day(s)`, 'info');
+  }
 }
 
 export async function runCloudBackup() {

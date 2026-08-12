@@ -190,6 +190,7 @@ export async function saveInv(id) {
     costPrice: parseFloat(csEl.value) || 0,
     stock: totalStock,
     minStock: parseInt(mnEl.value) || 5,
+    lowStock: parseInt(mnEl.value) || 5,
     unit: (unEl ? unEl.value.trim() : '') || 'pcs',
     variants: variants.length > 0 ? variants : undefined,
     image: _invImage || undefined

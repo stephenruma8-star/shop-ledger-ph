@@ -1,3 +1,4 @@
+import { logAudit } from './auth.js'
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
 import { closeModal, confirmModal, dbLoad, debounce, escapeHtml, filterByYear, modal, paginate, renderPagination, searchData, toast } from './helpers.js'
 import { fmtDate, now, peso, state, today } from './state.js'
@@ -46,7 +47,7 @@ export let debouncedRenderExpTable = debounce(renderExpTable, 250);
 export function openExpenseModal(id) {
   const isEdit = !!id;
   const e = isEdit ? state.expenses.find(x => x.id === id) : null;
-  const categories = ['Utilities','Rent','Supplies','Transportation','Salaries','Marketing','Maintenance','Food','Other'];
+  const categories = ['Purchases','Utilities','Rent','Supplies','Transportation','Salaries','Marketing','Maintenance','Food','Other'];
   modal(`
     <div class="p-6">
       <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">${isEdit ? 'Edit' : 'New'} Expense</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
@@ -82,8 +83,8 @@ export async function saveExpense(id) {
     description: descEl.value.trim(),
     amount, payee: payeeEl.value.trim()
   };
-  if (id) { const existing = await dbGet('expenses', id); if (existing) obj.createdAt = existing.createdAt; obj.id = id; await dbPut('expenses', obj); toast('Expense updated'); }
-  else { obj.createdAt = now(); await dbAdd('expenses', obj); toast('Expense recorded'); }
+  if (id) { const existing = await dbGet('expenses', id); if (existing) obj.createdAt = existing.createdAt; obj.id = id; await dbPut('expenses', obj); await logAudit('expense-edit', `${obj.category}: ${peso(obj.amount)} - ${obj.description || ''}`.trim()); toast('Expense updated'); }
+  else { obj.createdAt = now(); await dbAdd('expenses', obj); await logAudit('expense-add', `${obj.category}: ${peso(obj.amount)} - ${obj.description || ''}`.trim()); toast('Expense recorded'); }
   closeModal();
   state.expenses = await dbAll('expenses');
   renderExpTable();
@@ -94,6 +95,7 @@ export async function deleteExpense(id) {
   await dbDel('expenses', id);
   state.expenses = await dbAll('expenses');
   renderExpTable();
+  await logAudit('expense-delete', `Deleted expense #${id}`);
   toast('Expense deleted');
 }
 

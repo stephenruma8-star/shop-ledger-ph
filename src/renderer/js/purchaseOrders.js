@@ -1,6 +1,6 @@
 import { logAudit } from './auth.js'
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
-import { closeModal, confirmModal, dbLoad, debounce, escapeHtml, itemThumbHtml, modal, searchData, toast } from './helpers.js'
+import { closeModal, confirmModal, dbLoad, debounce, escapeHtml, itemThumbHtml, modal, searchData, toast, updateLowStockBadge } from './helpers.js'
 import { fmtDate, now, peso, state, today } from './state.js'
 
 export let poItems = [];
@@ -80,9 +80,11 @@ export function addPOItem() {
   const defaultPrice = parseFloat(opt.dataset.price);
   const qty = parseInt(qtyEl.value) || 1;
   const price = parseFloat(prEl.value) || defaultPrice;
-  const existing = poItems.find(i => i.invId === invId);
+  const invItem = state.inventory.find(i => i.id === invId);
+  const variantName = invItem && invItem.variants && invItem.variants.length ? invItem.variants[0].name : null;
+  const existing = poItems.find(i => i.invId === invId && (i.variantName || null) === variantName);
   if (existing) { existing.qty += qty; existing.price = price; }
-  else { poItems.push({ invId, name, price, qty }); }
+  else { poItems.push({ invId, name, price, qty, variantName }); }
   renderPOCart();
 }
 
@@ -96,7 +98,7 @@ export function renderPOCart() {
   el.innerHTML = poItems.map((item, i) => {
   const invItem = item.invId ? state.inventory.find(x => x.id === item.invId) : null;
   return `<div class="flex justify-between items-center py-1 border-b dark:border-gray-700 last:border-0 text-sm">
-    <span class="flex items-center gap-2">${invItem ? itemThumbHtml(invItem, 'w-6 h-6') : ''}<span>${escapeHtml(item.name)} x${item.qty} @ ${peso(item.price)}</span></span>
+    <span class="flex items-center gap-2">${invItem ? itemThumbHtml(invItem, 'w-6 h-6') : ''}<span>${escapeHtml(item.name)}${item.variantName ? ` (${escapeHtml(item.variantName)})` : ''} x${item.qty} @ ${peso(item.price)}</span></span>
     <div><span class="font-medium">${peso(item.price * item.qty)}</span><button onclick="removePOItem(${i})" class="ml-2 text-red-500"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
   </div>`;
 }).join('');
@@ -137,6 +139,10 @@ export async function receivePO(id) {
       const inv = await dbGet('inventory', item.invId);
       if (inv) {
         inv.stock = (inv.stock || 0) + item.qty;
+        if (item.variantName && inv.variants) {
+          const v = inv.variants.find(x => x.name === item.variantName);
+          if (v) v.stock = (v.stock || 0) + item.qty;
+        }
         if (item.price > 0) inv.costPrice = item.price;
         await dbPut('inventory', inv);
       }
@@ -145,6 +151,10 @@ export async function receivePO(id) {
   po.status = 'Received';
   po.receivedAt = now();
   await dbPut('purchaseOrders', po);
+  const linkedExp = (await dbAll('expenses')).find(e => e.refType === 'po' && e.refId === po.id);
+  if (!linkedExp && (po.total || 0) > 0) {
+    await dbAdd('expenses', { date: today(), category: 'Purchases', description: `PO ${po.poNo} received`, payee: po.supplierName || '', amount: po.total, createdAt: now(), refType: 'po', refId: po.id });
+  }
   state.purchaseOrders = await dbAll('purchaseOrders');
   state.inventory = await dbAll('inventory');
   renderPOTable();
@@ -153,10 +163,32 @@ export async function receivePO(id) {
 }
 
 export async function deletePO(id) {
-  if (!await confirmModal('Delete this purchase order?')) return;
+  const po = await dbGet('purchaseOrders', id);
+  if (!po) { toast('PO not found', 'error'); return; }
+  if (!await confirmModal(po.status === 'Received' ? `Delete received PO ${po.poNo}? Inventory stock will be reversed.` : 'Delete this purchase order?')) return;
+  if (po.status === 'Received') {
+    for (const item of (po.items || [])) {
+      if (item.invId) {
+        const inv = await dbGet('inventory', item.invId);
+        if (inv) {
+          inv.stock = (inv.stock || 0) - item.qty;
+          if (item.variantName && inv.variants) {
+            const v = inv.variants.find(x => x.name === item.variantName);
+            if (v) v.stock = (v.stock || 0) - item.qty;
+          }
+          await dbPut('inventory', inv);
+        }
+      }
+    }
+    state.inventory = await dbAll('inventory');
+    updateLowStockBadge();
+  }
+  const linkedExp = (await dbAll('expenses')).find(e => e.refType === 'po' && e.refId === id);
+  if (linkedExp) await dbDel('expenses', linkedExp.id);
   await dbDel('purchaseOrders', id);
   state.purchaseOrders = await dbAll('purchaseOrders');
   renderPOTable();
+  await logAudit('po', `PO ${po.poNo} deleted`);
   toast('PO deleted');
 }
 
