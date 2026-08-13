@@ -1,5 +1,5 @@
 export const DB_NAME = 'ShopLedgerPH';
-export const DB_VERSION = 3;
+export const DB_VERSION = 4;
 export let db = null;
 
 export function openDB() {

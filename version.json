@@ -1,5 +1,5 @@
 {
-  "version": "3.4.30",
+  "version": "3.4.31",
   "buildDate": "2026-08-13T00:00:00.000Z",
-  "notes": "Ledger completeness: cash sales no longer add to the client's balance (utang now only comes from non-cash sales; void/undo/return/delete correctly reverse only what was actually added, tracked per transaction via the balanceAdded flag); daily interest now creates a visible INT-xxxxx ledger row per client (shown in the client history timeline, amber badge in Sales, excluded from all revenue figures); Suppliers page gains a payment ledger with Purchased/Paid/Owed totals and a Record Payment button."
+  "notes": "Fix for the loading screen hang: the supplier payment ledger store was only created on fresh installs (the DB version was never bumped, so existing databases never ran the store-creation upgrade and the Suppliers page locked on the spinner with a NotFoundError). DB_VERSION is now 4, which triggers the upgrade on existing installs and creates the missing supplierPayments store; a strict IndexedDB upgrade smoke test guards against this class of bug going forward."
 }
