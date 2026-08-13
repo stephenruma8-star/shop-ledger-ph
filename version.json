@@ -1,5 +1,5 @@
 {
-  "version": "3.4.29",
-  "buildDate": "2026-08-12T00:00:00.000Z",
-  "notes": "All data flows now connected: typed sale descriptions link to inventory by name (or auto-create items), quick items carry inventory ids with live stock badges, mobile /api/sales links too; client-form sales deduct stock; bulk delete / client-history delete / client delete / PO delete now restore stock, reverse balances and audit; multi-qty return amounts fixed; variant stock updated on modal sales, mobile sales, PO receive and stock take; voided sales excluded from revenue everywhere; PO receive auto-creates a Purchases expense (removed on PO delete); mobile payments badge Full/Partial like desktop; audit log now covers payments, expenses, client/supplier CRUD, mobile sales and daily interest; lowStock/minStock unified; reports net profit is now Revenue - COGS - Expenses."
+  "version": "3.4.30",
+  "buildDate": "2026-08-13T00:00:00.000Z",
+  "notes": "Ledger completeness: cash sales no longer add to the client's balance (utang now only comes from non-cash sales; void/undo/return/delete correctly reverse only what was actually added, tracked per transaction via the balanceAdded flag); daily interest now creates a visible INT-xxxxx ledger row per client (shown in the client history timeline, amber badge in Sales, excluded from all revenue figures); Suppliers page gains a payment ledger with Purchased/Paid/Owed totals and a Record Payment button."
 }
