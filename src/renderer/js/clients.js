@@ -188,11 +188,7 @@ export async function saveClient(id) {
     await logAudit('client-edit', `Updated client ${name}`);
     if (cfCart.length > 0) {
       await resolveInvIds(cfCart);
-      const existingTx = state.transactions.find(t => t.clientId === id && t.date === today() && t.status !== 'voided');
-      const items = cfCart.map(i => ({ date: i.date, description: i.description, name: i.name, unitCost: i.unitCost, intRate: i.intRate, amount: cfLineAmt(i), invId: i.invId }));
-      const newSub = cfCart.reduce((s, i) => s + cfLineSub(i), 0);
-      const newInt = cfCart.reduce((s, i) => s + cfLineInt(i), 0);
-      const newGT = newSub + newInt;
+      const cfPay = document.getElementById('cf-payment')?.value || 'Cash';
       if (existingTx) {
         existingTx.items = [...(existingTx.items || []), ...items];
         existingTx.subtotal = (existingTx.subtotal || 0) + newSub;
@@ -204,13 +200,11 @@ export async function saveClient(id) {
         const invNos = state.transactions.filter(t => t.invoiceNo?.startsWith('INV-')).map(t => parseInt(t.invoiceNo.replace('INV-','')) || 0);
         const nextNo = invNos.length > 0 ? Math.max(...invNos) + 1 : 1;
         const invoiceNo = 'INV-' + String(nextNo).padStart(5,'0');
-        const cfPay = document.getElementById('cf-payment')?.value || 'Cash';
-        await dbAdd('transactions', { invoiceNo, clientId: id, clientName: name, date: today(), createdAt: now(), items, subtotal: newSub, totalInterest: newInt, discount: 0, scDiscount: 0, grandTotal: newGT, paymentMethod: cfPay, status: newGT <= 0 ? 'paid' : 'pending' });
+        await dbAdd('transactions', { invoiceNo, clientId: id, clientName: name, date: today(), createdAt: now(), items, subtotal: newSub, totalInterest: newInt, discount: 0, scDiscount: 0, grandTotal: newGT, paymentMethod: cfPay, status: newGT <= 0 ? 'paid' : 'pending', balanceAdded: cfPay !== 'Cash' });
         await logAudit('sale', `Sale ${invoiceNo} - ${peso(newGT)}`);
       }
       for (const i of cfCart) if (i.invId) await adjustStock(i.invId, i, -1);
-      c.balance = (c.balance || 0) + newGT;
-      await dbPut('clients', c);
+      if (cfPay !== 'Cash') { c.balance = (c.balance || 0) + newGT; await dbPut('clients', c); }
     }
     toast('Client updated');
     sessionStorage.removeItem('clientFormDraft');
@@ -227,10 +221,10 @@ export async function saveClient(id) {
       const invoiceNo = 'INV-' + String(nextNo).padStart(5,'0');
       const items = cfCart.map(i => ({ date: i.date, description: i.description, name: i.name, unitCost: i.unitCost, intRate: i.intRate, amount: cfLineAmt(i), invId: i.invId }));
       const cfPay = document.getElementById('cf-payment')?.value || 'Cash';
-      await dbAdd('transactions', { invoiceNo, clientId, clientName: name, date: today(), createdAt: now(), items, subtotal, totalInterest, discount: 0, scDiscount: 0, grandTotal, paymentMethod: cfPay, status: grandTotal <= 0 ? 'paid' : 'pending' });
+      await dbAdd('transactions', { invoiceNo, clientId, clientName: name, date: today(), createdAt: now(), items, subtotal, totalInterest, discount: 0, scDiscount: 0, grandTotal, paymentMethod: cfPay, status: grandTotal <= 0 ? 'paid' : 'pending', balanceAdded: cfPay !== 'Cash' });
       for (const i of cfCart) if (i.invId) await adjustStock(i.invId, i, -1);
       const c = await dbGet('clients', clientId);
-      if (c) { c.balance = (c.balance || 0) + grandTotal; await dbPut('clients', c); }
+      if (cfPay !== 'Cash' && c) { c.balance = (c.balance || 0) + grandTotal; await dbPut('clients', c); }
       await logAudit('sale', `Sale ${invoiceNo} - ${peso(grandTotal)}`);
     }
     toast('Client added');
@@ -247,7 +241,7 @@ export async function viewClientHistory(id) {
   if (!c) { toast('Client not found', 'error'); return; }
   const allTx = filterByYear(state.transactions.filter(t => t.clientId === id), 'date').sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   const allPays = filterByYear(state.payments.filter(p => p.clientId === id), 'date').sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  const totalSpent = allTx.reduce((s, t) => s + (t.grandTotal || 0), 0);
+  const totalSpent = allTx.filter(t => t.status !== 'interest').reduce((s, t) => s + (t.grandTotal || 0), 0);
   const totalPaid = allPays.reduce((s, p) => s + (p.amount || 0), 0);
   let activeTab = 'all';
   const tabContent = (tab) => {
@@ -260,7 +254,7 @@ export async function viewClientHistory(id) {
       if (item.type === 'sale') {
         const t = item.t;
         const rb = runningBal;
-        runningBal -= t.grandTotal || 0;
+        runningBal += t.status === 'interest' ? (t.grandTotal || 0) : -(t.grandTotal || 0);
         return `<div class="border dark:border-gray-700 rounded-lg mb-2 overflow-hidden">
           <div class="flex justify-between items-center px-3 py-2 bg-gray-50 dark:bg-gray-700 cursor-pointer" onclick="this.nextElementSibling.classList.toggle('hidden')">
             <div><span class="text-sm font-medium">${escHtml(t.invoiceNo||'Sale')}</span><span class="text-xs text-gray-400 ml-2">${fmtDateTime(t.createdAt)}</span></div>

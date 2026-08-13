@@ -6,7 +6,7 @@ import { fmtDate, fmtDateTime, peso, state, today } from './state.js'
 export async function viewDashboard(root) {
   await Promise.all([dbLoad('clients'), dbLoad('transactions'), dbLoad('expenses'), dbLoad('payments'), dbLoad('inventory'), dbLoad('settings')]);
   const todayStr = today();
-  const todayTx = state.transactions.filter(t => t.date === todayStr && t.status !== 'voided');
+  const todayTx = state.transactions.filter(t => t.date === todayStr && t.status !== 'voided' && t.status !== 'interest');
   const todayExp = state.expenses.filter(e => e.date === todayStr);
   const todayPay = state.payments.filter(p => p.date === todayStr);
   const todaySales = todayTx.reduce((s, t) => s + (t.grandTotal || 0), 0);
@@ -186,7 +186,7 @@ export async function dashToggle(key, val) {
 
 export async function dailySalesReport() {
   const todayStr = today();
-  const todayTx = state.transactions.filter(t => t.date === todayStr && t.status !== 'voided');
+  const todayTx = state.transactions.filter(t => t.date === todayStr && t.status !== 'voided' && t.status !== 'interest');
   const todayExp = state.expenses.filter(e => e.date === todayStr);
   const todayPay = state.payments.filter(p => p.date === todayStr);
   const sales = todayTx.reduce((s, t) => s + (t.grandTotal || 0), 0);
@@ -213,7 +213,7 @@ export async function dailySalesReport() {
 
 export function printDailyReport(openingCash) {
   const todayStr = today();
-  const todayTx = state.transactions.filter(t => t.date === todayStr && t.status !== 'voided');
+  const todayTx = state.transactions.filter(t => t.date === todayStr && t.status !== 'voided' && t.status !== 'interest');
   const todayExp = state.expenses.filter(e => e.date === todayStr);
   const todayPay = state.payments.filter(p => p.date === todayStr);
   const sales = todayTx.reduce((s, t) => s + (t.grandTotal || 0), 0);
@@ -280,7 +280,7 @@ export async function askAI() {
     const topClients = [...state.clients].filter(c => (c.balance||0) > 0).sort((a,b) => (b.balance||0)-(a.balance||0)).slice(0, 20);
     const recentTx = [...state.transactions].sort((a,b) => new Date(b.createdAt)-new Date(a.createdAt)).slice(0, 30);
     const lowStock = state.inventory.filter(i => (i.stock||0) <= (i.minStock||5));
-    const todaySales = state.transactions.filter(t => t.date === today() && t.status !== 'voided').reduce((s,t) => s+(t.grandTotal||0), 0);
+    const todaySales = state.transactions.filter(t => t.date === today() && t.status !== 'voided' && t.status !== 'interest').reduce((s,t) => s+(t.grandTotal||0), 0);
     const totalUtang = state.clients.reduce((s,c) => s+(c.balance||0), 0);
     let baseUrl, model, headers;
     if (provider === 'ollama') {
@@ -297,7 +297,7 @@ export async function askAI() {
 Shop Data Snapshot:
 - Total clients: ${state.clients.length}
 - Total transactions: ${state.transactions.length}
-- Total sales (all time): ₱${state.transactions.filter(t => t.status !== 'voided').reduce((s,t) => s+(t.grandTotal||0), 0).toFixed(2)}
+- Total sales (all time): ₱${state.transactions.filter(t => t.status !== 'voided' && t.status !== 'interest').reduce((s,t) => s+(t.grandTotal||0), 0).toFixed(2)}
 - Total expenses: ₱${state.expenses.reduce((s,e) => s+(e.amount||0), 0).toFixed(2)}
 - Today's sales: ₱${todaySales.toFixed(2)}
 - Total utang (outstanding balance): ₱${totalUtang.toFixed(2)}
@@ -567,7 +567,7 @@ export function drawDashChart() {
     const d = new Date(); d.setDate(d.getDate() - i);
     const key = d.toISOString().split('T')[0];
     labels.push(d.toLocaleDateString('en-PH', { weekday: 'short' }));
-    const dayTx = state.transactions.filter(t => t.date === key && t.status !== 'voided');
+    const dayTx = state.transactions.filter(t => t.date === key && t.status !== 'voided' && t.status !== 'interest');
     const dayExp = state.expenses.filter(e => e.date === key);
     sales.push(dayTx.reduce((s, t) => s + (t.grandTotal || 0), 0));
     expenses.push(dayExp.reduce((s, e) => s + (e.amount || 0), 0));
@@ -591,7 +591,7 @@ export function drawPayMethodChart() {
   if (typeof Chart === 'undefined') { setTimeout(drawPayMethodChart, 200); return; }
   if (window.__app.chartInstances.payMethod) window.__app.chartInstances.payMethod.destroy();
   const todayStr = today();
-  const todayTx = state.transactions.filter(t => t.date === todayStr && t.status !== 'voided');
+  const todayTx = state.transactions.filter(t => t.date === todayStr && t.status !== 'voided' && t.status !== 'interest');
   const methods = ['Cash', 'GCash', 'Maya', 'Bank Transfer'];
   const colors = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b'];
   const data = methods.map(m => todayTx.filter(t => (t.paymentMethod||'Cash') === m).reduce((s, t) => s + (t.grandTotal || 0), 0));
@@ -629,7 +629,7 @@ export function getProfitData() {
   const itemMap = new Map();
   let tRev = 0, tCogs = 0, tDisc = 0;
   for (const t of state.transactions || []) {
-    if (t.status === 'voided') continue;
+    if (t.status === 'voided' || t.status === 'interest') continue;
     const itms = t.items || [];
     const tot = itms.reduce((s, i) => s + (Number(i.amount) || 0), 0);
     const disc = (t.discount || 0) + (t.scDiscount || 0);

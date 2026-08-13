@@ -28,6 +28,12 @@ export function lineInt(item) {
 }
 export function lineAmt(item) { return lineSub(item) + lineInt(item); }
 
+export function wasBalanceAdded(t) {
+  if (!t || !t.clientId) return false;
+  if (t.balanceAdded !== undefined) return !!t.balanceAdded;
+  return t.paymentMethod !== 'Cash';
+}
+
 export let txCart = [];
 export let txEditingId = null;
 
@@ -77,7 +83,8 @@ export function renderTxTable() {
     <tbody>${items.map(t => {
       const isVoided = t.status === 'voided';
       const isReturn = t.status === 'return';
-      const statusBadge = isVoided ? '<span class="px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-700 dark:bg-red-900/30 font-semibold">VOIDED</span>' : isReturn ? '<span class="px-2 py-0.5 rounded-full text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/30 font-semibold">RETURN</span>' : t.status === 'pending' ? '<span class="px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-700 dark:bg-amber-900/30">Pending</span>' : '<span class="px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700 dark:bg-green-900/30">Paid</span>';
+      const isInterest = t.status === 'interest';
+  const statusBadge = isVoided ? '<span class="px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-700 dark:bg-red-900/30 font-semibold">VOIDED</span>' : isReturn ? '<span class="px-2 py-0.5 rounded-full text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/30 font-semibold">RETURN</span>' : isInterest ? '<span class="px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-700 dark:bg-amber-900/30 font-semibold">INTEREST</span>' : t.status === 'pending' ? '<span class="px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-700 dark:bg-amber-900/30">Pending</span>' : '<span class="px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700 dark:bg-green-900/30">Paid</span>';
       const rowClass = isVoided ? 'border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer opacity-60' : isReturn ? 'border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer bg-purple-50 dark:bg-purple-900/10' : 'border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer';
       return `<tr class="${rowClass}" onclick="viewTransactionDetail(${t.id})">
       <td class="p-3 w-10"><input type="checkbox" value="${t.id}" class="tx-check" onchange="toggleTxBulkBar()" onclick="event.stopPropagation()" /></td>
@@ -278,7 +285,7 @@ export async function undoSale(t) {
   for (const item of (t.items || [])) {
     if (item.invId) await adjustStock(item.invId, item, 1);
   }
-  if (t.clientId) {
+  if (wasBalanceAdded(t)) {
     const c = await dbGet('clients', t.clientId);
     if (c) { c.balance = Math.max(0, (c.balance || 0) - (t.grandTotal || 0)); await dbPut('clients', c); }
   }
@@ -309,7 +316,7 @@ export async function doSaveTransaction() {
           editRollback.push(() => adjustStock(item.invId, item, -1));
         }
       }
-      if (oldTxn.clientId) {
+      if (wasBalanceAdded(oldTxn)) {
         const oldC = await dbGet('clients', oldTxn.clientId);
         if (oldC) { oldC.balance = Math.max(0, (oldC.balance || 0) - (oldTxn.grandTotal || 0)); await dbPut('clients', oldC); }
         editRollback.push(() => dbGet('clients', oldTxn.clientId).then(cc => { if (cc) { cc.balance = (cc.balance || 0) + (oldTxn.grandTotal || 0); return dbPut('clients', cc); } }));
@@ -321,12 +328,12 @@ export async function doSaveTransaction() {
           editRollback.push(() => adjustStock(item.invId, item, 1));
         }
       }
-      if (clientId) {
+      if (clientId && paymentMethod !== 'Cash') {
         const c = await dbGet('clients', clientId);
         if (c) { c.balance = (c.balance || 0) + grandTotal; await dbPut('clients', c); }
         editRollback.push(() => dbGet('clients', clientId).then(cc => { if (cc) { cc.balance = (cc.balance || 0) - grandTotal; return dbPut('clients', cc); } }));
       }
-      const updated = { ...oldTxn, clientId, clientName, paymentMethod, items: newItems, subtotal, totalInterest, discount, scDiscount, grandTotal, editedAt: now() };
+      const updated = { ...oldTxn, clientId, clientName, paymentMethod, items: newItems, subtotal, totalInterest, discount, scDiscount, grandTotal, balanceAdded: !!(clientId && paymentMethod !== 'Cash'), editedAt: now() };
       await dbPut('transactions', updated);
       toast(`Sale ${oldTxn.invoiceNo} updated`, 'success');
       await logAudit('sale-edit', `Sale ${oldTxn.invoiceNo} updated: ${peso(oldTxn.grandTotal)} → ${peso(grandTotal)}`);
@@ -344,7 +351,8 @@ export async function doSaveTransaction() {
       invoiceNo, clientId, clientName, date: today(), createdAt: now(),
       items: txCart.map(i => ({ date: i.date, description: i.description, name: i.name, unitCost: i.unitCost, intRate: i.intRate, amount: lineAmt(i), invId: i.invId, variantName: i.variantName })),
       subtotal, totalInterest, discount, scDiscount, grandTotal,
-      paymentMethod, status: grandTotal <= 0 ? 'paid' : 'pending'
+      paymentMethod, status: grandTotal <= 0 ? 'paid' : 'pending',
+      balanceAdded: !!(clientId && paymentMethod !== 'Cash')
     };
     const rollback = [];
     try {
@@ -355,7 +363,7 @@ export async function doSaveTransaction() {
           rollback.push(() => adjustStock(item.invId, item, 1));
         }
       }
-      if (clientId) {
+      if (clientId && paymentMethod !== 'Cash') {
         const c = await dbGet('clients', clientId);
         if (c) {
           c.balance = (c.balance || 0) + grandTotal;
@@ -513,7 +521,7 @@ export async function voidTransaction(id) {
   for (const item of (t.items || [])) {
     if (item.invId) await adjustStock(item.invId, item, 1);
   }
-  if (t.clientId) {
+  if (wasBalanceAdded(t)) {
     const c = await dbGet('clients', t.clientId);
     if (c) { c.balance = Math.max(0, (c.balance || 0) - (t.grandTotal || 0)); await dbPut('clients', c); }
   }
@@ -557,7 +565,7 @@ export async function confirmReturn(id) {
     if (item.invId) await adjustStock(item.invId, item, 1);
   }
   const retTotal = returnItems.reduce((s, i) => s + (getQty(i.name || i.qty || '1') * (i.unitCost || i.price || 0)), 0);
-  if (orig.clientId) {
+  if (wasBalanceAdded(orig)) {
     const c = await dbGet('clients', orig.clientId);
     if (c) { c.balance = Math.max(0, (c.balance || 0) - Math.abs(retTotal)); await dbPut('clients', c); }
   }
@@ -575,6 +583,7 @@ export async function confirmReturn(id) {
     date: today(),
     createdAt: now(),
     status: 'return',
+    balanceAdded: false,
     refId: id
   };
   await dbAdd('transactions', retTxn);
@@ -771,6 +780,8 @@ Object.defineProperties(window, {
   saveTransaction: { get: () => saveTransaction, configurable: true },
   doSaveTransaction: { get: () => doSaveTransaction, configurable: true },
   linkCartToInventory: { get: () => linkCartToInventory, configurable: true },
+  undoSale: { get: () => undoSale, configurable: true },
+  wasBalanceAdded: { get: () => wasBalanceAdded, configurable: true },
   buildReceiptHTML: { get: () => buildReceiptHTML, configurable: true },
   viewTransactionDetail: { get: () => viewTransactionDetail, configurable: true },
   voidTransaction: { get: () => voidTransaction, configurable: true },

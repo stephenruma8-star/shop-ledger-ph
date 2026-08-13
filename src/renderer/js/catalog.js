@@ -382,7 +382,8 @@ async function sellItems(items, opts, printSize) {
     invoiceNo, clientId: opts.clientId, clientName: opts.clientName,
     date: today(), createdAt: now(), items,
     subtotal, totalInterest, discount, scDiscount, grandTotal,
-    paymentMethod: opts.paymentMethod, status: grandTotal <= 0 ? 'paid' : 'pending'
+    paymentMethod: opts.paymentMethod, status: grandTotal <= 0 ? 'paid' : 'pending',
+    balanceAdded: !!(opts.clientId && opts.paymentMethod !== 'Cash')
   };
   _qsBusy = true;
   let newId = null;
@@ -395,7 +396,7 @@ async function sellItems(items, opts, printSize) {
         rollback.push(() => adjustStock(it.invId, it, 1));
       }
     }
-    if (opts.clientId) {
+    if (opts.clientId && opts.paymentMethod !== 'Cash') {
       const c = await dbGet('clients', opts.clientId);
       if (c) {
         c.balance = (c.balance || 0) + grandTotal;

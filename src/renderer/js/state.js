@@ -10,6 +10,7 @@ export const state = {
   expenses: [],
   suppliers: [],
   purchaseOrders: [],
+  supplierPayments: [],
   notifications: [],
   user: null,
   currentRoute: 'dashboard',

@@ -22,7 +22,7 @@ function cogsOf(txList, invCost) {
 
 export async function viewReports(root) {
   await Promise.all([dbLoad('transactions'), dbLoad('payments'), dbLoad('expenses'), dbLoad('inventory')]);
-  const rTx = filterByYear(state.transactions, 'date').filter(t => t.status !== 'voided');
+  const rTx = filterByYear(state.transactions, 'date').filter(t => t.status !== 'voided' && t.status !== 'interest');
   const rEx = filterByYear(state.expenses, 'date');
   const rPay = filterByYear(state.payments, 'date');
   const invCost = new Map((state.inventory || []).map(i => [i.id, i.costPrice || 0]));
@@ -81,7 +81,7 @@ export function showMonthlyOverview() {
     d.setMonth(d.getMonth() - i);
     const monthKey = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
     labels.push(d.toLocaleDateString('en-PH', { month: 'short', year: 'numeric' }));
-    const monthRev = state.transactions.filter(t => (t.date || '').startsWith(monthKey) && t.status !== 'voided');
+    const monthRev = state.transactions.filter(t => (t.date || '').startsWith(monthKey) && t.status !== 'voided' && t.status !== 'interest');
     const monthExp = state.expenses.filter(e => (e.date || '').startsWith(monthKey));
     revData.push(monthRev.reduce((s, t) => s + (t.grandTotal || 0), 0));
     expData.push(monthExp.reduce((s, e) => s + (e.amount || 0), 0));
@@ -121,6 +121,7 @@ export async function getAllData() {
     payments: await dbAll('payments'), inventory: await dbAll('inventory'),
     quickItems: await dbAll('quickItems'), expenses: await dbAll('expenses'),
     suppliers: await dbAll('suppliers'), purchaseOrders: await dbAll('purchaseOrders'),
+    supplierPayments: await dbAll('supplierPayments'),
     notifications: await dbAll('notifications'),
     auditLogs: await dbAll('auditLogs'), users,
     settings: await dbAll('settings'), exportedAt: now()
@@ -167,7 +168,7 @@ export async function exportExcel() {
     html += `<tr><td colspan="20" style="padding:14px 10px;border:1px solid #cbd5e1;background:#0f172a;color:#fff;font-size:18px;font-weight:700;text-align:center">${esc(shopName)} ${shopAddr ? '&mdash; '+esc(shopAddr) : ''}</td></tr>`;
 
     // Summary row
-    const expTx = filterByYear(state.transactions, 'date').filter(t => t.status !== 'voided');
+    const expTx = filterByYear(state.transactions, 'date').filter(t => t.status !== 'voided' && t.status !== 'interest');
     const expEx = filterByYear(state.expenses, 'date');
     const expPay = filterByYear(state.payments, 'date');
     const totalRevenue = expTx.reduce((s, t) => s + (t.grandTotal || 0), 0);
@@ -302,7 +303,7 @@ export async function exportExcel() {
 
 export async function exportPDF() {
   await Promise.all([dbLoad('clients'), dbLoad('transactions'), dbLoad('payments'), dbLoad('expenses'), dbLoad('inventory'), dbLoad('suppliers'), dbLoad('purchaseOrders')]);
-  const pdfTx = filterByYear(state.transactions, 'date').filter(t => t.status !== 'voided');
+  const pdfTx = filterByYear(state.transactions, 'date').filter(t => t.status !== 'voided' && t.status !== 'interest');
   const pdfEx = filterByYear(state.expenses, 'date');
   const pdfPay = filterByYear(state.payments, 'date');
   const totalRevenue = pdfTx.reduce((s, t) => s + (t.grandTotal || 0), 0);
@@ -446,7 +447,7 @@ export async function restoreJSONFlow() {
   const data = result.data;
   if (!data || typeof data !== 'object') { toast('Invalid backup file', 'error'); return; }
   try {
-    const stores = ['clients','transactions','payments','inventory','quickItems','settings','users','expenses','suppliers','purchaseOrders','notifications','auditLogs'];
+    const stores = ['clients','transactions','payments','inventory','quickItems','settings','users','expenses','suppliers','purchaseOrders','supplierPayments','notifications','auditLogs'];
     await Promise.all(stores.map(s => dbClear(s)));
     for (const store of stores) {
       const items = data[store];
@@ -488,7 +489,7 @@ export async function restoreEncryptedFlow() {
     const decryptResult = await window.electronAPI.decryptBackupData(fileResult.data, pw);
     if (!decryptResult.success) { toast('Decryption failed: ' + (decryptResult.error || 'Wrong password?'), 'error'); return; }
     const data = decryptResult.data;
-    const stores = ['clients','transactions','payments','inventory','quickItems','settings','users','expenses','suppliers','purchaseOrders','notifications','auditLogs'];
+    const stores = ['clients','transactions','payments','inventory','quickItems','settings','users','expenses','suppliers','purchaseOrders','supplierPayments','notifications','auditLogs'];
     await Promise.all(stores.map(s => dbClear(s)));
     for (const store of stores) {
       const items = data[store];

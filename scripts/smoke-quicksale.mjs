@@ -183,6 +183,7 @@ try {
 
   // --- cart-level controls: client, global interest 20%, SC, paper size ---
   getEl('qs-cart-client').value = String(cliId);
+  getEl('qs-cart-payment').value = 'GCash';
   win.qsCartInterest('20');
   getEl('qs-cart-sc').checked = true;
   getEl('qs-cart-discount').value = '0';
@@ -212,7 +213,8 @@ try {
   eq(inv1.stock, 8, 'item1 stock 10 -> 8');
   eq(inv2.stock, 2, 'item2 stock 5 -> 2');
   const cli = await win.dbGet('clients', cliId);
-  eq(cli.balance, 282.33, 'client balance += 282.33');
+  eq(cli.balance, 282.33, 'GCash cart sale adds 282.33 to client balance');
+  eq(tx.balanceAdded, true, 'GCash cart sale balanceAdded true');
   eq(getEl('qs-cart').innerHTML, '', 'cart cleared after sale');
   const audits = await win.dbAll('auditLogs');
   ok(audits.some(a => a.action === 'sale'), 'audit log written for sale');
@@ -307,6 +309,83 @@ try {
   eq((await win.dbGet('transactions', 6)).invoiceNo, 'INV-00006', 'variant sale invoice INV-00006');
   eq(win.getQty('-2'), -2, 'getQty parses negative qty (return lines)');
   eq(win.getQty('3 pieces'), 3, 'getQty still parses plain qty with suffix');
+
+  // --- cash sale WITH client does NOT add to balance (balanceAdded flag) ---
+  getEl('tm-client').options = [{ value: String(cliId), text: 'Maria Santos' }];
+  getEl('tm-client').value = String(cliId);
+  getEl('tm-client').selectedIndex = 0;
+  getEl('tm-payment').value = 'Cash';
+  getEl('tm-sc').checked = false;
+  getEl('tm-discount').value = '0';
+  win.txCart = [{ date: new Date().toISOString().split('T')[0], description: 'Coke 500ml', name: '1', unitCost: 100, intRate: 0, invId: invId1 }];
+  await win.doSaveTransaction();
+  const txCash = await win.dbGet('transactions', 7);
+  eq(txCash.invoiceNo, 'INV-00007', 'cash sale invoice INV-00007');
+  eq(txCash.balanceAdded, false, 'cash sale balanceAdded false');
+  eq((await win.dbGet('clients', cliId)).balance, 282.33, 'cash sale leaves client balance unchanged (282.33 from GCash cart only)');
+  eq(txCash.clientId, cliId, 'cash sale still records client id');
+  eq(win.wasBalanceAdded(txCash), false, 'wasBalanceAdded false for cash sale');
+  eq(win.wasBalanceAdded(tx), true, 'wasBalanceAdded true for GCash sale');
+
+  // --- undo a cash sale must not touch balance; undo GCash sale reverses it ---
+  const balBeforeCash = (await win.dbGet('clients', cliId)).balance;
+  await win.undoSale(txCash);
+  eq((await win.dbGet('clients', cliId)).balance, balBeforeCash, 'undo cash sale leaves balance unchanged');
+  await win.undoSale(await win.dbGet('transactions', 1));
+  eq((await win.dbGet('clients', cliId)).balance, 0, 'undo GCash sale reverses the added balance');
+
+  // --- daily interest writes an INT- ledger row per client ---
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+  await win.dbAdd('settings', { key: 'lastInterestDate', value: yesterday });
+  win.state.settings = await win.dbAll('settings');
+  win.state.transactions = await win.dbAll('transactions');
+  win.openQuickSaleModal(invId1);
+  getEl('qs-qty').value = '1';
+  getEl('qs-interest').value = '10';
+  getEl('qs-sc').checked = false;
+  win.qsUpd();
+  getEl('qs-client').value = String(cliId);
+  getEl('qs-payment').value = 'GCash';
+  await win.qsSell(false);
+  win.state.transactions = await win.dbAll('transactions');
+  win.state.clients = await win.dbAll('clients');
+  const balBeforeInt = (await win.dbGet('clients', cliId)).balance;
+  await win.applyDailyInterest();
+  const intRow = (await win.dbAll('transactions')).find(t => t.invoiceNo === 'INT-00001');
+  ok(!!intRow, 'interest ledger row INT-00001 written');
+  eq(intRow.status, 'interest', 'interest row status is interest');
+  eq(intRow.clientId, cliId, 'interest row linked to client');
+  eq(intRow.grandTotal > 0, true, 'interest row has positive amount');
+  eq(intRow.balanceAdded, false, 'interest row never adds reversal-able balance');
+  eq((await win.dbGet('clients', cliId)).balance, parseFloat((balBeforeInt + intRow.grandTotal).toFixed(2)), 'client balance grew by interest row amount');
+  ok((await win.dbAll('auditLogs')).some(a => a.action === 'interest'), 'interest application audited');
+  const intRows = (await win.dbAll('transactions')).filter(t => t.invoiceNo === 'INT-00001');
+  eq(intRows.length, 1, 'no duplicate interest rows on second run (lastInterestDate updated)');
+
+  // --- supplier payment ledger: Purchased / Paid / Owed + Record Payment modal ---
+  const supId = await win.dbAdd('suppliers', { name: 'Distributor A', contact: '', email: '', category: '', createdAt: new Date().toISOString() });
+  await win.dbAdd('purchaseOrders', { poNo: 'PO-0001', supplierId: supId, supplierName: 'Distributor A', date: new Date().toISOString().split('T')[0], items: [], subtotal: 10000, total: 10000, status: 'Received', receivedAt: new Date().toISOString(), createdAt: new Date().toISOString() });
+  win.state.suppliers = await win.dbAll('suppliers');
+  win.state.purchaseOrders = await win.dbAll('purchaseOrders');
+  win.state.supplierPayments = await win.dbAll('supplierPayments');
+  await win.openSupplierPayModal(supId);
+  ok(document.getElementById('modal-root').innerHTML.includes('Record Payment'), 'supplier payment modal rendered');
+  getEl('sp-amount').value = '4000';
+  getEl('sp-date').value = new Date().toISOString().split('T')[0];
+  getEl('sp-notes').value = 'partial';
+  await win.saveSupplierPayment(supId);
+  const spp = (await win.dbAll('supplierPayments')).find(p => p.supplierId === supId);
+  ok(!!spp && spp.amount === 4000, 'supplier payment recorded with amount 4000');
+  ok(spp.supplierName === 'Distributor A', 'supplier payment stores supplier name');
+  ok((await win.dbAll('auditLogs')).some(a => a.action === 'supplier-payment' && (a.details || '').includes('Distributor A')), 'supplier payment audited');
+  win.renderSupTable();
+  const supHtml = getEl('supTable').innerHTML;
+  ok(supHtml.includes('₱10,000.00'), 'sup table shows purchased 10,000');
+  ok(supHtml.includes('₱4,000.00'), 'sup table shows paid 4,000');
+  ok(supHtml.includes('₱6,000.00'), 'sup table shows owed 6,000');
+  ok(supHtml.includes('openSupplierPayModal(' + supId + ')'), 'sup table has Pay button for supplier');
+  const supDump = await win.__app.getDBDump();
+  ok(Array.isArray(supDump.supplierPayments) && supDump.supplierPayments.length === 1, 'getDBDump includes supplierPayments');
 
   // --- update download progress modal (boot.js) ---
   win.showUpdateProgress('Starting download…');

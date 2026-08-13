@@ -65,7 +65,7 @@ export async function navigate(route) {
 }
 
 export async function loadAll() {
-  const stores = ['clients','transactions','payments','inventory','quickItems','settings','users','expenses','suppliers','purchaseOrders','notifications','auditLogs'];
+  const stores = ['clients','transactions','payments','inventory','quickItems','settings','users','expenses','suppliers','purchaseOrders','supplierPayments','notifications','auditLogs'];
   const results = await Promise.all(stores.map(s => dbAll(s).catch(() => [])));
   stores.forEach((s, i) => { state[s] = results[i]; });
   const shop = state.settings.find(x => x.key === 'shopName');

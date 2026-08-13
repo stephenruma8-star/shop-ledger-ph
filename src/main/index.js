@@ -289,7 +289,7 @@ function startLANServer() {
       if (!mainWindow || mainWindow.isDestroyed()) return res.status(503).json({ error: 'Window not ready' });
       const dump = await mainWindow.webContents.executeJavaScript('window.__app.getDBDump()');
       const todayStr = new Date().toISOString().split('T')[0];
-      const todayTx = (dump.transactions || []).filter(t => t.date === todayStr && t.status !== 'voided');
+      const todayTx = (dump.transactions || []).filter(t => t.date === todayStr && t.status !== 'voided' && t.status !== 'interest');
       const todaySales = todayTx.reduce((s, t) => s + (t.grandTotal || 0), 0);
       const todayExp = (dump.expenses || []).filter(e => e.date === todayStr);
       const todayExpTotal = todayExp.reduce((s, e) => s + (e.amount || 0), 0);
@@ -297,7 +297,7 @@ function startLANServer() {
       const todayPayTotal = todayPay.reduce((s, p) => s + (p.amount || 0), 0);
       const totalUtang = (dump.clients || []).reduce((s, c) => s + (c.balance || 0), 0);
       const lowStock = (dump.inventory || []).filter(i => (i.stock || 0) <= (i.lowStock ?? i.minStock ?? 5));
-      const monthSales = (dump.transactions || []).filter(t => (t.date || '').startsWith(todayStr.slice(0, 7)) && t.status !== 'voided')
+      const monthSales = (dump.transactions || []).filter(t => (t.date || '').startsWith(todayStr.slice(0, 7)) && t.status !== 'voided' && t.status !== 'interest')
         .reduce((s, t) => s + (t.grandTotal || 0), 0);
       const monthPay = (dump.payments || []).filter(p => (p.date || '').startsWith(todayStr.slice(0, 7)))
         .reduce((s, p) => s + (p.amount || 0), 0);
@@ -312,7 +312,7 @@ function startLANServer() {
         monthSales, monthCollected: monthPay, monthExpenses: monthExp,
         monthProfit: monthSales - monthExp,
         recent: (dump.transactions || [])
-          .filter(t => t.status !== 'voided')
+          .filter(t => t.status !== 'voided' && t.status !== 'interest')
           .sort((a, b) => String(b.date || b.createdAt || '').localeCompare(String(a.date || a.createdAt || '')))
           .slice(0, 5)
           .map(t => ({ invoiceNo: t.invoiceNo, clientName: t.clientName, grandTotal: t.grandTotal, date: t.date }))
@@ -359,7 +359,8 @@ function startLANServer() {
       const grandTotal = Math.max(0, subtotal + totalInterest - d);
       const clientData = clientId ? JSON.parse(await exec(`JSON.stringify(await dbGet('clients', ${JSON.stringify(clientId)}))`)) : null;
       const clientName = clientData ? clientData.name : 'Walk-in';
-      const txnData = JSON.stringify({ invoiceNo, clientId: clientId || null, clientName, date: new Date().toISOString().split('T')[0], createdAt: new Date().toISOString(), items: items.map(i => ({ ...i, amount: ((i.qty||1) * (i.unitCost || 0)) + ((i.qty||1) * (i.unitCost || 0)) * ((i.intRate||0)/100) })), subtotal, totalInterest, discount: d, scDiscount: 0, grandTotal, paymentMethod: paymentMethod || 'Cash', status: grandTotal <= 0 ? 'paid' : 'pending' });
+      const payMethod = paymentMethod || 'Cash';
+      const txnData = JSON.stringify({ invoiceNo, clientId: clientId || null, clientName, date: new Date().toISOString().split('T')[0], createdAt: new Date().toISOString(), items: items.map(i => ({ ...i, amount: ((i.qty||1) * (i.unitCost || 0)) + ((i.qty||1) * (i.unitCost || 0)) * ((i.intRate||0)/100) })), subtotal, totalInterest, discount: d, scDiscount: 0, grandTotal, paymentMethod: payMethod, status: grandTotal <= 0 ? 'paid' : 'pending', balanceAdded: !!(clientId && payMethod !== 'Cash') });
       await exec(`dbAdd('transactions', ${txnData})`);
       await exec(`(async()=>{try{await logAudit('sale','Mobile sale ${invoiceNo} - ₱${grandTotal.toFixed(2)}');}catch(e){}})()`);
       for (const item of items) {
@@ -382,7 +383,7 @@ function startLANServer() {
         }
         if (invId) await exec(`(async()=>{const i=await dbGet('inventory',${JSON.stringify(invId)});if(i){i.stock=(i.stock||0)-${parseInt(item.qty)||1};const vn=${JSON.stringify(item.variantName || null)};if(vn&&i.variants){const v=i.variants.find(x=>x.name===vn);if(v)v.stock=(v.stock||0)-${parseInt(item.qty)||1};}await dbPut('inventory',i);}})()`);
       }
-      if (clientId) await exec(`(async()=>{const c=await dbGet('clients',${JSON.stringify(clientId)});if(c){c.balance=(c.balance||0)+${grandTotal};await dbPut('clients',c);}})()`);
+      if (clientId) await exec(`(async()=>{const c=await dbGet('clients',${JSON.stringify(clientId)});if(c && ${JSON.stringify(payMethod)} !== 'Cash'){c.balance=(c.balance||0)+${grandTotal};await dbPut('clients',c);}})()`);
       notifyDataChanged({ source: 'api', kind: 'sale' });
       res.json({ success: true, invoiceNo });
     } catch (err) { res.status(500).json({ error: err.message }); }

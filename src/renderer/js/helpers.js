@@ -1,6 +1,6 @@
 import { logAudit } from './auth.js'
 import { cfUpdateRowAmt, cfUpdateTotals } from './clients.js'
-import { dbAdd, dbAll, dbPut } from './database.js'
+import { dbAdd, dbAll, dbDel, dbPut } from './database.js'
 import { renderExpTable } from './expenses.js'
 import { renderPayTable } from './payments.js'
 import { navigate } from './router.js'
@@ -620,6 +620,10 @@ export async function applyDailyInterest() {
   if (days <= 0) return;
   let applied = 0;
   const snapshots = [];
+  const ledgerRows = [];
+  let nextInt = 1;
+  const intNos = (state.transactions || []).filter(t => t.invoiceNo?.startsWith('INT-')).map(t => parseInt(t.invoiceNo.replace('INT-', '')) || 0);
+  if (intNos.length > 0) nextInt = Math.max(...intNos) + 1;
   for (const c of clients) {
     const rate = getInterestRate(c.id);
     if (rate <= 0) continue;
@@ -629,12 +633,21 @@ export async function applyDailyInterest() {
       if (interest <= 0) continue;
       c.balance = parseFloat((c.balance + interest).toFixed(2));
       await dbPut('clients', c);
+      const invoiceNo = 'INT-' + String(nextInt).padStart(5, '0');
+      nextInt++;
+      const rowId = await dbAdd('transactions', {
+        invoiceNo, clientId: c.id, clientName: c.name, date: todayStr, createdAt: now(),
+        items: [], subtotal: 0, totalInterest: interest, discount: 0, scDiscount: 0,
+        grandTotal: interest, paymentMethod: 'Interest', status: 'interest', balanceAdded: false
+      });
+      ledgerRows.push(rowId);
       applied++;
     } catch (e) {
       for (const snap of snapshots) {
         const orig = state.clients.find(x => x.id === snap.id);
         if (orig) orig.balance = snap.balance;
       }
+      for (const rid of ledgerRows) await dbDel('transactions', rid).catch(() => {});
       state.clients = await dbAll('clients');
       toast('Interest application failed — balances rolled back', 'error');
       return;
@@ -645,6 +658,7 @@ export async function applyDailyInterest() {
   state.settings = await dbAll('settings');
   state.clients = await dbAll('clients');
   if (applied > 0) {
+    state.transactions = await dbAll('transactions');
     await logAudit('interest', `Daily interest applied to ${applied} client(s) over ${days} day(s)`);
     toast(`Interest applied: ${applied} client(s) over ${days} day(s)`, 'info');
   }
@@ -664,6 +678,7 @@ export async function runCloudBackup() {
     payments: state.payments, inventory: state.inventory,
     quickItems: state.quickItems, expenses: state.expenses,
     suppliers: state.suppliers, purchaseOrders: state.purchaseOrders,
+    supplierPayments: state.supplierPayments || [],
     notifications: state.notifications,
     auditLogs: state.auditLogs, users,
     settings: state.settings, exportedAt: now()

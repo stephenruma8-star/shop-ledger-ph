@@ -35,7 +35,7 @@ export function showUpdateProgress(msg = 'Starting download…') {
 window.__app = window.__app || {};
 if (window.electronAPI) {
   window.__app.getDBDump = async () => {
-    const stores = ['clients','transactions','payments','inventory','quickItems','settings','users','expenses','suppliers','purchaseOrders','notifications','auditLogs'];
+    const stores = ['clients','transactions','payments','inventory','quickItems','settings','users','expenses','suppliers','purchaseOrders','supplierPayments','notifications','auditLogs'];
     const results = await Promise.all(stores.map(s => dbAll(s).catch(() => [])));
     const dump = {};
     stores.forEach((s, i) => {
