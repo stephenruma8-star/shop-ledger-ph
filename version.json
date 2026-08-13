@@ -1,5 +1,5 @@
 {
-  "version": "3.4.31",
+  "version": "3.4.32",
   "buildDate": "2026-08-13T00:00:00.000Z",
-  "notes": "Fix for the loading screen hang: the supplier payment ledger store was only created on fresh installs (the DB version was never bumped, so existing databases never ran the store-creation upgrade and the Suppliers page locked on the spinner with a NotFoundError). DB_VERSION is now 4, which triggers the upgrade on existing installs and creates the missing supplierPayments store; a strict IndexedDB upgrade smoke test guards against this class of bug going forward."
+  "notes": "Update check now confirms your installed version: 'Check for Update' shows 'You are up to date (vX.Y.Z)' instead of a bare success message."
 }

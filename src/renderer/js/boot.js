@@ -65,8 +65,10 @@ if (window.electronAPI) {
         </div>
       </div>`);
   });
-  window.electronAPI.onUpdateNotAvailable(() => {
-    toast('You are up to date', 'success');
+  window.electronAPI.onUpdateNotAvailable(async () => {
+    let v = '';
+    try { v = await window.electronAPI.getAppVersion(); } catch (e) { /* ignore */ }
+    toast(v ? `You are up to date (v${v})` : 'You are up to date', 'success');
   });
   window.electronAPI.onUpdateError((message) => {
     toast('Update check failed: ' + message, 'warning');
