@@ -1,5 +1,5 @@
 {
-  "version": "3.4.32",
+  "version": "3.4.33",
   "buildDate": "2026-08-13T00:00:00.000Z",
-  "notes": "Update check now confirms your installed version: 'Check for Update' shows 'You are up to date (vX.Y.Z)' instead of a bare success message."
+  "notes": "Removed the loading-screen flash: boot now hides the splash instantly (no 300ms fade), so the login screen appears immediately instead of flashing the spinner first."
 }

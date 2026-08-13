@@ -228,11 +228,11 @@ export async function checkForNewBuild() {
 
 export async function boot() {
   try {
+    const ls = document.getElementById('loading-screen');
+    if (ls) ls.classList.add('hidden');
     await openDB();
     await seedIfEmpty();
     await loadAll();
-    const ls = document.getElementById('loading-screen');
-    if (ls) { ls.classList.add('fade-out'); await new Promise(r => setTimeout(r, 300)); ls.classList.add('hidden'); }
     const savedUser = sessionStorage.getItem('shopUser');
     if (savedUser) {
       try { state.user = JSON.parse(savedUser); } catch (e) { sessionStorage.removeItem('shopUser'); }
@@ -251,7 +251,7 @@ export async function boot() {
   } catch (e) {
     console.error('Boot error:', e);
     const ls = document.getElementById('loading-screen');
-    if (ls) { ls.classList.add('fade-out'); setTimeout(() => ls.classList.add('hidden'), 300); }
+    if (ls) ls.classList.add('hidden');
     document.getElementById('login-screen')?.classList.remove('hidden');
     const errEl = document.getElementById('login-error');
     if (errEl) { errEl.textContent = 'Boot error: ' + e.message; errEl.classList.remove('hidden'); }
