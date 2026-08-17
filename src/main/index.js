@@ -224,7 +224,7 @@ function startLANServer() {
   expressApp.use(cors());
   expressApp.use(express.json({ limit: '100mb' }));
   expressApp.use((req, res, next) => {
-    if (req.path === '/api/health' || req.path === '/' || req.path === '/manifest.webmanifest' || req.path.startsWith('/assets/')) return next();
+    if (req.path === '/api/health' || req.path === '/' || req.path === '/manifest.webmanifest' || req.path === '/mobile-sw.js' || req.path.startsWith('/assets/')) return next();
     const token = req.headers['x-auth-token'] || req.query.token;
     if (token === _lanToken) return next();
     res.status(401).json({ error: 'Unauthorized' });
@@ -236,6 +236,10 @@ function startLANServer() {
 
   expressApp.get('/manifest.webmanifest', (req, res) => {
     res.type('application/manifest+json').send(fs.readFileSync(path.join(__dirname, '../renderer/manifest.webmanifest'), 'utf8'));
+  });
+
+  expressApp.get('/mobile-sw.js', (req, res) => {
+    res.type('application/javascript').send(fs.readFileSync(path.join(__dirname, '../renderer/mobile-sw.js'), 'utf8'));
   });
 
   expressApp.get('/assets/:file', (req, res) => {
@@ -317,6 +321,135 @@ function startLANServer() {
           .slice(0, 5)
           .map(t => ({ invoiceNo: t.invoiceNo, clientName: t.clientName, grandTotal: t.grandTotal, date: t.date }))
       });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  const EXPENSE_CATS = ['Purchases','Utilities','Rent','Supplies','Transportation','Salaries','Marketing','Maintenance','Food','Other'];
+
+  expressApp.get('/api/expenses', async (req, res) => {
+    try {
+      if (!mainWindow || mainWindow.isDestroyed()) return res.status(503).json({ error: 'Window not ready' });
+      const dump = await mainWindow.webContents.executeJavaScript('window.__app.getDBDump()');
+      const list = (dump.expenses || [])
+        .sort((a, b) => String(b.date || b.createdAt || '').localeCompare(String(a.date || a.createdAt || '')))
+        .map(e => ({ id: e.id, date: e.date, category: e.category, description: e.description, amount: e.amount, payee: e.payee, createdAt: e.createdAt }));
+      res.json(list);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  expressApp.post('/api/expenses', async (req, res) => {
+    try {
+      if (!mainWindow || mainWindow.isDestroyed()) return res.status(503).json({ error: 'Window not ready' });
+      const { description, amount, category, date, payee } = req.body;
+      const amountNum = parseFloat(amount) || 0;
+      if (amountNum <= 0) return res.status(400).json({ error: 'Valid amount required' });
+      const cat = EXPENSE_CATS.includes(category) ? category : 'Other';
+      await mainWindow.webContents.executeJavaScript(`
+        (async () => {
+          await dbAdd('expenses', { date: ${JSON.stringify(date || new Date().toISOString().split('T')[0])}, category: ${JSON.stringify(cat)}, description: ${JSON.stringify(String(description || '').trim())}, amount: ${amountNum}, payee: ${JSON.stringify(String(payee || '').trim())}, createdAt: new Date().toISOString() });
+          try { await logAudit('expense-add', ${JSON.stringify(cat)} + ': ₱' + ${amountNum}.toFixed(2) + ' - ' + ${JSON.stringify(String(description || '').trim())}); } catch (e) {}
+        })()
+      `);
+      notifyDataChanged({ source: 'api', kind: 'expense' });
+      res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  expressApp.get('/api/suppliers', async (req, res) => {
+    try {
+      if (!mainWindow || mainWindow.isDestroyed()) return res.status(503).json({ error: 'Window not ready' });
+      const dump = await mainWindow.webContents.executeJavaScript('window.__app.getDBDump()');
+      const paid = {}, purchased = {};
+      (dump.supplierPayments || []).forEach(p => { paid[p.supplierId] = (paid[p.supplierId] || 0) + (p.amount || 0); });
+      (dump.purchaseOrders || []).forEach(po => { purchased[po.supplierId] = (purchased[po.supplierId] || 0) + (po.total || 0); });
+      const list = (dump.suppliers || []).map(s => ({
+        id: s.id, name: s.name, contact: s.contact, email: s.email, category: s.category, address: s.address,
+        purchased: purchased[s.id] || 0, paid: paid[s.id] || 0, owed: Math.max(0, (purchased[s.id] || 0) - (paid[s.id] || 0))
+      })).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      res.json(list);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  expressApp.get('/api/purchase-orders', async (req, res) => {
+    try {
+      if (!mainWindow || mainWindow.isDestroyed()) return res.status(503).json({ error: 'Window not ready' });
+      const dump = await mainWindow.webContents.executeJavaScript('window.__app.getDBDump()');
+      const list = (dump.purchaseOrders || [])
+        .sort((a, b) => String(b.date || b.createdAt || '').localeCompare(String(a.date || a.createdAt || '')))
+        .map(po => ({ id: po.id, poNo: po.poNo, supplierId: po.supplierId, supplierName: po.supplierName, date: po.date, items: po.items || [], total: po.total, status: po.status, createdAt: po.createdAt }));
+      res.json(list);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  expressApp.post('/api/purchase-orders', async (req, res) => {
+    try {
+      if (!mainWindow || mainWindow.isDestroyed()) return res.status(503).json({ error: 'Window not ready' });
+      const { supplierId, items, date } = req.body;
+      if (!items || !items.length) return res.status(400).json({ error: 'No items' });
+      const exec = (js) => mainWindow.webContents.executeJavaScript(js);
+      const dump = await exec('window.__app.getDBDump()');
+      const supplier = (dump.suppliers || []).find(s => s.id === supplierId) || null;
+      const supplierName = supplier ? supplier.name : 'Unknown';
+      const poList = dump.purchaseOrders || [];
+      const poNos = poList.filter(p => p.poNo && String(p.poNo).startsWith('PO-')).map(p => parseInt(String(p.poNo).replace('PO-', '')) || 0);
+      const poNo = 'PO-' + String((poNos.length > 0 ? Math.max(...poNos) : 0) + 1).padStart(5, '0');
+      const total = items.reduce((s, i) => s + ((parseFloat(i.price) || 0) * (parseInt(i.qty) || 1)), 0);
+      const cleanItems = items.map(i => ({ invId: i.invId || null, name: String(i.name || 'Item'), price: parseFloat(i.price) || 0, qty: parseInt(i.qty) || 1, variantName: i.variantName || null }));
+      await exec(`dbAdd('purchaseOrders', ${JSON.stringify({ poNo, supplierId: supplierId || null, supplierName, date: date || new Date().toISOString().split('T')[0], items: cleanItems, total, status: 'Pending', createdAt: new Date().toISOString() })})`);
+      try { await exec(`logAudit('po', 'PO ${poNo} created from ${supplierName} (mobile)')`); } catch (e) {}
+      notifyDataChanged({ source: 'api', kind: 'po' });
+      res.json({ success: true, poNo });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  expressApp.get('/api/reports', async (req, res) => {
+    try {
+      if (!mainWindow || mainWindow.isDestroyed()) return res.status(503).json({ error: 'Window not ready' });
+      const dump = await mainWindow.webContents.executeJavaScript('window.__app.getDBDump()');
+      const todayStr = new Date().toISOString().split('T')[0];
+      const active = (t) => t.status !== 'voided' && t.status !== 'interest';
+      const dayTotal = (arr, f) => arr.filter(f).reduce((s, x) => s + (x.amount || x.grandTotal || 0), 0);
+      const todaySales = (dump.transactions || []).filter(t => active(t) && t.date === todayStr).reduce((s, t) => s + (t.grandTotal || 0), 0);
+      const todayExp = dayTotal(dump.expenses || [], e => e.date === todayStr);
+      const todayPay = dayTotal(dump.payments || [], p => p.date === todayStr);
+      const monthSales = (dump.transactions || []).filter(t => active(t) && (t.date || '').startsWith(todayStr.slice(0, 7))).reduce((s, t) => s + (t.grandTotal || 0), 0);
+      const monthExp = dayTotal(dump.expenses || [], e => (e.date || '').startsWith(todayStr.slice(0, 7)));
+      const monthPay = dayTotal(dump.payments || [], p => (p.date || '').startsWith(todayStr.slice(0, 7)));
+      const topItems = {};
+      (dump.transactions || []).filter(active).forEach(t => {
+        (t.items || []).forEach(it => {
+          const nm = it.description || it.name || 'Item';
+          const q = parseInt(it.qty) || 1;
+          const amt = (it.amount || (q * (it.unitCost || 0))) || 0;
+          if (!topItems[nm]) topItems[nm] = { name: nm, qty: 0, amount: 0 };
+          topItems[nm].qty += q; topItems[nm].amount += amt;
+        });
+      });
+      const week = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(Date.now() - i * 86400000).toISOString().split('T')[0];
+        week.push({
+          date: d,
+          sales: (dump.transactions || []).filter(t => active(t) && t.date === d).reduce((s, t) => s + (t.grandTotal || 0), 0),
+          expenses: dayTotal(dump.expenses || [], e => e.date === d)
+        });
+      }
+      res.json({
+        today: { sales: todaySales, expenses: todayExp, collected: todayPay, profit: todaySales - todayExp },
+        month: { sales: monthSales, expenses: monthExp, collected: monthPay, profit: monthSales - monthExp },
+        topItems: Object.values(topItems).sort((a, b) => b.amount - a.amount).slice(0, 5),
+        week
+      });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  expressApp.get('/api/settings', async (req, res) => {
+    try {
+      if (!mainWindow || mainWindow.isDestroyed()) return res.status(503).json({ error: 'Window not ready' });
+      const dump = await mainWindow.webContents.executeJavaScript('window.__app.getDBDump()');
+      const s = {};
+      (dump.settings || []).forEach(x => { s[x.key] = x.value; });
+      res.json({ shopName: s.shopName || 'My Sari-Sari Store', shopContact: s.shopContact || '', shopAddress: s.shopAddress || '', currency: s.currency || '₱' });
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 

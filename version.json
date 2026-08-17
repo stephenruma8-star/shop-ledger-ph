@@ -1,5 +1,5 @@
 {
-  "version": "3.4.33",
+  "version": "3.4.34",
   "buildDate": "2026-08-13T00:00:00.000Z",
-  "notes": "Removed the loading-screen flash: boot now hides the splash instantly (no 300ms fade), so the login screen appears immediately instead of flashing the spinner first."
+  "notes": "Full-feature mobile app (PWA): the phone page now has Expenses (view + record + search), Suppliers (purchased/paid/owed balances), Purchase Orders (create + view), Reports (today/month summary, top items, 7-day trend) and Settings (store info), reached via the new Home quick actions and nav tabs. New /api/expenses, /api/suppliers, /api/purchase-orders, /api/reports, /api/settings endpoints, plus an offline-capable service worker for secure-context installs (Tailscale/web)."
 }

@@ -61,6 +61,25 @@ const statsFixture = () => ({
   monthSales: 230.33, monthCollected: 100, monthExpenses: 0, monthProfit: 230.33,
   recent: mkFixtures().transactions,
 });
+const reportsFixture = () => ({
+  today: { sales: 230.33, expenses: 0, collected: 100, profit: 230.33 },
+  month: { sales: 230.33, expenses: 50, collected: 100, profit: 180.33 },
+  topItems: [{ name: 'Coke 500ml', qty: 3, amount: 300 }],
+  week: Array.from({ length: 7 }, (_, i) => ({ date: '2026-08-' + String(10 + i).padStart(2, '0'), sales: 100 + i * 10, expenses: 20 })),
+});
+const mkExtras = () => ({
+  expenses: [
+    { id: 1, date: todayStr, category: 'Utilities', description: 'Electric bill', amount: 1200, payee: 'Meralco', createdAt: new Date().toISOString() },
+    { id: 2, date: todayStr, category: 'Other', description: 'Ice', amount: 50, payee: '', createdAt: new Date().toISOString() },
+  ],
+  suppliers: [
+    { id: 1, name: 'ABC Trading', contact: '09151234567', email: 'abc@trading.ph', category: 'Grocery', address: '', purchased: 10000, paid: 4000, owed: 6000 },
+  ],
+  purchaseOrders: [
+    { id: 1, poNo: 'PO-00001', supplierId: 1, supplierName: 'ABC Trading', date: todayStr, items: [{ name: 'Coke', price: 80, qty: 10 }], total: 800, status: 'Pending', createdAt: new Date().toISOString() },
+  ],
+  settings: { shopName: 'Juan Sari-Sari Store', shopContact: '09171234567', shopAddress: 'Manila', currency: '₱' },
+});
 
 const els = new Map();
 const makeEl = (id) => {
@@ -85,11 +104,17 @@ const fakeFetch = async (url, opts) => {
   seen.add(method + ' ' + path);
   if (method === 'POST') { posts.push({ path, body: JSON.parse(opts.body || '{}') }); return { ok: true, json: async () => ({ success: true, invoiceNo: 'INV-0000X' }) }; }
   const F = mkFixtures();
+  const X = mkExtras();
   let payload = {};
   if (path.startsWith('/api/stats')) payload = statsFixture();
   else if (path.startsWith('/api/inventory')) payload = F.inventory.sort((a, b) => a.name.localeCompare(b.name));
   else if (path.startsWith('/api/transactions')) payload = F.transactions;
   else if (path.startsWith('/api/clients')) payload = F.clients;
+  else if (path.startsWith('/api/expenses')) payload = X.expenses;
+  else if (path.startsWith('/api/suppliers')) payload = X.suppliers;
+  else if (path.startsWith('/api/purchase-orders')) payload = X.purchaseOrders;
+  else if (path.startsWith('/api/reports')) payload = reportsFixture();
+  else if (path.startsWith('/api/settings')) payload = X.settings;
   return { ok: true, json: async () => payload };
 };
 
@@ -178,6 +203,11 @@ try {
   ok(seen.has('GET /api/clients'), 'called GET /api/clients');
   ok(getEl('conn-status').textContent === '● Live', 'connection status Live after WS auth');
   ok(curRef() === 'home', 'initial currentView is home');
+  ok(seen.has('GET /api/expenses'), 'called GET /api/expenses');
+  ok(seen.has('GET /api/suppliers'), 'called GET /api/suppliers');
+  ok(seen.has('GET /api/purchase-orders'), 'called GET /api/purchase-orders');
+  ok(seen.has('GET /api/reports'), 'called GET /api/reports');
+  ok(seen.has('GET /api/settings'), 'called GET /api/settings');
 
   // home route
   gcall(`showView('home')`);
@@ -187,6 +217,7 @@ try {
   ok(homeHtml.includes('Profit'), 'home shows profit line');
   ok(homeHtml.includes('Biscuit Pack'), 'home lists low-stock item');
   ok(homeHtml.includes('INV-00001'), 'home lists recent sale');
+  ok(homeHtml.includes('Quick Actions') && homeHtml.includes('Purchase Orders'), 'home shows quick action links');
 
   // catalog route
   gcall(`showView('catalog')`);
@@ -299,10 +330,73 @@ try {
   const ws = gget('ws');
   ok(!!ws && typeof ws.send === 'function', 'app holds a live WebSocket');
 
+  // expenses view + add expense flow
+  gcall(`showView('expenses')`);
+  const expHtml = getEl('view').innerHTML;
+  ok(expHtml.includes('Electric bill') && expHtml.includes('Meralco'), 'expenses view lists recorded expenses');
+  ok(expHtml.includes('This month') && expHtml.includes('₱1,250.00'), 'expenses view shows month total (1200+50)');
+  gcall(`filterExpenses('ice')`);
+  const expGrid = getEl('exp-grid').innerHTML;
+  ok(expGrid.includes('Ice') && !expGrid.includes('Electric'), 'expense search filters');
+  gcall(`addExpense()`);
+  ok(getEl('modal-root').innerHTML.includes('Save Expense'), 'add-expense modal rendered');
+  getEl('ex-desc').value = 'Trash bags';
+  getEl('ex-category').value = 'Supplies';
+  getEl('ex-amount').value = '75';
+  getEl('ex-payee').value = 'Market';
+  const beforeExpPosts = posts.length;
+  await gcall(`submitExpense()`);
+  const expPost = posts[beforeExpPosts];
+  ok(expPost && expPost.path === '/api/expenses', 'expense posted to POST /api/expenses');
+  if (expPost) ok(expPost.body.amount === 75 && expPost.body.category === 'Supplies' && expPost.body.description === 'Trash bags' && expPost.body.payee === 'Market' && !!expPost.body.date, 'expense payload shape');
+
+  // suppliers view
+  gcall(`showView('suppliers')`);
+  const supHtml = getEl('view').innerHTML;
+  ok(supHtml.includes('ABC Trading'), 'suppliers view lists supplier');
+  ok(supHtml.includes('09151234567'), 'suppliers view shows supplier contact');
+  ok(supHtml.includes('₱6,000.00') && supHtml.includes('Bought ₱10,000.00') && supHtml.includes('Paid ₱4,000.00'), 'suppliers shows purchased/paid/owed totals');
+  gcall(`filterSuppliers('abc')`);
+  const supGrid = getEl('sup-grid').innerHTML;
+  ok(supGrid.includes('ABC Trading') && supGrid.includes('Bought ₱10,000.00'), 'supplier search filters + totals');
+
+  // purchase orders view + new PO flow
+  gcall(`showView('purchase-orders')`);
+  const poHtml = getEl('view').innerHTML;
+  ok(poHtml.includes('PO-00001') && poHtml.includes('ABC Trading') && poHtml.includes('₱800.00'), 'PO view lists orders with totals');
+  gcall(`addPO()`);
+  ok(getEl('modal-root').innerHTML.includes('Create PO'), 'new-PO modal rendered');
+  getEl('po-supplier').value = '1';
+  const poItemSel = getEl('po-item');
+  poItemSel.options = [{ value: '1', dataset: { name: 'Coke 500ml', price: '100' } }];
+  poItemSel.selectedIndex = 0;
+  getEl('po-qty').value = '2';
+  getEl('po-price').value = '100';
+  gcall(`poAddItem()`);
+  ok(getEl('po-cart').innerHTML.includes('Coke 500ml') && getEl('po-total-mobile').textContent === '₱200.00', 'PO cart line + running total');
+  const beforePoPosts = posts.length;
+  await gcall(`submitPO()`);
+  const poPost = posts[beforePoPosts];
+  ok(poPost && poPost.path === '/api/purchase-orders', 'PO posted to POST /api/purchase-orders');
+  if (poPost) ok(poPost.body.supplierId === 1 && poPost.body.items.length === 1 && poPost.body.items[0].name === 'Coke 500ml' && poPost.body.items[0].price === 100 && poPost.body.items[0].qty === 2 && !!poPost.body.date, 'PO payload shape');
+
+  // reports view
+  gcall(`showView('reports')`);
+  const repHtml = getEl('view').innerHTML;
+  ok(repHtml.includes("Today's Sales") && repHtml.includes("Today's Profit"), 'reports shows today summary');
+  ok(repHtml.includes('Month Profit') && repHtml.includes('₱180.33'), 'reports shows month profit');
+  ok(repHtml.includes('Top items') && repHtml.includes('Coke 500ml'), 'reports shows top items');
+  ok(repHtml.includes('Last 7 days'), 'reports shows 7-day trend');
+
+  // settings view
+  gcall(`showView('settings')`);
+  const setHtml = getEl('view').innerHTML;
+  ok(setHtml.includes('Juan Sari-Sari Store') && setHtml.includes('Manila') && setHtml.includes('09171234567'), 'settings shows store info');
+
   for (const t of timerIds) clearTimeout(t);
 
   if (failures === 0) {
-    console.log('MOBILE PAGE OK: boots via /api/stats+/api/inventory+/api/transactions, 7 views render, cart sale + quick sell + out-of-stock guard + Bayad all verified');
+    console.log('MOBILE PAGE OK: boots via 8 /api endpoints, 11 views render, cart sale + quick sell + out-of-stock guard + Bayad + expenses + PO + reports + settings all verified');
     process.exit(0);
   } else {
     console.error('MOBILE PAGE FAILED: ' + failures + ' assertion(s) failed');
