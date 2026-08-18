@@ -26,6 +26,9 @@ body{background-image:radial-gradient(ellipse 80% 50% at 50% -20%,rgba(59,130,24
 .shimmer{background:linear-gradient(90deg,transparent,rgba(255,255,255,.08),transparent);background-size:200% 100%;animation:shimmer 2s infinite}@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .pulse-soft{animation:pulseSoft 2s ease-in-out infinite}@keyframes pulseSoft{0%,100%{opacity:1}50%{opacity:.6}}
 .card-hover{transition:transform .15s ease,box-shadow .15s ease}.card-hover:active{transform:scale(.99)}
+.badge-pop{animation:badgePop .3s ease-out}@keyframes badgePop{0%{transform:scale(1)}40%{transform:scale(1.3)}100%{transform:scale(1)}}
+.row-out{animation:rowOut .22s ease-out forwards;overflow:hidden}@keyframes rowOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-6px)}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 .num{font-variant-numeric:tabular-nums}
 .icon{flex:none}
 .glass{background:rgba(30,41,59,.85);border:1px solid rgba(255,255,255,.07)}
@@ -322,12 +325,21 @@ async function refreshAll() {
   refreshBusy = false;
 }
 
+function popEl(el) {
+  if (!el) return;
+  el.classList.remove('badge-pop'); void el.offsetWidth; el.classList.add('badge-pop');
+}
 function updateCartUI() {
   const c = cart.reduce((s, i) => s + i.qty, 0);
   const btn = document.getElementById('cart-count');
-  if (btn) btn.textContent = c;
+  if (btn) { if (btn.textContent !== String(c)) { btn.textContent = c; popEl(btn); } }
   const badge = document.getElementById('cart-badge');
-  if (badge) { badge.textContent = c; badge.classList.toggle('hidden', c === 0); badge.classList.toggle('flex', c > 0); }
+  if (badge) {
+    const was = badge.textContent;
+    badge.textContent = c;
+    badge.classList.toggle('hidden', c === 0); badge.classList.toggle('flex', c > 0);
+    if (c > 0 && was !== String(c)) popEl(badge);
+  }
   if (currentView === 'sale' && navModalOpen) updateNavMeta('sale');
 }
 
@@ -680,7 +692,7 @@ function renderSale() {
     </div>
     <div class="glass-card rounded-2xl p-2 mb-3 fade-in">
       ${cart.length ? cart.map((i, idx) => `
-        <div class="row py-2.5 px-1.5">
+        <div class="row py-2.5 px-1.5" id="mc-row-${idx}">
           <span class="w-10 h-10 rounded-xl overflow-hidden bg-gray-800 border border-white/10 flex items-center justify-center shrink-0">${itemById(i.invId) && itemById(i.invId).image ? '<img src="' + itemById(i.invId).image + '" alt="" class="w-full h-full object-cover" />' : '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>'}</span>
           <div class="flex-1 min-w-0">
             <div class="text-sm font-medium truncate text-gray-200">${esc(i.name)}</div>
@@ -752,7 +764,17 @@ function cartStep(idx, delta) {
   updateCartUI();
   renderSale();
 }
-function cartRemove(idx) { cart.splice(idx, 1); updateCartUI(); renderSale(); }
+let cartRemoving = false;
+function cartRemove(idx) {
+  if (cartRemoving) return;
+  const row = document.getElementById('mc-row-' + idx);
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (row && !reduceMotion) {
+    cartRemoving = true;
+    row.classList.add('row-out');
+    setTimeout(() => { cartRemoving = false; cart.splice(idx, 1); updateCartUI(); renderSale(); }, 220);
+  } else { cart.splice(idx, 1); updateCartUI(); renderSale(); }
+}
 function manualItem() {
   document.getElementById('modal-root').innerHTML = `
     <div class="fixed inset-0 bg-black/70 z-40 flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">

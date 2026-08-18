@@ -370,6 +370,10 @@ export function playSound(type) {
 
 export function animateCount(el, target, fmt) {
   if (!el) return;
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    el.textContent = fmt ? fmt(target) : String(Math.round(target));
+    return;
+  }
   const dur = 900;
   const start = performance.now();
   function frame(now) {

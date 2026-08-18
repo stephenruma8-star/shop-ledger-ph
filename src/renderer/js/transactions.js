@@ -206,13 +206,30 @@ export function renderTMCart() {
   }).join('')}</tbody></table>`;
 }
 
-export function removeCartItem(i) { txCart.splice(i, 1); renderTMCart(); updateTMTotals(); }
+let _tmRemoving = false;
+export function removeCartItem(i) {
+  if (_tmRemoving) return;
+  const el = document.getElementById('tm-cart');
+  const row = el && el.querySelectorAll('tbody tr')[i];
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (row && !reduceMotion) {
+    _tmRemoving = true;
+    row.classList.add('row-out');
+    setTimeout(() => { _tmRemoving = false; txCart.splice(i, 1); renderTMCart(); updateTMTotals(); }, 220);
+  } else { txCart.splice(i, 1); renderTMCart(); updateTMTotals(); }
+}
 
 let _lastTmTotal = null;
 export function flashTotal(el, total) {
-  if (!el || (_lastTmTotal !== null && _lastTmTotal === total)) return;
+  if (!el || (_lastTmTotal !== null && _lastTmTotal === total)) return false;
   _lastTmTotal = total;
   el.classList.remove('total-flash'); void el.offsetWidth; el.classList.add('total-flash');
+  return true;
+}
+
+function popEl(el) {
+  if (!el) return;
+  el.classList.remove('badge-pop'); void el.offsetWidth; el.classList.add('badge-pop');
 }
 
 export function updateTMTotals() {
@@ -229,8 +246,8 @@ export function updateTMTotals() {
     ${totalInterest > 0 ? `<div class="flex justify-between text-amber-600"><span>Total Interest</span><span>${peso(totalInterest)}</span></div>` : ''}
     ${scDiscount > 0 ? `<div class="flex justify-between text-green-600"><span>SC/PWD 20%</span><span>-${peso(scDiscount)}</span></div>` : ''}
     ${discount > 0 ? `<div class="flex justify-between text-orange-600"><span>Discount</span><span>-${peso(discount)}</span></div>` : ''}
-    <div class="flex justify-between font-bold text-lg border-t dark:border-gray-700 pt-1"><span>Total</span><span class="text-green-600">${peso(grandTotal)}</span></div>`;
-  flashTotal(el, grandTotal);
+    <div class="flex justify-between font-bold text-lg border-t dark:border-gray-700 pt-1"><span>Total</span><span id="tm-grand-total" class="text-green-600">${peso(grandTotal)}</span></div>`;
+  if (flashTotal(el, grandTotal)) popEl(document.getElementById('tm-grand-total'));
 }
 
 export function toggleSC() { updateTMTotals(); }

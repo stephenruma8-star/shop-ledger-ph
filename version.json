@@ -1,5 +1,5 @@
 {
-  "version": "3.4.36",
+  "version": "3.4.37",
   "buildDate": "2026-08-18T00:00:00.000Z",
-  "notes": "First-run setup wizard (store name/contact/address + receipt footer, admin only, skip anytime), clear offline banner on the desktop when there is no internet (cloud backup, updates and SMS reminders pause automatically; the store keeps working), and a friendlier Taglish tone across the app (dashboard, clients, expenses, suppliers, payments, catalog) with a small accessibility pass (keyboard focus rings, aria-labels on icon buttons and dialogs)."
+  "notes": "Animation polish: cart lines now fade out when removed (desktop and phone), the cart count/total pops when an item is added, desktop buttons give a small press-down feedback, dashboard numbers jump straight to the value, and the whole app respects the Windows 'Show animations' (prefers-reduced-motion) setting."
 }
