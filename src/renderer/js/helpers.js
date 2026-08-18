@@ -564,6 +564,19 @@ export function updateLowStockBadge() {
   else badge.classList.add('hidden');
 }
 
+export function pushSysNotif(id, text, act = 'dismiss', icon = 'ℹ️') {
+  window.__sysNotifs = window.__sysNotifs || [];
+  window.__sysNotifs = window.__sysNotifs.filter(n => n.id !== id);
+  window.__sysNotifs.push({ id, text, act, icon });
+  updateNotifications();
+}
+
+export function dismissSysNotif(id) {
+  if (!window.__sysNotifs) return;
+  window.__sysNotifs = window.__sysNotifs.filter(n => n.id !== id);
+  updateNotifications();
+}
+
 export function updateNotifications() {
   const badge = document.getElementById('notif-badge');
   const panel = document.getElementById('notif-panel');
@@ -571,12 +584,21 @@ export function updateNotifications() {
   const overdue = (state.clients || []).filter(c => (c.balance || 0) > 0 && c.dueDate && c.dueDate < today()).length;
   const lowStock = (state.inventory || []).filter(i => (i.stock || 0) <= (i.minStock || 5)).length;
   const recentPOs = (state.purchaseOrders || []).filter(po => po.status === 'Received' && po.receivedAt && new Date(po.receivedAt) > new Date(Date.now() - 86400000)).length;
-  const total = overdue + lowStock + recentPOs;
+  const sys = window.__sysNotifs || [];
+  const total = overdue + lowStock + recentPOs + sys.length;
   if (total > 0) { badge.textContent = total; badge.classList.remove('hidden'); }
   else badge.classList.add('hidden');
   if (panel) {
+    const sysRows = sys.map(n => {
+      let btn = '';
+      if (n.act === 'download') btn = `<button onclick="window.electronAPI.downloadUpdate();window.dismissSysNotif('${n.id}');if(window.showUpdateProgress)window.showUpdateProgress()" class="ml-auto shrink-0 text-[11px] px-2 py-1 rounded-lg bg-blue-600 text-white hover:bg-blue-700">Download</button>`;
+      else if (n.act === 'restart') btn = `<button onclick="window.electronAPI.installUpdate();window.dismissSysNotif('${n.id}')" class="ml-auto shrink-0 text-[11px] px-2 py-1 rounded-lg bg-green-600 text-white hover:bg-green-700">Restart</button>`;
+      else btn = `<button onclick="window.dismissSysNotif('${n.id}')" class="ml-auto shrink-0 text-gray-400 hover:text-gray-600" aria-label="Dismiss" title="Dismiss"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`;
+      return `<div class="flex items-center gap-2 text-gray-700 dark:text-gray-300"><span class="shrink-0">${n.icon}</span><span class="min-w-0 break-words">${escapeHtml(n.text)}</span>${btn}</div>`;
+    }).join('');
     panel.innerHTML = `<div class="p-3 space-y-2 text-sm">
       <div class="flex justify-between items-center border-b dark:border-gray-700 pb-2"><span class="font-bold">Notifications</span><button onclick="document.getElementById('notif-panel').classList.add('hidden')" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+      ${sys.length ? `<div class="border-b dark:border-gray-700 pb-2 space-y-2">${sysRows}</div>` : ''}
       ${overdue > 0 ? `<div class="flex items-center gap-2 text-red-600"><span>⚠️</span><span>${overdue} overdue balances</span></div>` : ''}
       ${lowStock > 0 ? `<div class="flex items-center gap-2 text-orange-600"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg><span>${lowStock} low stock items</span></div>` : ''}
       ${recentPOs > 0 ? `<div class="flex items-center gap-2 text-green-600"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg><span>${recentPOs} POs received today</span></div>` : ''}
@@ -667,6 +689,7 @@ export async function applyDailyInterest() {
     state.transactions = await dbAll('transactions');
     await logAudit('interest', `Daily interest applied to ${applied} client(s) over ${days} day(s)`);
     toast(`Interest applied: ${applied} client(s) over ${days} day(s)`, 'info');
+    pushSysNotif('interest', `Daily interest applied to ${applied} client(s) over ${days} day(s)`, 'dismiss', '💰');
   }
 }
 
@@ -698,7 +721,9 @@ export async function runCloudBackup() {
     state.settings = await dbAll('settings');
     toast('Cloud backup saved', 'success');
     await logAudit('backup', 'Auto cloud backup saved to ' + folder);
+    return true;
   }
+  return false;
 }
 
 export async function checkCloudBackupDue() {
@@ -712,15 +737,15 @@ export async function checkCloudBackupDue() {
   const interval = settingsMap['cloudBackupInterval'] || 'daily';
   const todayStr = today();
   if (lastBackup === todayStr) return;
-  if (interval === 'daily') { await runCloudBackup(); return; }
+  if (interval === 'daily') { if (await runCloudBackup()) pushSysNotif('backup', 'Auto cloud backup saved', 'dismiss', '☁️'); return; }
   if (interval === 'weekly') {
     const daysSince = Math.floor((new Date(todayStr) - new Date(lastBackup || '2000-01-01')) / 86400000);
-    if (daysSince >= 7) await runCloudBackup();
+    if (daysSince >= 7 && await runCloudBackup()) pushSysNotif('backup', 'Auto cloud backup saved', 'dismiss', '☁️');
     return;
   }
   if (interval === 'monthly') {
     const d = new Date(lastBackup || '2000-01-01');
-    if (d.getMonth() !== new Date().getMonth() || d.getFullYear() !== new Date().getFullYear()) await runCloudBackup();
+    if ((d.getMonth() !== new Date().getMonth() || d.getFullYear() !== new Date().getFullYear()) && await runCloudBackup()) pushSysNotif('backup', 'Auto cloud backup saved', 'dismiss', '☁️');
   }
 }
 
@@ -748,6 +773,7 @@ export async function sendOverdueReminders() {
   else { await dbAdd('settings', { key: 'lastSmsReminder', value: today() }); }
   state.settings = await dbAll('settings');
   await logAudit('auto-sms', `SMS reminders sent to ${sent} overdue client(s)`);
+  if (sent > 0) pushSysNotif('sms', `SMS reminders sent to ${sent} overdue client(s)`, 'dismiss', '📱');
   return { sent, failed, total: targets.length };
 }
 
@@ -826,6 +852,8 @@ Object.defineProperties(window, {
   searchData: { get: () => searchData, configurable: true },
   updateLowStockBadge: { get: () => updateLowStockBadge, configurable: true },
   updateNotifications: { get: () => updateNotifications, configurable: true },
+  pushSysNotif: { get: () => pushSysNotif, configurable: true },
+  dismissSysNotif: { get: () => dismissSysNotif, configurable: true },
   toggleNotifPanel: { get: () => toggleNotifPanel, configurable: true },
   hasInterestItems: { get: () => hasInterestItems, configurable: true },
   getInterestRate: { get: () => getInterestRate, configurable: true },

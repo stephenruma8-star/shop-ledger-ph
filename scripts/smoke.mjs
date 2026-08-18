@@ -100,6 +100,16 @@ try {
     ]);
   }
   console.log('ALL VIEWS OK: ' + routes.length + ' routes executed');
+  win.pushSysNotif('update', 'Version 9.9.9 is ready to download', 'download', '⬆️');
+  win.pushSysNotif('update', 'Version 9.9.9 is ready to download', 'download', '⬆️');
+  if ((win.__sysNotifs || []).filter(n => n.id === 'update').length !== 1) throw new Error('pushSysNotif did not dedupe by id');
+  win.pushSysNotif('ready', 'Version 9.9.9 downloaded', 'restart', '✅');
+  if ((win.__sysNotifs || []).length !== 2) throw new Error('pushSysNotif rows missing after two pushes');
+  win.dismissSysNotif('update');
+  if ((win.__sysNotifs || []).some(n => n.id === 'update')) throw new Error('dismissSysNotif failed to remove row');
+  win.dismissSysNotif('ready');
+  if ((win.__sysNotifs || []).length !== 0) throw new Error('system notifications not fully cleared');
+  console.log('BELL OK: system notifications push / dedupe / dismiss verified');
   console.log('DEEP SMOKE OK: boot() + all views executed without errors');
   process.exit(0);
 } catch (e) {

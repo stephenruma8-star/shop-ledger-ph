@@ -1,7 +1,7 @@
 import { applyPermissions } from './auth.js'
 import { cfCart, cfRenderCart } from './clients.js'
 import { dbAdd, dbAll, dbPut, openDB } from './database.js'
-import { escapeHtml, hashPassword, initConnIndicator, modal, playSound, startClock, toast } from './helpers.js'
+import { dismissSysNotif, escapeHtml, hashPassword, initConnIndicator, modal, playSound, pushSysNotif, startClock, toast } from './helpers.js'
 import { AppParticles } from './particles.js'
 import { emailBackupFlow, fileBackupFlow } from './reports.js'
 import { loadAll, navigate } from './router.js'
@@ -20,6 +20,8 @@ function _formatBytes(n) {
 }
 
 export function showUpdateProgress(msg = 'Starting download…') {
+  dismissSysNotif('update');
+  dismissSysNotif('lan-signal');
   modal(`
     <div class="p-6 w-[360px] max-w-full">
       <div class="flex justify-between items-center mb-3"><h3 class="text-xl font-bold">Downloading Update</h3></div>
@@ -58,6 +60,7 @@ if (window.electronAPI) {
     const remindTs = localStorage.getItem('updateRemindLater');
     if (remindTs && Date.now() < parseInt(remindTs)) return;
     const version = info.version || info.name || 'new version';
+    pushSysNotif('update', `Version ${version} is ready to download`, 'download', '⬆️');
     modal(`
       <div class="p-6">
         <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">Update Available</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
@@ -71,6 +74,8 @@ if (window.electronAPI) {
   window.electronAPI.onUpdateNotAvailable(async () => {
     let v = '';
     try { v = await window.electronAPI.getAppVersion(); } catch (e) { /* ignore */ }
+    dismissSysNotif('update');
+    dismissSysNotif('lan-signal');
     toast(v ? `You are up to date (v${v})` : 'You are up to date', 'success');
   });
   window.electronAPI.onUpdateError((message) => {
@@ -78,6 +83,9 @@ if (window.electronAPI) {
   });
   window.electronAPI.onUpdateDownloaded((info) => {
     const version = info.version || info.name || 'new version';
+    dismissSysNotif('update');
+    dismissSysNotif('lan-signal');
+    pushSysNotif('ready', `Version ${version} downloaded — restart to apply`, 'restart', '✅');
     modal(`
       <div class="p-6">
         <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">Update Ready</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
@@ -102,6 +110,7 @@ if (window.electronAPI) {
     if (meta) meta.textContent = total ? `${transferred} of ${total} · ${speed}` : `${transferred} · ${speed}`;
   });
   window.electronAPI.onLanUpdateSignal((info) => {
+    pushSysNotif('lan-signal', `Update signaled by ${info.from || 'another device'}${info.version ? ' (v' + escapeHtml(info.version) + ')' : ''} — check now`, 'download', '🔄');
     modal(`
       <div class="p-6">
         <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">LAN Update Signal</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>

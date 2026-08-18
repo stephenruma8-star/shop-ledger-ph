@@ -1,5 +1,5 @@
 {
-    "version":  "3.4.40",
-    "buildDate":  "2026-08-18T04:15:00.000Z",
-    "notes":  "Fixed the notification bell: the dropdown was opening behind the dashboard and other pages (the header's stacking order hid it). It now opens on top of everything except modals."
+    "version":  "3.4.41",
+    "buildDate":  "2026-08-18T05:30:00.000Z",
+    "notes":  "System events now land in the notification bell: new app update available (with a Download button), update downloaded (Restart button), update signaled by another device on the LAN, plus auto cloud backup done, SMS reminders sent and daily interest applied. Each row dismisses individually and adds to the bell badge."
 }
