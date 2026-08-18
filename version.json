@@ -1,5 +1,5 @@
 {
-    "version":  "3.4.39",
-    "buildDate":  "2026-08-18T03:03:47.325Z",
-    "notes":  "The whole interface is now in English: Bayad became Payment (menus, buttons, toasts, mobile nav), Salamat po sa pagbili! became Thank you for your purchase!, Taglish sale prompts and AI answers were switched to English. Item names and your own data stay as you typed them."
+    "version":  "3.4.40",
+    "buildDate":  "2026-08-18T04:15:00.000Z",
+    "notes":  "Fixed the notification bell: the dropdown was opening behind the dashboard and other pages (the header's stacking order hid it). It now opens on top of everything except modals."
 }
