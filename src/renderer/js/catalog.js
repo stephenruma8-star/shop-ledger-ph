@@ -411,7 +411,7 @@ async function sellItems(items, opts, printSize) {
     _qsBusy = false;
     return null;
   }
-  toast('Benta na-save ✓ Invoice: ' + invoiceNo, 'success');
+  toast('Sale saved ✓ Invoice: ' + invoiceNo, 'success');
   playSound('sale');
   await logAudit('sale', `Sale ${invoiceNo} - ${peso(grandTotal)}`);
   [state.transactions, state.inventory, state.clients] = await Promise.all([

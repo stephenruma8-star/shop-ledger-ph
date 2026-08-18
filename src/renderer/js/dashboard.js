@@ -292,7 +292,7 @@ export async function askAI() {
       model = provider;
       headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey };
     }
-    const context = `Ikaw ay isang business analyst para sa isang Philippine sari-sari store / maliit na tindahan na gumagamit ng "Shop Ledger PH". Sumagot nang maikli sa Tagalog o Taglish. Gumamit ng ₱ para sa pera.
+    const context = `You are a business analyst for a Philippine sari-sari store / small store using "Shop Ledger PH". Respond briefly in plain English. Use ₱ for money.
 
 Shop Data Snapshot:
 - Total clients: ${state.clients.length}

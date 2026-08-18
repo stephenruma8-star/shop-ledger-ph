@@ -4,7 +4,7 @@ import { closeModal, escapeHtml, modal, toast } from './helpers.js'
 import { state } from './state.js'
 
 let _obStep = 1;
-const _ONB_DEFAULT_FOOTER = 'Salamat po sa pagbili!';
+const _ONB_DEFAULT_FOOTER = 'Thank you for your purchase!';
 
 function setSettingKV(key, value) {
   const existing = state.settings.find(s => s.key === key);

@@ -40,7 +40,7 @@ export function renderClientGrid() {
     return `<div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border hover:shadow-md transition-shadow cursor-pointer glass-card" onclick="viewClientHistory(${c.id})">
       <div class="flex items-center gap-3 mb-2"><div class="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-600 font-bold flex-shrink-0">${c.name?.charAt(0)||'?'}</div>
         <div class="flex-1 min-w-0"><p class="font-semibold truncate">${escapeHtml(c.name)}</p><p class="text-xs text-gray-500">${escapeHtml(c.phone || 'No phone')}</p></div>
-        <button onclick="event.stopPropagation();recordClientPayment(${c.id})" class="text-green-500 hover:text-green-700 px-1" title="Bayad"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M6 7h9a4 4 0 0 1 0 8H6"/><line x1="4" y1="11" x2="17" y2="11"/></svg></button>
+        <button onclick="event.stopPropagation();recordClientPayment(${c.id})" class="text-green-500 hover:text-green-700 px-1" title="Payment"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M6 7h9a4 4 0 0 1 0 8H6"/><line x1="4" y1="11" x2="17" y2="11"/></svg></button>
         <button onclick="event.stopPropagation();printClientInfo(${c.id})" class="text-gray-400 hover:text-blue-600 px-1" title="Print"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></button>
         <button onclick="event.stopPropagation();deleteClient(${c.id})" class="text-gray-400 hover:text-red-600 px-1" title="Delete"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></div>
       <div class="flex justify-between items-center"><span class="text-xs text-gray-400">Balance:</span><span class="font-bold ${balColor}">${peso(bal)}</span></div>
@@ -284,7 +284,7 @@ export async function viewClientHistory(id) {
       <div><h3 class="text-xl font-bold">${escHtml(c.name)}</h3><p class="text-xs text-gray-500">${escHtml(c.phone||'')}${c.address?' · '+escHtml(c.address):''}</p></div>
       <div class="flex gap-1 flex-wrap justify-end">
         <button onclick="closeModal();openClientModal(${c.id})" class="px-2 py-1 text-xs bg-blue-600 text-white rounded"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-0.5 -mt-0.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit</button>
-        <button onclick="closeModal();recordClientPayment(${c.id})" class="px-2 py-1 text-xs bg-green-600 text-white rounded"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-0.5 -mt-0.5"><path d="M12 2v20M6 7h9a4 4 0 0 1 0 8H6"/><line x1="4" y1="11" x2="17" y2="11"/></svg>Bayad</button>
+        <button onclick="closeModal();recordClientPayment(${c.id})" class="px-2 py-1 text-xs bg-green-600 text-white rounded"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-0.5 -mt-0.5"><path d="M12 2v20M6 7h9a4 4 0 0 1 0 8H6"/><line x1="4" y1="11" x2="17" y2="11"/></svg>Payment</button>
         <button onclick="closeModal();printClientInfo(${c.id})" class="px-2 py-1 text-xs bg-gray-600 text-white rounded"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-0.5 -mt-0.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print</button>
         <button onclick="closeModal();deleteClient(${c.id})" class="px-2 py-1 text-xs bg-red-600 text-white rounded"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-0.5 -mt-0.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Del</button>
       </div>
@@ -378,7 +378,7 @@ export async function recordClientPayment(id) {
   if (!c) { toast('Client not found', 'error'); return; }
   modal(`
     <div class="p-6">
-      <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">Bayad — ${escapeHtml(c.name)}</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+      <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">Payment — ${escapeHtml(c.name)}</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
       <p class="text-sm text-gray-500 mb-3">Current balance: <strong class="${(c.balance||0)>0?'text-red-600':'text-green-600'}">${peso(c.balance)}</strong></p>
       <div class="space-y-3">
         <div class="grid grid-cols-2 gap-3">
@@ -422,7 +422,7 @@ export async function saveClientPayment(id) {
   if (!wasFullyPaid && c.balance <= 0) confetti();
   if (window.electronAPI) window.electronAPI.signalLanUpdate();
   await viewClientHistory(id);
-  toast('Bayad recorded ✓', 'success');
+  toast('Payment recorded ✓', 'success');
 }
 
 export async function deleteClientSale(txnId, clientId) {

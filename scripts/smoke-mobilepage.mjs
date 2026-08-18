@@ -326,7 +326,7 @@ try {
   // record Bayad
   gcall(`showView('pay', 1)`);
   const payHtml = getEl('view').innerHTML;
-  ok(payHtml.includes('Record Bayad') && payHtml.includes('Maria Santos'), 'pay view rendered with preselected client');
+  ok(payHtml.includes('Record Payment') && payHtml.includes('Maria Santos'), 'pay view rendered with preselected client');
   getEl('pay-client').value = '1';
   getEl('pay-amount').value = '100';
   getEl('pay-type').value = 'GCash';

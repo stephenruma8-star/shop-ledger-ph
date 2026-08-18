@@ -807,7 +807,7 @@ function buildMenu() {
   return Menu.buildFromTemplate([
     { label: 'File', submenu: [
       { label: 'New Sale', accelerator: 'F2', click: () => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('shortcut', 'new-sale'); } },
-      { label: 'Record Bayad', accelerator: 'F3', click: () => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('shortcut', 'new-payment'); } },
+      { label: 'Record Payment', accelerator: 'F3', click: () => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('shortcut', 'new-payment'); } },
       { type: 'separator' },
       { label: 'Backup', click: () => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('shortcut', 'file-backup'); } },
       { label: 'Email Backup', click: () => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('shortcut', 'email-backup'); } },

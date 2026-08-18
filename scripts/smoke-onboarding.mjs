@@ -176,7 +176,7 @@ try {
   const finalKeys = writes.map(w => w.value && w.value.key);
   if (!finalKeys.includes('receiptFooter')) throw new Error('receiptFooter not saved');
   const footerWrite = writes.find(w => w.value && w.value.key === 'receiptFooter');
-  if (footerWrite.value.value !== 'Salamat po sa pagbili!') throw new Error('receipt footer default not applied');
+  if (footerWrite.value.value !== 'Thank you for your purchase!') throw new Error('receipt footer default not applied');
   if (!finalKeys.includes('onboardingDone')) throw new Error('onboardingDone not saved');
   if (modalRoot.innerHTML !== '') throw new Error('wizard did not close on finish');
   if (writes.filter(w => w.value && w.value.key === undefined && w.store === 'auditLogs').length === 0) throw new Error('setup not audited');

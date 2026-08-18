@@ -1,5 +1,5 @@
 {
-  "version": "3.4.38",
-  "buildDate": "2026-08-18T00:00:00.000Z",
-  "notes": "\"Utang\" is now in English across the whole app: the menu item is Debts, dashboard and reports say Total Debts / Outstanding Debts, the on-credit sale marker and charge-to-client option say Credit, and wording like 'overdue utang' became 'overdue balances'."
+    "version":  "3.4.39",
+    "buildDate":  "2026-08-18T03:03:47.325Z",
+    "notes":  "The whole interface is now in English: Bayad became Payment (menus, buttons, toasts, mobile nav), Salamat po sa pagbili! became Thank you for your purchase!, Taglish sale prompts and AI answers were switched to English. Item names and your own data stay as you typed them."
 }

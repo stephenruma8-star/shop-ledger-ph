@@ -268,7 +268,7 @@ export async function saveTransaction() {
     Subtotal: ${peso(subtotal)}
     ${totalInterest > 0 ? 'Interest: ' + peso(totalInterest) + '\n  ' : ''}${scDiscount > 0 ? 'SC/PWD: -' + peso(scDiscount) + '\n  ' : ''}${discount > 0 ? 'Discount: -' + peso(discount) + '\n  ' : ''}→ Total: ${peso(grandTotal)}
     
-    Proceed with this sale? (I-save ang benta?)`)) return;
+    Proceed with this sale? (Save the sale?)`)) return;
     await doSaveTransaction();
   } finally { window.__app._savingTx = false; }
 }
