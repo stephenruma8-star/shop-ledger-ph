@@ -23,6 +23,8 @@ pageScript += `
   g.__cart = () => cart;
   g.__cur = () => currentView;
   g.__eval = (code) => eval(code);
+  g.__queue = () => offlineQueue;
+  g.__flush = () => flushQueue();
 }
 `;
 
@@ -36,6 +38,8 @@ const seen = new Set();
 const posts = [];
 let fetchCount = 0;
 const todayStr = new Date().toISOString().split('T')[0];
+const storage = new Map();
+const bridge = { offline: false };
 
 function tx(id, invoiceNo, clientName, grandTotal, status, itemCount) {
   return { id, invoiceNo, clientName, grandTotal, date: todayStr, paymentMethod: 'Cash', status, items: itemCount, subtotal: grandTotal, totalInterest: 0, discount: 0, scDiscount: 0, createdAt: new Date().toISOString() };
@@ -99,6 +103,7 @@ const getEl = (id) => { if (!els.has(id)) els.set(id, makeEl(id)); return els.ge
 
 const fakeFetch = async (url, opts) => {
   fetchCount++;
+  if (bridge.offline) throw new TypeError('Failed to fetch');
   const method = (opts && opts.method) || 'GET';
   const path = String(url).replace(/^https?:\/\/[^/]+/, '');
   seen.add(method + ' ' + path);
@@ -138,7 +143,12 @@ const sandbox = {
   },
   location: { search: '?token=tk123', protocol: 'http:', hostname: 'localhost' },
   navigator: {},
-  localStorage: { getItem: () => null, setItem: noop, removeItem: noop, clear: noop },
+  localStorage: {
+    getItem: (k) => (storage.has(k) ? storage.get(k) : null),
+    setItem: (k, v) => storage.set(k, String(v)),
+    removeItem: (k) => storage.delete(k),
+    clear: () => storage.clear(),
+  },
   WebSocket: FakeWebSocket,
   fetch: fakeFetch,
   setTimeout: sandboxTimeout,
@@ -393,10 +403,46 @@ try {
   const setHtml = getEl('view').innerHTML;
   ok(setHtml.includes('Juan Sari-Sari Store') && setHtml.includes('Manila') && setHtml.includes('09171234567'), 'settings shows store info');
 
+  // ---- offline write queue (v3.4.35) ----
+  gcall(`showView('expenses')`);
+  gcall(`addExpense()`);
+  getEl('ex-desc').value = 'Candles';
+  getEl('ex-category').value = 'Other';
+  getEl('ex-amount').value = '20';
+  getEl('ex-payee').value = 'Store';
+  bridge.offline = true;
+  const offPostsBefore = posts.length;
+  await gcall(`submitExpense()`);
+  await wait(20);
+  ok(posts.length === offPostsBefore, 'offline expense not posted directly');
+  ok(gget('__queue().length') === 1 && gget('__queue()[0].path') === '/api/expenses', 'offline expense queued with endpoint path');
+  ok(gget('__queue()[0].body.amount') === 20 && gget('__queue()[0].body.description') === 'Candles' && gget('__queue()[0].body.payee') === 'Store', 'queued expense payload preserved');
+  ok(getEl('pending-count').textContent === '1', 'offline banner shows pending count 1');
+  const expGridHtml = getEl('view').innerHTML;
+  ok(expGridHtml.includes('Candles') && expGridHtml.includes('pending sync'), 'queued expense shown in list with pending-sync badge');
+  const qStored = storage.get('slpOfflineQueue');
+  ok(!!qStored && JSON.parse(qStored).length === 1, 'queue persisted to localStorage');
+  gcall(`quickAdd(1)`);
+  gcall(`showView('sale')`);
+  const offSaleBefore = posts.length;
+  await gcall(`submitSale()`);
+  await wait(20);
+  ok(posts.length === offSaleBefore, 'offline sale not posted directly');
+  ok(gget('__queue().length') === 2 && gget('__queue()[1].path') === '/api/sales', 'offline sale queued after expense (FIFO order)');
+  ok(getEl('toast-root').children.some(c => c.textContent.includes('queued')), 'queued toast shown');
+  bridge.offline = false;
+  const synced = await gcall(`__flush()`);
+  await wait(20);
+  ok(synced === 2, 'flush() synced both queued writes');
+  const tail = posts.slice(-2);
+  ok(tail[0].path === '/api/expenses' && tail[1].path === '/api/sales', 'writes replayed in original order');
+  ok(tail[0].body.description === 'Candles' && tail[1].body.items[0].description === 'Coke 500ml', 'replayed payloads intact');
+  ok(gget('__queue().length') === 0 && getEl('pending-count').textContent === '0', 'queue and banner cleared after sync');
+
   for (const t of timerIds) clearTimeout(t);
 
   if (failures === 0) {
-    console.log('MOBILE PAGE OK: boots via 8 /api endpoints, 11 views render, cart sale + quick sell + out-of-stock guard + Bayad + expenses + PO + reports + settings all verified');
+    console.log('MOBILE PAGE OK: boots via 8 /api endpoints, 11 views render, cart sale + quick sell + out-of-stock guard + Bayad + expenses + PO + reports + settings + offline queue/Sync-now all verified');
     process.exit(0);
   } else {
     console.error('MOBILE PAGE FAILED: ' + failures + ' assertion(s) failed');

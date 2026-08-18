@@ -1,5 +1,5 @@
 {
-  "version": "3.4.34",
-  "buildDate": "2026-08-13T00:00:00.000Z",
-  "notes": "Full-feature mobile app (PWA): the phone page now has Expenses (view + record + search), Suppliers (purchased/paid/owed balances), Purchase Orders (create + view), Reports (today/month summary, top items, 7-day trend) and Settings (store info), reached via the new Home quick actions and nav tabs. New /api/expenses, /api/suppliers, /api/purchase-orders, /api/reports, /api/settings endpoints, plus an offline-capable service worker for secure-context installs (Tailscale/web)."
+  "version": "3.4.35",
+  "buildDate": "2026-08-18T00:00:00.000Z",
+  "notes": "Offline write queue for the phone app: when the store has no connection, sales, bayad, expenses and purchase orders are saved locally (with a pending-sync banner and Sync now button), shown optimistically in the expenses list, and replayed in order automatically when the network returns (auto-flush on reconnect, on page load with a queued backlog, or manually)."
 }

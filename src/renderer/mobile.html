@@ -149,6 +149,12 @@ header{position:sticky;top:0;z-index:30;background:rgba(15,23,42,.9);backdrop-fi
 <div id="modal-root"></div>
 <div id="toast-root" class="fixed top-[4.2rem] left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-sm space-y-2"></div>
 
+<div id="offline-banner" class="hidden fixed bottom-[5.1rem] left-1/2 -translate-x-1/2 z-40 w-[94%] max-w-sm gap-2 items-center bg-amber-500 text-white text-xs px-3.5 py-2.5 rounded-xl shadow-lg ring-1 ring-black/20 slide-in">
+  <svg class="shrink-0" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.58 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+  <span class="flex-1 text-center"><b id="pending-count">0</b> pending change(s) — will sync when back online</span>
+  <button onclick="syncNow()" class="btn btn-ghost !text-white !bg-black/25 text-[11px] px-2.5 py-1 h-auto rounded-lg" style="white-space:nowrap">Sync now</button>
+</div>
+
 <script>
 const API = window.location.origin;
 const peso = (n) => '₱' + (Number(n) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -190,11 +196,63 @@ async function apiGet(path) {
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }
+function apiPostRaw(path, body) {
+  return fetch(API + path, { method: 'POST', headers: { 'Content-Type': 'application/json', ...HDR() }, body: JSON.stringify(body) })
+    .then(async (r) => {
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.success) throw new Error(j.error || 'HTTP ' + r.status);
+      return j;
+    });
+}
 async function apiPost(path, body) {
-  const r = await fetch(API + path, { method: 'POST', headers: { 'Content-Type': 'application/json', ...HDR() }, body: JSON.stringify(body) });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok || !j.success) throw new Error(j.error || 'HTTP ' + r.status);
-  return j;
+  try { return await apiPostRaw(path, body); }
+  catch (e) {
+    if (!e || e.name !== 'TypeError') throw e;
+    queueOp(path, body);
+    return { success: true, queued: true };
+  }
+}
+
+// ---------- offline write queue ----------
+const QUEUE_KEY = 'slpOfflineQueue';
+let offlineQueue = [];
+function loadQueue() {
+  try { offlineQueue = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); } catch (e) { offlineQueue = []; }
+  if (!Array.isArray(offlineQueue)) offlineQueue = [];
+  updateQueueUI();
+}
+function saveQueue() { try { localStorage.setItem(QUEUE_KEY, JSON.stringify(offlineQueue)); } catch (e) {} }
+function updateQueueUI() {
+  const b = document.getElementById('offline-banner');
+  const c = document.getElementById('pending-count');
+  if (!b || !c) return;
+  const n = offlineQueue.length;
+  c.textContent = String(n);
+  b.classList.toggle('hidden', n === 0);
+}
+function queueOp(path, body) {
+  offlineQueue.push({ id: Date.now() + '-' + Math.random().toString(36).slice(2, 8), path, body, at: new Date().toISOString() });
+  saveQueue(); updateQueueUI();
+}
+async function flushQueue() {
+  let synced = 0;
+  while (offlineQueue.length) {
+    const op = offlineQueue[0];
+    try { await apiPostRaw(op.path, op.body); }
+    catch (e) { break; }
+    offlineQueue.shift(); synced++;
+  }
+  saveQueue(); updateQueueUI();
+  if (synced) {
+    toast(synced === 1 ? '1 change synced' : synced + ' changes synced', 'ok');
+    refreshAll();
+    if (offlineQueue.length) toast(offlineQueue.length + ' still pending — will retry', 'err');
+  }
+  return synced;
+}
+async function syncNow() {
+  const n = await flushQueue();
+  if (!n) toast('Still no connection — changes stay queued', 'err');
 }
 
 async function loadAll() {
@@ -209,6 +267,7 @@ async function loadAll() {
     data.expenses = expenses; data.suppliers = suppliers; data.purchaseOrders = purchaseOrders;
     data.reports = reports; data.settings = settings;
     await loadClients();
+    if (offlineQueue.length) flushQueue();
     return true;
   } catch (e) { setConn(false); return false; }
 }
@@ -234,7 +293,7 @@ function connectWS() {
   ws.onopen = () => { try { ws.send(JSON.stringify({ type: 'auth', token: getToken() })); } catch (e) {} };
   ws.onmessage = (ev) => {
     let msg; try { msg = JSON.parse(ev.data); } catch (e) { return; }
-    if (msg.type === 'auth-ok') { wsAuthed = true; setConn(true); }
+    if (msg.type === 'auth-ok') { wsAuthed = true; setConn(true); if (offlineQueue.length) flushQueue(); }
     else if (msg.type === 'update') refreshAll();
   };
   ws.onclose = () => { wsAuthed = false; setTimeout(connectWS, 5000); };
@@ -604,7 +663,8 @@ async function quickSell(id) {
       paymentMethod: 'Cash', discount: 0
     });
     closeQuick();
-    toast('✅ Sale saved! ' + r.invoiceNo, 'ok');
+    if (r.queued) toast('Sale queued — will sync when online', 'ok');
+    else toast('✅ Sale saved! ' + r.invoiceNo, 'ok');
     await refreshAll();
   } catch (e) { toast('Sale failed: ' + e.message, 'err'); }
 }
@@ -751,7 +811,8 @@ async function submitSale() {
   try {
     const disc = discount + (sc ? (items.reduce((s, i) => s + i.qty * i.unitCost, 0) * 0.2) : 0);
     const r = await apiPost('/api/sales', { clientId: charge ? clientId : null, items, paymentMethod, discount: disc });
-    toast('✅ Sale saved! ' + r.invoiceNo, 'ok');
+    if (r.queued) toast('Sale queued — will sync when online', 'ok');
+    else toast('✅ Sale saved! ' + r.invoiceNo, 'ok');
     cart = []; updateCartUI();
     showView('home'); await refreshAll();
   } catch (e) { toast('Sale failed: ' + e.message, 'err'); }
@@ -799,8 +860,9 @@ async function submitPay() {
   const type = document.getElementById('pay-type').value;
   if (!clientId || !amount) return toast('Fill in client and amount', 'err');
   try {
-    await apiPost('/api/payments', { clientId, amount, type, date: new Date().toISOString().split('T')[0] });
-    toast('✅ Bayad recorded!', 'ok');
+    const r = await apiPost('/api/payments', { clientId, amount, type, date: new Date().toISOString().split('T')[0] });
+    if (r.queued) toast('Bayad queued — will sync when online', 'ok');
+    else toast('✅ Bayad recorded!', 'ok');
     showView('home'); await refreshAll();
   } catch (e) { toast('Error: ' + e.message, 'err'); }
 }
@@ -902,7 +964,7 @@ function expenseListHTML(items) {
       <span class="icon-tile bg-red-500/15 text-red-400 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
       <div class="flex-1 min-w-0">
         <div class="font-semibold text-sm text-gray-200 truncate">${esc(e.description || e.category || 'Expense')}</div>
-        <div class="text-[11px] text-gray-500 truncate">${esc(e.category || '—')} · ${fmtDate(e.date)}${e.payee ? ' · ' + esc(e.payee) : ''}</div>
+        <div class="text-[11px] text-gray-500 truncate">${esc(e.category || '—')} · ${fmtDate(e.date)}${e.payee ? ' · ' + esc(e.payee) : ''}${e.queued ? ' · <span class="chip chip-amber" style="padding:.05rem .45rem;font-size:.65rem">⏳ pending sync</span>' : ''}</div>
       </div>
       <div class="text-right shrink-0">
         <div class="font-bold text-sm text-red-400 num">${peso(e.amount)}</div>
@@ -962,8 +1024,14 @@ async function submitExpense() {
   const payee = (document.getElementById('ex-payee').value || '').trim();
   if (!amount || amount <= 0) return toast('Enter a valid amount', 'err');
   try {
-    await apiPost('/api/expenses', { description, amount, category, date, payee });
+    const r = await apiPost('/api/expenses', { description, amount, category, date, payee });
     closeQuick();
+    if (r.queued) {
+      data.expenses.push({ id: Date.now(), date, category, description, amount, payee, queued: true });
+      if (currentView === 'expenses') renderExpenses();
+      toast('Expense queued — will sync when online', 'ok');
+      return;
+    }
     toast('✅ Expense recorded!', 'ok');
     await refreshAll();
   } catch (e) { toast('Error: ' + e.message, 'err'); }
@@ -1104,7 +1172,8 @@ async function submitPO() {
     const r = await apiPost('/api/purchase-orders', { supplierId, items: poItems.map(i => ({ invId: i.invId, name: i.name, price: i.price, qty: i.qty })), date: new Date().toISOString().split('T')[0] });
     closeQuick();
     poItems = [];
-    toast('✅ PO created! ' + (r.poNo || ''), 'ok');
+    if (r.queued) toast('PO queued — will sync when online', 'ok');
+    else toast('✅ PO created! ' + (r.poNo || ''), 'ok');
     await refreshAll();
   } catch (e) { toast('Error: ' + e.message, 'err'); }
 }
@@ -1199,6 +1268,8 @@ async function renderSettings() {
       navigator.serviceWorker.register('/mobile-sw.js').catch(() => {});
     }
   } catch (e) { /* PWA upgrade path unavailable on plain http - app still works */ }
+  loadQueue();
+  window.addEventListener('online', () => { if (offlineQueue.length) flushQueue(); });
   await loadAll();
   const ls = document.getElementById('loading-screen');
   if (ls) ls.classList.add('hidden');
