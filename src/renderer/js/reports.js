@@ -184,7 +184,7 @@ export async function exportExcel() {
       <span style="margin-right:24px"><strong>COGS:</strong> ₱${pesoVal(totalCOGS)}</span>
       <span style="margin-right:24px"><strong>Expenses:</strong> ₱${pesoVal(totalExpenses)}</span>
       <span style="margin-right:24px"><strong style="color:${sumColor}">Net Profit:</strong> <span style="color:${sumColor}">₱${pesoVal(netProfit)}</span></span>
-      <span style="margin-right:24px"><strong>Utang:</strong> ₱${pesoVal(totalUtang)}</span>
+      <span style="margin-right:24px"><strong>Debts:</strong> ₱${pesoVal(totalUtang)}</span>
       <span><strong>Payments:</strong> ₱${pesoVal(totalPayments)}</span>
     </td></tr>`;
 
@@ -321,7 +321,7 @@ export async function exportPDF() {
     <div class="card orange"><span class="lbl">Cost of Goods</span><span class="val">${fmt(totalCOGS)}</span></div>
     <div class="card red"><span class="lbl">Expenses</span><span class="val">${fmt(totalExpenses)}</span></div>
     <div class="card ${netProfit>=0?'blue':'red'}"><span class="lbl">Net Profit</span><span class="val">${fmt(netProfit)}</span></div>
-    <div class="card orange"><span class="lbl">Outstanding Utang</span><span class="val">${fmt(totalUtang)}</span></div>
+    <div class="card orange"><span class="lbl">Outstanding Debts</span><span class="val">${fmt(totalUtang)}</span></div>
     <div class="card blue"><span class="lbl">Payments Collected</span><span class="val">${fmt(totalPayments)}</span></div>
   </div>`;
 

@@ -155,7 +155,7 @@ export function openQuickSaleModal(id) {
         <button onclick="qsAddToCart()" class="flex-1 py-2 border dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">Add to Cart</button>
         <button onclick="closeModal()" class="flex-1 py-2 border dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">Cancel</button>
       </div>
-      <p class="text-xs text-gray-400 mt-2 text-center">Sales to clients are added to their balance (utang) automatically. Add to Cart lets you combine items into one sale.</p>
+      <p class="text-xs text-gray-400 mt-2 text-center">Sales to clients are added to their balance (credit) automatically. Add to Cart lets you combine items into one sale.</p>
     </div>`);
   qsRender();
 }

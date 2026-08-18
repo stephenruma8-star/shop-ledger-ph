@@ -22,7 +22,7 @@ export async function navigate(route) {
   const token = ++_navToken;
   state.currentRoute = route;
   const titles = {
-    dashboard: 'Dashboard', clients: 'Clients', utang: 'Utang',
+    dashboard: 'Dashboard', clients: 'Clients', utang: 'Debts',
     transactions: 'Sales', catalog: 'Catalog', inventory: 'Inventory', stocktake: 'Stock Take', expenses: 'Expenses',
     suppliers: 'Suppliers', payments: 'Payments', 'purchase-orders': 'Purchase Orders',
     reports: 'Reports', settings: 'Settings'

@@ -41,7 +41,7 @@ export async function viewDashboard(root) {
           <p class="text-lg font-bold text-red-600" id="dash-expenses"></p>
         </div>
         <div class="bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm border-l-4 border-orange-500">
-          <p class="text-xs text-gray-500">Total Utang</p>
+          <p class="text-xs text-gray-500">Total Debts</p>
           <p class="text-lg font-bold text-orange-600" id="dash-utang"></p>
           <p class="text-xs text-gray-400">${state.clients.filter(c => (c.balance||0) > 0).length} clients</p>
         </div>
@@ -112,8 +112,8 @@ export async function viewDashboard(root) {
       </div>` : ''}
       <div class="grid grid-cols-2 gap-2">
         ${dw.topUtang ? `<div class="bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm">
-          <h3 class="font-bold text-xs mb-1">Top Utang</h3>
-          <div class="max-h-48 overflow-y-auto">${topUtang.length === 0 ? '<p class="text-gray-400 text-xs">No utang</p>' : topUtang.slice(0, 10).map(c => `
+          <h3 class="font-bold text-xs mb-1">Top Debts</h3>
+          <div class="max-h-48 overflow-y-auto">${topUtang.length === 0 ? '<p class="text-gray-400 text-xs">No debts</p>' : topUtang.slice(0, 10).map(c => `
             <div class="flex justify-between py-0.5 text-xs border-b dark:border-gray-700 last:border-0">
               <span>${escapeHtml(c.name)}</span><span class="font-semibold text-orange-600">${peso(c.balance)}</span>
             </div>`).join('') + (topUtang.length > 10 ? `<div class="text-center pt-1"><a href="#" onclick="event.preventDefault();navigate('utang')" class="text-blue-500 text-xs hover:underline"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-0.5 -mt-0.5"><polyline points="9 18 15 12 9 6"/></svg>View all (${topUtang.length})</a></div>` : '')}</div>
@@ -169,7 +169,7 @@ export function getDashWidgets() {
 
 export function dashCustomize() {
   const w = getDashWidgets();
-  const items = { summaryCards: 'Summary Cards', profitBar: 'Profit Bar', profitAnalytics: 'Profit Analytics', weather: 'Weather & Holidays', chart: '7-Day Chart', payMethod: 'Payment Methods', topUtang: 'Top Utang', lowStock: 'Low Stock', aiInsights: 'AI Insights' };
+  const items = { summaryCards: 'Summary Cards', profitBar: 'Profit Bar', profitAnalytics: 'Profit Analytics', weather: 'Weather & Holidays', chart: '7-Day Chart', payMethod: 'Payment Methods', topUtang: 'Top Debts', lowStock: 'Low Stock', aiInsights: 'AI Insights' };
   modal(`<div class="p-6"><div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">Customize Dashboard</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
     <div class="space-y-2">${Object.entries(items).map(([k,v]) => `<label class="flex items-center gap-3 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg cursor-pointer"><input type="checkbox" ${w[k]!==false?'checked':''} onchange="dashToggle('${k}',this.checked)" class="w-4 h-4 text-blue-600 rounded" /><span class="text-sm">${v}</span></label>`).join('')}</div>
     <div class="flex gap-2 pt-4"><button onclick="closeModal();viewDashboard(document.getElementById('view'))" class="flex-1 py-2 bg-blue-600 text-white rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Apply & Reload</button><button onclick="closeModal()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg">Close</button></div></div>`);
@@ -300,7 +300,7 @@ Shop Data Snapshot:
 - Total sales (all time): ₱${state.transactions.filter(t => t.status !== 'voided' && t.status !== 'interest').reduce((s,t) => s+(t.grandTotal||0), 0).toFixed(2)}
 - Total expenses: ₱${state.expenses.reduce((s,e) => s+(e.amount||0), 0).toFixed(2)}
 - Today's sales: ₱${todaySales.toFixed(2)}
-- Total utang (outstanding balance): ₱${totalUtang.toFixed(2)}
+- Total debt (outstanding balance): ₱${totalUtang.toFixed(2)}
 - Total payments collected: ₱${state.payments.reduce((s,p) => s+(p.amount||0), 0).toFixed(2)}
 - Inventory items: ${state.inventory.length}
 - Low stock items: ${lowStock.map(i => i.name + '(' + (i.stock||0) + '/' + (i.minStock||5) + ')').join(', ') || 'None'}

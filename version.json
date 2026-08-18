@@ -1,5 +1,5 @@
 {
-  "version": "3.4.37",
+  "version": "3.4.38",
   "buildDate": "2026-08-18T00:00:00.000Z",
-  "notes": "Animation polish: cart lines now fade out when removed (desktop and phone), the cart count/total pops when an item is added, desktop buttons give a small press-down feedback, dashboard numbers jump straight to the value, and the whole app respects the Windows 'Show animations' (prefers-reduced-motion) setting."
+  "notes": "\"Utang\" is now in English across the whole app: the menu item is Debts, dashboard and reports say Total Debts / Outstanding Debts, the on-credit sale marker and charge-to-client option say Credit, and wording like 'overdue utang' became 'overdue balances'."
 }

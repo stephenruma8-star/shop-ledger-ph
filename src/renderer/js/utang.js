@@ -15,7 +15,7 @@ export async function viewUtang(root) {
     <div class="space-y-4 fade-in">
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border-l-4 stat-card border-orange-500">
-          <p class="text-xs text-gray-500 uppercase">Total Utang</p>
+          <p class="text-xs text-gray-500 uppercase">Total Debts</p>
           <p class="text-2xl font-bold text-orange-600">${peso(totalUtang)}</p>
           <p class="text-xs text-gray-400">${debtors.length} debtors</p>
         </div>
@@ -24,7 +24,7 @@ export async function viewUtang(root) {
           <p class="text-2xl font-bold text-red-600">${peso(maxUtang)}</p>
         </div>
         <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border-l-4 stat-card border-blue-500">
-          <p class="text-xs text-gray-500 uppercase">Average Utang</p>
+          <p class="text-xs text-gray-500 uppercase">Average Debt</p>
           <p class="text-2xl font-bold text-blue-600">${peso(avgUtang)}</p>
         </div>
       </div>

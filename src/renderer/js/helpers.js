@@ -464,7 +464,7 @@ export function showShortcuts() {
           <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>F9</span><span class="text-gray-500">Stock Take</span></div>
           <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>F10</span><span class="text-gray-500">Suppliers</span></div>
           <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>F11</span><span class="text-gray-500">Purchase Orders</span></div>
-          <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>Ctrl+U</span><span class="text-gray-500">Utang</span></div>
+          <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>Ctrl+U</span><span class="text-gray-500">Debts</span></div>
         </div>
         <div class="grid grid-cols-2 gap-2">
           <div class="p-2 bg-green-50 dark:bg-green-900/20 rounded col-span-2 font-semibold text-xs text-green-600">Actions</div>
@@ -577,7 +577,7 @@ export function updateNotifications() {
   if (panel) {
     panel.innerHTML = `<div class="p-3 space-y-2 text-sm">
       <div class="flex justify-between items-center border-b dark:border-gray-700 pb-2"><span class="font-bold">Notifications</span><button onclick="document.getElementById('notif-panel').classList.add('hidden')" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
-      ${overdue > 0 ? `<div class="flex items-center gap-2 text-red-600"><span>⚠️</span><span>${overdue} overdue utang</span></div>` : ''}
+      ${overdue > 0 ? `<div class="flex items-center gap-2 text-red-600"><span>⚠️</span><span>${overdue} overdue balances</span></div>` : ''}
       ${lowStock > 0 ? `<div class="flex items-center gap-2 text-orange-600"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg><span>${lowStock} low stock items</span></div>` : ''}
       ${recentPOs > 0 ? `<div class="flex items-center gap-2 text-green-600"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg><span>${recentPOs} POs received today</span></div>` : ''}
       ${total === 0 ? '<div class="text-gray-400 text-center py-4">✓ All good!</div>' : ''}

@@ -451,7 +451,7 @@ async function renderHome() {
       </div>
       <div class="stat-card rounded-2xl p-3.5">
         <div class="flex items-center justify-between mb-2 gap-1">
-          <span class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Total Utang</span>
+          <span class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Total Debts</span>
           <span class="icon-tile bg-orange-500/15 text-orange-400"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>
         </div>
         <div class="text-xl font-bold text-orange-400 num leading-tight">${peso(s.totalUtang)}</div>
@@ -529,7 +529,7 @@ async function renderClients() {
         <div class="text-xl font-bold text-blue-400 num">${data.clients.length}</div>
       </div>
       <div class="stat-card rounded-2xl p-3.5 text-center">
-        <div class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-1">Total utang</div>
+        <div class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-1">Total debts</div>
         <div class="text-xl font-bold text-orange-400 num">${peso(total)}</div>
       </div>
     </div>
@@ -733,7 +733,7 @@ function renderSale() {
         <input type="checkbox" id="sale-sc" onchange="saleTotals()" class="switch" />
       </label>
       <label class="flex items-center justify-between gap-3 py-1 cursor-pointer">
-        <span class="text-sm text-gray-300">Charge to client (utang)</span>
+        <span class="text-sm text-gray-300">Charge to client (credit)</span>
         <input type="checkbox" id="sale-charge" class="switch" />
       </label>
       <div class="flex justify-between items-center border-t border-white/10 pt-3">
@@ -946,7 +946,7 @@ async function renderTransactions() {
           </div>
           <div class="text-right shrink-0">
             <div class="font-bold text-sm text-green-400 num">${peso(t.grandTotal)}</div>
-            <span class="chip ${(t.status || '') === 'pending' ? 'chip-amber' : 'chip-green'}" style="padding:.1rem .5rem;font-size:.68rem">${esc(t.status == null ? '' : t.status === 'pending' ? 'Utang' : 'Paid')}</span>
+            <span class="chip ${(t.status || '') === 'pending' ? 'chip-amber' : 'chip-green'}" style="padding:.1rem .5rem;font-size:.68rem">${esc(t.status == null ? '' : t.status === 'pending' ? 'Credit' : 'Paid')}</span>
           </div>
         </div>`).join('')}
     </div>`;
