@@ -158,6 +158,8 @@ function _connApply(mode, label, icon) {
     const ic = el.querySelector('.conn-icon');
     if (ic) ic.outerHTML = svg;
   });
+  const banner = document.getElementById('conn-banner');
+  if (banner) banner.classList.toggle('hidden', mode !== 'offline');
 }
 
 export async function updateConnStatus() {

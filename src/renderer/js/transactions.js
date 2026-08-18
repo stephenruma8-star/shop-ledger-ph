@@ -251,7 +251,7 @@ export async function saveTransaction() {
     Subtotal: ${peso(subtotal)}
     ${totalInterest > 0 ? 'Interest: ' + peso(totalInterest) + '\n  ' : ''}${scDiscount > 0 ? 'SC/PWD: -' + peso(scDiscount) + '\n  ' : ''}${discount > 0 ? 'Discount: -' + peso(discount) + '\n  ' : ''}→ Total: ${peso(grandTotal)}
     
-    Proceed with this sale?`)) return;
+    Proceed with this sale? (I-save ang benta?)`)) return;
     await doSaveTransaction();
   } finally { window.__app._savingTx = false; }
 }
@@ -516,7 +516,7 @@ export function viewTransactionDetail(id) {
 
 export async function voidTransaction(id) {
   const t = await dbGet('transactions', id);
-  if (!await confirmModal(`Void sale ${t.invoiceNo} (${peso(t.grandTotal)})? This will restore inventory and adjust client balance.`)) return;
+  if (!await confirmModal(`Void sale ${t.invoiceNo} (${peso(t.grandTotal)})? Ibabalik ang stock at iaadjust ang client balance.`)) return;
   if (t.status === 'voided') { toast('Already voided', 'warning'); return; }
   for (const item of (t.items || [])) {
     if (item.invId) await adjustStock(item.invId, item, 1);

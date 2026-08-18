@@ -422,7 +422,7 @@ export async function saveClientPayment(id) {
   if (!wasFullyPaid && c.balance <= 0) confetti();
   if (window.electronAPI) window.electronAPI.signalLanUpdate();
   await viewClientHistory(id);
-  toast('Payment recorded', 'success');
+  toast('Bayad recorded ✓', 'success');
 }
 
 export async function deleteClientSale(txnId, clientId) {

@@ -123,7 +123,7 @@ export async function savePayment(id) {
     await dbPut('clients', c);
     const pay = { clientId, clientName: c.name, amount, date, type, notes, createdAt: now() };
     await dbAdd('payments', pay);
-    toast('Payment recorded', 'success');
+    toast('Bayad recorded ✓');
   }
   closeModal();
   state.payments = await dbAll('payments');

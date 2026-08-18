@@ -36,6 +36,7 @@ export async function doLogin() {
   applyPermissions();
   await logAudit('login', `User ${user.username} logged in`);
   navigate(state.currentRoute || 'dashboard');
+  if (window.__app?._onAfterLogin) window.__app._onAfterLogin();
 }
 
 export async function doLogout() {

@@ -79,7 +79,7 @@ export async function saveSupplierPayment(supplierId) {
   closeModal();
   renderSupTable();
   if (window.electronAPI) window.electronAPI.signalLanUpdate();
-  toast('Payment recorded');
+  toast('Supplier bayad recorded ✓');
 }
 
 export function openSupplierModal(id) {

@@ -84,7 +84,7 @@ export async function saveExpense(id) {
     amount, payee: payeeEl.value.trim()
   };
   if (id) { const existing = await dbGet('expenses', id); if (existing) obj.createdAt = existing.createdAt; obj.id = id; await dbPut('expenses', obj); await logAudit('expense-edit', `${obj.category}: ${peso(obj.amount)} - ${obj.description || ''}`.trim()); toast('Expense updated'); }
-  else { obj.createdAt = now(); await dbAdd('expenses', obj); await logAudit('expense-add', `${obj.category}: ${peso(obj.amount)} - ${obj.description || ''}`.trim()); toast('Expense recorded'); }
+  else { obj.createdAt = now(); await dbAdd('expenses', obj); await logAudit('expense-add', `${obj.category}: ${peso(obj.amount)} - ${obj.description || ''}`.trim()); toast('Expense recorded ✓'); }
   closeModal();
   state.expenses = await dbAll('expenses');
   renderExpTable();

@@ -1,5 +1,5 @@
 {
-  "version": "3.4.35",
+  "version": "3.4.36",
   "buildDate": "2026-08-18T00:00:00.000Z",
-  "notes": "Offline write queue for the phone app: when the store has no connection, sales, bayad, expenses and purchase orders are saved locally (with a pending-sync banner and Sync now button), shown optimistically in the expenses list, and replayed in order automatically when the network returns (auto-flush on reconnect, on page load with a queued backlog, or manually)."
+  "notes": "First-run setup wizard (store name/contact/address + receipt footer, admin only, skip anytime), clear offline banner on the desktop when there is no internet (cloud backup, updates and SMS reminders pause automatically; the store keeps working), and a friendlier Taglish tone across the app (dashboard, clients, expenses, suppliers, payments, catalog) with a small accessibility pass (keyboard focus rings, aria-labels on icon buttons and dialogs)."
 }

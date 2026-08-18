@@ -7,6 +7,9 @@ import { emailBackupFlow, fileBackupFlow } from './reports.js'
 import { loadAll, navigate } from './router.js'
 import { state, today } from './state.js'
 import { renderTMCart, txCart, updateTMTotals } from './transactions.js'
+import { maybeOnboard } from './onboarding.js'
+
+(window.__app || (window.__app = {}))._onAfterLogin = maybeOnboard;
 
 function _formatBytes(n) {
   const v = Number(n) || 0;
@@ -241,6 +244,7 @@ export async function boot() {
       document.getElementById('user-info').textContent = `${state.user.name} (${state.user.role})`;
       startClock();
       applyPermissions();
+      maybeOnboard();
     }
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') document.documentElement.classList.add('dark');
