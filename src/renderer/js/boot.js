@@ -261,6 +261,7 @@ export async function boot() {
     await updateVersionBadge();
     checkForNewBuild();
     initConnIndicator();
+    if (window.electronAPI?.planCloudBackups) window.electronAPI.planCloudBackups().catch(() => {});
   } catch (e) {
     console.error('Boot error:', e);
     const ls = document.getElementById('loading-screen');

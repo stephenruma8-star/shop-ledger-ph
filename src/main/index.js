@@ -56,7 +56,8 @@ const QRCode = require('qrcode');
 const axios = require('axios');
 const net = require('net');
 const { startWsServer } = require('./wsServer.js');
-const { registerDbIpc, closeDb } = require('./db.js');
+const { registerDbIpc, closeDb, init: sqliteInit, get: dbGetRow, add: dbAddRow, put: dbPutRow, all: dbAllRows, snapshot: dbSnapshot } = require('./db.js');
+const { encryptData, decryptData } = require('./crypto.js');
 
 let autoUpdater = null;
 try { autoUpdater = require('electron-updater').autoUpdater; if (autoUpdater) autoUpdater.autoCheckUpdates = false; autoUpdater.autoDownload = false; } catch (e) { console.error('autoUpdater not available:', e.message); }
@@ -523,6 +524,56 @@ function startLANServer() {
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
+  expressApp.get('/api/sqlite-status', (req, res) => {
+    try {
+      const s = sqliteInit(app.getPath('userData'));
+      res.json({ ok: !!s.ok, backend: s.ok ? 'sqlite' : 'indexeddb', path: s.path || null, size: s.size || 0, stores: s.stores || 0, needMigration: s.ok ? !!s.needMigration : false, error: s.error || null });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  expressApp.post('/api/sqlite/enable', (req, res) => {
+    try {
+      const s = sqliteInit(app.getPath('userData'));
+      res.json({ ok: !!s.ok, backend: s.ok ? 'sqlite' : 'indexeddb', path: s.path || null, size: s.size || 0, stores: s.stores || 0, needMigration: s.ok ? !!s.needMigration : false, error: s.error || null });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  expressApp.post('/api/settings/api-key', async (req, res) => {
+    const { apiKey, type } = req.body || {};
+    if (!apiKey) return res.status(400).json({ error: 'apiKey required' });
+    try {
+      const r = await setSetting(type === 'cloud' ? 'cloudApiKey' : 'smsApiKey', String(apiKey));
+      if (!r.success) return res.status(503).json(r);
+      res.json(r);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  expressApp.post('/api/settings/cashier', async (req, res) => {
+    const { username } = req.body || {};
+    if (!username) return res.status(400).json({ error: 'username required' });
+    try {
+      const r = await setSetting('currentCashier', String(username));
+      if (!r.success) return res.status(503).json(r);
+      res.json(r);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  expressApp.post('/api/settings/theme', async (req, res) => {
+    const { theme } = req.body || {};
+    if (!theme) return res.status(400).json({ error: 'theme required' });
+    try {
+      const r = await setSetting('theme', String(theme));
+      if (!r.success) return res.status(503).json(r);
+      res.json(r);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  expressApp.get('/api/backups', (req, res) => {
+    try {
+      res.json({ backups: readBackupIndex().map(b => ({ name: b.name, date: b.date, size: b.size || 0, status: b.status, type: b.type, encrypted: !!b.encrypted, error: b.error || null })).reverse() });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
   expressApp.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
   try {
@@ -573,24 +624,140 @@ function notifyDataChanged(info) {
   } catch (e) {}
 }
 
-function encryptData(data, password) {
-  const salt = crypto.randomBytes(16);
-  const key = crypto.pbkdf2Sync(password, salt, 100000, 32, 'sha256');
-  const iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
-  let encrypted = cipher.update(data, 'utf8', 'hex');
-  encrypted += cipher.final('hex');
-  return { salt: salt.toString('hex'), iv: iv.toString('hex'), data: encrypted };
+function settingsFromDb() {
+  const rows = dbAllRows('settings') || [];
+  const m = {};
+  rows.forEach(r => { m[r.key] = r.value; });
+  return m;
 }
 
-function decryptData(encryptedObj, password) {
-  const salt = Buffer.from(encryptedObj.salt, 'hex');
-  const iv = Buffer.from(encryptedObj.iv, 'hex');
-  const key = crypto.pbkdf2Sync(password, salt, 100000, 32, 'sha256');
-  const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
-  let decrypted = decipher.update(encryptedObj.data, 'hex', 'utf8');
-  decrypted += decipher.final('utf8');
-  return decrypted;
+function sqliteReady() {
+  try {
+    const s = sqliteInit(app.getPath('userData'));
+    return !!(s && s.ok);
+  } catch (e) { return false; }
+}
+
+async function setSetting(key, value) {
+  if (sqliteReady()) {
+    const rows = dbAllRows('settings') || [];
+    const existing = rows.find(r => r.key === key);
+    if (existing) dbPutRow('settings', { ...existing, value });
+    else dbAddRow('settings', { key, value });
+    notifyDataChanged({ source: 'api', kind: 'settings' });
+    return { success: true };
+  }
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    await mainWindow.webContents.executeJavaScript(`(async () => {
+      const rows = await dbAll('settings');
+      const ex = rows.find(r => r.key === ${JSON.stringify(key)});
+      if (ex) { ex.value = ${JSON.stringify(value)}; await dbPut('settings', ex); }
+      else { await dbAdd('settings', { key: ${JSON.stringify(key)}, value: ${JSON.stringify(value)} }); }
+      return true;
+    })()`);
+    notifyDataChanged({ source: 'api', kind: 'settings' });
+    return { success: true };
+  }
+  return { success: false, error: 'No storage available' };
+}
+
+function backupsDir() { return path.join(app.getPath('userData'), 'backups'); }
+function backupsIndexPath() { return path.join(backupsDir(), 'backups.json'); }
+
+function readBackupIndex() {
+  try { return JSON.parse(fs.readFileSync(backupsIndexPath(), 'utf8')); } catch (e) { return []; }
+}
+
+function writeBackupIndex(list) {
+  try {
+    fs.mkdirSync(backupsDir(), { recursive: true });
+    fs.writeFileSync(backupsIndexPath(), JSON.stringify(list, null, 2));
+  } catch (e) { console.error('backup index write failed:', e.message); }
+}
+
+function backupFileName() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return `backup-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.bak`;
+}
+
+// Writes one backup file into dir at filePath. Returns { size, type, encrypted }.
+// sqlite backend -> consistent snapshot of the live DB; otherwise a renderer JSON dump.
+async function buildBackupFile(filePath, password) {
+  let type = 'snapshot';
+  let encrypted = false;
+  if (sqliteReady()) {
+    const s = await dbSnapshot(filePath);
+    if (password) {
+      const enc = encryptData(fs.readFileSync(filePath), password);
+      fs.writeFileSync(filePath, JSON.stringify(enc));
+      encrypted = true;
+    }
+    return { size: s.size, type, encrypted };
+  }
+  type = 'json';
+  const dump = await mainWindow.webContents.executeJavaScript('window.__app.getDBDump()');
+  const raw = Buffer.from(JSON.stringify(dump), 'utf8');
+  if (password) {
+    fs.writeFileSync(filePath, JSON.stringify(encryptData(raw, password)));
+    encrypted = true;
+  } else {
+    fs.writeFileSync(filePath, raw);
+  }
+  return { size: fs.statSync(filePath).size, type, encrypted };
+}
+
+async function backupEntry(filePath, password, name) {
+  fs.mkdirSync(backupsDir(), { recursive: true });
+  const list = readBackupIndex();
+  const entry = { name, date: new Date().toISOString(), size: 0, status: 'creating', type: 'snapshot', encrypted: false };
+  const idx = list.findIndex(b => b.name === name);
+  if (idx >= 0) list[idx] = entry;
+  else list.push(entry);
+  writeBackupIndex(list);
+  try {
+    const info = await buildBackupFile(filePath, password);
+    entry.size = info.size;
+    entry.type = info.type;
+    entry.encrypted = info.encrypted;
+    entry.status = 'ok';
+  } catch (e) {
+    entry.status = 'failed';
+    entry.error = e.message;
+    try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch (e2) {}
+  }
+  writeBackupIndex(list);
+  return entry;
+}
+
+let cloudBackupTimer = null;
+
+async function runCloudBackupCheck() {
+  try {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    let m = null;
+    if (sqliteReady()) m = settingsFromDb();
+    else {
+      const dump = await mainWindow.webContents.executeJavaScript('window.__app.getDBDump()');
+      m = {};
+      (dump.settings || []).forEach(x => { m[x.key] = x.value; });
+    }
+    if (m.cloudBackupEnabled !== 'true') return;
+    if (!m.cloudBackupFolder || !m.cloudBackupPassword) return;
+    const todayStr = new Date().toISOString().split('T')[0];
+    const last = m.lastCloudBackup || '';
+    if (last === todayStr) return;
+    const interval = m.cloudBackupInterval || 'daily';
+    let due = false;
+    if (interval === 'daily') due = true;
+    else if (interval === 'weekly') due = Math.floor((new Date(todayStr) - new Date(last || '2000-01-01')) / 86400000) >= 7;
+    else {
+      const d = new Date(last || '2000-01-01');
+      due = d.getMonth() !== new Date().getMonth() || d.getFullYear() !== new Date().getFullYear();
+    }
+    if (!due) return;
+    await mainWindow.webContents.executeJavaScript('runCloudBackup()');
+  } catch (e) { console.error('cloud backup plan check failed:', e.message); }
 }
 
 ipcMain.handle('signal-lan-update', () => {
@@ -665,8 +832,65 @@ ipcMain.handle('save-backup-file', async (event, { data, filename }) => {
 ipcMain.handle('decrypt-backup-data', async (event, { encrypted, password }) => {
   try {
     const decrypted = decryptData(encrypted, password);
-    return { success: true, data: JSON.parse(decrypted) };
+    return { success: true, data: JSON.parse(decrypted.toString('utf8')) };
   } catch (err) { return { success: false, error: err.message }; }
+});
+
+ipcMain.handle('get-local-backups', () => {
+  const list = readBackupIndex();
+  const withSize = list.map(b => {
+    const fp = path.join(backupsDir(), b.name);
+    let size = b.size || 0;
+    try { if (fs.existsSync(fp)) size = fs.statSync(fp).size; } catch (e) {}
+    return { ...b, size };
+  });
+  return { success: true, backups: withSize.reverse() };
+});
+
+ipcMain.handle('create-local-backup', async (event, { password }) => {
+  try {
+    const name = backupFileName();
+    const entry = await backupEntry(path.join(backupsDir(), name), password, name);
+    return { success: entry.status === 'ok', backup: entry };
+  } catch (err) { return { success: false, error: err.message }; }
+});
+
+ipcMain.handle('retry-local-backup', async (event, { name, password }) => {
+  try {
+    const entry = await backupEntry(path.join(backupsDir(), name), password, name);
+    return { success: entry.status === 'ok', backup: entry };
+  } catch (err) { return { success: false, error: err.message }; }
+});
+
+ipcMain.handle('sync-saved-sqlite-backups', async () => {
+  try {
+    let folder = sqliteReady() ? (settingsFromDb().cloudBackupFolder || '') : '';
+    if (!folder && mainWindow && !mainWindow.isDestroyed()) {
+      const dump = await mainWindow.webContents.executeJavaScript('window.__app.getDBDump()');
+      const s = (dump.settings || []).find(x => x.key === 'cloudBackupFolder');
+      if (s) folder = s.value;
+    }
+    if (!folder) return { success: false, error: 'Cloud backup folder not configured in Settings' };
+    fs.mkdirSync(folder, { recursive: true });
+    const copied = [];
+    const failed = [];
+    for (const b of readBackupIndex()) {
+      const src = path.join(backupsDir(), b.name);
+      if (!fs.existsSync(src)) continue;
+      try { fs.copyFileSync(src, path.join(folder, b.name)); copied.push(b.name); }
+      catch (e) { failed.push(b.name); }
+    }
+    if (copied.length === 0 && failed.length === 0) return { success: true, copied, failed, note: 'No local backups to sync' };
+    return { success: failed.length === 0, copied, failed };
+  } catch (err) { return { success: false, error: err.message }; }
+});
+
+ipcMain.handle('plan-cloud-backups', async () => {
+  if (!cloudBackupTimer) {
+    cloudBackupTimer = setInterval(() => runCloudBackupCheck(), 3600000);
+  }
+  runCloudBackupCheck();
+  return { success: true };
 });
 
 ipcMain.handle('load-backup-file', async () => {
@@ -828,6 +1052,7 @@ app.whenReady().then(() => {
     ensureFirewallRules();
     startLANServer();
     startUDPBroadcast();
+    runCloudBackupCheck();
     wsServer = startWsServer({
       port: WS_PORT,
       token: _lanToken,

@@ -47,4 +47,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   printReceipt: (config) => ipcRenderer.invoke('print-receipt', config),
   printThermal: (config) => ipcRenderer.invoke('print-thermal', config),
   onLanDataRefresh: (callback) => ipcRenderer.on('lan-data-refresh', (_, info) => callback(info)),
+  getLocalBackups: () => ipcRenderer.invoke('get-local-backups'),
+  createLocalBackup: (password) => ipcRenderer.invoke('create-local-backup', { password }),
+  retryLocalBackup: (name, password) => ipcRenderer.invoke('retry-local-backup', { name, password }),
+  syncSavedSqliteBackups: () => ipcRenderer.invoke('sync-saved-sqlite-backups'),
+  planCloudBackups: () => ipcRenderer.invoke('plan-cloud-backups'),
 });

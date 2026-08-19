@@ -1,6 +1,6 @@
 {
     "name":  "shop-ledger-ph",
-    "version":  "3.5.1",
+    "version":  "3.6.0",
     "description":  "Shop Ledger PH - Complete POS \u0026 Inventory System for Philippine Sari-Sari Stores",
     "repository":  "stephenruma8-star/shop-ledger-ph",
     "main":  "out/main/index.js",
@@ -12,7 +12,7 @@
                     "preview":  "electron-vite preview",
                     "rebuild:electron":  "electron-rebuild -f -w better-sqlite3",
                     "lint":  "node scripts/lint.mjs",
-"test":  "npm run lint && npm run build && node scripts/smoke.mjs && node scripts/smoke-validation.mjs && node scripts/smoke-mobile.mjs && node scripts/smoke-mobilepage.mjs && node scripts/smoke-strict-idb.mjs && node scripts/smoke-quicksale.mjs && node scripts/smoke-onboarding.mjs && node scripts/sqlite-node-abi.mjs && node scripts/smoke-sqlite.mjs"
+"test":  "npm run lint && npm run build && node scripts/smoke.mjs && node scripts/smoke-validation.mjs && node scripts/smoke-mobile.mjs && node scripts/smoke-mobilepage.mjs && node scripts/smoke-strict-idb.mjs && node scripts/smoke-quicksale.mjs && node scripts/smoke-onboarding.mjs && node scripts/sqlite-node-abi.mjs && node scripts/smoke-sqlite.mjs && node scripts/smoke-backups.mjs"
                 },
     "dependencies":  {
                           "axios":  "^1.18.1",

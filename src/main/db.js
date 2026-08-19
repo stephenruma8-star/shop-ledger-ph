@@ -122,6 +122,15 @@ function migrate(dump) {
   return { migrated: true, counts };
 }
 
+// Online backup (VACUUM-style consistent copy) of the live SQLite file.
+function snapshot(destPath) {
+  if (!db) return Promise.reject(new Error('SQLite not initialized'));
+  return db.backup(destPath).then(() => {
+    try { return { ok: true, size: fs.statSync(destPath).size }; }
+    catch (e) { throw new Error('Snapshot written but unreadable: ' + e.message); }
+  });
+}
+
 function stats() {
   if (!db) return { ok: false, error: 'SQLite not initialized' };
   const counts = {};
@@ -149,4 +158,4 @@ function registerDbIpc(ipcMain, userDataPath) {
   ipcMain.handle('db-stats', () => stats());
 }
 
-module.exports = { registerDbIpc, init, migrate, get, add, put, del, all, clear, stats, close, closeDb: close };
+module.exports = { registerDbIpc, init, migrate, get, add, put, del, all, clear, stats, snapshot, close, closeDb: close };

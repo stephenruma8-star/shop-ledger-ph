@@ -1,5 +1,5 @@
 {
-    "version":  "3.5.1",
-    "buildDate":  "2026-08-19T01:00:00.000Z",
-    "notes":  "Hotfix: v3.5.0's packaged app failed to launch ('Cannot find module ./db.js') because the SQLite storage module wasn't copied into the asar build - the build now ships src/main/db.js alongside wsServer.js. Also hardened the single-instance handler so a second launch can no longer hit a 'mainWindow before initialization' error. If you installed 3.5.0, install this build over it - your data is untouched."
+    "version":  "3.6.0",
+    "buildDate":  "2026-08-19T00:00:00.000Z",
+    "notes":  "Backup center: the sidebar now has Backups (local SQLite snapshots with optional encryption, retry for failed, and one-click sync to your cloud folder), Quick Items (standalone manager) and Sync Cloud Backups actions. The mobile API gained sqlite-status/enable, api-key, cashier and theme endpoints backed directly by the SQLite store, plus a backups list gateway. Encryption is now binary-safe (Buffer-based) for snapshot files, and the app plans due cloud backups hourly from the main process."
 }

@@ -22,7 +22,7 @@ function copyMainStatic() {
     name: 'copy-main-static',
     apply: 'build',
     closeBundle() {
-      for (const name of ['wsServer.js', 'db.js']) cpSync(resolve('src/main', name), resolve('out/main', name))
+      for (const name of ['wsServer.js', 'db.js', 'crypto.js']) cpSync(resolve('src/main', name), resolve('out/main', name))
     }
   }
 }
