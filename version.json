@@ -1,5 +1,5 @@
 {
-    "version":  "3.5.0",
-    "buildDate":  "2026-08-19T00:00:00.000Z",
-    "notes":  "Storage engine migrated from IndexedDB to SQLite (better-sqlite3): records are kept in a local .sqlite database with WAL mode for faster lookups and crash-safe writes. Your existing data migrates automatically on first launch; the IndexedDB fallback remains for edge cases. Includes a rebuild helper (npm run rebuild:electron) for testing with the Electron binary in dev."
+    "version":  "3.5.1",
+    "buildDate":  "2026-08-19T01:00:00.000Z",
+    "notes":  "Hotfix: v3.5.0's packaged app failed to launch ('Cannot find module ./db.js') because the SQLite storage module wasn't copied into the asar build - the build now ships src/main/db.js alongside wsServer.js. Also hardened the single-instance handler so a second launch can no longer hit a 'mainWindow before initialization' error. If you installed 3.5.0, install this build over it - your data is untouched."
 }

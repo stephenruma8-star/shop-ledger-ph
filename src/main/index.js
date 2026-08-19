@@ -27,6 +27,7 @@ process.on('exit', () => { if (lockFd !== null) { try { require('fs').closeSync(
 process.on('SIGTERM', () => process.exit(0));
 process.on('SIGINT', () => process.exit(0));
 
+let mainWindow, tray, lanServer, udpBroadcast, wsServer;
 app.on('second-instance', () => { if (mainWindow) { if (mainWindow.isMinimized()) mainWindow.restore(); mainWindow.show(); mainWindow.focus(); } });
 
 const _log = function(m) {
@@ -60,7 +61,6 @@ const { registerDbIpc, closeDb } = require('./db.js');
 let autoUpdater = null;
 try { autoUpdater = require('electron-updater').autoUpdater; if (autoUpdater) autoUpdater.autoCheckUpdates = false; autoUpdater.autoDownload = false; } catch (e) { console.error('autoUpdater not available:', e.message); }
 
-let mainWindow, tray, lanServer, udpBroadcast, wsServer;
 let isQuitting = false;
 const LAN_PORT = 3456;
 const UDP_PORT = 3457;
