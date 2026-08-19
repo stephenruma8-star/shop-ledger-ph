@@ -131,6 +131,66 @@ function snapshot(destPath) {
   });
 }
 
+function integrityCheck() {
+  if (!db) return { ok: false, error: 'SQLite not initialized' };
+  try {
+    const rows = db.pragma('integrity_check', { simple: true });
+    const list = Array.isArray(rows) ? rows : [String(rows)];
+    const ok = list.length === 1 && list[0] === 'ok';
+    return { ok, result: ok ? 'ok' : list.join('; ') };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+
+function optimize() {
+  if (!db) return { ok: false, error: 'SQLite not initialized' };
+  try { db.pragma('optimize'); return { ok: true }; }
+  catch (e) { return { ok: false, error: e.message }; }
+}
+
+function checkpoint() {
+  if (!db) return { ok: false, error: 'SQLite not initialized' };
+  try { db.pragma('wal_checkpoint(TRUNCATE)'); return { ok: true }; }
+  catch (e) { return { ok: false, error: e.message }; }
+}
+
+function vacuum() {
+  if (!db) return { ok: false, error: 'SQLite not initialized' };
+  try { db.exec('VACUUM'); return { ok: true, size: fileSize() }; }
+  catch (e) { return { ok: false, error: e.message }; }
+}
+
+// Swaps the live database for the given file (a previously made snapshot):
+// keeps a .prerestore safety copy of the current DB, drops stale WAL/SHM sidecars,
+// reopens, and stamps meta so the renderer never re-migrates over a restored store.
+function replaceWith(filePath) {
+  if (!db) return { ok: false, error: 'SQLite not initialized' };
+  let opened = false;
+  try {
+    const head = fs.readFileSync(filePath);
+    if (head.slice(0, 16).toString('ascii') !== 'SQLite format 3\u0000') return { ok: false, error: 'Not a valid SQLite file' };
+    db.close();
+    try { fs.copyFileSync(dbPath, dbPath + '.prerestore'); } catch (e) {}
+    fs.copyFileSync(filePath, dbPath);
+    for (const suffix of ['-wal', '-shm']) { try { fs.unlinkSync(dbPath + suffix); } catch (e) {} }
+    db = new Database(dbPath);
+    opened = true;
+    db.pragma('journal_mode = WAL');
+    db.pragma('synchronous = NORMAL');
+    db.pragma('busy_timeout = 5000');
+    stmts.clear();
+    db.exec('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)');
+    for (const s of STORES) db.exec(`CREATE TABLE IF NOT EXISTS s_${s} (id INTEGER PRIMARY KEY AUTOINCREMENT, value TEXT NOT NULL)`);
+    stmt('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run('sqliteMigrated', 'true');
+    const chk = integrityCheck();
+    if (!chk.ok) { close(); return { ok: false, error: 'Restored file failed integrity check: ' + (chk.result || chk.error) }; }
+    return openInfo();
+  } catch (e) {
+    try { if (db) db.close(); } catch (e2) {}
+    db = null; opened = false;
+    return { ok: false, error: e.message };
+  }
+}
+
 function stats() {
   if (!db) return { ok: false, error: 'SQLite not initialized' };
   const counts = {};
@@ -158,4 +218,4 @@ function registerDbIpc(ipcMain, userDataPath) {
   ipcMain.handle('db-stats', () => stats());
 }
 
-module.exports = { registerDbIpc, init, migrate, get, add, put, del, all, clear, stats, snapshot, close, closeDb: close };
+module.exports = { registerDbIpc, init, migrate, get, add, put, del, all, clear, stats, snapshot, integrityCheck, optimize, checkpoint, vacuum, replaceWith, close, closeDb: close };

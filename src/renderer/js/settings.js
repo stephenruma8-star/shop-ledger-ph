@@ -115,6 +115,29 @@ export async function viewSettings(root) {
         </div>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
+        <h3 class="font-bold text-lg mb-4 flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>Database</h3>
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" id="set-autoSnapshotEnabled" ${settingsMap['autoSnapshotEnabled'] === 'true' ? 'checked' : ''} class="w-4 h-4 text-blue-600 rounded" /> Auto daily snapshot</label>
+            <p class="text-xs text-gray-400 mt-1">Saves a local snapshot automatically once per day. Old auto snapshots are pruned past the keep count (manual backups are never removed).</p>
+          </div>
+          <div><label class="text-xs text-gray-500 block">Keep auto snapshots</label><input id="set-snapshotKeepCount" type="number" min="1" max="90" value="${escapeHtml(settingsMap['snapshotKeepCount'] || '14')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" /><p class="text-xs text-gray-400 mt-1">Default 14 days of automatic snapshots.</p></div>
+        </div>
+        <div class="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
+          <div class="flex items-center justify-between mb-2">
+            <div>
+              <p class="text-sm font-semibold">Health</p>
+              <p class="text-xs text-gray-400">Backup type, file status and structure check on the live database.</p>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="dbMaintenance('integrity')" class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700">Check Integrity</button>
+              <button onclick="dbMaintenance('compact')" class="px-3 py-1.5 bg-gray-600 text-white rounded-lg text-sm hover:bg-gray-700">Compact</button>
+            </div>
+          </div>
+          <div id="db-health-status" class="text-xs text-gray-400">Loading…</div>
+        </div>
+      </div>
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
         <h3 class="font-bold text-lg mb-4 flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>Quick Items</h3>
         <div class="space-y-2">
           ${state.quickItems.map(q => `<div class="flex items-center gap-2 text-sm"><input class="flex-1 px-2 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800" value="${escapeHtml(q.name)}" data-qi-id="${q.id}" data-field="name" /><input class="w-24 px-2 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800" type="number" step="0.01" value="${q.price}" data-qi-id="${q.id}" data-field="price" /><button onclick="deleteQuickItem(${q.id})" class="text-red-500 text-xs"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Del</button></div>`).join('')}
@@ -164,10 +187,51 @@ export async function viewSettings(root) {
       </div>
       <div class="sticky bottom-0 bg-white dark:bg-gray-800 -mx-6 px-6 py-3 border-t dark:border-gray-700"><button onclick="saveSettings()" class="w-full py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="20 6 9 17 4 12"/></svg>Save All Settings</button></div>
     </div>`;
+  if (window.electronAPI?.runDbHealth) loadDbHealth();
+}
+
+async function loadDbHealth() {
+  const holder = document.getElementById('db-health-status');
+  if (!holder) return;
+  holder.textContent = 'Loading…';
+  try {
+    const h = await window.electronAPI.runDbHealth('status');
+    if (!h?.success) { holder.textContent = 'Backend unavailable: ' + (h?.error || 'unknown'); return; }
+    const d = h.details || {};
+    const line = v => `<div class="flex justify-between py-0.5"><span class="text-gray-500">${v[0]}</span><span class="font-mono">${v[1]}</span></div>`;
+    holder.innerHTML = [
+      ['Storage', d.backend === 'sqlite' ? 'SQLite' : (d.backend || 'Unknown')],
+      ['Location', d.sqlitePath ? `<span title="${d.sqlitePath}">app data…</span>` : '—'],
+      ['Size', d.dbSizeBytes != null ? formatDbBytes(d.dbSizeBytes) : '—'],
+      ['Table count', d.tableCount != null ? d.tableCount : '—'],
+      ['Integrity', d.integrityOk ? '<span class="text-green-600">OK</span>' : (d.integrityResult || 'Unknown')],
+      ['Last snapshot', d.lastSnapshot ? d.lastSnapshot : 'None'],
+      ['Snapshot count', d.snapshotCount != null ? d.snapshotCount : '—']
+    ].map(line).join('');
+  } catch (e) { holder.textContent = 'Failed to load: ' + e.message; }
+}
+
+function formatDbBytes(n) {
+  const v = Number(n) || 0;
+  if (v <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.min(Math.floor(Math.log(v) / Math.log(1024)), units.length - 1);
+  return (v / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1) + ' ' + units[i];
+}
+
+export async function dbMaintenance(action) {
+  if (!window.electronAPI?.runDbHealth) { toast('Desktop app only', 'warning'); return; }
+  toast(action === 'compact' ? 'Compacting database… (may take a moment)' : 'Checking database integrity…', 'info');
+  try {
+    const r = await window.electronAPI.runDbHealth(action);
+    if (r?.success) { toast(action === 'compact' ? 'Database compacted' : 'Integrity check passed', 'success'); }
+    else toast((r?.error || 'Maintenance failed') + (r?.details ? ' — ' + (r.details.integrityResult || r.details.error || '') : ''), 'error');
+  } catch (e) { toast('Maintenance failed: ' + e.message, 'error'); }
+  loadDbHealth();
 }
 
 export async function saveSettings() {
-  const keys = ['shopName','shopContact','shopAddress','weatherLocation','cloudBackupFolder','cloudBackupPassword','cloudBackupInterval','smsApiKey','smsAlertNumber','smsAutoReminderFreq','smsAutoReminderDay','backupEmail','aiApiKey','aiModel','receiptFooter','receiptHeaderText','printStripeColor1','printStripeColor2','thermalHost','thermalPort'];
+  const keys = ['shopName','shopContact','shopAddress','weatherLocation','cloudBackupFolder','cloudBackupPassword','cloudBackupInterval','smsApiKey','smsAlertNumber','smsAutoReminderFreq','smsAutoReminderDay','backupEmail','aiApiKey','aiModel','receiptFooter','receiptHeaderText','printStripeColor1','printStripeColor2','thermalHost','thermalPort','snapshotKeepCount'];
   for (const key of keys) {
     const el = document.getElementById(`set-${key}`);
     if (el) {
@@ -189,6 +253,13 @@ export async function saveSettings() {
     const existing = state.settings.find(s => s.key === 'smsAutoReminderEnabled');
     if (existing) { existing.value = val; await dbPut('settings', existing); }
     else { await dbAdd('settings', { key: 'smsAutoReminderEnabled', value: val }); }
+  }
+  const snapCb = document.getElementById('set-autoSnapshotEnabled');
+  if (snapCb) {
+    const val = snapCb.checked ? 'true' : 'false';
+    const existing = state.settings.find(s => s.key === 'autoSnapshotEnabled');
+    if (existing) { existing.value = val; await dbPut('settings', existing); }
+    else { await dbAdd('settings', { key: 'autoSnapshotEnabled', value: val }); }
   }
   const smtp = { host: document.getElementById('set-smtp-host')?.value || '', port: document.getElementById('set-smtp-port')?.value || '587', user: document.getElementById('set-smtp-user')?.value || '', pass: document.getElementById('set-smtp-pass')?.value || '', fromName: document.getElementById('set-smtp-fromName')?.value || '' };
   const smtpExisting = state.settings.find(s => s.key === 'smtpConfig');
@@ -481,6 +552,7 @@ Object.defineProperties(window, {
   testThermalPrint: { get: () => testThermalPrint, configurable: true },
   openUserModal: { get: () => openUserModal, configurable: true },
   saveUser: { get: () => saveUser, configurable: true },
+  dbMaintenance: { get: () => dbMaintenance, configurable: true },
   checkUpdates: { get: () => checkUpdates, configurable: true },
   rebuildApp: { get: () => rebuildApp, configurable: true }
 });

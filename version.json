@@ -1,5 +1,5 @@
 {
-    "version":  "3.6.0",
+    "version":  "3.7.0",
     "buildDate":  "2026-08-19T00:00:00.000Z",
-    "notes":  "Backup center: the sidebar now has Backups (local SQLite snapshots with optional encryption, retry for failed, and one-click sync to your cloud folder), Quick Items (standalone manager) and Sync Cloud Backups actions. The mobile API gained sqlite-status/enable, api-key, cashier and theme endpoints backed directly by the SQLite store, plus a backups list gateway. Encryption is now binary-safe (Buffer-based) for snapshot files, and the app plans due cloud backups hourly from the main process."
+    "notes":  "Database maintenance: the Backups modal can now restore a snapshot (the current database is swapped out, a .prerestore safety copy is kept, and encrypted snapshots ask for their password). Settings gained a Database card with live health info, one-click integrity checks and a compact (VACUUM) action, plus auto daily snapshots with a keep count (default 14) that are planned from the main process and pruned automatically. Backups are now integrity-checked and optimized after every snapshot, and the database is optimized and checkpointed on quit."
 }

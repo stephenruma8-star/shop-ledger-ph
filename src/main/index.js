@@ -58,6 +58,7 @@ const net = require('net');
 const { startWsServer } = require('./wsServer.js');
 const { registerDbIpc, closeDb, init: sqliteInit, get: dbGetRow, add: dbAddRow, put: dbPutRow, all: dbAllRows, snapshot: dbSnapshot } = require('./db.js');
 const { encryptData, decryptData } = require('./crypto.js');
+const backupService = require('./backupService.js');
 
 let autoUpdater = null;
 try { autoUpdater = require('electron-updater').autoUpdater; if (autoUpdater) autoUpdater.autoCheckUpdates = false; autoUpdater.autoDownload = false; } catch (e) { console.error('autoUpdater not available:', e.message); }
@@ -570,7 +571,7 @@ function startLANServer() {
 
   expressApp.get('/api/backups', (req, res) => {
     try {
-      res.json({ backups: readBackupIndex().map(b => ({ name: b.name, date: b.date, size: b.size || 0, status: b.status, type: b.type, encrypted: !!b.encrypted, error: b.error || null })).reverse() });
+      res.json({ backups: backupService.readBackupIndex().map(b => ({ name: b.name, date: b.date, size: b.size || 0, status: b.status, type: b.type, encrypted: !!b.encrypted, error: b.error || null })).reverse() });
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
@@ -661,73 +662,29 @@ async function setSetting(key, value) {
   return { success: false, error: 'No storage available' };
 }
 
-function backupsDir() { return path.join(app.getPath('userData'), 'backups'); }
-function backupsIndexPath() { return path.join(backupsDir(), 'backups.json'); }
-
-function readBackupIndex() {
-  try { return JSON.parse(fs.readFileSync(backupsIndexPath(), 'utf8')); } catch (e) { return []; }
-}
-
-function writeBackupIndex(list) {
-  try {
-    fs.mkdirSync(backupsDir(), { recursive: true });
-    fs.writeFileSync(backupsIndexPath(), JSON.stringify(list, null, 2));
-  } catch (e) { console.error('backup index write failed:', e.message); }
-}
-
-function backupFileName() {
-  const d = new Date();
-  const p = (n) => String(n).padStart(2, '0');
-  return `backup-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.bak`;
-}
-
-// Writes one backup file into dir at filePath. Returns { size, type, encrypted }.
-// sqlite backend -> consistent snapshot of the live DB; otherwise a renderer JSON dump.
-async function buildBackupFile(filePath, password) {
-  let type = 'snapshot';
-  let encrypted = false;
-  if (sqliteReady()) {
-    const s = await dbSnapshot(filePath);
-    if (password) {
-      const enc = encryptData(fs.readFileSync(filePath), password);
-      fs.writeFileSync(filePath, JSON.stringify(enc));
-      encrypted = true;
-    }
-    return { size: s.size, type, encrypted };
+async function serviceSettings() {
+  if (sqliteReady()) return settingsFromDb();
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    try {
+      const dump = await mainWindow.webContents.executeJavaScript('window.__app.getDBDump()');
+      const m = {};
+      (dump.settings || []).forEach(x => { m[x.key] = x.value; });
+      return m;
+    } catch (e) { return {}; }
   }
-  type = 'json';
-  const dump = await mainWindow.webContents.executeJavaScript('window.__app.getDBDump()');
-  const raw = Buffer.from(JSON.stringify(dump), 'utf8');
-  if (password) {
-    fs.writeFileSync(filePath, JSON.stringify(encryptData(raw, password)));
-    encrypted = true;
-  } else {
-    fs.writeFileSync(filePath, raw);
-  }
-  return { size: fs.statSync(filePath).size, type, encrypted };
+  return {};
 }
 
-async function backupEntry(filePath, password, name) {
-  fs.mkdirSync(backupsDir(), { recursive: true });
-  const list = readBackupIndex();
-  const entry = { name, date: new Date().toISOString(), size: 0, status: 'creating', type: 'snapshot', encrypted: false };
-  const idx = list.findIndex(b => b.name === name);
-  if (idx >= 0) list[idx] = entry;
-  else list.push(entry);
-  writeBackupIndex(list);
-  try {
-    const info = await buildBackupFile(filePath, password);
-    entry.size = info.size;
-    entry.type = info.type;
-    entry.encrypted = info.encrypted;
-    entry.status = 'ok';
-  } catch (e) {
-    entry.status = 'failed';
-    entry.error = e.message;
-    try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch (e2) {}
-  }
-  writeBackupIndex(list);
-  return entry;
+function configureBackupService() {
+  const userDataPath = app.getPath('userData');
+  backupService.configure({
+    userDataPath,
+    backupsDir: path.join(userDataPath, 'backups'),
+    getSettings: () => serviceSettings(),
+    setSetting: (key, value) => setSetting(key, value),
+    getRendererDump: () => mainWindow.webContents.executeJavaScript('window.__app.getDBDump()'),
+    notify: (info) => notifyDataChanged(info)
+  });
 }
 
 let cloudBackupTimer = null;
@@ -735,13 +692,7 @@ let cloudBackupTimer = null;
 async function runCloudBackupCheck() {
   try {
     if (!mainWindow || mainWindow.isDestroyed()) return;
-    let m = null;
-    if (sqliteReady()) m = settingsFromDb();
-    else {
-      const dump = await mainWindow.webContents.executeJavaScript('window.__app.getDBDump()');
-      m = {};
-      (dump.settings || []).forEach(x => { m[x.key] = x.value; });
-    }
+    const m = await serviceSettings();
     if (m.cloudBackupEnabled !== 'true') return;
     if (!m.cloudBackupFolder || !m.cloudBackupPassword) return;
     const todayStr = new Date().toISOString().split('T')[0];
@@ -836,60 +787,50 @@ ipcMain.handle('decrypt-backup-data', async (event, { encrypted, password }) => 
   } catch (err) { return { success: false, error: err.message }; }
 });
 
-ipcMain.handle('get-local-backups', () => {
-  const list = readBackupIndex();
-  const withSize = list.map(b => {
-    const fp = path.join(backupsDir(), b.name);
-    let size = b.size || 0;
-    try { if (fs.existsSync(fp)) size = fs.statSync(fp).size; } catch (e) {}
-    return { ...b, size };
-  });
-  return { success: true, backups: withSize.reverse() };
-});
+ipcMain.handle('get-local-backups', () => backupService.listBackups());
 
 ipcMain.handle('create-local-backup', async (event, { password }) => {
   try {
-    const name = backupFileName();
-    const entry = await backupEntry(path.join(backupsDir(), name), password, name);
+    const entry = await backupService.createBackup(password, false);
     return { success: entry.status === 'ok', backup: entry };
   } catch (err) { return { success: false, error: err.message }; }
 });
 
 ipcMain.handle('retry-local-backup', async (event, { name, password }) => {
   try {
-    const entry = await backupEntry(path.join(backupsDir(), name), password, name);
+    const entry = await backupService.retryBackup(name, password);
     return { success: entry.status === 'ok', backup: entry };
+  } catch (err) { return { success: false, error: err.message }; }
+});
+
+ipcMain.handle('restore-local-backup', async (event, { name, password }) => {
+  try {
+    return await backupService.restoreBackup(name, password);
+  } catch (err) { return { success: false, error: err.message }; }
+});
+
+ipcMain.handle('run-db-health', async (event, { action }) => {
+  try {
+    return backupService.dbHealth(action || 'status');
   } catch (err) { return { success: false, error: err.message }; }
 });
 
 ipcMain.handle('sync-saved-sqlite-backups', async () => {
   try {
-    let folder = sqliteReady() ? (settingsFromDb().cloudBackupFolder || '') : '';
-    if (!folder && mainWindow && !mainWindow.isDestroyed()) {
-      const dump = await mainWindow.webContents.executeJavaScript('window.__app.getDBDump()');
-      const s = (dump.settings || []).find(x => x.key === 'cloudBackupFolder');
-      if (s) folder = s.value;
-    }
-    if (!folder) return { success: false, error: 'Cloud backup folder not configured in Settings' };
-    fs.mkdirSync(folder, { recursive: true });
-    const copied = [];
-    const failed = [];
-    for (const b of readBackupIndex()) {
-      const src = path.join(backupsDir(), b.name);
-      if (!fs.existsSync(src)) continue;
-      try { fs.copyFileSync(src, path.join(folder, b.name)); copied.push(b.name); }
-      catch (e) { failed.push(b.name); }
-    }
-    if (copied.length === 0 && failed.length === 0) return { success: true, copied, failed, note: 'No local backups to sync' };
-    return { success: failed.length === 0, copied, failed };
+    return await backupService.syncSavedSqliteBackups();
   } catch (err) { return { success: false, error: err.message }; }
 });
 
+async function runPlannedJobs() {
+  runCloudBackupCheck();
+  try { await backupService.planLocalSnapshot(); } catch (e) { console.error('local snapshot plan failed:', e.message); }
+}
+
 ipcMain.handle('plan-cloud-backups', async () => {
   if (!cloudBackupTimer) {
-    cloudBackupTimer = setInterval(() => runCloudBackupCheck(), 3600000);
+    cloudBackupTimer = setInterval(() => runPlannedJobs(), 3600000);
   }
-  runCloudBackupCheck();
+  runPlannedJobs();
   return { success: true };
 });
 
@@ -1046,13 +987,14 @@ function buildMenu() {
 app.whenReady().then(() => {
   try {
     registerDbIpc(ipcMain);
+    configureBackupService();
     setupAutoUpdater();
     createWindow();
     createTray();
     ensureFirewallRules();
     startLANServer();
     startUDPBroadcast();
-    runCloudBackupCheck();
+    runPlannedJobs();
     wsServer = startWsServer({
       port: WS_PORT,
       token: _lanToken,
@@ -1062,7 +1004,15 @@ app.whenReady().then(() => {
     });
   } catch (e) { console.error('Startup error:', e); }
 }).catch(e => console.error('whenReady failed:', e));
-app.on('before-quit', () => { isQuitting = true; closeDb(); });
+app.on('before-quit', () => {
+  isQuitting = true;
+  try {
+    const d = require('./db.js');
+    d.optimize();
+    d.checkpoint();
+  } catch (e) { console.error('quit maintenance failed:', e.message); }
+  closeDb();
+});
 app.on('window-all-closed', () => {
   if (lanServer) lanServer.close();
   if (udpBroadcast) try { udpBroadcast.close(); } catch(e) {}

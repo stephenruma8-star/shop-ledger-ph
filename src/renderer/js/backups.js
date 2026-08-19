@@ -1,6 +1,6 @@
 // Backups modal, Quick Items modal and cloud sync actions.
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
-import { closeModal, escapeHtml, modal, toast } from './helpers.js'
+import { closeModal, confirmModal, escapeHtml, modal, toast } from './helpers.js'
 import { state } from './state.js'
 
 function formatBytes(n) {
@@ -17,11 +17,19 @@ function statusBadge(b) {
   return '<span class="px-2 py-0.5 rounded-full text-xs bg-yellow-100 text-yellow-700">Creating</span>';
 }
 
+function actionCell(b) {
+  const name = escapeHtml(b.name);
+  const retry = `<button onclick="retryLocalBackup('${name}')" class="px-2 py-1 bg-amber-500 text-white rounded text-xs hover:bg-amber-600">Retry</button>`;
+  const restore = `<button onclick="restoreLocalBackup('${name}')" class="px-2 py-1 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700">Restore</button>`;
+  const dash = '<span class="text-gray-300 text-xs">—</span>';
+  return b.status === 'failed' ? retry : b.status === 'ok' ? restore : dash;
+}
+
 export async function openBackupsModal() {
   if (!window.electronAPI?.getLocalBackups) { toast('Backups only available in the desktop app', 'warning'); return; }
   const renderList = async (rows) => rows.length > 0
     ? `<div class="overflow-auto max-h-72 border dark:border-gray-700 rounded-lg"><table class="w-full text-sm"><thead><tr class="bg-gray-50 dark:bg-gray-700 sticky top-0"><th class="p-2 text-left">File</th><th class="p-2 text-left">Date</th><th class="p-2 text-right">Size</th><th class="p-2 text-center">Status</th><th class="p-2 text-center">Actions</th></tr></thead><tbody>${
-        rows.map(b => `<tr class="border-b dark:border-gray-700"><td class="p-2 font-mono text-xs">${escapeHtml(b.name)}</td><td class="p-2 text-xs">${escapeHtml(new Date(b.date).toLocaleString())}</td><td class="p-2 text-right text-xs">${formatBytes(b.size)}</td><td class="p-2 text-center">${statusBadge(b)}</td><td class="p-2 text-center">${b.status === 'failed' ? `<button onclick="retryLocalBackup('${escapeHtml(b.name)}')" class="px-2 py-1 bg-amber-500 text-white rounded text-xs hover:bg-amber-600">Retry</button>` : '<span class="text-gray-300 text-xs">—</span>'}</td></tr>`).join('')
+        rows.map(b => `<tr class="border-b dark:border-gray-700"><td class="p-2 font-mono text-xs">${escapeHtml(b.name)}</td><td class="p-2 text-xs">${escapeHtml(new Date(b.date).toLocaleString())}</td><td class="p-2 text-right text-xs">${formatBytes(b.size)}</td><td class="p-2 text-center">${statusBadge(b)}</td><td class="p-2 text-center">${actionCell(b)}</td></tr>`).join('')
       }</tbody></table></div>`
     : '<p class="text-gray-400 text-sm py-4 text-center">No backups yet — click Back Up Now</p>';
   const res = await window.electronAPI.getLocalBackups();
@@ -70,9 +78,25 @@ export async function refreshBackupsList() {
   const rows = res.success ? res.backups : [];
   holder.innerHTML = rows.length > 0
     ? `<div class="overflow-auto max-h-72 border dark:border-gray-700 rounded-lg"><table class="w-full text-sm"><thead><tr class="bg-gray-50 dark:bg-gray-700 sticky top-0"><th class="p-2 text-left">File</th><th class="p-2 text-left">Date</th><th class="p-2 text-right">Size</th><th class="p-2 text-center">Status</th><th class="p-2 text-center">Actions</th></tr></thead><tbody>${
-        rows.map(b => `<tr class="border-b dark:border-gray-700"><td class="p-2 font-mono text-xs">${escapeHtml(b.name)}</td><td class="p-2 text-xs">${escapeHtml(new Date(b.date).toLocaleString())}</td><td class="p-2 text-right text-xs">${formatBytes(b.size)}</td><td class="p-2 text-center">${statusBadge(b)}</td><td class="p-2 text-center">${b.status === 'failed' ? `<button onclick="retryLocalBackup('${escapeHtml(b.name)}')" class="px-2 py-1 bg-amber-500 text-white rounded text-xs hover:bg-amber-600">Retry</button>` : '<span class="text-gray-300 text-xs">—</span>'}</td></tr>`).join('')
+        rows.map(b => `<tr class="border-b dark:border-gray-700"><td class="p-2 font-mono text-xs">${escapeHtml(b.name)}</td><td class="p-2 text-xs">${escapeHtml(new Date(b.date).toLocaleString())}</td><td class="p-2 text-right text-xs">${formatBytes(b.size)}</td><td class="p-2 text-center">${statusBadge(b)}</td><td class="p-2 text-center">${actionCell(b)}</td></tr>`).join('')
       }</tbody></table></div>`
     : '<p class="text-gray-400 text-sm py-4 text-center">No backups yet — click Back Up Now</p>';
+}
+
+export async function restoreLocalBackup(name) {
+  if (!window.electronAPI?.restoreLocalBackup) { toast('Desktop app only', 'warning'); return; }
+  const ok = await confirmModal(`Restore database from <b>${escapeHtml(name)}</b>?<br><span class="text-xs text-gray-400">The current database is replaced by this snapshot. A safety copy (<code>.prerestore</code>) is kept. The app reloads after restoring.</span>`, 'Restore');
+  if (!ok) return;
+  const pw = document.getElementById('local-backup-password')?.value || '';
+  toast('Restoring backup...', 'info');
+  const r = await window.electronAPI.restoreLocalBackup(name, pw);
+  if (r.success) {
+    toast('Database restored', 'success');
+    await refreshBackupsList();
+    closeModal();
+    setTimeout(() => { try { window.location.reload(); } catch (e) {} }, 800);
+    try { window.__app?.loadAll?.(); } catch (e) {}
+  } else toast('Restore failed: ' + (r.error || 'Unknown error'), 'error');
 }
 
 export async function syncCloudBackups() {
@@ -136,6 +160,7 @@ Object.defineProperties(window, {
   openBackupsModal: { get: () => openBackupsModal, configurable: true },
   createLocalBackup: { get: () => createLocalBackup, configurable: true },
   retryLocalBackup: { get: () => retryLocalBackup, configurable: true },
+  restoreLocalBackup: { get: () => restoreLocalBackup, configurable: true },
   refreshBackupsList: { get: () => refreshBackupsList, configurable: true },
   syncCloudBackups: { get: () => syncCloudBackups, configurable: true },
   openQuickItemsModal: { get: () => openQuickItemsModal, configurable: true },

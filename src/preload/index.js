@@ -51,5 +51,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   createLocalBackup: (password) => ipcRenderer.invoke('create-local-backup', { password }),
   retryLocalBackup: (name, password) => ipcRenderer.invoke('retry-local-backup', { name, password }),
   syncSavedSqliteBackups: () => ipcRenderer.invoke('sync-saved-sqlite-backups'),
+  restoreLocalBackup: (name, password) => ipcRenderer.invoke('restore-local-backup', { name, password }),
+  runDbHealth: (action) => ipcRenderer.invoke('run-db-health', { action }),
   planCloudBackups: () => ipcRenderer.invoke('plan-cloud-backups'),
 });
