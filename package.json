@@ -35,6 +35,9 @@
                   "files":  [
                                 "out/**"
                             ],
+                  "asarUnpack":  [
+                                     "**/node_modules/better-sqlite3/**"
+                                 ],
                   "directories":  {
                                       "output":  "build"
                                   },
