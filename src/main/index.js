@@ -55,6 +55,7 @@ const QRCode = require('qrcode');
 const axios = require('axios');
 const net = require('net');
 const { startWsServer } = require('./wsServer.js');
+const { registerDbIpc, closeDb } = require('./db.js');
 
 let autoUpdater = null;
 try { autoUpdater = require('electron-updater').autoUpdater; if (autoUpdater) autoUpdater.autoCheckUpdates = false; autoUpdater.autoDownload = false; } catch (e) { console.error('autoUpdater not available:', e.message); }
@@ -820,6 +821,7 @@ function buildMenu() {
 
 app.whenReady().then(() => {
   try {
+    registerDbIpc(ipcMain);
     setupAutoUpdater();
     createWindow();
     createTray();
@@ -835,7 +837,7 @@ app.whenReady().then(() => {
     });
   } catch (e) { console.error('Startup error:', e); }
 }).catch(e => console.error('whenReady failed:', e));
-app.on('before-quit', () => { isQuitting = true; });
+app.on('before-quit', () => { isQuitting = true; closeDb(); });
 app.on('window-all-closed', () => {
   if (lanServer) lanServer.close();
   if (udpBroadcast) try { udpBroadcast.close(); } catch(e) {}

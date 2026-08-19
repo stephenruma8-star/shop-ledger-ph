@@ -1,5 +1,5 @@
 {
-    "version":  "3.4.41",
-    "buildDate":  "2026-08-18T05:30:00.000Z",
-    "notes":  "System events now land in the notification bell: new app update available (with a Download button), update downloaded (Restart button), update signaled by another device on the LAN, plus auto cloud backup done, SMS reminders sent and daily interest applied. Each row dismisses individually and adds to the bell badge."
+    "version":  "3.5.0",
+    "buildDate":  "2026-08-19T00:00:00.000Z",
+    "notes":  "Storage engine migrated from IndexedDB to SQLite (better-sqlite3): records are kept in a local .sqlite database with WAL mode for faster lookups and crash-safe writes. Your existing data migrates automatically on first launch; the IndexedDB fallback remains for edge cases. Includes a rebuild helper (npm run rebuild:electron) for testing with the Electron binary in dev."
 }

@@ -2,6 +2,17 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   isElectron: true,
+  db: {
+    open: () => ipcRenderer.invoke('db-open'),
+    migrate: (dump) => ipcRenderer.invoke('db-migrate', { dump }),
+    get: (store, id) => ipcRenderer.invoke('db-get', { store, id }),
+    add: (store, obj) => ipcRenderer.invoke('db-add', { store, obj }),
+    put: (store, obj) => ipcRenderer.invoke('db-put', { store, obj }),
+    del: (store, id) => ipcRenderer.invoke('db-del', { store, id }),
+    all: (store) => ipcRenderer.invoke('db-all', { store }),
+    clear: (store) => ipcRenderer.invoke('db-clear', { store }),
+    stats: () => ipcRenderer.invoke('db-stats')
+  },
   sendEmailBackup: (config) => ipcRenderer.invoke('send-email-backup', config),
   saveBackupFile: (data, filename) => ipcRenderer.invoke('save-backup-file', { data, filename }),
   loadBackupFile: () => ipcRenderer.invoke('load-backup-file'),
