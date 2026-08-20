@@ -3,7 +3,7 @@ import { renderClientGrid } from './clients.js'
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
 import { calcInterest, closeModal, confirmModal, dbLoad, debounce, escapeHtml, filterByYear, itemThumbHtml, modal, paginate, renderPagination, searchData, toast, updateLowStockBadge } from './helpers.js'
 import { openPrintWindow } from './printLayout.js'
-import { fmtDate, fmtDateTime, now, peso, state, today } from './state.js'
+import { fmtDate, fmtDateTime, now, peso, round2, state, today } from './state.js'
 
 export function getQty(name) { const m = String(name||'1').match(/^-?[\d.]+/); return m ? parseFloat(m[0]) : 1; }
 export async function adjustStock(invId, item, delta) {
@@ -18,13 +18,13 @@ export async function adjustStock(invId, item, delta) {
   }
   await dbPut('inventory', inv);
 }
-export function lineSub(item) { return getQty(item.name) * (item.unitCost || 0); }
+export function lineSub(item) { return round2(getQty(item.name) * (item.unitCost || 0)); }
 export function lineInt(item) {
   const sub = lineSub(item);
   if ((item.intRate || 0) === 0 || sub === 0) return 0;
   const itemDate = item.date || today();
   const days = Math.max(1, Math.floor((new Date(today()) - new Date(itemDate)) / 86400000));
-  return calcInterest(sub, item.intRate, days);
+  return round2(calcInterest(sub, item.intRate, days));
 }
 export function lineAmt(item) { return lineSub(item) + lineInt(item); }
 
@@ -240,7 +240,7 @@ export function updateTMTotals() {
   const scCheck = document.getElementById('tm-sc');
   const scDiscount = scCheck && scCheck.checked ? subtotal * 0.2 : 0;
   const discount = parseFloat(document.getElementById('tm-discount')?.value || 0) + scDiscount;
-  const grandTotal = Math.max(0, subtotal + totalInterest - discount);
+  const grandTotal = round2(Math.max(0, subtotal + totalInterest - discount));
   el.innerHTML = `
     <div class="flex justify-between"><span>Subtotal (goods)</span><span>${peso(subtotal)}</span></div>
     ${totalInterest > 0 ? `<div class="flex justify-between text-amber-600"><span>Total Interest</span><span>${peso(totalInterest)}</span></div>` : ''}
@@ -262,7 +262,7 @@ export async function saveTransaction() {
     const scCheck = document.getElementById('tm-sc');
     const scDiscount = scCheck && scCheck.checked ? subtotal * 0.2 : 0;
     const discount = parseFloat(document.getElementById('tm-discount')?.value || 0) + scDiscount;
-    const grandTotal = Math.max(0, subtotal + totalInterest - discount);
+    const grandTotal = round2(Math.max(0, subtotal + totalInterest - discount));
     if (txEditingId) { await doSaveTransaction(); return; }
     if (!await confirmModal(`Review Sale:
     Subtotal: ${peso(subtotal)}
@@ -315,7 +315,7 @@ export async function doSaveTransaction() {
   const scCheck = document.getElementById('tm-sc');
   const scDiscount = scCheck && scCheck.checked ? subtotal * 0.2 : 0;
   const discount = parseFloat(document.getElementById('tm-discount')?.value || 0) + scDiscount;
-  const grandTotal = Math.max(0, subtotal + totalInterest - discount);
+  const grandTotal = round2(Math.max(0, subtotal + totalInterest - discount));
   const clientSel = document.getElementById('tm-client');
   const clientId = clientSel.value ? parseInt(clientSel.value) : null;
   const clientName = clientSel.options[clientSel.selectedIndex]?.text || 'Walk-in';
@@ -585,7 +585,7 @@ export async function confirmReturn(id) {
 }
 
 export function buildReturnTxn(orig, returnItems, reason = '') {
-  const retTotal = returnItems.reduce((s, i) => s + (getQty(i.name || i.qty || '1') * (i.unitCost || i.price || 0)), 0);
+  const retTotal = round2(returnItems.reduce((s, i) => s + (getQty(i.name || i.qty || '1') * (i.unitCost || i.price || 0)), 0));
   return {
     invoiceNo: (orig.invoiceNo || '') + '-R',
     clientId: orig.clientId,

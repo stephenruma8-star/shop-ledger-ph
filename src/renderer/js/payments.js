@@ -1,6 +1,6 @@
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
 import { closeModal, confirmModal, dbLoad, debounce, escapeHtml, filterByYear, modal, paginate, renderPagination, searchData, toast } from './helpers.js'
-import { fmtDate, now, peso, state, today } from './state.js'
+import { fmtDate, now, peso, round2, state, today } from './state.js'
 
 export async function viewPayments(root) {
   await dbLoad('payments');
@@ -94,7 +94,7 @@ export async function savePayment(id) {
   const ntEl = document.getElementById('pf-notes');
   if (!clEl || !amtEl || !dtEl || !tpEl || !ntEl) { toast('Form not ready', 'error'); return; }
   const clientId = parseInt(clEl.value);
-  const amount = parseFloat(amtEl.value);
+  const amount = round2(parseFloat(amtEl.value));
   if (requireFields([
     { el: clEl, test: () => !!clientId, msg: 'Please select a client' },
     { el: amtEl, test: () => amount > 0, msg: 'Valid amount required' }

@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   decryptBackupData: (encrypted, password) => ipcRenderer.invoke('decrypt-backup-data', { encrypted, password }),
   sendSMS: (config) => ipcRenderer.invoke('send-sms', config),
   generateMobileQR: () => ipcRenderer.invoke('generate-mobile-qr'),
+  rotateLanToken: () => ipcRenderer.invoke('rotate-lan-token'),
+  importJsonDump: (dump) => ipcRenderer.invoke('import-json-dump', { dump }),
   getAppPreferences: () => ipcRenderer.invoke('get-app-preferences'),
   setAppPreferences: (prefs) => ipcRenderer.invoke('set-app-preferences', prefs),
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),

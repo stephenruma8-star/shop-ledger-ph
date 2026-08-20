@@ -123,6 +123,10 @@ export async function viewSettings(root) {
           </div>
           <div><label class="text-xs text-gray-500 block">Keep auto snapshots</label><input id="set-snapshotKeepCount" type="number" min="1" max="90" value="${escapeHtml(settingsMap['snapshotKeepCount'] || '14')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" /><p class="text-xs text-gray-400 mt-1">Default 14 days of automatic snapshots.</p></div>
         </div>
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div><label class="text-xs text-gray-500 block">Keep manual backups</label><input id="set-keepManualBackups" type="number" min="0" max="90" value="${escapeHtml(settingsMap['keepManualBackups'] || '0')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" /><p class="text-xs text-gray-400 mt-1">Keep the newest N manual backups, prune the oldest. 0 = keep everything.</p></div>
+          <div><label class="text-xs text-gray-500 block">Audit log retention (days)</label><input id="set-auditRetentionDays" type="number" min="0" max="3650" value="${escapeHtml(settingsMap['auditRetentionDays'] || '0')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" /><p class="text-xs text-gray-400 mt-1">Delete audit entries older than this many days (0 = keep everything).</p></div>
+        </div>
         <div class="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
           <div class="flex items-center justify-between mb-2">
             <div>
@@ -272,7 +276,7 @@ export async function dbMaintenance(action) {
 }
 
 export async function saveSettings() {
-  const keys = ['shopName','shopContact','shopAddress','weatherLocation','cloudBackupFolder','cloudBackupPassword','cloudBackupInterval','smsApiKey','smsAlertNumber','smsAutoReminderFreq','smsAutoReminderDay','backupEmail','aiApiKey','aiModel','receiptFooter','receiptHeaderText','printStripeColor1','printStripeColor2','thermalHost','thermalPort','snapshotKeepCount'];
+  const keys = ['shopName','shopContact','shopAddress','weatherLocation','cloudBackupFolder','cloudBackupPassword','cloudBackupInterval','smsApiKey','smsAlertNumber','smsAutoReminderFreq','smsAutoReminderDay','backupEmail','aiApiKey','aiModel','receiptFooter','receiptHeaderText','printStripeColor1','printStripeColor2','thermalHost','thermalPort','snapshotKeepCount','keepManualBackups','auditRetentionDays'];
   for (const key of keys) {
     const el = document.getElementById(`set-${key}`);
     if (el) {

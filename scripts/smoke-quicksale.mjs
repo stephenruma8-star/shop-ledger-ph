@@ -212,6 +212,16 @@ try {
   const inv2 = await win.dbGet('inventory', invId2);
   eq(inv1.stock, 8, 'item1 stock 10 -> 8');
   eq(inv2.stock, 2, 'item2 stock 5 -> 2');
+
+  // --- fractional price rounds to exact cents (3 x 19.99 must not leave float dust) ---
+  const inv3 = await win.dbAdd('inventory', { name: 'Chips 19.99', price: 19.99, sellPrice: 19.99, stock: 5, lowStock: 2, createdAt: new Date().toISOString() });
+  win.state.inventory = await win.dbAll('inventory');
+  win.openQuickSaleModal(inv3);
+  getEl('qs-qty').value = '3';
+  getEl('qs-interest').value = '0';
+  getEl('qs-sc').checked = false;
+  win.qsUpd();
+  eq(getEl('qs-total').textContent, '₱59.97', 'fractional price rounds to cents: 3 x 19.99 = 59.97');
   const cli = await win.dbGet('clients', cliId);
   eq(cli.balance, 282.33, 'GCash cart sale adds 282.33 to client balance');
   eq(tx.balanceAdded, true, 'GCash cart sale balanceAdded true');

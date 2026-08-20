@@ -1,7 +1,7 @@
 import { logAudit } from './auth.js'
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
 import { closeModal, confirmModal, dbLoad, debounce, escapeHtml, filterByYear, modal, paginate, renderPagination, searchData, toast } from './helpers.js'
-import { fmtDate, now, peso, state, today } from './state.js'
+import { fmtDate, now, peso, round2, state, today } from './state.js'
 
 export async function viewExpenses(root) {
   await dbLoad('expenses');
@@ -76,7 +76,7 @@ export async function saveExpense(id) {
   const descEl = document.getElementById('ef-desc');
   const payeeEl = document.getElementById('ef-payee');
   if (!amtEl || !dateEl || !catEl || !descEl || !payeeEl) { toast('Form element missing', 'error'); return; }
-  const amount = parseFloat(amtEl.value);
+  const amount = round2(parseFloat(amtEl.value));
   if (requireFields([{ el: amtEl, test: () => amount > 0, msg: 'Valid amount required' }])) return;
   const obj = {
     date: dateEl.value || today(), category: catEl.value,

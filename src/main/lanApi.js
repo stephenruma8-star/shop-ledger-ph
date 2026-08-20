@@ -113,7 +113,7 @@ function createLanApiRouter(deps) {
   router.post('/api/expenses', wrap(async (req, res) => {
     if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
     const { description, amount, category, date, payee } = req.body;
-    const amountNum = parseFloat(amount) || 0;
+    const amountNum = Math.round((parseFloat(amount) || 0) * 100) / 100;
     if (amountNum <= 0) return res.status(400).json({ error: 'Valid amount required' });
     const cat = EXPENSE_CATS.includes(category) ? category : 'Other';
     await deps.rendererExec(`
@@ -213,7 +213,7 @@ function createLanApiRouter(deps) {
   router.post('/api/payments', wrap(async (req, res) => {
     if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
     const { clientId, amount, type, date } = req.body;
-    const amtNum = parseFloat(amount) || 0;
+    const amtNum = Math.round((parseFloat(amount) || 0) * 100) / 100;
     const cId = JSON.stringify(clientId);
     const amt = JSON.stringify(amtNum);
     const payType = JSON.stringify(amtNum > 0 ? (type === 'Full' || type === 'Partial' ? type : null) : null);

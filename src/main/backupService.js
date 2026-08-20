@@ -120,6 +120,22 @@ function listBackups() {
   return { success: true, backups: withSize.reverse() };
 }
 
+// Removes the oldest MANUAL backups beyond `keep` (0/empty = keep all). Auto snapshots untouched.
+function pruneManualBackups(keep) {
+  const keepCount = parseInt(keep, 10) || 0;
+  if (keepCount <= 0) return 0;
+  const list = readBackupIndex();
+  const manual = list.filter(b => !b.auto).sort((a, b) => new Date(a.date) - new Date(b.date));
+  const excess = manual.slice(0, Math.max(0, manual.length - keepCount));
+  if (excess.length === 0) return 0;
+  const names = new Set(excess.map(b => b.name));
+  writeBackupIndex(list.filter(b => !names.has(b.name)));
+  for (const b of excess) {
+    try { fs.unlinkSync(path.join(backupsDir(), b.name)); } catch (e) {}
+  }
+  return excess.length;
+}
+
 // Removes the oldest auto snapshots beyond `keep` (manual backups are never pruned).
 function pruneAutoSnapshots(keep) {
   const list = readBackupIndex();
@@ -133,6 +149,28 @@ function pruneAutoSnapshots(keep) {
     try { fs.unlinkSync(path.join(backupsDir(), b.name)); } catch (e) {}
   }
   return excess.length;
+}
+
+// Retention sweep: prunes old manual backups (keepManualBackups) and audit logs older than
+// auditRetentionDays (0 = keep everything for both).
+async function runRetention() {
+  const m = (await cfg.getSettings()) || {};
+  const out = { manualPruned: 0, auditPruned: 0 };
+  try { out.manualPruned = pruneManualBackups(m.keepManualBackups); } catch (e) { out.error = e.message; }
+  const days = parseInt(m.auditRetentionDays, 10) || 0;
+  if (days > 0) {
+    try {
+      const cutoff = new Date(Date.now() - days * 86400000).toISOString();
+      let pruned = 0;
+      for (const r of (dbm.all ? (dbm.all('auditLogs') || []) : [])) {
+        if (r.createdAt && r.createdAt < cutoff) {
+          try { dbm.del('auditLogs', r.id); pruned++; } catch (e) {}
+        }
+      }
+      out.auditPruned = pruned;
+    } catch (e) { out.error = e.message; }
+  }
+  return out;
 }
 
 // One auto snapshot per day (settings autoSnapshotEnabled + snapshotKeepCount).
@@ -196,6 +234,51 @@ async function syncSavedSqliteBackups() {
   return { success: failed.length === 0, copied, failed };
 }
 
+// Lightweight shape/type validation for restored dumps. Checks each row of every known store,
+// catches corrupted imports (wrong shapes, non-numeric money, missing ids) before they erase data.
+const IMPORT_SCHEMA = {
+  clients: { name: 'string', balance: 'number' },
+  transactions: { invoiceNo: 'string', grandTotal: 'number', date: 'string' },
+  payments: { amount: 'number', date: 'string' },
+  inventory: { name: 'string', stock: 'number', unitCost: 'number' },
+  quickItems: { name: 'string', price: 'number' },
+  expenses: { amount: 'number', date: 'string' },
+  suppliers: { name: 'string' },
+  purchaseOrders: { poNo: 'string', total: 'number' },
+  supplierPayments: { amount: 'number' },
+  users: { username: 'string' },
+  notifications: {},
+  auditLogs: {},
+  settings: { key: 'string' }
+};
+const IMPORT_STORES = Object.keys(IMPORT_SCHEMA);
+
+function validateImportDump(dump) {
+  if (!dump || typeof dump !== 'object' || Array.isArray(dump)) {
+    return { ok: false, error: 'Not a backup dump (expected { store: [records...] })' };
+  }
+  const keys = Object.keys(dump);
+  if (keys.length === 0) return { ok: false, error: 'Backup dump has no store arrays' };
+  let total = 0;
+  for (const key of keys) {
+    const rows = dump[key];
+    if (!Array.isArray(rows)) return { ok: false, error: `Store "${key}" must be an array` };
+    if (!IMPORT_STORES.includes(key)) return { ok: false, error: `Unknown store "${key}"` };
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r || typeof r !== 'object' || Array.isArray(r)) return { ok: false, error: `Store "${key}" row ${i} is not an object` };
+      if (r.id == null) return { ok: false, error: `Store "${key}" row ${i} has no id` };
+      for (const [field, type] of Object.entries(IMPORT_SCHEMA[key])) {
+        if (r[field] == null) continue;
+        if (typeof r[field] !== type) return { ok: false, error: `Store "${key}" row ${i} ${field} must be a ${type}` };
+        if (type === 'number' && !isFinite(r[field])) return { ok: false, error: `Store "${key}" row ${i} ${field} must be a valid number` };
+      }
+      total++;
+    }
+  }
+  return { ok: true, counts: total };
+}
+
 // Imports a { store: [records...] } JSON dump (or a legacy encrypted backup of one) into
 // the live database, replacing all stores. The current DB is kept as .prerestore.
 async function importJsonBackup({ filePath, password }) {
@@ -208,13 +291,20 @@ async function importJsonBackup({ filePath, password }) {
     try { parsed = JSON.parse(decryptData(parsed, password).toString('utf8')); }
     catch (e) { return { success: false, error: 'Wrong password or corrupted backup' }; }
   }
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || !Object.values(parsed).some(Array.isArray)) {
-    return { success: false, error: 'Not a backup dump (expected { store: [records...] })' };
-  }
-  const r = dbm.replaceFromDump(parsed);
+  const v = validateImportDump(parsed);
+  if (!v.ok) return { success: false, error: v.error };
+  return importJsonDump(parsed, { file: path.basename(filePath) });
+}
+
+// Validates and imports an already-parsed JSON dump (used by both the file importer and the
+// renderer restore flow). Keeps the live DB as .prerestore via replaceFromDump.
+async function importJsonDump(dump, opts = {}) {
+  const v = validateImportDump(dump);
+  if (!v.ok) return { success: false, error: v.error };
+  const r = dbm.replaceFromDump(dump);
   if (!r.ok) return { success: false, error: r.error };
-  cfg.notify({ source: 'app', kind: 'import', file: path.basename(filePath) });
-  return { success: true, counts: r.counts };
+  cfg.notify({ source: 'app', kind: 'import', file: opts.file || '' });
+  return { success: true, counts: r.counts, validated: v.counts };
 }
 
 // Database health + maintenance: status / integrity / compact (VACUUM).
@@ -256,4 +346,4 @@ function dbHealth(action) {
   return out;
 }
 
-module.exports = { configure, createBackup, retryBackup, listBackups, pruneAutoSnapshots, planLocalSnapshot, restoreBackup, importJsonBackup, syncSavedSqliteBackups, dbHealth, readBackupIndex };
+module.exports = { configure, createBackup, retryBackup, listBackups, pruneAutoSnapshots, pruneManualBackups, runRetention, planLocalSnapshot, restoreBackup, importJsonBackup, importJsonDump, validateImportDump, syncSavedSqliteBackups, dbHealth, readBackupIndex };

@@ -18,6 +18,7 @@ export const state = {
 };
 
 export const peso = (n) => '₱' + (Math.round(Number(n || 0) * 100) / 100).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+export const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
 export function fmtDate(d) {
   if (!d) return '';

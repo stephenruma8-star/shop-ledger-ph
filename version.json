@@ -1,5 +1,5 @@
 {
-    "version":  "3.9.1",
+    "version":  "3.9.2",
     "buildDate":  "2026-08-20T00:00:00.000Z",
-    "notes":  "Hardening patch. Dates are now computed from local time instead of UTC (PH is UTC+8, so sales between midnight and 8 AM were being booked under yesterday's date - today sales, daily reports, refund totals and the LAN week series are now correct). The LAN/mobile access token is generated with crypto.randomBytes(24) instead of Math.random. Backup exports (JSON file, email, encrypted, and the LAN fallback dump) now mask secret settings - SMTP password, cloud backup password, SMS and AI API keys - instead of shipping them in plaintext; restoring such a backup only requires re-entering those values."
+    "notes":  "Money is now rounded to exact cents at every write boundary - line totals, interest, sale and return totals, payments, expenses, interest accrual and LAN (mobile) amounts - so long running totals can never drift into 3-decimal float dust. Restoring a JSON backup now validates every row (unknown stores, missing ids, non-numeric money and re-injected numbers are refused before anything is wiped) and the renderer restore path ships through the same validated importer. New retention settings under Settings > Database: keep only the newest N manual backups and auto-delete audit logs older than a set number of days (both default to keep-everything). The Mobile Access window gained a Red rotate button - one click invalidates the current access code, kicks all connected phones and issues a fresh QR pair."
 }

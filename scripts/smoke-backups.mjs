@@ -191,6 +191,67 @@ writeFileSync(arrFile, JSON.stringify([1, 2, 3]));
 const b2 = await svc.importJsonBackup({ filePath: arrFile });
 ok(b2.success === false && /backup dump/i.test(b2.error), 'array file rejected');
 
+// 14 import validation (validateImportDump)
+const validDump = {
+  clients: [{ id: 1, name: 'Aling Nena', balance: 125.5 }, { id: 2, name: 'Mang Jose' }],
+  transactions: [{ id: 7, invoiceNo: 'INV-100', grandTotal: 99.99, date: '2026-01-01' }],
+  payments: [{ id: 3, amount: 50, date: '2026-01-01' }],
+  settings: [{ id: 9, key: 'shopName', value: 'Nena Store' }]
+};
+const v0 = svc.validateImportDump(validDump);
+ok(v0.ok === true && v0.counts === 5, 'validateImportDump accepts valid dump (5 rows)');
+const v1 = svc.validateImportDump({ clients: [], bogus: [] });
+ok(v1.ok === false && /unknown store/i.test(v1.error), 'unknown store rejected');
+const v2 = svc.validateImportDump({ clients: 'not-an-array' });
+ok(v2.ok === false && /must be an array/i.test(v2.error), 'non-array store rejected');
+const v3 = svc.validateImportDump({ clients: [{ name: 'NoId' }] });
+ok(v3.ok === false && /has no id/i.test(v3.error), 'row without id rejected');
+const v4 = svc.validateImportDump({ transactions: [{ id: 1, invoiceNo: 'X', grandTotal: '99.99' }] });
+ok(v4.ok === false && /grandTotal must be a number/i.test(v4.error), 'string grandTotal rejected (catches money corruption)');
+const v5 = svc.validateImportDump({ expenses: [{ id: 1, amount: NaN }] });
+ok(v5.ok === false && /must be a valid number/i.test(v5.error), 'NaN amount rejected');
+const v6 = svc.validateImportDump({ clients: [{ id: 1, name: 123 }] });
+ok(v6.ok === false && /name must be a string/i.test(v6.error), 'numeric client name rejected');
+
+// 15 renderer restore path (importJsonDump) gains the same validation
+const dimport = await svc.importJsonDump(validDump);
+ok(dimport.success === true && dimport.validated === 5 && dimport.counts.clients === 2, 'importJsonDump imports validated dump');
+ok((await invoke(h, 'db-get', { store: 'clients', id: 2 })).name === 'Mang Jose', 'importJsonDump data readable after restore');
+const dbad = await svc.importJsonDump({ clients: [{ id: 1, name: 5 }] });
+ok(dbad.success === false && /name must be a string/i.test(dbad.error), 'importJsonDump rejects corrupted dump without wiping data');
+ok((await invoke(h, 'db-get', { store: 'clients', id: 2 })).name === 'Mang Jose', 'data intact after rejected import');
+const dnull = await svc.importJsonDump(null);
+ok(dnull.success === false && /backup dump/i.test(dnull.error), 'importJsonDump rejects null');
+
+// 16 pruneManualBackups keeps the newest N manual backups
+for (let i = 0; i < 3; i++) await svc.createBackup('', false);
+const beforePrune = await svc.listBackups();
+const oldestManual = beforePrune.backups.filter(b => !b.auto).sort((a, b) => new Date(a.date) - new Date(b.date))[0];
+const prunedManual = svc.pruneManualBackups(2);
+ok(prunedManual === 2, 'pruneManualBackups removes oldest excess manual backups (keep 2 of 4)');
+const afterManual = await svc.listBackups();
+ok(afterManual.backups.filter(b => !b.auto).length === 2, 'two manual backups kept after prune');
+ok(!afterManual.backups.some(b => b.name === oldestManual.name), 'oldest manual backup removed from index');
+ok(!existsSync(join(svcDir, 'backups', oldestManual.name)), 'pruned manual backup file deleted');
+const zeroKeep = svc.pruneManualBackups('0');
+ok(zeroKeep === 0 && (await svc.listBackups()).backups.filter(b => !b.auto).length === 2, '0 keep count never prunes manual backups');
+
+// 17 runRetention sweeps audit logs by age + prunes manual backups per settings
+const oldLog = { id: 'L1', action: 'sale', detail: 'old', createdAt: '2026-01-01T00:00:00.000Z' };
+const newLog = { id: 'L2', action: 'sale', detail: 'recent', createdAt: new Date().toISOString() };
+await invoke(h, 'db-add', { store: 'auditLogs', obj: oldLog });
+await invoke(h, 'db-add', { store: 'auditLogs', obj: newLog });
+fakeSettings.keepManualBackups = '1';
+fakeSettings.auditRetentionDays = '30';
+const ret = await svc.runRetention();
+ok(ret.manualPruned >= 1, 'runRetention prunes manual backups past keepManualBackups');
+ok(ret.auditPruned === 1, 'runRetention deletes audit logs older than auditRetentionDays');
+const logsLeft = await invoke(h, 'db-all', { store: 'auditLogs' });
+ok(logsLeft.length === 1 && logsLeft[0].createdAt === newLog.createdAt, 'recent audit log preserved after retention');
+fakeSettings.auditRetentionDays = '0';
+const retNone = await svc.runRetention();
+ok(retNone.auditPruned === 0, 'auditRetentionDays 0 keeps every audit log');
+
 rmSync(dir, { recursive: true, force: true });
 rmSync(svcDir, { recursive: true, force: true });
 closeDb();

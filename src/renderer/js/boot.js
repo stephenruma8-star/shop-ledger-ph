@@ -1,7 +1,7 @@
 import { applyPermissions } from './auth.js'
 import { cfCart, cfRenderCart } from './clients.js'
 import { dbAdd, dbAll, dbPut, openDB } from './database.js'
-import { dismissSysNotif, escapeHtml, hashPassword, initConnIndicator, modal, playSound, pushSysNotif, startClock, toast } from './helpers.js'
+import { closeModal, confirmModal, dismissSysNotif, escapeHtml, hashPassword, initConnIndicator, modal, playSound, pushSysNotif, startClock, toast } from './helpers.js'
 import { AppParticles } from './particles.js'
 import { emailBackupFlow, fileBackupFlow, redactSettings } from './reports.js'
 import { loadAll, navigate } from './router.js'
@@ -193,6 +193,7 @@ export async function showMobileAccess() {
           <input id="mobile-url-ts" readonly value="${escapeHtml(ts.url)}" onclick="this.select()" class="flex-1 px-3 py-2 border dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-sm font-mono" />
           <button onclick="copyMobileUrl('mobile-url-ts')" class="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy</button>
         </div>` : ''}
+        <button onclick="rotateLanToken()" class="mt-1 w-full py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Rotate Token — kick all connected phones</button>
         <div class="text-xs text-gray-400 space-y-1">
           <p>• Open the page on your phone to view clients and log payments.</p>
           <p>• Keep this app running — it hosts the mobile page on port 3456.</p>
@@ -216,6 +217,16 @@ export async function copyMobileUrl(id) {
     document.execCommand('copy');
     toast('URL copied');
   }
+}
+
+export async function rotateLanToken() {
+  if (!window.electronAPI?.rotateLanToken) return;
+  if (!await confirmModal('This will invalidate the current access code and disconnect all connected phones. Generate a fresh pair QR code?')) return;
+  const res = await window.electronAPI.rotateLanToken();
+  if (!res || !res.success) { toast('Token rotation failed', 'error'); return; }
+  toast('Access code rotated — phones must rescan the new QR', 'success');
+  closeModal();
+  showMobileAccess();
 }
 
 export async function checkForNewBuild() {
@@ -376,6 +387,7 @@ Object.defineProperties(window, {
   updateVersionBadge: { get: () => updateVersionBadge, configurable: true },
   showMobileAccess: { get: () => showMobileAccess, configurable: true },
   copyMobileUrl: { get: () => copyMobileUrl, configurable: true },
+  rotateLanToken: { get: () => rotateLanToken, configurable: true },
   checkForNewBuild: { get: () => checkForNewBuild, configurable: true },
   showUpdateProgress: { get: () => showUpdateProgress, configurable: true },
   boot: { get: () => boot, configurable: true },

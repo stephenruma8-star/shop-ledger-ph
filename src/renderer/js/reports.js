@@ -527,14 +527,8 @@ export async function restoreJSONFlow() {
   const data = result.data;
   if (!data || typeof data !== 'object') { toast('Invalid backup file', 'error'); return; }
   try {
-    const stores = ['clients','transactions','payments','inventory','quickItems','settings','users','expenses','suppliers','purchaseOrders','supplierPayments','notifications','auditLogs'];
-    await Promise.all(stores.map(s => dbClear(s)));
-    for (const store of stores) {
-      const items = data[store];
-      if (items && Array.isArray(items)) {
-        for (const item of items) await dbPut(store, item);
-      }
-    }
+    const r = await window.electronAPI.importJsonDump(data);
+    if (!r || !r.success) { toast('Restore failed: ' + ((r && r.error) || 'unknown'), 'error'); return; }
     toast('Data restored successfully', 'success');
     await loadAll();
     await logAudit('backup', 'Data restored from JSON backup');

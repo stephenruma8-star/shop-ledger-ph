@@ -555,6 +555,7 @@ ipcMain.on('log-renderer', (event, payload) => {
 async function runPlannedJobs() {
   runCloudBackupCheck();
   try { await backupService.planLocalSnapshot(); } catch (e) { console.error('local snapshot plan failed:', e.message); }
+  try { await backupService.runRetention(); } catch (e) { console.error('retention sweep failed:', e.message); }
 }
 
 ipcMain.handle('plan-cloud-backups', async () => {
@@ -586,6 +587,20 @@ ipcMain.handle('generate-mobile-qr', async () => {
     tailscale = { url: tsUrl, qr: await QRCode.toDataURL(tsUrl, { width: 300 }) };
   }
   return { url, qr, token: _lanToken, wsPort: WS_PORT, tailscale };
+});
+
+// Rotates the LAN access token: connected phones get disconnected and old codes stop working.
+ipcMain.handle('rotate-lan-token', async () => {
+  _lanToken = crypto.randomBytes(24).toString('hex');
+  try { fs.writeFileSync(APP_CONFIG_PATH, JSON.stringify({ ...readAppPrefs(), lanToken: _lanToken }, null, 2)); } catch (e) { console.error('Failed to save rotated token:', e.message); }
+  logger.info('LAN access token rotated');
+  return { success: true, token: _lanToken };
+});
+
+// Renderer restore path: validated import of an already-parsed JSON dump (no file dialog).
+ipcMain.handle('import-json-dump', async (event, { dump }) => {
+  try { return await backupService.importJsonDump(dump || null); }
+  catch (e) { return { success: false, error: e.message }; }
 });
 
 ipcMain.handle('get-app-preferences', () => readAppPrefs());
