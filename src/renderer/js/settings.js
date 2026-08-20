@@ -204,6 +204,7 @@ async function loadDbHealth() {
       ['Location', d.sqlitePath ? `<span title="${d.sqlitePath}">app data…</span>` : '—'],
       ['Size', d.dbSizeBytes != null ? formatDbBytes(d.dbSizeBytes) : '—'],
       ['Table count', d.tableCount != null ? d.tableCount : '—'],
+      ['Schema', d.schemaVersion != null ? 'v' + d.schemaVersion : '—'],
       ['Integrity', d.integrityOk ? '<span class="text-green-600">OK</span>' : (d.integrityResult || 'Unknown')],
       ['Last snapshot', d.lastSnapshot ? d.lastSnapshot : 'None'],
       ['Snapshot count', d.snapshotCount != null ? d.snapshotCount : '—']

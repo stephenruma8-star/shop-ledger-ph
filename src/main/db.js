@@ -15,6 +15,38 @@ let db = null;
 let dbPath = null;
 const stmts = new Map();
 
+// Versioned schema migrations. Baseline (v1) is the current schema; future schema changes
+// (new stores, columns, indexes) add higher versions with idempotent steps. Each step runs
+// once inside a transaction and is recorded in schema_migrations.
+const MIGRATIONS = [
+  { version: 1, name: 'baseline', up() {} }
+];
+
+function schemaVersion() {
+  try {
+    const row = stmt('SELECT MAX(version) AS v FROM schema_migrations').get();
+    return row ? (row.v || 0) : 0;
+  } catch (e) { return 0; }
+}
+
+function runMigrations() {
+  if (!db) return { ok: false, error: 'SQLite not initialized' };
+  try {
+    db.exec('CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, name TEXT, applied_at TEXT)');
+    const applied = new Set(stmt('SELECT version FROM schema_migrations').all().map(r => r.version));
+    let ran = 0;
+    for (const m of MIGRATIONS) {
+      if (applied.has(m.version)) continue;
+      db.transaction(() => {
+        m.up();
+        stmt('INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)').run(m.version, m.name, new Date().toISOString());
+      })();
+      ran++;
+    }
+    return { ok: true, schemaVersion: schemaVersion(), applied: ran };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+
 function stmt(sql) {
   let s = stmts.get(sql);
   if (!s) { s = db.prepare(sql); stmts.set(sql, s); }
@@ -47,6 +79,7 @@ function init(userDataPath) {
     db.pragma('busy_timeout = 5000');
     db.exec('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)');
     for (const s of STORES) db.exec(`CREATE TABLE IF NOT EXISTS s_${s} (id INTEGER PRIMARY KEY AUTOINCREMENT, value TEXT NOT NULL)`);
+    runMigrations();
     return openInfo();
   } catch (e) {
     console.error('SQLite init failed:', e);
@@ -180,6 +213,7 @@ function replaceWith(filePath) {
     stmts.clear();
     db.exec('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)');
     for (const s of STORES) db.exec(`CREATE TABLE IF NOT EXISTS s_${s} (id INTEGER PRIMARY KEY AUTOINCREMENT, value TEXT NOT NULL)`);
+    runMigrations();
     stmt('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run('sqliteMigrated', 'true');
     const chk = integrityCheck();
     if (!chk.ok) { close(); return { ok: false, error: 'Restored file failed integrity check: ' + (chk.result || chk.error) }; }
@@ -189,6 +223,33 @@ function replaceWith(filePath) {
     db = null; opened = false;
     return { ok: false, error: e.message };
   }
+}
+
+// Replaces all stores from a { store: [records...] } dump (JSON backup import).
+// Keeps a .prerestore safety copy, preserves original ids, stamps sqliteMigrated
+// so the renderer never re-migrates over the imported data.
+function replaceFromDump(dump) {
+  if (!db) return { ok: false, error: 'SQLite not initialized' };
+  if (!dump || typeof dump !== 'object' || Array.isArray(dump)) return { ok: false, error: 'Invalid backup dump' };
+  try { fs.copyFileSync(dbPath, dbPath + '.prerestore'); } catch (e) {}
+  const counts = {};
+  const tx = db.transaction(() => {
+    for (const s of STORES) {
+      const records = Array.isArray(dump[s]) ? dump[s] : [];
+      db.exec(`DELETE FROM s_${s}`);
+      const ins = stmt(`INSERT OR IGNORE INTO s_${s} (id, value) VALUES (?, ?)`);
+      let n = 0;
+      for (const rec of records) {
+        if (rec && typeof rec.id === 'number') { ins.run(rec.id, JSON.stringify(rec)); n++; }
+      }
+      counts[s] = n;
+    }
+    stmt('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run('sqliteMigrated', 'true');
+  });
+  tx();
+  const chk = integrityCheck();
+  if (!chk.ok) return { ok: false, error: 'Imported data failed integrity check: ' + (chk.result || chk.error) };
+  return { ok: true, counts };
 }
 
 function stats() {
@@ -218,4 +279,4 @@ function registerDbIpc(ipcMain, userDataPath) {
   ipcMain.handle('db-stats', () => stats());
 }
 
-module.exports = { registerDbIpc, init, migrate, get, add, put, del, all, clear, stats, snapshot, integrityCheck, optimize, checkpoint, vacuum, replaceWith, close, closeDb: close };
+module.exports = { registerDbIpc, init, migrate, get, add, put, del, all, clear, stats, snapshot, integrityCheck, optimize, checkpoint, vacuum, replaceWith, replaceFromDump, runMigrations, schemaVersion, close, closeDb: close };

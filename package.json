@@ -1,72 +1,72 @@
 {
-    "name":  "shop-ledger-ph",
-    "version":  "3.7.0",
-    "description":  "Shop Ledger PH - Complete POS \u0026 Inventory System for Philippine Sari-Sari Stores",
-    "repository":  "stephenruma8-star/shop-ledger-ph",
-    "main":  "out/main/index.js",
-    "scripts":  {
-                    "start":  "electron .",
-                    "dev":  "electron-vite dev",
-                    "build":  "electron-vite build",
-                    "build:win":  "electron-vite build \u0026\u0026 electron-builder --win",
-                    "preview":  "electron-vite preview",
-                    "rebuild:electron":  "electron-rebuild -f -w better-sqlite3",
-                    "lint":  "node scripts/lint.mjs",
-"test":  "npm run lint && npm run build && node scripts/smoke.mjs && node scripts/smoke-validation.mjs && node scripts/smoke-mobile.mjs && node scripts/smoke-mobilepage.mjs && node scripts/smoke-strict-idb.mjs && node scripts/smoke-quicksale.mjs && node scripts/smoke-onboarding.mjs && node scripts/sqlite-node-abi.mjs && node scripts/smoke-sqlite.mjs && node scripts/smoke-backups.mjs"
-                },
-    "dependencies":  {
-                          "axios":  "^1.18.1",
-                          "better-sqlite3":  "^12.4.1",
-                          "cors":  "^2.8.6",
-                         "electron-updater":  "^6.1.8",
-                         "express":  "^4.22.2",
-                         "nodemailer":  "^6.10.1",
-                         "qrcode":  "^1.5.4"
-                     },
-    "devDependencies":  {
-                            "@electron/rebuild":  "^3.7.1",
-                            "electron":  "^30.5.1",
-                            "electron-builder":  "^24.13.3",
-                            "electron-vite":  "^5.0.0"
-                        },
-    "build":  {
-                  "appId":  "com.shopledger.ph",
-                  "productName":  "Shop Ledger PH",
-                  "files":  [
-                                "out/**"
-                            ],
-                  "asarUnpack":  [
-                                     "**/node_modules/better-sqlite3/**"
-                                 ],
-                  "directories":  {
-                                      "output":  "build"
-                                  },
-                  "icon":  "src/renderer/assets/icon.png",
-                  "win":  {
-                              "icon":  "src/renderer/assets/icon.ico",
-                              "requestedExecutionLevel":  "requireAdministrator",
-                              "target":  [
-                                             "nsis",
-                                             "portable"
-                                         ]
-                          },
-                  "portable":  {
-                                   "artifactName":  "Shop-Ledger-PH-${version}-portable.exe"
-                               },
-                  "publish":  [
-                                  {
-                                      "provider":  "github",
-                                      "owner":  "stephenruma8-star",
-                                      "repo":  "shop-ledger-ph"
-                                  }
-                              ],
-                  "nsis":  {
-                               "oneClick":  true,
-                               "createDesktopShortcut":  true,
-                               "perMachine":  false,
-                               "installerIcon":  "src/renderer/assets/icon.ico",
-                               "uninstallerIcon":  "src/renderer/assets/icon.ico",
-                               "artifactName":  "Shop-Ledger-PH-Setup-${version}.exe"
-                           }
-              }
+    "name": "shop-ledger-ph",
+"version":  "3.8.0",
+    "description": "Shop Ledger PH - Complete POS & Inventory System for Philippine Sari-Sari Stores",
+    "repository": "stephenruma8-star/shop-ledger-ph",
+    "main": "out/main/index.js",
+    "scripts": {
+        "start": "electron .",
+        "dev": "electron-vite dev",
+        "build": "electron-vite build",
+        "build:win": "electron-vite build && electron-builder --win",
+        "preview": "electron-vite preview",
+        "rebuild:electron": "electron-rebuild -f -w better-sqlite3",
+        "lint": "node scripts/lint.mjs",
+        "test": "npm run lint && npm run build && node scripts/smoke.mjs && node scripts/smoke-validation.mjs && node scripts/smoke-mobile.mjs && node scripts/smoke-mobilepage.mjs && node scripts/smoke-strict-idb.mjs && node scripts/smoke-quicksale.mjs && node scripts/smoke-onboarding.mjs && node scripts/sqlite-node-abi.mjs && node scripts/smoke-sqlite.mjs && node scripts/smoke-backups.mjs && node scripts/smoke-lan-api.mjs"
+    },
+    "dependencies": {
+        "axios": "^1.18.1",
+        "better-sqlite3": "^12.4.1",
+        "cors": "^2.8.6",
+        "electron-updater": "^6.1.8",
+        "express": "^4.22.2",
+        "nodemailer": "^6.10.1",
+        "qrcode": "^1.5.4"
+    },
+    "devDependencies": {
+        "@electron/rebuild": "^3.7.1",
+        "electron": "^30.5.1",
+        "electron-builder": "^24.13.3",
+        "electron-vite": "^5.0.0"
+    },
+    "build": {
+        "appId": "com.shopledger.ph",
+        "productName": "Shop Ledger PH",
+        "files": [
+            "out/**"
+        ],
+        "asarUnpack": [
+            "**/node_modules/better-sqlite3/**"
+        ],
+        "directories": {
+            "output": "build"
+        },
+        "icon": "src/renderer/assets/icon.png",
+        "win": {
+            "icon": "src/renderer/assets/icon.ico",
+            "requestedExecutionLevel": "requireAdministrator",
+            "target": [
+                "nsis",
+                "portable"
+            ]
+        },
+        "portable": {
+            "artifactName": "Shop-Ledger-PH-${version}-portable.exe"
+        },
+        "publish": [
+            {
+                "provider": "github",
+                "owner": "stephenruma8-star",
+                "repo": "shop-ledger-ph"
+            }
+        ],
+        "nsis": {
+            "oneClick": true,
+            "createDesktopShortcut": true,
+            "perMachine": false,
+            "installerIcon": "src/renderer/assets/icon.ico",
+            "uninstallerIcon": "src/renderer/assets/icon.ico",
+            "artifactName": "Shop-Ledger-PH-Setup-${version}.exe"
+        }
+    }
 }

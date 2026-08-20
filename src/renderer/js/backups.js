@@ -41,6 +41,7 @@ export async function openBackupsModal() {
         <div><label class="text-xs text-gray-500 block">Encryption Password <span class="text-gray-400">(optional)</span></label><input id="local-backup-password" type="password" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" placeholder="Password to protect this backup" /></div>
         <div class="flex items-end gap-2">
           <button onclick="createLocalBackup()" class="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">Back Up Now</button>
+          <button onclick="importJsonBackup()" class="flex-1 px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700">Import JSON</button>
           <button onclick="syncCloudBackups()" class="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">Sync to Cloud</button>
         </div>
       </div>
@@ -97,6 +98,20 @@ export async function restoreLocalBackup(name) {
     setTimeout(() => { try { window.location.reload(); } catch (e) {} }, 800);
     try { window.__app?.loadAll?.(); } catch (e) {}
   } else toast('Restore failed: ' + (r.error || 'Unknown error'), 'error');
+}
+
+export async function importJsonBackup() {
+  if (!window.electronAPI?.importJsonBackup) { toast('Desktop app only', 'warning'); return; }
+  const ok = await confirmModal(`Import a <b>JSON backup</b> into the database?<br><span class="text-xs text-gray-400">Works with older pre-SQLite backups and encrypted files (enter their password in the field above). The current database is replaced - a safety copy (<code>.prerestore</code>) is kept. The app reloads after importing.</span>`, 'Import');
+  if (!ok) return;
+  const pw = document.getElementById('local-backup-password')?.value || '';
+  toast('Importing backup...', 'info');
+  const r = await window.electronAPI.importJsonBackup(pw);
+  if (r.success) {
+    toast('Backup imported', 'success');
+    closeModal();
+    setTimeout(() => { try { window.location.reload(); } catch (e) {} }, 800);
+  } else if (!r.canceled) toast('Import failed: ' + (r.error || 'Unknown error'), 'error');
 }
 
 export async function syncCloudBackups() {
@@ -161,6 +176,7 @@ Object.defineProperties(window, {
   createLocalBackup: { get: () => createLocalBackup, configurable: true },
   retryLocalBackup: { get: () => retryLocalBackup, configurable: true },
   restoreLocalBackup: { get: () => restoreLocalBackup, configurable: true },
+  importJsonBackup: { get: () => importJsonBackup, configurable: true },
   refreshBackupsList: { get: () => refreshBackupsList, configurable: true },
   syncCloudBackups: { get: () => syncCloudBackups, configurable: true },
   openQuickItemsModal: { get: () => openQuickItemsModal, configurable: true },

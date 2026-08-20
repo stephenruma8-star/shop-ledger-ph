@@ -196,6 +196,27 @@ async function syncSavedSqliteBackups() {
   return { success: failed.length === 0, copied, failed };
 }
 
+// Imports a { store: [records...] } JSON dump (or a legacy encrypted backup of one) into
+// the live database, replacing all stores. The current DB is kept as .prerestore.
+async function importJsonBackup({ filePath, password }) {
+  let raw;
+  try { raw = fs.readFileSync(filePath, 'utf8'); } catch (e) { return { success: false, error: 'Cannot read file: ' + e.message }; }
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch (e) { return { success: false, error: 'Not a valid JSON backup file' }; }
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && typeof parsed.data === 'string' && (parsed.salt || parsed.iv)) {
+    if (!password) return { success: false, error: 'This backup is encrypted - enter its password to import' };
+    try { parsed = JSON.parse(decryptData(parsed, password).toString('utf8')); }
+    catch (e) { return { success: false, error: 'Wrong password or corrupted backup' }; }
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || !Object.values(parsed).some(Array.isArray)) {
+    return { success: false, error: 'Not a backup dump (expected { store: [records...] })' };
+  }
+  const r = dbm.replaceFromDump(parsed);
+  if (!r.ok) return { success: false, error: r.error };
+  cfg.notify({ source: 'app', kind: 'import', file: path.basename(filePath) });
+  return { success: true, counts: r.counts };
+}
+
 // Database health + maintenance: status / integrity / compact (VACUUM).
 function dbHealth(action) {
   const info = dbm.init(cfg.userDataPath);
@@ -208,6 +229,7 @@ function dbHealth(action) {
     sqlitePath: (st.ok && st.path) || info.path || '',
     dbSizeBytes: (st.ok && st.size) || info.size || 0,
     tableCount: 0,
+    schemaVersion: dbm.schemaVersion(),
     lastSnapshot: null,
     snapshotCount: list.length,
     counts: {}
@@ -234,4 +256,4 @@ function dbHealth(action) {
   return out;
 }
 
-module.exports = { configure, createBackup, retryBackup, listBackups, pruneAutoSnapshots, planLocalSnapshot, restoreBackup, syncSavedSqliteBackups, dbHealth, readBackupIndex };
+module.exports = { configure, createBackup, retryBackup, listBackups, pruneAutoSnapshots, planLocalSnapshot, restoreBackup, importJsonBackup, syncSavedSqliteBackups, dbHealth, readBackupIndex };

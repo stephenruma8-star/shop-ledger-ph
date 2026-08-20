@@ -2,7 +2,7 @@
 //   - db.snapshot() online backup of the live SQLite file
 //   - binary-safe encrypted snapshots (src/main/crypto.js)
 //   - db maintenance primitives (integrity / optimize / checkpoint / vacuum)
-//   - backupService (auto snapshots, pruning, restore via replaceWith, dbHealth)
+//   - backupService (auto snapshots, pruning, restore via replaceWith, JSON import, dbHealth)
 // Runs in plain Node with a fake ipcMain and a temp user-data dir.
 import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync, readFileSync, existsSync } from 'node:fs';
@@ -158,6 +158,38 @@ writeFileSync(join(svcDir, 'backups', 'backups.json'), JSON.stringify([
 ], null, 2));
 const jr = await svc.restoreBackup('json-only.bak', '');
 ok(jr.success === false && /not a valid database snapshot/i.test(jr.error), 'json backup rejected for DB restore');
+
+// 11 JSON dump import (replaceFromDump path)
+const STORES_ALL = ['clients','transactions','payments','inventory','quickItems','settings','auditLogs','users','expenses','suppliers','purchaseOrders','supplierPayments','notifications'];
+const dump = {};
+for (const s of STORES_ALL) dump[s] = await invoke(h, 'db-all', { store: s });
+const jsonFile = join(svcDir, 'legacy-dump.json');
+writeFileSync(jsonFile, JSON.stringify(dump));
+const imp = await svc.importJsonBackup({ filePath: jsonFile });
+ok(imp.success === true && imp.counts.clients >= 2 && imp.counts.settings >= 1, 'importJsonBackup imports a plain JSON dump with counts');
+const impClient = await invoke(h, 'db-get', { store: 'clients', id: 1 });
+ok(impClient && impClient.name === 'Aling Nena', 'imported client data readable after import');
+
+// 12 legacy encrypted backup import
+const encJsonFile = join(svcDir, 'legacy-dump.enc');
+writeFileSync(encJsonFile, JSON.stringify(encryptData(JSON.stringify(dump), 'pw123')));
+let e1 = await svc.importJsonBackup({ filePath: encJsonFile });
+ok(e1.success === false && /password/i.test(e1.error), 'encrypted import without password rejected');
+e1 = await svc.importJsonBackup({ filePath: encJsonFile, password: 'bad' });
+ok(e1.success === false && /wrong password|corrupted/i.test(e1.error), 'encrypted import wrong password rejected');
+e1 = await svc.importJsonBackup({ filePath: encJsonFile, password: 'pw123' });
+ok(e1.success === true, 'encrypted import with password succeeds');
+ok((await invoke(h, 'db-get', { store: 'settings', id: 1 })).key === 'shopName', 'encrypted import data readable');
+
+// 13 invalid files rejected
+const badFile = join(svcDir, 'not-json.txt');
+writeFileSync(badFile, 'this is not json');
+const b1 = await svc.importJsonBackup({ filePath: badFile });
+ok(b1.success === false && /not a valid json/i.test(b1.error), 'non-JSON file rejected');
+const arrFile = join(svcDir, 'arr-dump.json');
+writeFileSync(arrFile, JSON.stringify([1, 2, 3]));
+const b2 = await svc.importJsonBackup({ filePath: arrFile });
+ok(b2.success === false && /backup dump/i.test(b2.error), 'array file rejected');
 
 rmSync(dir, { recursive: true, force: true });
 rmSync(svcDir, { recursive: true, force: true });

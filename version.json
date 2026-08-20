@@ -1,5 +1,5 @@
 {
-    "version":  "3.7.0",
+    "version":  "3.8.0",
     "buildDate":  "2026-08-19T00:00:00.000Z",
-    "notes":  "Database maintenance: the Backups modal can now restore a snapshot (the current database is swapped out, a .prerestore safety copy is kept, and encrypted snapshots ask for their password). Settings gained a Database card with live health info, one-click integrity checks and a compact (VACUUM) action, plus auto daily snapshots with a keep count (default 14) that are planned from the main process and pruned automatically. Backups are now integrity-checked and optimized after every snapshot, and the database is optimized and checkpointed on quit."
+    "notes":  "SQLite everywhere: the LAN/mobile API moved into its own router (src/main/lanApi.js) and every read endpoint (clients, inventory, transactions, stats, expenses, suppliers, purchase-orders, reports, settings, backups, sqlite-status) now serves straight from the SQLite store - no more renderer round-trip, and the mobile server keeps working even with the window closed. Schema changes are now versioned (schema_migrations) so future releases can ALTER safely, and the database health card shows the schema version. The Backups modal gained Import JSON: old pre-SQLite .json backups (including encrypted ones) can be imported into the live database, replacing all stores with a .prerestore safety copy kept."
 }
