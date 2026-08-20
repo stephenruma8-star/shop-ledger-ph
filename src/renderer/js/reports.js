@@ -27,16 +27,21 @@ export async function viewReports(root) {
   const rPay = filterByYear(state.payments, 'date');
   const invCost = new Map((state.inventory || []).map(i => [i.id, i.costPrice || 0]));
   const totalRevenue = rTx.reduce((s, t) => s + (t.grandTotal || 0), 0);
+  const totalRefunds = rTx.filter(t => t.status === 'return').reduce((s, t) => s + Math.abs(t.grandTotal || 0), 0);
   const totalCOGS = cogsOf(rTx, invCost);
   const totalExpenses = rEx.reduce((s, e) => s + (e.amount || 0), 0);
   const netProfit = totalRevenue - totalCOGS - totalExpenses;
   const profitMargin = totalRevenue > 0 ? ((netProfit / totalRevenue) * 100).toFixed(1) : 0;
   root.innerHTML = `
     <div class="space-y-4 fade-in">
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border-l-4 stat-card border-green-500">
           <p class="text-xs text-gray-500 uppercase">Total Revenue</p>
           <p class="text-2xl font-bold text-green-600">${peso(totalRevenue)}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border-l-4 stat-card border-fuchsia-500">
+          <p class="text-xs text-gray-500 uppercase">Refunds</p>
+          <p class="text-2xl font-bold text-fuchsia-600">${peso(totalRefunds)}</p>
         </div>
         <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border-l-4 stat-card border-amber-500">
           <p class="text-xs text-gray-500 uppercase">Cost of Goods</p>
@@ -172,6 +177,7 @@ export async function exportExcel() {
     const expEx = filterByYear(state.expenses, 'date');
     const expPay = filterByYear(state.payments, 'date');
     const totalRevenue = expTx.reduce((s, t) => s + (t.grandTotal || 0), 0);
+    const totalRefunds = expTx.filter(t => t.status === 'return').reduce((s, t) => s + Math.abs(t.grandTotal || 0), 0);
     const invCost = new Map((state.inventory || []).map(i => [i.id, i.costPrice || 0]));
     const totalCOGS = cogsOf(expTx, invCost);
     const totalExpenses = expEx.reduce((s, e) => s + (e.amount || 0), 0);
@@ -181,6 +187,7 @@ export async function exportExcel() {
     const sumColor = netProfit >= 0 ? '#059669' : '#dc2626';
     html += `<tr><td colspan="20" style="padding:8px 10px;border:1px solid #cbd5e1;background:#f8fafc">
       <span style="margin-right:24px"><strong>Revenue:</strong> ₱${pesoVal(totalRevenue)}</span>
+      <span style="margin-right:24px"><strong style="color:#c026d3">Refunds:</strong> <span style="color:#c026d3">-₱${pesoVal(totalRefunds)}</span></span>
       <span style="margin-right:24px"><strong>COGS:</strong> ₱${pesoVal(totalCOGS)}</span>
       <span style="margin-right:24px"><strong>Expenses:</strong> ₱${pesoVal(totalExpenses)}</span>
       <span style="margin-right:24px"><strong style="color:${sumColor}">Net Profit:</strong> <span style="color:${sumColor}">₱${pesoVal(netProfit)}</span></span>
@@ -301,12 +308,65 @@ export async function exportExcel() {
   } catch (e) { toast('Export error: ' + e.message, 'error'); }
 }
 
+export async function exportXlsx() {
+  try {
+    await Promise.all([dbLoad('clients'), dbLoad('transactions'), dbLoad('payments'), dbLoad('expenses'), dbLoad('inventory'), dbLoad('suppliers'), dbLoad('purchaseOrders')]);
+    const X = window.XLSX;
+    if (!X || !X.utils || typeof X.writeFile !== 'function') { toast('Excel engine not loaded, using legacy export', 'warning'); return exportExcel(); }
+    const xTx = filterByYear(state.transactions, 'date').filter(t => t.status !== 'voided' && t.status !== 'interest');
+    const xEx = filterByYear(state.expenses, 'date');
+    const xPay = filterByYear(state.payments, 'date');
+    const invCost = new Map((state.inventory || []).map(i => [i.id, i.costPrice || 0]));
+    const totalRevenue = xTx.reduce((s, t) => s + (t.grandTotal || 0), 0);
+    const totalRefunds = xTx.filter(t => t.status === 'return').reduce((s, t) => s + Math.abs(t.grandTotal || 0), 0);
+    const totalCOGS = cogsOf(xTx, invCost);
+    const totalExpenses = xEx.reduce((s, e) => s + (e.amount || 0), 0);
+    const netProfit = totalRevenue - totalCOGS - totalExpenses;
+    const totalUtang = (state.clients || []).reduce((s, c) => s + (c.balance || 0), 0);
+    const totalPayments = xPay.reduce((s, p) => s + (p.amount || 0), 0);
+    const settingsMap = {};
+    state.settings.forEach(s => settingsMap[s.key] = s.value);
+    const shopName = settingsMap['shopName'] || 'Shop Ledger PH';
+
+    const wb = X.utils.book_new();
+    X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([
+      [shopName], ['Generated', new Date().toLocaleString()], [],
+      ['Revenue', totalRevenue], ['Refunds', -totalRefunds],
+      ['Cost of Goods', totalCOGS], ['Expenses', totalExpenses],
+      ['Net Profit', netProfit], ['Outstanding Debts', totalUtang], ['Payments Collected', totalPayments]
+    ]), 'Summary');
+
+    const sheet = (headers, rows) => X.utils.aoa_to_sheet([[shopName, ...headers], ...rows]);
+    X.utils.book_append_sheet(wb, sheet(['Invoice', 'Date', 'Client', 'Items', 'Total', 'Payment', 'Status'],
+      xTx.filter(t => t.invoiceNo).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(t => [
+        t.invoiceNo, t.date ? fmtDate(t.date) : '', t.clientName || 'Walk-in',
+        (t.items || []).map(i => `${i.description || ''} x${i.name || '1'}`).join('; '),
+        t.grandTotal, t.paymentMethod || '', t.status || ''
+      ])), 'Transactions');
+    X.utils.book_append_sheet(wb, sheet(['Name', 'Phone', 'Address', 'Balance', 'Due Date'],
+      (state.clients || []).filter(c => c.name).map(c => [c.name, c.phone || '', c.address || '', c.balance || 0, c.dueDate ? fmtDate(c.dueDate) : ''])), 'Clients');
+    X.utils.book_append_sheet(wb, sheet(['Date', 'Client', 'Amount', 'Type', 'Notes'],
+      xPay.filter(p => p.clientName).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(p => [p.date ? fmtDate(p.date) : '', p.clientName, p.amount, p.type || '', p.notes || ''])), 'Payments');
+    X.utils.book_append_sheet(wb, sheet(['Date', 'Category', 'Description', 'Amount', 'Payee'],
+      xEx.filter(e => e.description).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(e => [e.date ? fmtDate(e.date) : '', e.category || '', e.description, e.amount, e.payee || ''])), 'Expenses');
+    X.utils.book_append_sheet(wb, sheet(['Name', 'SKU', 'Category', 'Sell Price', 'Stock', 'Min Stock'],
+      (state.inventory || []).filter(i => i.name).map(i => [i.name, i.sku || '', i.category || '', i.sellPrice, i.stock || 0, i.minStock || 5])), 'Inventory');
+    X.utils.book_append_sheet(wb, sheet(['Name', 'Contact', 'Email', 'Category', 'Address'],
+      (state.suppliers || []).filter(s => s.name).map(s => [s.name, s.contact || '', s.email || '', s.category || '', s.address || ''])), 'Suppliers');
+    X.utils.book_append_sheet(wb, sheet(['PO No', 'Supplier', 'Date', 'Items', 'Total', 'Status'],
+      (state.purchaseOrders || []).filter(po => po.poNo).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(po => [po.poNo, po.supplierName || '', po.date ? fmtDate(po.date) : '', (po.items || []).map(i => `${i.name || ''} x${i.qty || 0}`).join('; '), po.total, po.status || ''])), 'Purchase Orders');
+    X.writeFile(wb, `ShopLedgerPH_Report_${today()}.xlsx`);
+    toast('Excel (.xlsx) exported');
+  } catch (e) { toast('Export error: ' + e.message, 'error'); }
+}
+
 export async function exportPDF() {
   await Promise.all([dbLoad('clients'), dbLoad('transactions'), dbLoad('payments'), dbLoad('expenses'), dbLoad('inventory'), dbLoad('suppliers'), dbLoad('purchaseOrders')]);
   const pdfTx = filterByYear(state.transactions, 'date').filter(t => t.status !== 'voided' && t.status !== 'interest');
   const pdfEx = filterByYear(state.expenses, 'date');
   const pdfPay = filterByYear(state.payments, 'date');
   const totalRevenue = pdfTx.reduce((s, t) => s + (t.grandTotal || 0), 0);
+  const totalRefunds = pdfTx.filter(t => t.status === 'return').reduce((s, t) => s + Math.abs(t.grandTotal || 0), 0);
   const invCost = new Map((state.inventory || []).map(i => [i.id, i.costPrice || 0]));
   const totalCOGS = cogsOf(pdfTx, invCost);
   const totalExpenses = pdfEx.reduce((s, e) => s + (e.amount || 0), 0);
@@ -319,6 +379,7 @@ export async function exportPDF() {
   let html = `<div class="print-summary">
     <div class="card green"><span class="lbl">Revenue</span><span class="val">${fmt(totalRevenue)}</span></div>
     <div class="card orange"><span class="lbl">Cost of Goods</span><span class="val">${fmt(totalCOGS)}</span></div>
+    <div class="card orange"><span class="lbl">Refunds</span><span class="val">${fmt(totalRefunds)}</span></div>
     <div class="card red"><span class="lbl">Expenses</span><span class="val">${fmt(totalExpenses)}</span></div>
     <div class="card ${netProfit>=0?'blue':'red'}"><span class="lbl">Net Profit</span><span class="val">${fmt(netProfit)}</span></div>
     <div class="card orange"><span class="lbl">Outstanding Debts</span><span class="val">${fmt(totalUtang)}</span></div>
@@ -548,6 +609,7 @@ Object.defineProperties(window, {
   showMonthlyOverview: { get: () => showMonthlyOverview, configurable: true },
   getAllData: { get: () => getAllData, configurable: true },
   exportExcel: { get: () => exportExcel, configurable: true },
+  exportXlsx: { get: () => exportXlsx, configurable: true },
   exportPDF: { get: () => exportPDF, configurable: true },
   backupJSON: { get: () => backupJSON, configurable: true },
   encryptedBackupFlow: { get: () => encryptedBackupFlow, configurable: true },

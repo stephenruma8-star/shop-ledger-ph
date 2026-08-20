@@ -524,6 +524,7 @@ export function viewTransactionDetail(id) {
         <button onclick="closeModal();printThermalReceipt(${t.id})" class="py-2 px-3 bg-gray-700 text-white rounded-lg hover:bg-gray-800 text-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Thermal</button>
         ${t.status !== 'voided' && t.status !== 'return' ? `<button onclick="closeModal();editTransaction(${t.id})" class="px-3 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit</button>` : ''}
         ${t.status !== 'voided' && t.status !== 'return' ? `<button onclick="closeModal();returnTransaction(${t.id})" class="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>Return</button>` : ''}
+        ${t.status !== 'voided' && t.status !== 'return' ? `<button onclick="closeModal();refundSale(${t.id})" class="px-3 py-2 bg-fuchsia-600 text-white rounded-lg hover:bg-fuchsia-700 text-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M3 1v9h9"/><path d="M3 10a9 9 0 1 1 2.68 6.32"/><line x1="9" y1="12" x2="15" y2="6"/><line x1="9" y1="12" x2="15" y2="18"/></svg>Refund</button>` : ''}
         ${t.status !== 'voided' && t.status !== 'return' ? `<button onclick="closeModal();voidTransaction(${t.id})" class="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>Void</button>` : ''}
         <button onclick="closeModal()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Close</button>
       </div>
@@ -579,15 +580,14 @@ export async function confirmReturn(id) {
     if (!item) continue;
     const qty = getQty(item.name || item.qty || '1');
     returnItems.push({ ...item, name: '-' + (item.name || qty), qty: -qty });
-    if (item.invId) await adjustStock(item.invId, item, 1);
   }
+  await doReturn(orig, returnItems);
+}
+
+export function buildReturnTxn(orig, returnItems, reason = '') {
   const retTotal = returnItems.reduce((s, i) => s + (getQty(i.name || i.qty || '1') * (i.unitCost || i.price || 0)), 0);
-  if (wasBalanceAdded(orig)) {
-    const c = await dbGet('clients', orig.clientId);
-    if (c) { c.balance = Math.max(0, (c.balance || 0) - Math.abs(retTotal)); await dbPut('clients', c); }
-  }
-  const retTxn = {
-    invoiceNo: orig.invoiceNo + '-R',
+  return {
+    invoiceNo: (orig.invoiceNo || '') + '-R',
     clientId: orig.clientId,
     clientName: orig.clientName,
     items: returnItems,
@@ -601,8 +601,22 @@ export async function confirmReturn(id) {
     createdAt: now(),
     status: 'return',
     balanceAdded: false,
-    refId: id
+    refId: orig.id,
+    reason: reason || ''
   };
+}
+
+export async function doReturn(orig, returnItems) {
+  if (!returnItems.length) { toast('Select at least one item to return', 'warning'); return; }
+  for (const item of returnItems) {
+    if (item.invId) await adjustStock(item.invId, item, 1);
+  }
+  const retTxn = buildReturnTxn(orig, returnItems);
+  const retTotal = retTxn.grandTotal || 0;
+  if (wasBalanceAdded(orig)) {
+    const c = await dbGet('clients', orig.clientId);
+    if (c) { c.balance = Math.max(0, (c.balance || 0) - Math.abs(retTotal)); await dbPut('clients', c); }
+  }
   await dbAdd('transactions', retTxn);
   [state.transactions, state.inventory] = await Promise.all([dbAll('transactions'), dbAll('inventory')]);
   if (orig.clientId) state.clients = await dbAll('clients');
@@ -611,6 +625,18 @@ export async function confirmReturn(id) {
   toast(`Return processed: ${peso(Math.abs(retTotal))}`, 'success');
   await logAudit('return', `Return on ${orig.invoiceNo} - ${peso(Math.abs(retTotal))}`);
   renderTxTable();
+}
+
+export async function refundSale(id) {
+  const orig = await dbGet('transactions', id);
+  if (!orig) { toast('Transaction not found', 'error'); return; }
+  if (orig.status === 'voided') { toast('Cannot refund a voided sale', 'warning'); return; }
+  if (orig.status === 'return') { toast('This sale already has a return', 'warning'); return; }
+  if (!await confirmModal(`Full refund of ${orig.invoiceNo} (${peso(orig.grandTotal || 0)})? Iuuli ang lahat ng items, ibabalik ang stock at iaadjust ang client balance.`)) return;
+  await doReturn(orig, (orig.items || []).map(item => {
+    const qty = getQty(item.name || item.qty || '1');
+    return { ...item, name: '-' + (item.name || qty), qty: -qty };
+  }));
 }
 
 export async function deleteClientFromSale(id) {
@@ -804,6 +830,9 @@ Object.defineProperties(window, {
   voidTransaction: { get: () => voidTransaction, configurable: true },
   returnTransaction: { get: () => returnTransaction, configurable: true },
   confirmReturn: { get: () => confirmReturn, configurable: true },
+  buildReturnTxn: { get: () => buildReturnTxn, configurable: true },
+  doReturn: { get: () => doReturn, configurable: true },
+  refundSale: { get: () => refundSale, configurable: true },
   deleteClientFromSale: { get: () => deleteClientFromSale, configurable: true },
   editTransaction: { get: () => editTransaction, configurable: true },
   printReceipt: { get: () => printReceipt, configurable: true },

@@ -27,7 +27,8 @@ await invoke('db-migrate', { dump: {
   transactions: [
     { id: 1, invoiceNo: 'INV-00001', clientName: 'Aling Nena', date: TODAY, createdAt: TODAY + 'T10:00:00.000Z', status: 'paid', paymentMethod: 'Cash', grandTotal: 100, subtotal: 100, totalInterest: 0, discount: 0, scDiscount: 0, items: [{ description: 'Coke', qty: 1, unitCost: 30, amount: 30 }] },
     { id: 2, invoiceNo: 'INV-00002', clientName: 'Walk-in', date: TODAY, createdAt: TODAY + 'T11:00:00.000Z', status: 'pending', paymentMethod: 'GCash', grandTotal: 50, subtotal: 50, totalInterest: 0, discount: 0, scDiscount: 0, items: [{ description: 'Bread', qty: 5, unitCost: 20, amount: 100 }, { description: 'Water', qty: 1, unitCost: 10, amount: 10 }] },
-    { id: 3, invoiceNo: 'INV-00003', clientName: 'X', date: '2026-01-01', createdAt: '2026-01-01T00:00:00.000Z', status: 'voided', paymentMethod: 'Cash', grandTotal: 999, subtotal: 999, totalInterest: 0, discount: 0, scDiscount: 0, items: [] }
+    { id: 3, invoiceNo: 'INV-00003', clientName: 'X', date: '2026-01-01', createdAt: '2026-01-01T00:00:00.000Z', status: 'voided', paymentMethod: 'Cash', grandTotal: 999, subtotal: 999, totalInterest: 0, discount: 0, scDiscount: 0, items: [] },
+    { id: 4, invoiceNo: 'INV-00004-R', clientName: 'Aling Nena', date: TODAY, createdAt: TODAY + 'T12:00:00.000Z', status: 'return', paymentMethod: 'Cash', grandTotal: -30, subtotal: -30, totalInterest: 0, discount: 0, scDiscount: 0, refId: 1, items: [{ description: 'Coke', qty: -1, unitCost: 30, amount: -30 }] }
   ],
   expenses: [{ id: 1, date: TODAY, category: 'Rent', description: 'rent', amount: 20, payee: 'X', createdAt: TODAY + 'T09:00:00.000Z' }],
   payments: [{ id: 1, date: TODAY, amount: 30, clientId: 1, createdAt: TODAY + 'T09:30:00.000Z' }],
@@ -70,16 +71,17 @@ const server = app.listen(0, '127.0.0.1', async () => {
 
     // transactions
     r = await json('/api/transactions');
-    ok(r.status === 200 && r.body.length === 3 && r.body[0].invoiceNo === 'INV-00001' && r.body[1].items === 2 && r.body[2].items === 0, 'GET /api/transactions sorted desc, items collapsed to count');
+    ok(r.status === 200 && r.body.length === 4 && r.body[0].invoiceNo === 'INV-00001' && r.body[1].items === 2 && r.body[2].invoiceNo === 'INV-00004-R' && r.body[2].status === 'return' && r.body[2].grandTotal === -30 && r.body[2].items === 1 && r.body[3].items === 0, 'GET /api/transactions sorted desc (stable), items collapsed to count, refund rows served');
     r = await json('/api/transactions?limit=2');
     ok(r.status === 200 && r.body.length === 2, 'GET /api/transactions respects limit cap');
 
     // stats
     r = await json('/api/stats');
     ok(r.status === 200 && r.body.clients === 2 && r.body.inventory === 2 && r.body.totalUtang === 135.5, 'GET /api/stats counts and total utang');
-    ok(r.body.todaySales === 150 && r.body.todayExpenses === 20 && r.body.todayCollected === 30 && r.body.todayProfit === 130, 'GET /api/stats today aggregates');
-    ok(r.body.monthSales === 150 && r.body.monthProfit === 130, 'GET /api/stats month aggregates');
-    ok(r.body.lowStockCount === 1 && r.body.recent.length === 2 && r.body.recent[0].invoiceNo === 'INV-00001', 'GET /api/stats low stock + recent (excludes voided)');
+    ok(r.body.todaySales === 120 && r.body.todayExpenses === 20 && r.body.todayCollected === 30 && r.body.todayProfit === 100, 'GET /api/stats today aggregates (refund nets revenue)');
+    ok(r.body.monthSales === 120 && r.body.monthProfit === 100, 'GET /api/stats month aggregates');
+    ok(r.body.todayRefunds === 30 && r.body.monthRefunds === 30, 'GET /api/stats refund totals (absolute of return rows)');
+    ok(r.body.lowStockCount === 1 && r.body.recent.length === 3 && r.body.recent[0].invoiceNo === 'INV-00001' && r.body.recent[2].invoiceNo === 'INV-00004-R', 'GET /api/stats low stock + recent (excludes voided, includes return)');
 
     // expenses
     r = await json('/api/expenses');
@@ -95,7 +97,8 @@ const server = app.listen(0, '127.0.0.1', async () => {
 
     // reports
     r = await json('/api/reports');
-    ok(r.status === 200 && r.body.today.sales === 150 && r.body.month.sales === 150 && r.body.today.profit === 130, 'GET /api/reports today/month');
+    ok(r.status === 200 && r.body.today.sales === 120 && r.body.month.sales === 120 && r.body.today.profit === 100, 'GET /api/reports today/month');
+    ok(r.body.today.refunds === 30 && r.body.month.refunds === 30 && r.body.week.every(w => typeof w.refunds === 'number'), 'GET /api/reports refund totals + week refund series');
     ok(r.body.topItems.length === 3 && r.body.topItems[0].name === 'Bread' && r.body.week.length === 7, 'GET /api/reports top items (by amount) + 7-day week');
 
     // settings

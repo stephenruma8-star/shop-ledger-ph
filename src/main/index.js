@@ -1,4 +1,4 @@
-﻿const { app, BrowserWindow, ipcMain, dialog, Menu, Tray, nativeImage, crashReporter } = require('electron');
+﻿const { app, BrowserWindow, ipcMain, dialog, Menu, Tray, nativeImage, crashReporter, shell } = require('electron');
 
 // Single-instance lock â€” must run before anything else
 const gotLock = app.requestSingleInstanceLock();
@@ -33,17 +33,20 @@ app.on('second-instance', () => { if (mainWindow) { if (mainWindow.isMinimized()
 const _log = function(m) {
   try { require('fs').appendFileSync(require('path').join(require('os').tmpdir(),'slp-crash.log'), new Date().toISOString()+' '+m+'\n'); }catch(e){}
 };
+const logger = require('./logger.js');
+try { logger.configure(app.getPath('userData')); } catch (e) {}
 const origEmit = process.emit;
 process.emit = function(ev, ...a) {
   if (ev === 'uncaughtException') {
     const msg = 'UNCAUGHT: '+(a[0]?.message||a[0])+'\n'+(a[0]?.stack||'');
     _log(msg);
+    logger.error(msg);
     try { dialog.showErrorBox('Shop Ledger PH - Error', msg); } catch(e) {}
     return true;
   }
   return origEmit.apply(this, [ev, ...a]);
 };
-process.on('unhandledRejection', function(e) { _log('UNHANDLED: '+(e?.message||e)); });
+process.on('unhandledRejection', function(e) { _log('UNHANDLED: '+(e?.message||e)); logger.error('UNHANDLED REJECTION: '+(e?.message||e)); });
 try { crashReporter.start({ submitURL: '', uploadToServer: false, ignoreSystemCrashHandler: true }); } catch(e) {}
 const path = require('path');
 const fs = require('fs');
@@ -101,6 +104,10 @@ function createWindow() {
     else { callback(false); }
   });
   mainWindow.setMenu(buildMenu());
+  mainWindow.webContents.on('console-message', (e, level, message) => {
+    if (level === 2 || level === 3) logger.warn('[renderer] ' + message);
+    else logger.info('[renderer] ' + message);
+  });
   mainWindow.on('close', (e) => {
     if (isQuitting) return;
     e.preventDefault();
@@ -262,6 +269,7 @@ function startLANServer() {
     rendererExec: (js) => mainWindow.webContents.executeJavaScript(js),
     setSetting: (key, value) => setSetting(key, value),
     backupService,
+    logger,
     notify: (info) => notifyDataChanged(info)
   }));
 
@@ -269,7 +277,9 @@ function startLANServer() {
 
   try {
     lanServer = expressApp.listen(LAN_PORT, '0.0.0.0', () => {
-      console.log(`LAN server at http://${getLocalIP()}:${LAN_PORT}`);
+      const url = `http://${getLocalIP()}:${LAN_PORT}`;
+      console.log(`LAN server at ${url}`);
+      logger.info('LAN server at ' + url);
     });
   } catch (e) { console.error('LAN server error:', e.message); }
 }
@@ -522,6 +532,27 @@ ipcMain.handle('sync-saved-sqlite-backups', async () => {
   } catch (err) { return { success: false, error: err.message }; }
 });
 
+ipcMain.handle('logs-info', async () => {
+  return logger.getLogInfo();
+});
+
+ipcMain.handle('open-logs-folder', async () => {
+  try {
+    const info = logger.getLogInfo();
+    if (!info.enabled || !info.dir) return { success: false, error: 'logger not configured' };
+    await shell.openPath(info.dir);
+    return { success: true };
+  } catch (err) { return { success: false, error: err.message }; }
+});
+
+ipcMain.on('log-renderer', (event, payload) => {
+  try {
+    const level = (payload && ['log', 'info', 'warn', 'error'].includes(payload.level)) ? payload.level : 'info';
+    const message = payload && payload.message ? String(payload.message) : '';
+    logger[level === 'log' ? 'info' : level]('[renderer-ipc] ' + message);
+  } catch (err) { logger.error('log-renderer handler error: ' + err.message); }
+});
+
 async function runPlannedJobs() {
   runCloudBackupCheck();
   try { await backupService.planLocalSnapshot(); } catch (e) { console.error('local snapshot plan failed:', e.message); }
@@ -704,7 +735,8 @@ app.whenReady().then(() => {
       }
     });
   } catch (e) { console.error('Startup error:', e); }
-}).catch(e => console.error('whenReady failed:', e));
+  logger.info('app ready - version ' + app.getVersion());
+}).catch(e => { console.error('whenReady failed:', e); logger.error('whenReady failed: ' + e.message); });
 app.on('before-quit', () => {
   isQuitting = true;
   try {
@@ -713,6 +745,7 @@ app.on('before-quit', () => {
     d.checkpoint();
   } catch (e) { console.error('quit maintenance failed:', e.message); }
   closeDb();
+  logger.info('app quitting');
 });
 app.on('window-all-closed', () => {
   if (lanServer) lanServer.close();

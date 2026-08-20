@@ -29,8 +29,11 @@ function createLanApiRouter(deps) {
     return out;
   }
 
+  const log = (...a) => { if (deps.logger && typeof deps.logger.error === 'function') deps.logger.error(...a); };
+
   function wrap(fn) {
     return (req, res) => fn(req, res).catch((err) => {
+      log('lanApi ' + req.path + ' failed: ' + (err && err.message ? err.message : err));
       res.status(err && err.status === 503 ? 503 : 500).json({ error: err.message });
     });
   }
@@ -76,12 +79,16 @@ function createLanApiRouter(deps) {
       .reduce((s, t) => s + (t.grandTotal || 0), 0);
     const monthPay = dayTotal(dump.payments || [], p => (p.date || '').startsWith(tStr.slice(0, 7)));
     const monthExp = dayTotal(dump.expenses || [], e => (e.date || '').startsWith(tStr.slice(0, 7)));
+    const refundAbs = (t) => Math.abs(t.grandTotal || 0);
+    const todayRefunds = (dump.transactions || []).filter(t => t.date === tStr && t.status === 'return').reduce((s, t) => s + refundAbs(t), 0);
+    const monthRefunds = (dump.transactions || []).filter(t => (t.date || '').startsWith(tStr.slice(0, 7)) && t.status === 'return').reduce((s, t) => s + refundAbs(t), 0);
     res.json({
       clients: (dump.clients || []).length,
       inventory: (dump.inventory || []).length,
       totalUtang, lowStockCount: lowStock.length,
       todaySales, todayExpenses: todayExpTotal, todayCollected: todayPayTotal,
       todayProfit: todaySales - todayExpTotal,
+      todayRefunds, monthRefunds,
       monthSales, monthCollected: monthPay, monthExpenses: monthExp,
       monthProfit: monthSales - monthExp,
       recent: (dump.transactions || [])
@@ -173,17 +180,21 @@ function createLanApiRouter(deps) {
       });
     });
     const week = [];
+    const refundAbs = (t) => Math.abs(t.grandTotal || 0);
+    const todayRefunds = (dump.transactions || []).filter(t => t.status === 'return' && t.date === tStr).reduce((s, t) => s + refundAbs(t), 0);
+    const monthRefunds = (dump.transactions || []).filter(t => t.status === 'return' && (t.date || '').startsWith(tStr.slice(0, 7))).reduce((s, t) => s + refundAbs(t), 0);
     for (let i = 6; i >= 0; i--) {
       const d = new Date(Date.now() - i * 86400000).toISOString().split('T')[0];
       week.push({
         date: d,
         sales: (dump.transactions || []).filter(t => active(t) && t.date === d).reduce((s, t) => s + (t.grandTotal || 0), 0),
-        expenses: dayTotal(dump.expenses || [], e => e.date === d)
+        expenses: dayTotal(dump.expenses || [], e => e.date === d),
+        refunds: (dump.transactions || []).filter(t => t.status === 'return' && t.date === d).reduce((s, t) => s + refundAbs(t), 0)
       });
     }
     res.json({
-      today: { sales: todaySales, expenses: todayExp, collected: todayPay, profit: todaySales - todayExp },
-      month: { sales: monthSales, expenses: monthExp, collected: monthPay, profit: monthSales - monthExp },
+      today: { sales: todaySales, expenses: todayExp, collected: todayPay, profit: todaySales - todayExp, refunds: todayRefunds },
+      month: { sales: monthSales, expenses: monthExp, collected: monthPay, profit: monthSales - monthExp, refunds: monthRefunds },
       topItems: Object.values(topItems).sort((a, b) => b.amount - a.amount).slice(0, 5),
       week
     });

@@ -138,6 +138,22 @@ export async function viewSettings(root) {
         </div>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
+        <h3 class="font-bold text-lg mb-4 flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Logs</h3>
+        <div class="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
+          <div class="flex items-center justify-between mb-2">
+            <div>
+              <p class="text-sm font-semibold">App logs</p>
+              <p class="text-xs text-gray-400">Rotating log file with app events, renderer errors and crashes.</p>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="openLogsFolder()" class="px-3 py-1.5 bg-gray-600 text-white rounded-lg text-sm hover:bg-gray-700"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Open Folder</button>
+              <button onclick="loadLogsInfo()" class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700">Refresh</button>
+            </div>
+          </div>
+          <div id="logs-status" class="text-xs text-gray-400">Loading…</div>
+        </div>
+      </div>
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
         <h3 class="font-bold text-lg mb-4 flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>Quick Items</h3>
         <div class="space-y-2">
           ${state.quickItems.map(q => `<div class="flex items-center gap-2 text-sm"><input class="flex-1 px-2 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800" value="${escapeHtml(q.name)}" data-qi-id="${q.id}" data-field="name" /><input class="w-24 px-2 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800" type="number" step="0.01" value="${q.price}" data-qi-id="${q.id}" data-field="price" /><button onclick="deleteQuickItem(${q.id})" class="text-red-500 text-xs"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Del</button></div>`).join('')}
@@ -188,6 +204,7 @@ export async function viewSettings(root) {
       <div class="sticky bottom-0 bg-white dark:bg-gray-800 -mx-6 px-6 py-3 border-t dark:border-gray-700"><button onclick="saveSettings()" class="w-full py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="20 6 9 17 4 12"/></svg>Save All Settings</button></div>
     </div>`;
   if (window.electronAPI?.runDbHealth) loadDbHealth();
+  if (window.electronAPI?.getLogsInfo) loadLogsInfo();
 }
 
 async function loadDbHealth() {
@@ -210,6 +227,29 @@ async function loadDbHealth() {
       ['Snapshot count', d.snapshotCount != null ? d.snapshotCount : '—']
     ].map(line).join('');
   } catch (e) { holder.textContent = 'Failed to load: ' + e.message; }
+}
+
+export async function loadLogsInfo() {
+  const holder = document.getElementById('logs-status');
+  if (!holder) return;
+  holder.textContent = 'Loading…';
+  try {
+    if (!window.electronAPI?.getLogsInfo) { holder.textContent = 'Desktop app only'; return; }
+    const info = await window.electronAPI.getLogsInfo();
+    if (!info || !info.enabled) { holder.innerHTML = 'Logging not configured yet — it activates at app startup.'; return; }
+    const line = v => `<div class="flex justify-between py-0.5"><span class="text-gray-500">${v[0]}</span><span class="font-mono">${v[1]}</span></div>`;
+    holder.innerHTML = [
+      ['File', info.file ? `<span title="${info.file}">logs\shop-ledger.log</span>` : '—'],
+      ['Size', info.size != null ? formatDbBytes(info.size) : '—'],
+      ['Errors recorded', info.errorCount != null ? info.errorCount : '—']
+    ].map(line).join('');
+  } catch (e) { holder.textContent = 'Failed to load: ' + e.message; }
+}
+
+export async function openLogsFolder() {
+  if (!window.electronAPI?.openLogsFolder) { toast('Desktop app only', 'warning'); return; }
+  const r = await window.electronAPI.openLogsFolder();
+  if (!r || !r.success) toast('Logs folder not available', 'error');
 }
 
 function formatDbBytes(n) {
@@ -554,6 +594,8 @@ Object.defineProperties(window, {
   openUserModal: { get: () => openUserModal, configurable: true },
   saveUser: { get: () => saveUser, configurable: true },
   dbMaintenance: { get: () => dbMaintenance, configurable: true },
+  loadLogsInfo: { get: () => loadLogsInfo, configurable: true },
+  openLogsFolder: { get: () => openLogsFolder, configurable: true },
   checkUpdates: { get: () => checkUpdates, configurable: true },
   rebuildApp: { get: () => rebuildApp, configurable: true }
 });

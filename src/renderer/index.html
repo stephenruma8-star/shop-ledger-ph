@@ -12,6 +12,14 @@
 <script type="module" src="assets/vendor/xlsx.js"></script>
 <script type="module" src="assets/vendor/jsbarcode.js"></script>
 <script type="module">tailwind.config={darkMode:'class',theme:{extend:{colors:{phblue:{50:'#eff6ff',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8'}}}}};</script>
+<script>
+window.addEventListener('error', function (e) {
+  try { window.electronAPI.logRenderer('error', 'unhandled: ' + (e.message || 'error') + (e.filename ? ' @ ' + e.filename + ':' + e.lineno : '')); } catch (err) {}
+});
+window.addEventListener('unhandledrejection', function (e) {
+  try { window.electronAPI.logRenderer('error', 'unhandledrejection: ' + (e.reason && e.reason.message ? e.reason.message : String(e.reason))); } catch (err) {}
+});
+</script>
 <style>
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;transition:background-color .3s,color .3s}
 .fade-in{animation:fadeIn .2s ease-out}@keyframes fadeIn{from{opacity:0}to{opacity:1}}

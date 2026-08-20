@@ -43,7 +43,7 @@ const win = new Proxy({
 globalThis.window = win;
 globalThis.self = win;
 win.Chart = class { constructor() {} destroy() {} update() {} resize() {} };
-win.XLSX = { utils: { json_to_sheet: () => ({}), aoa_to_sheet: () => ({}), book_new: () => ({}), book_append_sheet: () => {} }, writeFile: () => {} };
+win.XLSX = { utils: { json_to_sheet: () => ({}), aoa_to_sheet: () => ({}), book_new: () => ({}), book_append_sheet: () => {} }, writeFile: (wb, name) => { win.__xlsxCalls = win.__xlsxCalls || []; win.__xlsxCalls.push({ wb, name }); } };
 win.JsBarcode = () => ({ render: () => {} });
 Object.defineProperty(globalThis, 'document', { value: {
   getElementById: () => makeEl(),
@@ -110,6 +110,17 @@ try {
   win.dismissSysNotif('ready');
   if ((win.__sysNotifs || []).length !== 0) throw new Error('system notifications not fully cleared');
   console.log('BELL OK: system notifications push / dedupe / dismiss verified');
+  await win.exportXlsx();
+  const xlsxCalls = win.__xlsxCalls || [];
+  if (xlsxCalls.length !== 1 || !xlsxCalls[0].name.endsWith('.xlsx')) throw new Error('exportXlsx did not write a single .xlsx file: ' + JSON.stringify(xlsxCalls.map(c => c.name)));
+  console.log('XLSX OK: exportXlsx wrote ' + xlsxCalls[0].name);
+  const bt = win.buildReturnTxn(
+    { id: 77, invoiceNo: 'INV-00077', clientId: 3, clientName: 'Maria', paymentMethod: 'Cash' },
+    [{ description: 'Coke', name: '-2', qty: -2, unitCost: 15 }],
+    'defective'
+  );
+  if (bt.status !== 'return' || bt.invoiceNo !== 'INV-00077-R' || bt.refId !== 77 || bt.grandTotal !== -30 || bt.reason !== 'defective' || bt.subtotal !== -30) throw new Error('buildReturnTxn output wrong: ' + JSON.stringify(bt));
+  console.log('REFUND OK: buildReturnTxn → ' + bt.invoiceNo + ' total ' + bt.grandTotal);
   console.log('DEEP SMOKE OK: boot() + all views executed without errors');
   process.exit(0);
 } catch (e) {

@@ -1,5 +1,5 @@
 {
-    "version":  "3.8.0",
-    "buildDate":  "2026-08-19T00:00:00.000Z",
-    "notes":  "SQLite everywhere: the LAN/mobile API moved into its own router (src/main/lanApi.js) and every read endpoint (clients, inventory, transactions, stats, expenses, suppliers, purchase-orders, reports, settings, backups, sqlite-status) now serves straight from the SQLite store - no more renderer round-trip, and the mobile server keeps working even with the window closed. Schema changes are now versioned (schema_migrations) so future releases can ALTER safely, and the database health card shows the schema version. The Backups modal gained Import JSON: old pre-SQLite .json backups (including encrypted ones) can be imported into the live database, replacing all stores with a .prerestore safety copy kept."
+    "version":  "3.9.0",
+    "buildDate":  "2026-08-20T00:00:00.000Z",
+    "notes":  "Refunds, real .xlsx export, and app logging. Sales can now be refunded in one click from the transaction detail (full refund with stock restore and client balance adjustment, booked as a -R return invoice), and refund totals are visible everywhere: Reports stat card, Excel/PDF summaries, LAN stats and reports API (todayRefunds, monthRefunds, week refund series). Reports gained a true multi-sheet .xlsx export via the bundled SheetJS engine (falls back to the legacy .xls export if unavailable). The app now writes a rotating log at %APPDATA%\\shop-ledger-ph\\logs\\shop-ledger.log (512KB per file, 3 rollovers) capturing app lifecycle, LAN server events, uncaught exceptions, renderer console errors and unhandled rejections - with a Logs card in Settings to inspect and open the folder."
 }
