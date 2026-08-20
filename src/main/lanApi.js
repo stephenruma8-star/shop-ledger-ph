@@ -12,7 +12,10 @@ function createLanApiRouter(deps) {
 
   const active = (t) => t.status !== 'voided' && t.status !== 'interest';
   const dayTotal = (arr, f) => arr.filter(f).reduce((s, x) => s + (x.amount || x.grandTotal || 0), 0);
-  const todayStr = () => new Date().toISOString().split('T')[0];
+  // Local calendar date — matches the renderer's today() so mobile and desktop
+  // aggregates agree even between midnight and 8 AM (PH is UTC+8).
+  const localDate = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  const todayStr = () => localDate(new Date());
 
   // Rows for the named stores: straight from SQLite, or from the renderer dump as a fallback.
   async function load(...names) {
@@ -184,7 +187,7 @@ function createLanApiRouter(deps) {
     const todayRefunds = (dump.transactions || []).filter(t => t.status === 'return' && t.date === tStr).reduce((s, t) => s + refundAbs(t), 0);
     const monthRefunds = (dump.transactions || []).filter(t => t.status === 'return' && (t.date || '').startsWith(tStr.slice(0, 7))).reduce((s, t) => s + refundAbs(t), 0);
     for (let i = 6; i >= 0; i--) {
-      const d = new Date(Date.now() - i * 86400000).toISOString().split('T')[0];
+      const d = localDate(new Date(Date.now() - i * 86400000));
       week.push({
         date: d,
         sales: (dump.transactions || []).filter(t => active(t) && t.date === d).reduce((s, t) => s + (t.grandTotal || 0), 0),

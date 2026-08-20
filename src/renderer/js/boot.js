@@ -3,7 +3,7 @@ import { cfCart, cfRenderCart } from './clients.js'
 import { dbAdd, dbAll, dbPut, openDB } from './database.js'
 import { dismissSysNotif, escapeHtml, hashPassword, initConnIndicator, modal, playSound, pushSysNotif, startClock, toast } from './helpers.js'
 import { AppParticles } from './particles.js'
-import { emailBackupFlow, fileBackupFlow } from './reports.js'
+import { emailBackupFlow, fileBackupFlow, redactSettings } from './reports.js'
 import { loadAll, navigate } from './router.js'
 import { state, today } from './state.js'
 import { renderTMCart, txCart, updateTMTotals } from './transactions.js'
@@ -45,6 +45,7 @@ if (window.electronAPI) {
     const dump = {};
     stores.forEach((s, i) => {
       if (s === 'users') dump[s] = results[i].map(u => { const { password, ...rest } = u; return rest; });
+      else if (s === 'settings') dump[s] = redactSettings(results[i]);
       else dump[s] = results[i];
     });
     return dump;

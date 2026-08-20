@@ -1,5 +1,5 @@
 {
-    "version":  "3.9.0",
+    "version":  "3.9.1",
     "buildDate":  "2026-08-20T00:00:00.000Z",
-    "notes":  "Refunds, real .xlsx export, and app logging. Sales can now be refunded in one click from the transaction detail (full refund with stock restore and client balance adjustment, booked as a -R return invoice), and refund totals are visible everywhere: Reports stat card, Excel/PDF summaries, LAN stats and reports API (todayRefunds, monthRefunds, week refund series). Reports gained a true multi-sheet .xlsx export via the bundled SheetJS engine (falls back to the legacy .xls export if unavailable). The app now writes a rotating log at %APPDATA%\\shop-ledger-ph\\logs\\shop-ledger.log (512KB per file, 3 rollovers) capturing app lifecycle, LAN server events, uncaught exceptions, renderer console errors and unhandled rejections - with a Logs card in Settings to inspect and open the folder."
+    "notes":  "Hardening patch. Dates are now computed from local time instead of UTC (PH is UTC+8, so sales between midnight and 8 AM were being booked under yesterday's date - today sales, daily reports, refund totals and the LAN week series are now correct). The LAN/mobile access token is generated with crypto.randomBytes(24) instead of Math.random. Backup exports (JSON file, email, encrypted, and the LAN fallback dump) now mask secret settings - SMTP password, cloud backup password, SMS and AI API keys - instead of shipping them in plaintext; restoring such a backup only requires re-entering those values."
 }

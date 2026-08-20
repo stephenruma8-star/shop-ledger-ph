@@ -20,7 +20,10 @@ registerDbIpc({ handle: (name, fn) => handlers.set(name, fn) }, userData);
 const invoke = (name, arg) => handlers.get(name)({}, arg);
 await invoke('db-open');
 
-const TODAY = new Date().toISOString().split('T')[0];
+// Local calendar date — must match lanApi's local todayStr() exactly, even at
+// hours where UTC and PH dates differ (00:00-07:59 local).
+const _d = new Date();
+const TODAY = _d.getFullYear() + '-' + String(_d.getMonth() + 1).padStart(2, '0') + '-' + String(_d.getDate()).padStart(2, '0');
 await invoke('db-migrate', { dump: {
   clients: [{ id: 1, name: 'Aling Nena', balance: 125.5 }, { id: 2, name: 'Mang Jose', balance: 10 }],
   inventory: [{ id: 1, name: 'Coke', stock: 3, lowStock: 5, sellPrice: 30, createdAt: '2026-01-01' }, { id: 2, name: 'Bread', stock: 10, lowStock: 2, price: 25, createdAt: '2026-01-01' }],

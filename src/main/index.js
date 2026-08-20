@@ -1,4 +1,4 @@
-﻿const { app, BrowserWindow, ipcMain, dialog, Menu, Tray, nativeImage, crashReporter, shell } = require('electron');
+﻿const { app, BrowserWindow, ipcMain, dialog, Menu, Tray, nativeImage, shell } = require('electron');
 
 // Single-instance lock â€” must run before anything else
 const gotLock = app.requestSingleInstanceLock();
@@ -47,7 +47,6 @@ process.emit = function(ev, ...a) {
   return origEmit.apply(this, [ev, ...a]);
 };
 process.on('unhandledRejection', function(e) { _log('UNHANDLED: '+(e?.message||e)); logger.error('UNHANDLED REJECTION: '+(e?.message||e)); });
-try { crashReporter.start({ submitURL: '', uploadToServer: false, ignoreSystemCrashHandler: true }); } catch(e) {}
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -76,7 +75,7 @@ function readAppPrefs() {
   try { return JSON.parse(fs.readFileSync(APP_CONFIG_PATH, 'utf8')); } catch (e) { return {}; }
 }
 const _savedToken = readAppPrefs().lanToken;
-let _lanToken = _savedToken || (Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2));
+let _lanToken = _savedToken || crypto.randomBytes(24).toString('hex');
 if (!_savedToken) {
   try {
     const prefs = { ...readAppPrefs(), lanToken: _lanToken };

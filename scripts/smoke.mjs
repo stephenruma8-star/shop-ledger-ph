@@ -121,6 +121,16 @@ try {
   );
   if (bt.status !== 'return' || bt.invoiceNo !== 'INV-00077-R' || bt.refId !== 77 || bt.grandTotal !== -30 || bt.reason !== 'defective' || bt.subtotal !== -30) throw new Error('buildReturnTxn output wrong: ' + JSON.stringify(bt));
   console.log('REFUND OK: buildReturnTxn → ' + bt.invoiceNo + ' total ' + bt.grandTotal);
+  const rs = win.redactSettings([
+    { key: 'shopName', value: 'Nena Store' },
+    { key: 'cloudBackupPassword', value: 'supersecret' },
+    { key: 'smtpConfig', value: JSON.stringify({ host: 'smtp.example.com', user: 'a@b.c', pass: 'hunter2' }) }
+  ]);
+  const rsText = JSON.stringify(rs);
+  if (rsText.includes('supersecret') || rsText.includes('hunter2')) throw new Error('redactSettings leaked a secret');
+  if (rs[0].value !== 'Nena Store') throw new Error('redactSettings touched a non-secret setting');
+  if (JSON.parse(rs[2].value).pass !== '********') throw new Error('smtpConfig pass not masked');
+  console.log('REDACT OK: secrets masked in backup settings, plain settings untouched');
   console.log('DEEP SMOKE OK: boot() + all views executed without errors');
   process.exit(0);
 } catch (e) {

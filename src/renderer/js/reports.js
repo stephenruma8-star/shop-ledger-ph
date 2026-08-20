@@ -119,6 +119,25 @@ export function showMonthlyOverview() {
   });
 }
 
+export const SECRET_SETTING_KEYS = ['cloudBackupPassword', 'smsApiKey', 'aiApiKey', 'smtpConfig'];
+
+// Masks secret setting values before they leave the machine in JSON backups,
+// email backups or LAN dumps. smtpConfig keeps its shape (just the password
+// scrubbed) so consumers that parse it still work on masked copies.
+export function redactSettings(settings) {
+  return (settings || []).map(s => {
+    if (!SECRET_SETTING_KEYS.includes(s.key)) return s;
+    if (s.key === 'smtpConfig') {
+      try {
+        const parsed = JSON.parse(s.value || '{}');
+        const masked = { ...parsed, pass: '********' };
+        return { ...s, value: JSON.stringify(masked) };
+      } catch (e) { return { ...s, value: '********' }; }
+    }
+    return { ...s, value: '********' };
+  });
+}
+
 export async function getAllData() {
   const users = (await dbAll('users')).map(u => { const { password, ...rest } = u; return rest; });
   return {
@@ -129,7 +148,7 @@ export async function getAllData() {
     supplierPayments: await dbAll('supplierPayments'),
     notifications: await dbAll('notifications'),
     auditLogs: await dbAll('auditLogs'), users,
-    settings: await dbAll('settings'), exportedAt: now()
+    settings: redactSettings(await dbAll('settings')), exportedAt: now()
   };
 }
 
@@ -608,6 +627,7 @@ Object.defineProperties(window, {
   viewReports: { get: () => viewReports, configurable: true },
   showMonthlyOverview: { get: () => showMonthlyOverview, configurable: true },
   getAllData: { get: () => getAllData, configurable: true },
+  redactSettings: { get: () => redactSettings, configurable: true },
   exportExcel: { get: () => exportExcel, configurable: true },
   exportXlsx: { get: () => exportXlsx, configurable: true },
   exportPDF: { get: () => exportPDF, configurable: true },

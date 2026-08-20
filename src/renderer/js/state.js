@@ -31,7 +31,12 @@ export function fmtDateTime(d) {
   return dt.toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-export function today() { return new Date().toISOString().split('T')[0]; }
+// Local calendar date (YYYY-MM-DD). Uses the machine's local time so a sale at
+// 12:30 AM is counted on today's date, not the previous UTC day's.
+export function today() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
 
 export function now() { return new Date().toISOString(); }
 
