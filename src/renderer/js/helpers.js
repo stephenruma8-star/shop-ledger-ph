@@ -291,10 +291,10 @@ export function lookupItem(prefix, i) {
 }
 
 export function intRateOptions(selected) {
-  let opts = '<option value="0"' + (selected == 0 ? ' selected' : '') + '>0%</option>';
+  let opts = '<option value="0"' + (Number(selected) === 0 ? ' selected' : '') + '>0%</option>';
   for (let r = 0.5; r <= 20; r += 0.5) {
     const v = Math.round(r * 10) / 10;
-    opts += '<option value="' + v + '"' + (selected == v ? ' selected' : '') + '>' + v + '%</option>';
+    opts += '<option value="' + v + '"' + (Number(selected) === v ? ' selected' : '') + '>' + v + '%</option>';
   }
   return opts;
 }
@@ -528,7 +528,48 @@ export function dbLoad(store) {
   return dbAll(store).then(data => { state[store] = data; return data; });
 }
 
-export async function hashPassword(pw) { const b = new TextEncoder().encode(pw); const h = await crypto.subtle.digest('SHA-256', b); return Array.from(new Uint8Array(h)).map(b => b.toString(16).padStart(2,'0')).join(''); }
+const _pwEnc = new TextEncoder();
+const _pwB64enc = (bytes) => { let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(s); };
+const _pwB64dec = (str) => { const bin = atob(str); return Uint8Array.from(bin, c => c.charCodeAt(0)); };
+const _pwTimingSafeEq = (a, b) => {
+  if (a.length !== b.length) return false;
+  let d = 0;
+  for (let i = 0; i < a.length; i++) d |= a[i] ^ b[i];
+  return d === 0;
+};
+async function sha256Hex(pw) {
+  const h = await crypto.subtle.digest('SHA-256', _pwEnc.encode(pw));
+  return Array.from(new Uint8Array(h)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+const PBKDF2_ITER = 210000;
+// Salted PBKDF2-SHA-256 hash: "pbkdf2$<iter>$<saltB64>$<hashB64>".
+// Replaces the old unsalted SHA-256 hex (helpers.js v3.9.2); verifyPassword() still
+// accepts legacy hex and plaintext so existing users can log in and are upgraded on success.
+export async function hashPassword(pw) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const key = await crypto.subtle.importKey('raw', _pwEnc.encode(pw), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: PBKDF2_ITER, hash: 'SHA-256' }, key, 256);
+  return `pbkdf2$${PBKDF2_ITER}$${_pwB64enc(salt)}$${_pwB64enc(new Uint8Array(bits))}`;
+}
+export async function verifyPassword(pw, stored) {
+  if (!pw || !stored) return false;
+  if (typeof stored === 'string' && stored.startsWith('pbkdf2$')) {
+    const parts = stored.split('$');
+    if (parts.length !== 4) return false;
+    const iters = parseInt(parts[1], 10);
+    if (!(iters > 0)) return false;
+    let salt, want;
+    try { salt = _pwB64dec(parts[2]); want = _pwB64dec(parts[3]); } catch (e) { return false; }
+    if (want.length !== 32) return false;
+    const key = await crypto.subtle.importKey('raw', _pwEnc.encode(pw), 'PBKDF2', false, ['deriveBits']);
+    const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: iters, hash: 'SHA-256' }, key, 256);
+    return _pwTimingSafeEq(new Uint8Array(bits), want);
+  }
+  if (typeof stored === 'string' && /^[0-9a-f]{64}$/i.test(stored)) {
+    return _pwTimingSafeEq(_pwEnc.encode(await sha256Hex(pw)), _pwEnc.encode(stored.toLowerCase()));
+  }
+  return stored === pw;
+}
 export let _confirmResolve = null;
 export function confirmModal(msg, label) {
   if (_confirmResolve) { _confirmResolve(false); _confirmResolve = null; }
@@ -846,6 +887,7 @@ Object.defineProperties(window, {
   escapeHtml: { get: () => escapeHtml, configurable: true },
   dbLoad: { get: () => dbLoad, configurable: true },
   hashPassword: { get: () => hashPassword, configurable: true },
+  verifyPassword: { get: () => verifyPassword, configurable: true },
   _confirmResolve: { get: () => _confirmResolve, set: (v) => { _confirmResolve = v; }, configurable: true },
   confirmModal: { get: () => confirmModal, configurable: true },
   parseCSVLine: { get: () => parseCSVLine, configurable: true },

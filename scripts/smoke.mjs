@@ -78,6 +78,7 @@ for (const g of ['tailwind', 'Chart', 'XLSX', 'JsBarcode']) {
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 
 const bundlePath = process.argv[2] || findBundle();
 function findBundle() {
@@ -131,6 +132,19 @@ try {
   if (rs[0].value !== 'Nena Store') throw new Error('redactSettings touched a non-secret setting');
   if (JSON.parse(rs[2].value).pass !== '********') throw new Error('smtpConfig pass not masked');
   console.log('REDACT OK: secrets masked in backup settings, plain settings untouched');
+  const salted1 = await win.hashPassword('secret123');
+  const salted2 = await win.hashPassword('secret123');
+  if (!salted1.startsWith('pbkdf2$')) throw new Error('hashPassword no longer returns a salted PBKDF2 hash: ' + salted1);
+  if (salted1 === salted2) throw new Error('hashPassword salted hash must be unique per call (random salt)');
+  if (!(await win.verifyPassword('secret123', salted1))) throw new Error('verifyPassword rejects a correct PBKDF2 password');
+  if (await win.verifyPassword('wrong', salted1)) throw new Error('verifyPassword accepts a wrong PBKDF2 password');
+  const legacyHex = createHash('sha256').update('legacy').digest('hex');
+  if (!(await win.verifyPassword('legacy', legacyHex))) throw new Error('verifyPassword must still accept v3.9.2 unsalted SHA-256 hashes (migration)');
+  if (await win.verifyPassword('wrong', legacyHex)) throw new Error('verifyPassword accepts a wrong legacy password');
+  if (!(await win.verifyPassword('plainpw', 'plainpw'))) throw new Error('verifyPassword must still accept legacy plaintext passwords');
+  if (await win.verifyPassword('pl4inpw', 'plainpw')) throw new Error('verifyPassword accepts a wrong plaintext password');
+  if (await win.verifyPassword('x', 'pbkdf2$999$AAAA$AAAA')) throw new Error('verifyPassword must reject malformed pbkdf2 hashes');
+  console.log('PASSWORD OK: salted PBKDF2 hashing + legacy SHA-256/plaintext migration verified');
   console.log('DEEP SMOKE OK: boot() + all views executed without errors');
   process.exit(0);
 } catch (e) {

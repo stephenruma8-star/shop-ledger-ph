@@ -59,7 +59,7 @@ const axios = require('axios');
 const net = require('net');
 const { startWsServer } = require('./wsServer.js');
 const { createLanApiRouter } = require('./lanApi.js');
-const { registerDbIpc, closeDb, init: sqliteInit, get: dbGetRow, add: dbAddRow, put: dbPutRow, all: dbAllRows, snapshot: dbSnapshot } = require('./db.js');
+const { registerDbIpc, closeDb, init: sqliteInit, add: dbAddRow, put: dbPutRow, all: dbAllRows } = require('./db.js');
 const { encryptData, decryptData } = require('./crypto.js');
 const backupService = require('./backupService.js');
 
@@ -670,7 +670,7 @@ ipcMain.handle('print-receipt', async (event, { html, width }) => {
     });
     await printWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
     await new Promise(r => setTimeout(r, 500));
-    printWin.webContents.print({ silent: true, printBackground: true, margins: { marginType: 'none' } }, (success) => {
+    printWin.webContents.print({ silent: true, printBackground: true, margins: { marginType: 'none' } }, () => {
       printWin.close();
     });
     return { success: true };

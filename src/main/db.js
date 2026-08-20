@@ -197,7 +197,6 @@ function vacuum() {
 // reopens, and stamps meta so the renderer never re-migrates over a restored store.
 function replaceWith(filePath) {
   if (!db) return { ok: false, error: 'SQLite not initialized' };
-  let opened = false;
   try {
     const head = fs.readFileSync(filePath);
     if (head.slice(0, 16).toString('ascii') !== 'SQLite format 3\u0000') return { ok: false, error: 'Not a valid SQLite file' };
@@ -206,7 +205,6 @@ function replaceWith(filePath) {
     fs.copyFileSync(filePath, dbPath);
     for (const suffix of ['-wal', '-shm']) { try { fs.unlinkSync(dbPath + suffix); } catch (e) {} }
     db = new Database(dbPath);
-    opened = true;
     db.pragma('journal_mode = WAL');
     db.pragma('synchronous = NORMAL');
     db.pragma('busy_timeout = 5000');
@@ -220,7 +218,7 @@ function replaceWith(filePath) {
     return openInfo();
   } catch (e) {
     try { if (db) db.close(); } catch (e2) {}
-    db = null; opened = false;
+    db = null;
     return { ok: false, error: e.message };
   }
 }

@@ -155,6 +155,7 @@ try {
   const listeners = domListeners.DOMContentLoaded || [];
   for (const fn of listeners) await fn();
   await win.navigate('catalog');
+  for (let i = 0; i < 100 && (!Array.isArray(win.state.inventory) || win.state.inventory.length < 2); i++) await new Promise(r => setTimeout(r, 10));
 
   // --- single-item modal: qty/interest/SC/discount math ---
   win.openQuickSaleModal(invId1);

@@ -1,5 +1,5 @@
 import { dbAdd, dbAll, dbGet, dbPut } from './database.js'
-import { closeModal, escapeHtml, hashPassword, modal, requireFields, setFieldError, startClock, toast } from './helpers.js'
+import { closeModal, escapeHtml, hashPassword, modal, requireFields, setFieldError, startClock, toast, verifyPassword } from './helpers.js'
 import { navigate } from './router.js'
 import { now, state, today } from './state.js'
 
@@ -14,14 +14,17 @@ export async function doLogin() {
   setFieldError(pEl, p ? null : 'Please fill out this field');
   if (!u || !p) { err.classList.add('hidden'); return; }
   const users = await dbAll('users');
-  const pHash = await hashPassword(p);
-  let user = users.find(x => x.username === u && x.password === pHash);
-  if (!user) {
-    const legacy = users.find(x => x.username === u && x.password === p);
-    if (legacy) { user = legacy; user.password = pHash; await dbPut('users', user); }
-    else {
-      err.textContent = 'Invalid username or password'; err.classList.remove('hidden'); return;
+  let user = users.find(x => x.username === u);
+  if (user && await verifyPassword(p, user.password)) {
+    if (!String(user.password || '').startsWith('pbkdf2$')) {
+      user.password = await hashPassword(p);
+      await dbPut('users', user);
     }
+  } else {
+    user = null;
+  }
+  if (!user) {
+    err.textContent = 'Invalid username or password'; err.classList.remove('hidden'); return;
   }
   err.classList.add('hidden');
   setFieldError(uEl, null);
@@ -119,8 +122,7 @@ export async function doChangePassword() {
     { el: confEl, test: () => confirm === newPw, msg: 'New passwords do not match' }
   ])) return;
   err.classList.add('hidden');
-  const pHash = await hashPassword(current);
-  if (state.user.password !== pHash) { err.textContent = 'Current password is incorrect'; err.classList.remove('hidden'); return; }
+  if (!(await verifyPassword(current, state.user.password))) { err.textContent = 'Current password is incorrect'; err.classList.remove('hidden'); return; }
   const user = await dbGet('users', state.user.id);
   if (!user) { err.textContent = 'User not found'; err.classList.remove('hidden'); return; }
   user.password = await hashPassword(newPw);
