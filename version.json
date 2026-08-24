@@ -1,5 +1,5 @@
 {
-    "version":  "3.9.5",
+    "version":  "3.9.6",
     "buildDate":  "2026-08-24T00:00:00.000Z",
-    "notes":  "Fix: the Check for Updates button now surfaces network and API errors to the user instead of silently failing. Previously, if the GitHub API was unreachable or returned a non-200 status, the user saw 'Checking...' then nothing. Now the error message is displayed via toast and the update-error event."
+    "notes":  "Removed duplicate Quick Items section from Settings page — the sidebar modal is now the single place to manage quick items."
 }

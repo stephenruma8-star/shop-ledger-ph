@@ -3,7 +3,7 @@ import { closeModal, dbLoad, escapeHtml, hashPassword, modal, runCloudBackup, se
 import { state } from './state.js'
 
 export async function viewSettings(root) {
-  await Promise.all([dbLoad('settings'), dbLoad('users'), dbLoad('quickItems')]);
+  await Promise.all([dbLoad('settings'), dbLoad('users')]);
   const settingsMap = {};
   state.settings.forEach(s => settingsMap[s.key] = s.value);
   let appPrefs = {};
@@ -157,13 +157,7 @@ export async function viewSettings(root) {
           <div id="logs-status" class="text-xs text-gray-400">Loading…</div>
         </div>
       </div>
-      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
-        <h3 class="font-bold text-lg mb-4 flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>Quick Items</h3>
-        <div class="space-y-2">
-          ${state.quickItems.map(q => `<div class="flex items-center gap-2 text-sm"><input class="flex-1 px-2 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800" value="${escapeHtml(q.name)}" data-qi-id="${q.id}" data-field="name" /><input class="w-24 px-2 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800" type="number" step="0.01" value="${q.price}" data-qi-id="${q.id}" data-field="price" /><button onclick="deleteQuickItem(${q.id})" class="text-red-500 text-xs"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Del</button></div>`).join('')}
-          <div class="flex gap-2"><input id="new-qi-name" placeholder="Item name" class="flex-1 px-2 py-1.5 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-sm" onkeydown="if(event.key==='Enter')addQuickItem()" /><input id="new-qi-price" type="number" step="0.01" placeholder="Price" class="w-24 px-2 py-1.5 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-sm" onkeydown="if(event.key==='Enter')addQuickItem()" /><button onclick="addQuickItem()" class="px-3 py-1.5 bg-blue-600 text-white rounded text-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add</button></div>
-        </div>
-      </div>
+
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
         <h3 class="font-bold text-lg mb-4 flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Users</h3>
         <div class="overflow-auto mb-3">${state.users.length > 0 ? `<table class="w-full text-sm"><thead><tr class="bg-gray-50 dark:bg-gray-700"><th class="p-2 text-left">Username</th><th class="p-2 text-left">Name</th><th class="p-2 text-left">Role</th><th class="p-2 text-center">Actions</th></tr></thead>
@@ -327,34 +321,6 @@ export async function saveSettings() {
   toast('Settings saved');
 }
 
-export async function updateQuickItemField(el) {
-  const id = parseInt(el.dataset.qiId);
-  const field = el.dataset.field;
-  const val = field === 'price' ? (parseFloat(el.value) || 0) : el.value.trim();
-  const item = await dbGet('quickItems', id);
-  if (item) { item[field] = val; await dbPut('quickItems', item); }
-}
-
-export async function addQuickItem() {
-  const nmEl = document.getElementById('new-qi-name');
-  const prEl = document.getElementById('new-qi-price');
-  if (!nmEl || !prEl) { toast('Form not ready', 'warning'); return; }
-  const name = nmEl.value.trim();
-  const price = parseFloat(prEl.value) || 0;
-  if (requireFields([{ el: nmEl, msg: 'Enter item name' }])) return;
-  await dbAdd('quickItems', { name, price });
-  state.quickItems = await dbAll('quickItems');
-  nmEl.value = '';
-  prEl.value = '';
-  viewSettings(document.getElementById('view'));
-  toast('Quick item added');
-}
-
-export async function deleteQuickItem(id) {
-  await dbDel('quickItems', id);
-  state.quickItems = await dbAll('quickItems');
-  viewSettings(document.getElementById('view'));
-}
 
 export function uploadReceiptLogo(e) {
   const file = e.target.files[0];
