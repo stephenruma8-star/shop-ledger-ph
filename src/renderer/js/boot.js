@@ -374,6 +374,17 @@ export function initLoginParticles() {
   } catch (e) { console.error('Login particle error:', e); }
 }
 
+// Capture renderer errors and crashes into the main-process logs (logger.js + electron-log).
+window.addEventListener('error', (e) => {
+  const msg = 'renderer error: ' + (e && (e.message || (e.error && e.error.message))) + (e && e.filename ? ' at ' + e.filename + ':' + e.lineno : '');
+  try { window.electronAPI.logRenderer('error', msg); } catch (err) {}
+  console.error(msg);
+});
+window.addEventListener('unhandledrejection', (e) => {
+  const msg = 'renderer unhandled rejection: ' + (e && e.reason && (e.reason.message || e.reason.stack) || e && e.reason || e);
+  try { window.electronAPI.logRenderer('error', msg); } catch (err) {}
+});
+
 document.addEventListener('DOMContentLoaded', () => {
   boot();
   initLoginParticles();

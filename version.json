@@ -1,5 +1,5 @@
 {
-    "version":  "3.9.3",
+    "version":  "3.9.4",
     "buildDate":  "2026-08-20T00:00:00.000Z",
-    "notes":  "Passwords are now stored as salted PBKDF2-SHA-256 hashes (210,000 iterations, unique 16-byte salt per user) instead of a single unsalted SHA-256 digest; existing installs keep working because login verifies legacy hashes and transparently upgrades to the new format on success. The toolchain got real engineering guardrails: ESLint 10 with a flat config plus a TypeScript-typed preload/IPC bridge (tsc typechecks, the compiled bridge is byte-for-byte the same API), and a GitHub Actions CI workflow runs lint, build and the full smoke suite on every push. Money rounding to exact cents, validated JSON restore, backup retention and LAN token rotation are unchanged from 3.9.2."
+    "notes":  "Security and ops hardening: nodemailer upgraded to 9 with hardened transport (file-access and URL-access disabled on the email-backup SMTP path), Electron upgraded to 42 for Chromium security patches, and electron-log now captures main-process uncaught exceptions/rejections, renderer unhandled errors, render-process-gone and child-process-gone crashes, and preload-load errors - all written to rolling log files in userData. The build pipeline now ships a dedicated Electron-ABI prebuild script (rebuild-electron-abi.mjs) and a boot smoke test (smoke-boot.mjs) that validates the full main-process startup under the real Electron binary. A GitHub Actions CI workflow is staged locally and ready to activate when the PAT gains workflow scope."
 }

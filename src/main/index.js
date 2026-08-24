@@ -34,6 +34,13 @@ const _log = function(m) {
   try { require('fs').appendFileSync(require('path').join(require('os').tmpdir(),'slp-crash.log'), new Date().toISOString()+' '+m+'\n'); }catch(e){}
 };
 const logger = require('./logger.js');
+const electronLog = require('electron-log/main');
+try {
+  electronLog.initialize({ spyRendererConsole: false });
+  electronLog.transports.file.level = 'info';
+  electronLog.transports.console.level = false;
+  electronLog.catchErrors({ showDialog: false });
+} catch (e) { console.error('electron-log init failed:', e.message); }
 try { logger.configure(app.getPath('userData')); } catch (e) {}
 const origEmit = process.emit;
 process.emit = function(ev, ...a) {
@@ -41,12 +48,13 @@ process.emit = function(ev, ...a) {
     const msg = 'UNCAUGHT: '+(a[0]?.message||a[0])+'\n'+(a[0]?.stack||'');
     _log(msg);
     logger.error(msg);
+    try { electronLog.error(msg); } catch (e) {}
     try { dialog.showErrorBox('Shop Ledger PH - Error', msg); } catch(e) {}
     return true;
   }
   return origEmit.apply(this, [ev, ...a]);
 };
-process.on('unhandledRejection', function(e) { _log('UNHANDLED: '+(e?.message||e)); logger.error('UNHANDLED REJECTION: '+(e?.message||e)); });
+process.on('unhandledRejection', function(e) { const m = 'UNHANDLED REJECTION: '+(e?.message||e); _log(m); logger.error(m); try { electronLog.error(m); } catch (err) {} });
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -103,7 +111,9 @@ function createWindow() {
     else { callback(false); }
   });
   mainWindow.setMenu(buildMenu());
-  mainWindow.webContents.on('console-message', (e, level, message) => {
+  mainWindow.webContents.on('console-message', (event, details) => {
+    const level = typeof details === 'object' ? details.level : details;
+    const message = typeof details === 'object' ? details.message : '';
     if (level === 2 || level === 3) logger.warn('[renderer] ' + message);
     else logger.info('[renderer] ' + message);
   });
@@ -455,7 +465,8 @@ ipcMain.handle('send-email-backup', async (event, { smtp, to, data, filename }) 
   try {
     const transporter = nodemailer.createTransport({
       host: smtp.host, port: parseInt(smtp.port) || 587,
-      auth: { user: smtp.user, pass: smtp.pass }
+      auth: { user: smtp.user, pass: smtp.pass },
+      disableFileAccess: true, disableUrlAccess: true
     });
     await transporter.sendMail({
       from: `"${smtp.fromName || 'Shop Ledger PH'}" <${smtp.user}>`,
@@ -549,6 +560,7 @@ ipcMain.on('log-renderer', (event, payload) => {
     const level = (payload && ['log', 'info', 'warn', 'error'].includes(payload.level)) ? payload.level : 'info';
     const message = payload && payload.message ? String(payload.message) : '';
     logger[level === 'log' ? 'info' : level]('[renderer-ipc] ' + message);
+    electronLog[level === 'log' ? 'info' : level]('[renderer] ' + message);
   } catch (err) { logger.error('log-renderer handler error: ' + err.message); }
 });
 
@@ -766,4 +778,24 @@ app.on('window-all-closed', () => {
   if (udpBroadcast) try { udpBroadcast.close(); } catch(e) {}
   if (wsServer) try { wsServer.close(); } catch(e) {}
   if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('render-process-gone', (event, webContents, details) => {
+  const msg = 'Render process gone: ' + (details && details.reason || 'unknown') + (details && details.exitCode != null ? ' (exit ' + details.exitCode + ')' : '');
+  logger.error(msg);
+  try { electronLog.error(msg, details || {}); } catch (e) {}
+});
+
+app.on('child-process-gone', (event, details) => {
+  const msg = 'Child process gone: ' + (details && details.type || 'unknown') + ' ' + (details && details.reason || '') + (details && details.exitCode != null ? ' (exit ' + details.exitCode + ')' : '');
+  logger.error(msg);
+  try { electronLog.error(msg, details || {}); } catch (e) {}
+});
+
+app.on('web-contents-created', (event, contents) => {
+  contents.on('preload-error', (e, preloadPath, error) => {
+    const msg = 'Preload error at ' + preloadPath + ': ' + (error && error.message || error);
+    logger.error(msg);
+    try { electronLog.error(msg); } catch (err) {}
+  });
 });
