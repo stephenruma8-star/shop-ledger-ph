@@ -234,9 +234,18 @@ function checkForUpdates() {
   if (!autoUpdater || !app.isPackaged) return;
   const https = require('https');
   https.get('https://api.github.com/repos/stephenruma8-star/shop-ledger-ph/releases/latest', { headers: { 'User-Agent': 'shop-ledger-ph' } }, (res) => {
-    if (res.statusCode === 200) autoUpdater.checkForUpdates().catch(() => {});
-    else console.log('No published releases yet, skipping update check');
-  }).on('error', () => {});
+    if (res.statusCode === 200) autoUpdater.checkForUpdates().catch((err) => {
+      console.error('Auto-update check failed:', err.message);
+      mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-error', 'Update check failed: ' + err.message);
+    });
+    else {
+      console.log('GitHub returned ' + res.statusCode + ', skipping update check');
+      mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-not-available');
+    }
+  }).on('error', (err) => {
+    console.error('Update check network error:', err.message);
+    mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-error', 'Could not reach GitHub: ' + err.message);
+  });
 }
 
 function startLANServer() {
