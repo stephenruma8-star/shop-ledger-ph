@@ -846,6 +846,19 @@ export async function checkSmsReminderDue() {
 
 
 // expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
+export async function checkUpdatesFromHeader() {
+  const btn = document.getElementById('header-update-btn');
+  if (!window.electronAPI?.checkUpdate) { toast('Update check only available in the desktop app', 'warning'); return; }
+  if (btn) btn.disabled = true;
+  try {
+    const result = await window.electronAPI.checkUpdate();
+    if (!result.success) toast(result.error || 'Update check unavailable', 'warning');
+  } catch (err) {
+    toast('Update check failed: ' + err.message, 'warning');
+  }
+  if (btn) btn.disabled = false;
+}
+
 Object.defineProperties(window, {
   dp: { get: () => dp, configurable: true },
   PAGE_SIZE: { get: () => PAGE_SIZE, configurable: true },
@@ -903,5 +916,6 @@ Object.defineProperties(window, {
   sendOverdueReminders: { get: () => sendOverdueReminders, configurable: true },
   checkSmsReminderDue: { get: () => checkSmsReminderDue, configurable: true },
   runCloudBackup: { get: () => runCloudBackup, configurable: true },
-  checkCloudBackupDue: { get: () => checkCloudBackupDue, configurable: true }
+  checkCloudBackupDue: { get: () => checkCloudBackupDue, configurable: true },
+  checkUpdatesFromHeader: { get: () => checkUpdatesFromHeader, configurable: true }
 });

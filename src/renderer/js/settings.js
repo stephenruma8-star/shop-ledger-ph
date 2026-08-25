@@ -184,16 +184,11 @@ export async function viewSettings(root) {
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
         <div class="flex items-center justify-between mb-3">
-          <h3 class="font-bold text-lg">⚙️ App Version</h3>
+          <h3 class="font-bold text-lg">App Version</h3>
           <span class="text-xs text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded" id="app-version-label">v${installedVersion || settingsMap['lastBuildVersion'] || '3.4.6'}</span>
         </div>
         <p class="text-xs text-gray-400 mb-3">Built from source at <code class="text-blue-500">C:\Users\CDH\Desktop\shop-ledger-ph</code></p>
-        <button id="btn-check-update" onclick="checkUpdates()" class="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-xl hover:from-blue-700 hover:to-indigo-800 font-semibold flex items-center justify-center gap-2">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          <span id="check-update-text">Check for Updates</span>
-        </button>
-        <p id="update-status" class="text-xs text-gray-400 mt-2 text-center hidden"></p>
-        <button id="btn-rebuild" onclick="rebuildApp()" class="w-full mt-2 py-2.5 border dark:border-gray-600 rounded-xl text-sm hover:bg-gray-100 dark:hover:bg-gray-700 font-semibold flex items-center justify-center gap-2">
+        <button id="btn-rebuild" onclick="rebuildApp()" class="w-full py-2.5 border dark:border-gray-600 rounded-xl text-sm hover:bg-gray-100 dark:hover:bg-gray-700 font-semibold flex items-center justify-center gap-2">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
           <span id="rebuild-text">Rebuild Installer (from source)</span>
         </button>
@@ -486,31 +481,6 @@ export async function saveUser(id) {
   viewSettings(document.getElementById('view'));
 }
 
-export async function checkUpdates() {
-  const btn = document.getElementById('btn-check-update');
-  const text = document.getElementById('check-update-text');
-  const status = document.getElementById('update-status');
-  if (!btn || !text || !status) return;
-  if (!window.electronAPI?.checkUpdate) { status.textContent = 'Update check only available in the desktop app.'; status.className = 'text-xs text-yellow-500 mt-2 text-center'; status.classList.remove('hidden'); return; }
-  btn.disabled = true;
-  text.textContent = 'Checking...';
-  status.className = 'text-xs text-gray-400 mt-2 text-center';
-  status.textContent = 'Checking GitHub for the latest version...';
-  status.classList.remove('hidden');
-  try {
-    const result = await window.electronAPI.checkUpdate();
-    if (!result.success) {
-      status.textContent = result.error || 'Update check unavailable';
-      status.className = 'text-xs text-yellow-500 mt-2 text-center';
-      toast(result.error || 'Update check unavailable', 'warning');
-    }
-  } catch (err) {
-    status.textContent = 'Update check failed: ' + err.message;
-    status.className = 'text-xs text-red-500 mt-2 text-center';
-  }
-  text.textContent = 'Check for Updates';
-  btn.disabled = false;
-}
 
 export async function rebuildApp() {
   if (!window.electronAPI?.rebuildApp) { toast('Rebuild only available in desktop app', 'warning'); return; }
@@ -566,6 +536,5 @@ Object.defineProperties(window, {
   dbMaintenance: { get: () => dbMaintenance, configurable: true },
   loadLogsInfo: { get: () => loadLogsInfo, configurable: true },
   openLogsFolder: { get: () => openLogsFolder, configurable: true },
-  checkUpdates: { get: () => checkUpdates, configurable: true },
   rebuildApp: { get: () => rebuildApp, configurable: true }
 });

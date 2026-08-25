@@ -1,5 +1,5 @@
 {
-    "version":  "3.9.6",
-    "buildDate":  "2026-08-24T00:00:00.000Z",
-    "notes":  "Removed duplicate Quick Items section from Settings page — the sidebar modal is now the single place to manage quick items."
+    "version":  "3.9.7",
+    "buildDate":  "2026-08-25T00:00:00.000Z",
+    "notes":  "Moved Check for Updates to a small icon next to the notification bell in the header. Shows tooltip on hover. Removed the full-width button from Settings."
 }
