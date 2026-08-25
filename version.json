@@ -1,5 +1,5 @@
 {
-    "version":  "3.9.7",
+    "version":  "3.9.8",
     "buildDate":  "2026-08-25T00:00:00.000Z",
-    "notes":  "Moved Check for Updates to a small icon next to the notification bell in the header. Shows tooltip on hover. Removed the full-width button from Settings."
+    "notes":  "Changed the Check for Updates header icon to a circle with a down arrow."
 }
