@@ -1,5 +1,5 @@
 {
-    "version":  "3.9.9",
+    "version":  "3.9.10",
     "buildDate":  "2026-08-25T00:00:00.000Z",
-    "notes":  "Centered the Check for Updates tooltip on the header icon."
+    "notes":  "Changed page background from gray-50 to gray-100 for better contrast and readability."
 }
