@@ -24,7 +24,7 @@ export async function viewInventory(root) {
 
 export function renderInvTable() {
   const q = document.getElementById('invSearch')?.value || '';
-  const filtered = searchData(state.inventory, q, ['name','sku','category']);
+  const filtered = searchData(state.inventory, q, ['name','sku','category','barcode']);
   const sorted = [...filtered].sort((a, b) => a.name?.localeCompare(b.name));
   const container = document.getElementById('invTable');
   if (!container) return;
@@ -117,6 +117,7 @@ export function openInventoryModal(id) {
           <div><label class="text-xs text-gray-500 block">Name *</label><input id="if-name" value="${isEdit ? escapeHtml(i.name||'') : ''}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
           <div><label class="text-xs text-gray-500 block">SKU</label><input id="if-sku" value="${isEdit ? escapeHtml(i.sku||'') : ''}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
         </div>
+        <div><label class="text-xs text-gray-500 block">Barcode (scan or type)</label><input id="if-barcode" value="${isEdit ? escapeHtml(i.barcode||'') : ''}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 font-mono" placeholder="Scan barcode with scanner or type manually" /></div>
         <div><label class="text-xs text-gray-500 block">Category</label><input id="if-category" value="${isEdit ? escapeHtml(i.category||'') : ''}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
         <div>
           <label class="text-xs text-gray-500 block">Picture (optional)</label>
@@ -157,6 +158,7 @@ export function openInventoryModal(id) {
 export async function saveInv(id) {
   const nmEl = document.getElementById('if-name');
   const skEl = document.getElementById('if-sku');
+  const bcEl = document.getElementById('if-barcode');
   const ctEl = document.getElementById('if-category');
   const prEl = document.getElementById('if-price');
   const csEl = document.getElementById('if-cost');
@@ -167,10 +169,13 @@ export async function saveInv(id) {
   const name = nmEl.value.trim();
   if (requireFields([{ el: nmEl, msg: 'Please fill out this field' }])) return;
   const sku = skEl.value.trim();
+  const barcode = bcEl ? bcEl.value.trim() : '';
   const dupName = state.inventory.find(i => i.name.toLowerCase() === name.toLowerCase() && i.id !== id);
   if (dupName) { toast('Item with this name already exists', 'error'); return; }
   const dupSku = sku && state.inventory.find(i => i.sku && i.sku.toLowerCase() === sku.toLowerCase() && i.id !== id);
   if (dupSku) { toast('Item with this SKU already exists', 'error'); return; }
+  const dupBarcode = barcode && state.inventory.find(i => i.barcode && i.barcode === barcode && i.id !== id);
+  if (dupBarcode) { toast('Item with this barcode already exists', 'error'); return; }
   const hasVariants = document.getElementById('if-hasVariants')?.checked;
   let variants = [];
   if (hasVariants) {
@@ -184,7 +189,7 @@ export async function saveInv(id) {
   const totalStock = variants.length > 0 ? variants.reduce((s, v) => s + v.stock, 0) : (parseInt(stEl.value) || 0);
 
   const obj = {
-    name, sku,
+    name, sku, barcode,
     category: ctEl.value.trim(),
     sellPrice: parseFloat(prEl.value) || 0,
     costPrice: parseFloat(csEl.value) || 0,

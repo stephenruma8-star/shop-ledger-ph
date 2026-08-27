@@ -1,9 +1,35 @@
 export const DB_NAME = 'ShopLedgerPH';
 export const DB_VERSION = 4;
+export const SCHEMA_VERSION = 1;
 export let db = null;
 export let sqlite = null;
 
 const STORES = ['clients','transactions','payments','inventory','quickItems','settings','auditLogs','users','expenses','suppliers','purchaseOrders','supplierPayments','notifications'];
+
+const MIGRATIONS = [
+  { version: 1, name: 'initial schema', up: async (dbApi) => { /* tables created on init */ } },
+];
+
+export async function runMigrations(dbApi) {
+  let current = 0;
+  try {
+    const rows = await dbApi.all('settings');
+    const s = rows.find(r => r.key === 'schemaVersion');
+    current = s ? parseInt(s.value) || 0 : 0;
+  } catch (e) { /* first run */ }
+  for (const m of MIGRATIONS) {
+    if (m.version > current) {
+      console.log(`Migration ${m.version}: ${m.name}`);
+      await m.up(dbApi);
+      try {
+        const rows = await dbApi.all('settings');
+        const existing = rows.find(r => r.key === 'schemaVersion');
+        if (existing) { existing.value = String(m.version); await dbApi.put('settings', existing); }
+        else await dbApi.add('settings', { key: 'schemaVersion', value: String(m.version) });
+      } catch (e) { console.error('Failed to save schema version:', e); }
+    }
+  }
+}
 
 // Dump every IndexedDB store (used only for the one-time SQLite migration).
 function dumpAllStoresIDB() {
@@ -57,6 +83,7 @@ export async function openDB() {
       await window.electronAPI.db.migrate(dump);
     }
     sqlite = window.electronAPI.db;
+    await runMigrations(sqlite);
     return sqlite;
   } catch (e) {
     console.error('SQLite backend unavailable, using IndexedDB:', e);

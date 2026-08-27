@@ -60,6 +60,7 @@ export async function viewReports(root) {
         <button onclick="showMonthlyOverview()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Monthly Overview</button>
         <button onclick="exportExcel()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Export Excel</button>
         <button onclick="exportPDF()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Export PDF</button>
+        <button onclick="exportAccountingCSV()" class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export CSV</button>
         <button onclick="dailySalesReport()" class="px-4 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>Daily Report</button>
         <button onclick="backupJSON()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M21.5 17.5a5 5 0 0 0-4.7-7.5 7 7 0 0 0-13.1 2.5A5 5 0 0 0 6 21h12a4 4 0 0 0 3.5-3.5z"/></svg>Backup JSON</button>
         <button onclick="encryptedBackupFlow()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M21.5 17.5a5 5 0 0 0-4.7-7.5 7 7 0 0 0-13.1 2.5A5 5 0 0 0 6 21h12a4 4 0 0 0 3.5-3.5z"/></svg>Encrypted Backup</button>
@@ -379,6 +380,59 @@ export async function exportXlsx() {
   } catch (e) { toast('Export error: ' + e.message, 'error'); }
 }
 
+function csvEscape(v) {
+  const s = String(v == null ? '' : v);
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+
+function csvDownload(filename, headers, rows) {
+  const csv = [headers.map(csvEscape).join(','), ...rows.map(r => r.map(csvEscape).join(','))].join('\r\n');
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function exportAccountingCSV() {
+  try {
+    await Promise.all([dbLoad('transactions'), dbLoad('payments'), dbLoad('expenses'), dbLoad('inventory')]);
+    const txs = filterByYear(state.transactions, 'date').filter(t => t.status !== 'voided' && t.status !== 'interest');
+    const pays = filterByYear(state.payments, 'date');
+    const exps = filterByYear(state.expenses, 'date');
+    const settingsMap = {};
+    state.settings.forEach(s => settingsMap[s.key] = s.value);
+    const shopName = settingsMap['shopName'] || 'ShopLedgerPH';
+
+    const txRows = txs.filter(t => t.invoiceNo).sort((a, b) => new Date(a.date) - new Date(b.date)).map(t => [
+      t.date || '', 'Invoice', t.invoiceNo, t.clientName || 'Walk-in',
+      '', (t.grandTotal || 0).toFixed(2), '', t.paymentMethod || 'Cash', t.notes || ''
+    ]);
+    csvDownload(`${shopName}_Transactions_${today()}.csv`,
+      ['Date', 'Type', 'Reference', 'Payee/Client', 'Account', 'Amount', 'Category', 'Payment Method', 'Memo'],
+      txRows);
+
+    const payRows = pays.sort((a, b) => new Date(a.date) - new Date(b.date)).map(p => [
+      p.date || '', 'Payment', '', p.clientName || '',
+      'Accounts Receivable', (p.amount || 0).toFixed(2), '', p.type || '', p.notes || ''
+    ]);
+    csvDownload(`${shopName}_Payments_${today()}.csv`,
+      ['Date', 'Type', 'Reference', 'Payee/Client', 'Account', 'Amount', 'Category', 'Payment Type', 'Memo'],
+      payRows);
+
+    const expRows = exps.sort((a, b) => new Date(a.date) - new Date(b.date)).map(e => [
+      e.date || '', 'Expense', '', e.payee || '',
+      e.category || 'General', (e.amount || 0).toFixed(2), e.category || '', '', e.description || ''
+    ]);
+    csvDownload(`${shopName}_Expenses_${today()}.csv`,
+      ['Date', 'Type', 'Reference', 'Payee/Client', 'Account', 'Amount', 'Category', 'Payment Method', 'Memo'],
+      expRows);
+
+    toast('Accounting CSVs exported (3 files)');
+  } catch (e) { toast('Export error: ' + e.message, 'error'); }
+}
+
 export async function exportPDF() {
   await Promise.all([dbLoad('clients'), dbLoad('transactions'), dbLoad('payments'), dbLoad('expenses'), dbLoad('inventory'), dbLoad('suppliers'), dbLoad('purchaseOrders')]);
   const pdfTx = filterByYear(state.transactions, 'date').filter(t => t.status !== 'voided' && t.status !== 'interest');
@@ -625,6 +679,7 @@ Object.defineProperties(window, {
   exportExcel: { get: () => exportExcel, configurable: true },
   exportXlsx: { get: () => exportXlsx, configurable: true },
   exportPDF: { get: () => exportPDF, configurable: true },
+  exportAccountingCSV: { get: () => exportAccountingCSV, configurable: true },
   backupJSON: { get: () => backupJSON, configurable: true },
   encryptedBackupFlow: { get: () => encryptedBackupFlow, configurable: true },
   doEncryptedBackup: { get: () => doEncryptedBackup, configurable: true },

@@ -229,6 +229,22 @@ export async function rotateLanToken() {
   showMobileAccess();
 }
 
+export async function verifyBackups() {
+  if (!window.electronAPI?.runDbHealth) return;
+  try {
+    const h = await window.electronAPI.runDbHealth('status');
+    if (!h?.success) return;
+    const d = h.details || {};
+    if (d.snapshotCount > 0 && d.lastSnapshot) {
+      const lastDate = new Date(d.lastSnapshot);
+      const daysSince = Math.floor((Date.now() - lastDate.getTime()) / 86400000);
+      if (daysSince > 3) {
+        pushSysNotif('backup-stale', `Last backup was ${daysSince} days ago. Consider creating a new backup.`, 'backup', '💾');
+      }
+    }
+  } catch (e) { /* silent */ }
+}
+
 export async function checkForNewBuild() {
   try {
     const res = await fetch('version.json?' + Date.now());
@@ -274,6 +290,7 @@ export async function boot() {
     checkForNewBuild();
     initConnIndicator();
     if (window.electronAPI?.planCloudBackups) window.electronAPI.planCloudBackups().catch(() => {});
+    verifyBackups().catch(() => {});
   } catch (e) {
     console.error('Boot error:', e);
     const ls = document.getElementById('loading-screen');
@@ -401,6 +418,7 @@ Object.defineProperties(window, {
   rotateLanToken: { get: () => rotateLanToken, configurable: true },
   checkForNewBuild: { get: () => checkForNewBuild, configurable: true },
   showUpdateProgress: { get: () => showUpdateProgress, configurable: true },
+  verifyBackups: { get: () => verifyBackups, configurable: true },
   boot: { get: () => boot, configurable: true },
   _loginParticleRAF: { get: () => _loginParticleRAF, set: (v) => { _loginParticleRAF = v; }, configurable: true },
   initLoginParticles: { get: () => initLoginParticles, configurable: true }

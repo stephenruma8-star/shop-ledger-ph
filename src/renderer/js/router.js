@@ -4,6 +4,7 @@ import { viewDashboard } from './dashboard.js'
 import { dbAll } from './database.js'
 import { viewExpenses } from './expenses.js'
 import { applyDailyInterest, checkCloudBackupDue, checkSmsReminderDue, closeModal, focusPageSearch, populateYearSelector, saveCurrentModal, showShortcuts, toggleTheme, updateLowStockBadge, updateNotifications } from './helpers.js'
+import { viewHelp } from './help.js'
 import { viewInventory } from './inventory.js'
 import { AppParticles } from './particles.js'
 import { viewPayments } from './payments.js'
@@ -25,7 +26,7 @@ export async function navigate(route) {
     dashboard: 'Dashboard', clients: 'Clients', utang: 'Debts',
     transactions: 'Sales', catalog: 'Catalog', inventory: 'Inventory', stocktake: 'Stock Take', expenses: 'Expenses',
     suppliers: 'Suppliers', payments: 'Payments', 'purchase-orders': 'Purchase Orders',
-    reports: 'Reports', settings: 'Settings'
+    reports: 'Reports', settings: 'Settings', help: 'Help'
   };
   const pt = document.getElementById('page-title');
   if (pt) pt.textContent = titles[route] || 'Dashboard';
@@ -57,6 +58,7 @@ export async function navigate(route) {
     case 'purchase-orders': await viewPurchaseOrders(root); break;
     case 'reports': await viewReports(root); break;
     case 'settings': await viewSettings(root); break;
+    case 'help': viewHelp(root); break;
     default: root.innerHTML = '<div class="text-center py-20 text-gray-500">Page not found</div>';
   }
   if (typeof AppParticles !== 'undefined') AppParticles.switchScene(route);
