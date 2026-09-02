@@ -481,7 +481,8 @@ export function showShortcuts() {
           <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>Esc</span><span class="text-gray-500">Close modal</span></div>
           <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>Enter</span><span class="text-gray-500">Save modal form</span></div>
           <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>Ctrl+Enter</span><span class="text-gray-500">Save (from textarea)</span></div>
-          <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>Ctrl+F</span><span class="text-gray-500">Focus search</span></div>
+          <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>Ctrl+F</span><span class="text-gray-500">Focus page search</span></div>
+          <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>Ctrl+K</span><span class="text-gray-500">Global search</span></div>
           <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>Ctrl+/</span><span class="text-gray-500">Show shortcuts</span></div>
           <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>Ctrl+Shift+T</span><span class="text-gray-500">Toggle dark mode</span></div>
         </div>
@@ -869,6 +870,52 @@ export async function checkUpdatesFromHeader() {
   if (btn) btn.disabled = false;
 }
 
+export function globalSearch(query) {
+  const results = document.getElementById('global-search-results');
+  if (!results) return;
+  const q = query.trim().toLowerCase();
+  if (q.length < 2) { results.classList.add('hidden'); return; }
+  if (!window.state) return;
+  const hits = [];
+  (window.state.inventory || []).forEach(inv => {
+    const name = (inv.name || '').toLowerCase();
+    const sku = (inv.sku || '').toLowerCase();
+    if (name.includes(q) || sku.includes(q)) hits.push({ type: 'Inventory', label: inv.name, sub: `SKU: ${inv.sku || 'N/A'} — ₱${inv.price}`, route: 'inventory' });
+  });
+  (window.state.clients || []).forEach(cl => {
+    const name = (cl.name || '').toLowerCase();
+    if (name.includes(q)) hits.push({ type: 'Client', label: cl.name, sub: `Balance: ₱${cl.balance || 0}`, route: 'utang' });
+  });
+  (window.state.transactions || []).forEach(tx => {
+    const name = (tx.clientName || '').toLowerCase();
+    const items = (tx.items || []).map(i => i.name).join(', ').toLowerCase();
+    if (name.includes(q) || items.includes(q)) hits.push({ type: 'Transaction', label: `${tx.clientName || 'Walk-in'} — ₱${tx.total}`, sub: tx.date, route: 'transactions' });
+  });
+  (window.state.expenses || []).forEach(ex => {
+    const desc = (ex.description || '').toLowerCase();
+    const cat = (ex.category || '').toLowerCase();
+    if (desc.includes(q) || cat.includes(q)) hits.push({ type: 'Expense', label: ex.description, sub: `₱${ex.amount} — ${ex.category}`, route: 'expenses' });
+  });
+  (window.state.payments || []).forEach(p => {
+    const name = (p.clientName || '').toLowerCase();
+    if (name.includes(q)) hits.push({ type: 'Payment', label: `${p.clientName} — ₱${p.amount}`, sub: p.date, route: 'payments' });
+  });
+  if (hits.length === 0) {
+    results.innerHTML = '<div class="p-4 text-center text-gray-400 text-sm">No results found</div>';
+  } else {
+    results.innerHTML = hits.slice(0, 12).map(h =>
+      `<div class="px-4 py-2.5 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-0 transition-colors" onclick="navigate('${h.route}');document.getElementById('global-search-results').classList.add('hidden');document.getElementById('global-search').value='';">
+        <div class="flex items-center gap-2">
+          <span class="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300">${h.type}</span>
+          <span class="font-medium text-sm">${escapeHtml(h.label)}</span>
+        </div>
+        <p class="text-xs text-gray-400 mt-0.5 ml-16">${escapeHtml(h.sub)}</p>
+      </div>`
+    ).join('');
+  }
+  results.classList.remove('hidden');
+}
+
 Object.defineProperties(window, {
   dp: { get: () => dp, configurable: true },
   PAGE_SIZE: { get: () => PAGE_SIZE, configurable: true },
@@ -928,5 +975,6 @@ Object.defineProperties(window, {
   checkSmsReminderDue: { get: () => checkSmsReminderDue, configurable: true },
   runCloudBackup: { get: () => runCloudBackup, configurable: true },
   checkCloudBackupDue: { get: () => checkCloudBackupDue, configurable: true },
-  checkUpdatesFromHeader: { get: () => checkUpdatesFromHeader, configurable: true }
+  checkUpdatesFromHeader: { get: () => checkUpdatesFromHeader, configurable: true },
+  globalSearch: { get: () => globalSearch, configurable: true }
 });

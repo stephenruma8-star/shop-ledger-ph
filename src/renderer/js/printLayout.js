@@ -41,7 +41,20 @@ body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#1e293b;backgr
 .print-summary .card.red{background:#fef2f2;border-left:4px solid #ef4444}
 .print-summary .card.blue{background:#eff6ff;border-left:4px solid #3b82f6}
 .print-summary .card.orange{background:#fff7ed;border-left:4px solid #f97316}
-@media print{*{-webkit-print-color-adjust:exact;print-color-adjust:exact}body{background:#fff;padding:0}.print-preview{box-shadow:none;border-radius:0;padding:24px 32px;max-width:none;min-height:auto;margin:0}.print-toolbar{display:none}}`;
+.receipt{max-width:300px;margin:0 auto;font-family:'Courier New',monospace;font-size:11px;line-height:1.4;color:#000}
+.receipt .rct-header{text-align:center;border-bottom:1px dashed #000;padding-bottom:8px;margin-bottom:8px}
+.receipt .rct-header h2{font-size:14px;font-weight:700;margin-bottom:2px}
+.receipt .rct-header p{font-size:9px;color:#444}
+.receipt .rct-items{margin:8px 0}
+.receipt .rct-row{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px dotted #ddd}
+.receipt .rct-row .rct-name{flex:1}
+.receipt .rct-row .rct-qty{width:30px;text-align:center}
+.receipt .rct-row .rct-price{width:70px;text-align:right}
+.receipt .rct-totals{border-top:1px solid #000;margin-top:6px;padding-top:6px}
+.receipt .rct-totals .rct-row{border-bottom:none;font-weight:600}
+.receipt .rct-totals .rct-row.grand{font-size:13px;border-top:2px solid #000;margin-top:4px;padding-top:4px}
+.receipt .rct-footer{text-align:center;border-top:1px dashed #000;padding-top:8px;margin-top:8px;font-size:9px;color:#444}
+@media print{*{-webkit-print-color-adjust:exact;print-color-adjust:exact}body{background:#fff;padding:0}.print-preview{box-shadow:none;border-radius:0;padding:24px 32px;max-width:none;min-height:auto;margin:0}.print-toolbar{display:none}.receipt{max-width:none}}`;
 }
 
 export function printToolbar(activeSize) {
@@ -97,6 +110,37 @@ export function escHtml(s) {
   return (''+(s||'')).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
+export function thermalReceipt(tx) {
+  const m = {};
+  state.settings.forEach(s => m[s.key] = s.value);
+  const name = m['shopName'] || 'Shop Ledger PH';
+  const addr = m['shopAddress'] || '';
+  const contact = m['shopContact'] || '';
+  const hdr = m['receiptHeaderText'] || '';
+  const msg = m['receiptFooter'] || 'Thank you for your patronage!';
+  let html = `<div class="receipt"><div class="rct-header"><h2>${escHtml(name)}</h2>`;
+  if (addr) html += `<p>${escHtml(addr)}</p>`;
+  if (contact) html += `<p>${escHtml(contact)}</p>`;
+  if (hdr) html += `<p>${escHtml(hdr)}</p>`;
+  html += `<p>${fmtDateTime(tx.createdAt || tx.date)}</p></div>`;
+  html += `<div class="rct-items">`;
+  (tx.items || []).forEach(item => {
+    html += `<div class="rct-row"><span class="rct-name">${escHtml(item.name)}</span><span class="rct-qty">x${item.quantity || 1}</span><span class="rct-price">₱${(item.total || item.unitCost || 0).toFixed(2)}</span></div>`;
+  });
+  html += `</div><div class="rct-totals">`;
+  html += `<div class="rct-row"><span>Subtotal</span><span>₱${(tx.subtotal || 0).toFixed(2)}</span></div>`;
+  if (tx.discount) html += `<div class="rct-row"><span>Discount</span><span>-₱${tx.discount.toFixed(2)}</span></div>`;
+  if (tx.vat) html += `<div class="rct-row"><span>VAT</span><span>₱${tx.vat.toFixed(2)}</span></div>`;
+  html += `<div class="rct-row grand"><span>TOTAL</span><span>₱${(tx.grandTotal || tx.total || 0).toFixed(2)}</span></div>`;
+  if (tx.paymentMethod) html += `<div class="rct-row"><span>Payment</span><span>${escHtml(tx.paymentMethod)}</span></div>`;
+  if (tx.amountPaid) html += `<div class="rct-row"><span>Amount Paid</span><span>₱${tx.amountPaid.toFixed(2)}</span></div>`;
+  if (tx.change) html += `<div class="rct-row"><span>Change</span><span>₱${tx.change.toFixed(2)}</span></div>`;
+  html += `</div><div class="rct-footer"><p>${escHtml(msg)}</p>`;
+  if (tx.id) html += `<p>Ref: ${tx.id.slice(-8).toUpperCase()}</p>`;
+  html += `</div></div>`;
+  return html;
+}
+
 
 // expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
 Object.defineProperties(window, {
@@ -106,5 +150,6 @@ Object.defineProperties(window, {
   printFooter: { get: () => printFooter, configurable: true },
   printScript: { get: () => printScript, configurable: true },
   openPrintWindow: { get: () => openPrintWindow, configurable: true },
-  escHtml: { get: () => escHtml, configurable: true }
+  escHtml: { get: () => escHtml, configurable: true },
+  thermalReceipt: { get: () => thermalReceipt, configurable: true }
 });

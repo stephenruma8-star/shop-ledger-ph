@@ -306,6 +306,12 @@ export async function boot() {
 }
 
 document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey && e.key === 'k') {
+    e.preventDefault();
+    const gs = document.getElementById('global-search');
+    if (gs) { gs.focus(); gs.select(); }
+    return;
+  }
   if (e.ctrlKey && e.shiftKey && e.key === 'B') {
     const tmCart = document.getElementById('tm-cart');
     if (tmCart && tmCart.offsetParent !== null) {
@@ -329,6 +335,11 @@ document.addEventListener('click', (e) => {
   const container = document.getElementById('notif-container');
   if (panel && !panel.classList.contains('hidden') && container && !container.contains(e.target)) {
     panel.classList.add('hidden');
+  }
+  const gsResults = document.getElementById('global-search-results');
+  const gsContainer = document.getElementById('global-search-container');
+  if (gsResults && !gsResults.classList.contains('hidden') && gsContainer && !gsContainer.contains(e.target)) {
+    gsResults.classList.add('hidden');
   }
 });
 export let _loginParticleRAF = null;

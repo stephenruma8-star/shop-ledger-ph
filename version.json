@@ -1,5 +1,5 @@
 {
-    "version":  "3.10.2",
+    "version":  "3.10.3",
     "buildDate":  "2026-09-02T00:00:00.000Z",
-    "notes":  "Visual polish: modern login screen with gradient icon, consistent card hover effects, better table row hover, gradient stat cards on dashboard, friendly empty state illustrations, refined toast notifications with icons."
+    "notes":  "Global search (Ctrl+K), keyboard shortcut hints on nav buttons, batch CSV import for inventory, thermal receipt layout, and improved print styles."
 }

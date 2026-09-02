@@ -12,6 +12,7 @@ export async function viewInventory(root) {
       <div class="flex gap-2 flex-wrap items-center">
         <input id="invSearch" placeholder="Search inventory..." class="flex-1 min-w-[200px] px-4 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" oninput="debouncedRenderInvTable()" />
         <button onclick="openInventoryModal()" title="F5 / Ctrl+I" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Item</button>
+        <button onclick="importInventoryCSV()" class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Import CSV</button>
         <button onclick="showReorderSuggestions()" class="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>Reorder</button>
       </div>
       <div id="reorderSection" class="hidden"></div>
@@ -385,5 +386,62 @@ Object.defineProperties(window, {
   bulkDeleteInv: { get: () => bulkDeleteInv, configurable: true },
   bulkEditInv: { get: () => bulkEditInv, configurable: true },
   applyBulkEdit: { get: () => applyBulkEdit, configurable: true },
-  viewItemHistory: { get: () => viewItemHistory, configurable: true }
+  viewItemHistory: { get: () => viewItemHistory, configurable: true },
+  importInventoryCSV: { get: () => importInventoryCSV, configurable: true }
 });
+
+export function importInventoryCSV() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.csv,.txt';
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const text = await file.text();
+    const lines = text.split('\n').filter(l => l.trim());
+    if (lines.length < 2) { toast('CSV must have a header row and at least one item', 'error'); return; }
+    const header = lines[0].toLowerCase();
+    const hasName = header.includes('name');
+    const hasPrice = header.includes('price');
+    const hasSku = header.includes('sku');
+    const hasCategory = header.includes('category');
+    const hasBarcode = header.includes('barcode');
+    const hasStock = header.includes('stock');
+    if (!hasName) { toast('CSV must have a "name" column', 'error'); return; }
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
+    let imported = 0, skipped = 0;
+    for (let i = 1; i < lines.length; i++) {
+      const parts = lines[i].split(',').map(p => p.trim().replace(/^"|"$/g, ''));
+      const row = {};
+      headers.forEach((h, idx) => { row[h] = parts[idx] || ''; });
+      const name = row.name || '';
+      if (!name) { skipped++; continue; }
+      const existing = state.inventory.find(inv => inv.name.toLowerCase() === name.toLowerCase());
+      if (existing) { skipped++; continue; }
+      const item = {
+        id: crypto.randomUUID(),
+        name: name,
+        sku: row.sku || '',
+        barcode: row.barcode || '',
+        category: row.category || '',
+        price: parseFloat(row.price) || 0,
+        sellPrice: parseFloat(row.sellprice || row.price) || 0,
+        cost: parseFloat(row.cost) || 0,
+        stock: parseInt(row.stock) || 0,
+        minStock: parseInt(row.minstock || row.min_stock) || 5,
+        unit: row.unit || 'pcs',
+        status: 'active',
+        createdAt: now(),
+        updatedAt: now()
+      };
+      await dbAdd('inventory', item);
+      state.inventory.push(item);
+      imported++;
+    }
+    renderInvTable();
+    updateLowStockBadge();
+    logAudit('import_inventory', { file: file.name, imported, skipped });
+    toast(`Imported ${imported} items, skipped ${skipped}`, imported > 0 ? 'success' : 'warning');
+  };
+  input.click();
+}
