@@ -293,6 +293,7 @@ export async function boot() {
     await updateVersionBadge();
     checkForNewBuild();
     initConnIndicator();
+    if (typeof initRipple === 'function') initRipple();
     if (window.electronAPI?.planCloudBackups) window.electronAPI.planCloudBackups().catch(() => {});
     verifyBackups().catch(() => {});
   } catch (e) {

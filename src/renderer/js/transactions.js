@@ -100,6 +100,7 @@ export function renderTxTable() {
       <span id="tx-bulk-count" class="font-semibold">0 selected</span>
       <button onclick="bulkDeleteTx()" class="ml-auto px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete Selected</button>
     </div>${renderPagination('tx', page, totalPages)}`;
+  if (typeof staggerRows === 'function') staggerRows(container.querySelector('tbody'));
 }
 
 export function openTransactionModal() {

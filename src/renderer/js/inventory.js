@@ -39,7 +39,7 @@ export function renderInvTable() {
         <td class="p-3 font-medium">${escapeHtml(i.name)}</td><td class="p-3 text-gray-500">${escapeHtml(i.sku || '-')}</td>
         <td class="p-3">${escapeHtml(i.category || '-')}</td><td class="p-3 text-right">${peso(i.sellPrice||i.price||0)}</td>
         <td class="p-3 text-right text-gray-500">${peso(i.costPrice||0)}</td>
-        <td class="p-3 text-center"><span class="${low ? 'text-red-600 font-bold' : ''}">${i.stock || 0}</span>${low ? ' ⚠️' : ''}</td>
+        <td class="p-3 text-center"><div class="flex flex-col items-center gap-1"><span class="${low ? 'text-red-600 font-bold' : ''}">${i.stock || 0}</span><div class="progress-bar w-16 ${low ? 'progress-red' : (i.stock || 0) > (i.minStock || 5) * 2 ? 'progress-green' : 'progress-yellow'}"><div class="progress-fill" style="width:${Math.min(100, ((i.stock || 0) / Math.max(1, (i.minStock || 5) * 2)) * 100)}%"></div></div></div></td>
         <td class="p-3 text-left text-gray-500 text-xs">${escapeHtml(i.unit||'pcs')}${i.variants && i.variants.length ? `<br><span class="text-blue-500 font-medium">${i.variants.length} vars</span>` : ''}</td>
         <td class="p-3 text-center">
           <button onclick="openInventoryModal(${i.id})" class="text-blue-600 hover:text-blue-800 text-xs mr-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit</button>
@@ -52,6 +52,7 @@ export function renderInvTable() {
       <button onclick="bulkEditInv()" class="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit Selected</button>
       <button onclick="bulkDeleteInv()" class="ml-auto px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete Selected</button>
     </div>`;
+  if (typeof staggerRows === 'function') staggerRows(container.querySelector('tbody'));
 }
 export function addVariantRow() {
   const list = document.getElementById('if-variants-list');

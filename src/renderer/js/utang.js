@@ -69,6 +69,7 @@ export function renderUtangTable() {
           ${c.phone ? `<button onclick="sendSMSReminder(${c.id})" class="text-green-600 hover:text-green-800 text-xs"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>SMS</button>` : ''}
         </td></tr>`;
       }).join('')}</tbody></table>`;
+  if (typeof staggerRows === 'function') staggerRows(container.querySelector('tbody'));
 }
 
 export async function sendSMSReminder(clientId) {

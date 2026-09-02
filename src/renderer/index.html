@@ -113,6 +113,44 @@ header{padding:.5rem 1rem!important}
 @media(min-width:769px){#mobile-menu-btn{display:none!important}}
 :focus-visible{outline:2px solid #3b82f6!important;outline-offset:2px;border-radius:6px}
 button:focus:not(:focus-visible),a:focus:not(:focus-visible),input:focus:not(:focus-visible),select:focus:not(:focus-visible),textarea:focus:not(:focus-visible){outline:none}
+.page-enter{animation:pageSlideIn .3s ease-out forwards}
+.page-exit{animation:pageSlideOut .2s ease-in forwards}
+@keyframes pageSlideIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pageSlideOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-8px)}}
+.card-enter{animation:cardUp .4s ease-out both}
+.card-enter:nth-child(1){animation-delay:.05s}
+.card-enter:nth-child(2){animation-delay:.1s}
+.card-enter:nth-child(3){animation-delay:.15s}
+.card-enter:nth-child(4){animation-delay:.2s}
+.card-enter:nth-child(5){animation-delay:.25s}
+.card-enter:nth-child(6){animation-delay:.3s}
+@keyframes cardUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.ripple{position:relative;overflow:hidden}
+.ripple-effect{position:absolute;border-radius:50%;background:rgba(255,255,255,.35);transform:scale(0);animation:rippleAnim .5s ease-out forwards;pointer-events:none}
+@keyframes rippleAnim{to{transform:scale(3);opacity:0}}
+.modal-enter{animation:modalIn .25s cubic-bezier(.21,1.02,.73,1) forwards}
+.modal-exit{animation:modalOut .2s ease-in forwards}
+@keyframes modalIn{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
+@keyframes modalOut{from{opacity:1;transform:scale(1)}to{opacity:0;transform:scale(.95)}}
+.skeleton{background:linear-gradient(90deg,#e5e7eb 25%,#f3f4f6 50%,#e5e7eb 75%);background-size:200% 100%;animation:skeletonShimmer 1.5s infinite;border-radius:6px}
+.dark .skeleton{background:linear-gradient(90deg,#374151 25%,#4b5563 50%,#374151 75%);background-size:200% 100%}
+@keyframes skeletonShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.counter-enter{animation:counterPop .4s ease-out}
+@keyframes counterPop{0%{transform:scale(.8);opacity:0}60%{transform:scale(1.05)}100%{transform:scale(1);opacity:1}}
+.row-enter{animation:rowSlide .3s ease-out both}
+@keyframes rowSlide{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:translateX(0)}}
+.img-zoom{transition:transform .25s ease,box-shadow .25s ease;border-radius:8px}
+.img-zoom:hover{transform:scale(1.08);box-shadow:0 8px 25px rgba(0,0,0,.15)}
+.dark .img-zoom:hover{box-shadow:0 8px 25px rgba(0,0,0,.4)}
+.tip-fade{position:relative}
+.tip-fade::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);padding:4px 8px;background:rgba(15,23,42,.9);color:#fff;font-size:11px;border-radius:4px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .15s ease,transform .15s ease;z-index:50}
+.tip-fade:hover::after{opacity:1;transform:translateX(-50%) translateY(-2px)}
+.progress-bar{height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden}
+.dark .progress-bar{background:#374151}
+.progress-fill{height:100%;border-radius:3px;transition:width .6s cubic-bezier(.4,0,.2,1)}
+.progress-green .progress-fill{background:linear-gradient(90deg,#22c55e,#16a34a)}
+.progress-red .progress-fill{background:linear-gradient(90deg,#ef4444,#dc2626)}
+.progress-yellow .progress-fill{background:linear-gradient(90deg,#f59e0b,#d97706)}
 </style>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen">

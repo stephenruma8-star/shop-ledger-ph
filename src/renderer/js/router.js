@@ -39,9 +39,11 @@ export async function navigate(route) {
     b.classList.toggle('active', isActive);
   });
   const root = document.getElementById('view');
-  root.className = 'flex-1 overflow-auto p-6 slide-up';
+  root.className = 'flex-1 overflow-auto p-6';
+  root.style.opacity = '0';
+  root.style.transform = 'translateY(8px)';
   root.innerHTML = '<div class="flex items-center justify-center py-20"><div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div></div>';
-  await new Promise(r => setTimeout(r, 20));
+  await new Promise(r => setTimeout(r, 15));
   if (token !== _navToken) return;
   populateYearSelector();
   switch (route) {
@@ -61,6 +63,12 @@ export async function navigate(route) {
     case 'help': viewHelp(root); break;
     default: root.innerHTML = '<div class="text-center py-20 text-gray-500">Page not found</div>';
   }
+  root.style.transition = 'opacity .25s ease-out, transform .25s ease-out';
+  root.style.opacity = '1';
+  root.style.transform = 'translateY(0)';
+  root.querySelectorAll('.glass-card, .bg-white, [class*="rounded-xl"]').forEach((el, i) => {
+    if (!el.classList.contains('card-enter')) { el.classList.add('card-enter'); el.style.animationDelay = (i * 0.04) + 's'; }
+  });
   if (typeof AppParticles !== 'undefined') AppParticles.switchScene(route);
   const aside = document.querySelector('#app > aside');
   if (aside && aside.classList.contains('open')) { aside.classList.remove('open'); document.getElementById('sidebar-overlay')?.classList.remove('open'); }

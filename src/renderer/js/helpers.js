@@ -11,7 +11,7 @@ export function dp(d) { const p = (d||'').split('-'); return { y: p[0]||'', m: p
 
 export function itemThumbHtml(item, cls) {
   const size = cls || 'w-9 h-9';
-  if (item && item.image) return `<img src="${item.image}" alt="" class="${size} object-cover rounded-md shrink-0" />`;
+  if (item && item.image) return `<img src="${item.image}" alt="" class="${size} object-cover rounded-md shrink-0 img-zoom" />`;
   return `<div class="${size} rounded-md bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-base shrink-0">📦</div>`;
 }
 
@@ -424,14 +424,22 @@ export function confetti() {
 export function modal(html) {
   const root = document.getElementById('modal-root');
   if (!root) return;
-  root.innerHTML = `<div class="fixed inset-0 bg-black/50 z-[400] flex items-start justify-center pt-4 overflow-auto fade-in" onclick="if(event.target===this)closeModal()"><div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-[90vw] mx-4 mb-4 slide-in max-h-[95vh] overflow-auto glass-strong" onclick="event.stopPropagation()">${html}</div></div>`;
+  root.innerHTML = `<div class="fixed inset-0 bg-black/50 z-[400] flex items-start justify-center pt-4 overflow-auto fade-in" onclick="if(event.target===this)closeModal()"><div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-[90vw] mx-4 mb-4 modal-enter max-h-[95vh] overflow-auto glass-strong" onclick="event.stopPropagation()">${html}</div></div>`;
 }
 
 export function closeModal() {
   if (_confirmResolve) { _confirmResolve(false); _confirmResolve = null; }
   clearItemSuggestions();
   const root = document.getElementById('modal-root');
-  if (root) root.innerHTML = '';
+  if (!root) return;
+  const inner = root.querySelector('.modal-enter');
+  if (inner) {
+    inner.classList.remove('modal-enter');
+    inner.classList.add('modal-exit');
+    setTimeout(() => { root.innerHTML = ''; }, 200);
+  } else {
+    root.innerHTML = '';
+  }
 }
 
 export function toggleSidebar() {
@@ -916,6 +924,49 @@ export function globalSearch(query) {
   results.classList.remove('hidden');
 }
 
+export function createRipple(e) {
+  const el = e.currentTarget;
+  const rect = el.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const size = Math.max(rect.width, rect.height);
+  const ripple = document.createElement('span');
+  ripple.className = 'ripple-effect';
+  ripple.style.width = ripple.style.height = size + 'px';
+  ripple.style.left = (x - size / 2) + 'px';
+  ripple.style.top = (y - size / 2) + 'px';
+  el.appendChild(ripple);
+  setTimeout(() => ripple.remove(), 500);
+}
+
+export function initRipple() {
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('button, .nav-btn');
+    if (btn && !btn.classList.contains('ripple')) { btn.classList.add('ripple'); }
+    if (btn) createRipple({ currentTarget: btn, clientX: e.clientX, clientY: e.clientY });
+  });
+}
+
+export function skeletonRow(count = 3) {
+  return Array(count).fill('<div class="flex items-center gap-4 p-4"><div class="skeleton w-10 h-10 rounded-lg shrink-0"></div><div class="flex-1 space-y-2"><div class="skeleton h-4 w-3/4 rounded"></div><div class="skeleton h-3 w-1/2 rounded"></div></div></div>').join('');
+}
+
+export function animateCounter(el, target, fmt) {
+  if (!el) return;
+  el.classList.add('counter-enter');
+  animateCount(el, target, fmt);
+  setTimeout(() => el.classList.remove('counter-enter'), 500);
+}
+
+export function staggerRows(container) {
+  if (!container) return;
+  const rows = container.querySelectorAll('tr');
+  rows.forEach((row, i) => {
+    row.classList.add('row-enter');
+    row.style.animationDelay = (i * 0.03) + 's';
+  });
+}
+
 Object.defineProperties(window, {
   dp: { get: () => dp, configurable: true },
   PAGE_SIZE: { get: () => PAGE_SIZE, configurable: true },
@@ -976,5 +1027,10 @@ Object.defineProperties(window, {
   runCloudBackup: { get: () => runCloudBackup, configurable: true },
   checkCloudBackupDue: { get: () => checkCloudBackupDue, configurable: true },
   checkUpdatesFromHeader: { get: () => checkUpdatesFromHeader, configurable: true },
-  globalSearch: { get: () => globalSearch, configurable: true }
+  globalSearch: { get: () => globalSearch, configurable: true },
+  createRipple: { get: () => createRipple, configurable: true },
+  initRipple: { get: () => initRipple, configurable: true },
+  skeletonRow: { get: () => skeletonRow, configurable: true },
+  animateCounter: { get: () => animateCounter, configurable: true },
+  staggerRows: { get: () => staggerRows, configurable: true }
 });

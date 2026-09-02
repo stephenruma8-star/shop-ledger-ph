@@ -149,11 +149,19 @@ export async function viewDashboard(root) {
   if (dw.payMethod) drawPayMethodChart();
   if (dw.profitAnalytics) drawProfitChart(profitData);
   if (dw.weather) { loadWeather(); loadNextHoliday(); loadHolidaysScroll(); }
-  animateCount(root.querySelector('#dash-sales'), todaySales, peso);
-  animateCount(root.querySelector('#dash-expenses'), todayExpTotal, peso);
-  animateCount(root.querySelector('#dash-utang'), totalUtang, peso);
-  animateCount(root.querySelector('#dash-collected'), todayPayTotal, peso);
-  animateCount(root.querySelector('#dash-profit'), todayProfit, peso);
+  if (typeof animateCounter === 'function') {
+    animateCounter(root.querySelector('#dash-sales'), todaySales, peso);
+    animateCounter(root.querySelector('#dash-expenses'), todayExpTotal, peso);
+    animateCounter(root.querySelector('#dash-utang'), totalUtang, peso);
+    animateCounter(root.querySelector('#dash-collected'), todayPayTotal, peso);
+    animateCounter(root.querySelector('#dash-profit'), todayProfit, peso);
+  } else {
+    animateCount(root.querySelector('#dash-sales'), todaySales, peso);
+    animateCount(root.querySelector('#dash-expenses'), todayExpTotal, peso);
+    animateCount(root.querySelector('#dash-utang'), totalUtang, peso);
+    animateCount(root.querySelector('#dash-collected'), todayPayTotal, peso);
+    animateCount(root.querySelector('#dash-profit'), todayProfit, peso);
+  }
 }
 
 export function getDashWidgets() {

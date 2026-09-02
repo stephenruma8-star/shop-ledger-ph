@@ -1,5 +1,5 @@
 {
-    "version":  "3.10.3",
-    "buildDate":  "2026-09-02T00:00:00.000Z",
-    "notes":  "Global search (Ctrl+K), keyboard shortcut hints on nav buttons, batch CSV import for inventory, thermal receipt layout, and improved print styles."
+    "version":  "3.10.4",
+    "buildDate":  "2026-09-03T00:00:00.000Z",
+    "notes":  "10 UI/UX animations: page transitions, card entrance, button ripple, modal scale, skeleton loading, counter animation, row stagger, image zoom, tooltip fade, progress bars."
 }
