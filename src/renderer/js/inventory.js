@@ -16,7 +16,7 @@ export async function viewInventory(root) {
       </div>
       <div id="reorderSection" class="hidden"></div>
       <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden glass-card">
-        <div class="overflow-auto" id="invTable"></div>
+        <div class="overflow-auto table-scroll" id="invTable"></div>
       </div>
     </div>`;
   renderInvTable();

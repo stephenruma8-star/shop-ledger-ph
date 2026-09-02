@@ -15,7 +15,7 @@ export async function viewPayments(root) {
         <button onclick="openPaymentModal()" title="F3 / Ctrl+Shift+P" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Record Payment</button>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden glass-card">
-        <div class="overflow-auto" id="payTable"></div>
+        <div class="overflow-auto table-scroll" id="payTable"></div>
       </div>
     </div>`;
   renderPayTable();

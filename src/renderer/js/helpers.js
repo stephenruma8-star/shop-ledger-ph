@@ -441,6 +441,15 @@ export function toggleSidebar() {
   if (overlay) overlay.classList.toggle('open', isOpen);
 }
 
+export function toggleSidebarCollapse() {
+  const aside = document.getElementById('app-sidebar');
+  if (!aside) return;
+  const collapsed = aside.classList.toggle('sidebar-collapsed');
+  localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0');
+  const icon = document.getElementById('collapse-icon');
+  if (icon) icon.style.transform = collapsed ? 'rotate(180deg)' : '';
+}
+
 export function toggleTheme() {
   document.documentElement.classList.toggle('dark');
   localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
@@ -887,6 +896,7 @@ Object.defineProperties(window, {
   modal: { get: () => modal, configurable: true },
   closeModal: { get: () => closeModal, configurable: true },
   toggleSidebar: { get: () => toggleSidebar, configurable: true },
+  toggleSidebarCollapse: { get: () => toggleSidebarCollapse, configurable: true },
   toggleTheme: { get: () => toggleTheme, configurable: true },
   showShortcuts: { get: () => showShortcuts, configurable: true },
   focusPageSearch: { get: () => focusPageSearch, configurable: true },

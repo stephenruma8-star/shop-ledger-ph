@@ -282,6 +282,10 @@ export async function boot() {
       startClock();
       applyPermissions();
       maybeOnboard();
+      if (localStorage.getItem('sidebarCollapsed') === '1') {
+        const aside = document.getElementById('app-sidebar');
+        if (aside) { aside.classList.add('sidebar-collapsed'); const icon = document.getElementById('collapse-icon'); if (icon) icon.style.transform = 'rotate(180deg)'; }
+      }
     }
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') document.documentElement.classList.add('dark');

@@ -50,6 +50,18 @@ button:not(:disabled):active{transform:scale(.97)}
 .dark input:focus, .dark select:focus, .dark textarea:focus{background:rgba(30,41,59,.75)!important}
 @media print{.no-print{display:none!important}body{background:white!important}}
 .login-bg{background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 50%,#1d4ed8 100%)}
+.table-scroll{max-height:70vh;overflow:auto}
+.table-scroll thead th{position:sticky;top:0;z-index:10;background:inherit}
+.table-scroll thead tr{box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.sidebar-collapsed{width:60px!important}
+.sidebar-collapsed .nav-btn span,.sidebar-collapsed .nav-btn svg+.shrink-0+.flex-1,.sidebar-collapsed #shop-name,.sidebar-collapsed #user-info,.sidebar-collapsed #sidebar-clock,.sidebar-collapsed #sidebar-version,.sidebar-collapsed aside>.p-5 h1,.sidebar-collapsed aside>.p-5 p,.sidebar-collapsed aside>.p-3.space-y-1 span:not(.shrink-0),.sidebar-collapsed aside>.p-3.space-y-1 .flex-1{display:none!important}
+.sidebar-collapsed aside{width:60px}
+.sidebar-collapsed aside .nav-btn{justify-content:center;padding-left:0;padding-right:0}
+.sidebar-collapsed aside .nav-btn svg{margin:0}
+.sidebar-collapsed aside>div:last-child .nav-btn{justify-content:center;padding-left:0;padding-right:0}
+.sidebar-collapsed aside>div:last-child .nav-btn svg{margin:0}
+.sidebar-collapsed aside>div:last-child .nav-btn .shrink-0{margin:0}
+.sidebar-collapsed aside>div:last-child .nav-btn span.flex-1{display:none}
 .dark body{background:#0f172a}
 .dark .nav-btn.active{background:rgba(59,130,246,.15)!important;border-left:3px solid #3b82f6;border-radius:0 8px 8px 0}
 ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#475569;border-radius:3px}::-webkit-scrollbar-thumb:hover{background:#64748b}
@@ -123,7 +135,7 @@ button:focus:not(:focus-visible),a:focus:not(:focus-visible),input:focus:not(:fo
 
 <div id="app" class="flex min-h-screen hidden">
   <div id="sidebar-overlay" onclick="toggleSidebar()"></div>
-  <aside class="no-print w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col flex-shrink-0 glass-nav">
+  <aside id="app-sidebar" class="no-print w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col flex-shrink-0 glass-nav transition-all duration-200">
     <div class="p-5 border-b border-gray-200 dark:border-gray-700">
       <div class="flex items-center gap-2 mb-1"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="text-glow shrink-0"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg><h1 class="text-xl font-bold text-glow">Shop Ledger PH</h1></div>
       <p class="text-xs text-gray-500 truncate" id="shop-name">Store</p>
@@ -131,6 +143,7 @@ button:focus:not(:focus-visible),a:focus:not(:focus-visible),input:focus:not(:fo
       <p class="text-xs text-gray-400 mt-1" id="sidebar-clock"></p>
       <p class="text-xs text-gray-400/70 mt-1" id="sidebar-version"></p>
     </div>
+    <button onclick="toggleSidebarCollapse()" title="Collapse sidebar" class="absolute -right-3 top-16 z-20 w-6 h-6 bg-white dark:bg-gray-700 border dark:border-gray-600 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 shadow-sm"><svg id="collapse-icon" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
     <nav class="flex-1 p-3 space-y-0.5 overflow-auto" id="main-nav">
       <button data-route="dashboard" title="F1 / Ctrl+D" class="nav-btn w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Dashboard</button>
       <button data-route="clients" title="F4 / Ctrl+Shift+C" class="nav-btn w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Clients</button>

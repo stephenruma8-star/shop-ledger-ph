@@ -1,5 +1,5 @@
 {
-    "version":  "3.10.0",
-    "buildDate":  "2026-08-27T00:00:00.000Z",
-    "notes":  "Major feature release: automated unit tests (43 tests), in-app help page, database migration system, periodic backup verification, accounting CSV export (QuickBooks/Xero compatible), and barcode scanning support."
+    "version":  "3.10.1",
+    "buildDate":  "2026-09-02T00:00:00.000Z",
+    "notes":  "Layout improvements: sticky table headers on all data tables, quick action buttons on dashboard (New Sale, Add Client, Record Expense), and collapsible sidebar (icon-only mode with toggle button)."
 }
