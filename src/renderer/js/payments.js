@@ -33,7 +33,7 @@ export function renderPayTable() {
   const { items, page, totalPages } = paginate(sorted, 'pay');
   const container = document.getElementById('payTable');
   if (!container) return;
-  if (sorted.length === 0) { container.innerHTML = '<div class="p-6 text-center text-gray-400">No payments recorded</div>'; return; }
+  if (sorted.length === 0) { container.innerHTML = '<div class="empty-state"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg><p class="font-medium text-gray-500">No payments recorded</p><p class="text-sm mt-1">Payments will appear here once recorded</p></div>'; return; }
   container.innerHTML = `<div class="p-3 bg-gray-50 dark:bg-gray-700 text-sm font-medium flex justify-between"><span>Total Payments: ${sorted.length} entries</span><span class="text-green-600 font-bold">${peso(total)}</span></div>
     <table class="w-full text-sm"><thead><tr class="bg-gray-50 dark:bg-gray-700 text-left"><th class="p-3">Date</th><th class="p-3">Client</th><th class="p-3">Type</th><th class="p-3 text-right">Amount</th><th class="p-3">Notes</th><th class="p-3 text-center">Actions</th></tr></thead>
     <tbody>${items.map(p => `<tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">

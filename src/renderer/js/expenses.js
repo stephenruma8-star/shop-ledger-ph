@@ -33,7 +33,7 @@ export function renderExpTable() {
   const { items, page, totalPages } = paginate(sorted, 'exp');
   const container = document.getElementById('expTable');
   if (!container) return;
-  if (sorted.length === 0) { container.innerHTML = '<div class="p-6 text-center text-gray-400">No expenses recorded</div>'; return; }
+  if (sorted.length === 0) { container.innerHTML = '<div class="empty-state"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><p class="font-medium text-gray-500">No expenses recorded</p><p class="text-sm mt-1">Track your business expenses here</p></div>'; return; }
   container.innerHTML = `<div class="p-3 bg-gray-50 dark:bg-gray-700 text-sm font-medium flex justify-between"><span>Total Expenses: ${sorted.length} entries</span><span class="text-red-600 font-bold">${peso(total)}</span></div>
     <table class="w-full text-sm"><thead><tr class="bg-gray-50 dark:bg-gray-700 text-left"><th class="p-3">Date</th><th class="p-3">Category</th><th class="p-3">Description</th><th class="p-3">Payee</th><th class="p-3 text-right">Amount</th><th class="p-3 text-center">Actions</th></tr></thead>
     <tbody>${items.map(e => `<tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">

@@ -78,7 +78,7 @@ export function renderTxTable() {
   const { items, page, totalPages } = paginate(sorted, 'tx');
   const container = document.getElementById('txTable');
   if (!container) return;
-  if (sorted.length === 0) { container.innerHTML = '<div class="p-6 text-center text-gray-400">No transactions yet</div>'; return; }
+  if (sorted.length === 0) { container.innerHTML = '<div class="empty-state"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><p class="font-medium text-gray-500">No transactions yet</p><p class="text-sm mt-1">Record your first sale to get started</p></div>'; return; }
   container.innerHTML = `<table class="w-full text-sm"><thead><tr class="bg-gray-50 dark:bg-gray-700 text-left"><th class="p-3 w-10"><input type="checkbox" onchange="document.querySelectorAll('.tx-check').forEach(c=>c.checked=this.checked);toggleTxBulkBar()" /></th><th class="p-3">Invoice</th><th class="p-3">Date</th><th class="p-3">Client</th><th class="p-3">Items</th><th class="p-3 text-right">Total</th><th class="p-3">Method</th><th class="p-3">Status</th><th class="p-3 text-center">Actions</th></tr></thead>
     <tbody>${items.map(t => {
       const isVoided = t.status === 'voided';

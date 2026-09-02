@@ -35,21 +35,21 @@ export async function viewDashboard(root) {
         </div>
       </div>
       ${dw.summaryCards ? `<div class="grid grid-cols-4 gap-2">
-        <div class="bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm border-l-4 border-green-500">
+        <div class="stat-gradient-green rounded-lg p-3 shadow-sm border-l-4 border-green-500">
           <p class="text-xs text-gray-500">Today Sales</p>
           <p class="text-lg font-bold text-green-600" id="dash-sales"></p>
           <p class="text-xs text-gray-400">${todayTx.length} txns</p>
         </div>
-        <div class="bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm border-l-4 border-red-500">
+        <div class="stat-gradient-red rounded-lg p-3 shadow-sm border-l-4 border-red-500">
           <p class="text-xs text-gray-500">Today Expenses</p>
           <p class="text-lg font-bold text-red-600" id="dash-expenses"></p>
         </div>
-        <div class="bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm border-l-4 border-orange-500">
+        <div class="stat-gradient-orange rounded-lg p-3 shadow-sm border-l-4 border-orange-500">
           <p class="text-xs text-gray-500">Total Debts</p>
           <p class="text-lg font-bold text-orange-600" id="dash-utang"></p>
           <p class="text-xs text-gray-400">${state.clients.filter(c => (c.balance||0) > 0).length} clients</p>
         </div>
-        <div class="bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm border-l-4 border-blue-500">
+        <div class="stat-gradient-blue rounded-lg p-3 shadow-sm border-l-4 border-blue-500">
           <p class="text-xs text-gray-500">Today Collected</p>
           <p class="text-lg font-bold text-blue-600" id="dash-collected"></p>
         </div>

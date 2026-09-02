@@ -1,5 +1,5 @@
 {
-    "version":  "3.10.1",
+    "version":  "3.10.2",
     "buildDate":  "2026-09-02T00:00:00.000Z",
-    "notes":  "Layout improvements: sticky table headers on all data tables, quick action buttons on dashboard (New Sale, Add Client, Record Expense), and collapsible sidebar (icon-only mode with toggle button)."
+    "notes":  "Visual polish: modern login screen with gradient icon, consistent card hover effects, better table row hover, gradient stat cards on dashboard, friendly empty state illustrations, refined toast notifications with icons."
 }

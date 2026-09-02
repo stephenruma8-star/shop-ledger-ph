@@ -51,7 +51,7 @@ export function renderUtangTable() {
   const container = document.getElementById('utangTable');
   if (!container) return;
   if (filtered.length === 0) {
-    container.innerHTML = '<div class="p-6 text-center text-gray-400">No debtors found</div>'; return;
+    container.innerHTML = '<div class="empty-state"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><p class="font-medium text-gray-500">No debtors found</p><p class="text-sm mt-1">Clients with outstanding balances will appear here</p></div>'; return;
   }
   const settings = state.settings.find(x => x.key === 'smsApiKey');
   const smsApiKey = settings ? settings.value : '';
