@@ -41,6 +41,7 @@ export function renderPagedTable(key) {
   if (key === 'tx') renderTxTable();
   else if (key === 'exp') renderExpTable();
   else if (key === 'pay') renderPayTable();
+  else if (key === 'log' && typeof window.viewAuditLog === 'function') window.viewAuditLog();
 }
 
 export function showItemSuggestions(input, prefix, i) {

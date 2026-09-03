@@ -1,5 +1,5 @@
 {
-    "version":  "3.10.5",
+    "version":  "3.10.6",
     "buildDate":  "2026-09-03T00:00:00.000Z",
-    "notes":  "Enhanced catalog zoom: images scale 110%, emoji scales 125%, cards lift with shadow on hover, detail modal image zoom."
+    "notes":  "Fixed audit log pagination: Next/Prev buttons now work correctly."
 }
