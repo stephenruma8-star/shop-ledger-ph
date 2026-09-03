@@ -74,9 +74,9 @@ export function renderCatalog() {
       : stock <= (inv.lowStock ?? inv.minStock ?? 5)
         ? '<span class="text-amber-600 font-semibold">Low stock: ' + stock + ' left</span>'
         : '<span class="text-gray-500">Stock: <span class="font-semibold text-green-600">' + stock + '</span></span>';
-    return `<button onclick="openQuickSaleModal(${inv.id})" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden text-left card-hover hover:ring-2 hover:ring-blue-500/50 group">
-      <div class="h-28 bg-gray-100 dark:bg-gray-700 flex items-center justify-center overflow-hidden">
-        ${inv.image ? `<img src="${inv.image}" alt="${escapeHtml(inv.name)}" class="w-full h-full object-cover group-hover:scale-105 transition-transform" />` : '<span class="text-4xl">📦</span>'}
+    return `<button onclick="openQuickSaleModal(${inv.id})" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden text-left transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/10 hover:-translate-y-1 hover:ring-2 hover:ring-blue-500/50 group">
+      <div class="h-28 bg-gray-100 dark:bg-gray-700 flex items-center justify-center overflow-hidden relative">
+        ${inv.image ? `<img src="${inv.image}" alt="${escapeHtml(inv.name)}" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" />` : '<span class="text-4xl transition-transform duration-300 group-hover:scale-125">📦</span>'}
       </div>
       <div class="p-2.5">
         <div class="font-medium text-sm truncate" title="${escapeHtml(inv.name)}">${escapeHtml(inv.name)}</div>
@@ -100,7 +100,7 @@ export function openQuickSaleModal(id) {
     <div class="p-6">
       <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">Quick Sale</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
       <div class="flex gap-4">
-        <div class="w-28 h-28 shrink-0 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-700 flex items-center justify-center border dark:border-gray-700">
+        <div class="w-28 h-28 shrink-0 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-700 flex items-center justify-center border dark:border-gray-700 img-zoom cursor-zoom-in">
           ${inv.image ? `<img src="${inv.image}" alt="" class="w-full h-full object-cover" />` : '<span class="text-5xl">📦</span>'}
         </div>
         <div class="flex-1 space-y-1 min-w-0">
