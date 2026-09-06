@@ -1,6 +1,6 @@
 import { logAudit } from './auth.js'
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
-import { closeModal, confirmModal, dbLoad, debounce, escapeHtml, modal, searchData, toast } from './helpers.js'
+import { closeModal, confirmModal, dbLoad, debounce, escapeHtml, modal, requireFields, searchData, toast } from './helpers.js'
 import { now, peso, state, today } from './state.js'
 
 export async function viewSuppliers(root) {

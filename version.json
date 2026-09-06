@@ -1,5 +1,5 @@
 {
-    "version":  "3.10.6",
+    "version":  "3.10.7",
     "buildDate":  "2026-09-03T00:00:00.000Z",
-    "notes":  "Fixed audit log pagination: Next/Prev buttons now work correctly."
+    "notes":  "Bug fixes: missing imports (cfCart, requireFields), CSV import ID fix, audit log details fix, interest rollback fix, variable shadowing fix, mousemove listener leak fix."
 }

@@ -277,6 +277,7 @@ export async function boot() {
     if (savedUser) {
       try { state.user = JSON.parse(savedUser); } catch (e) { sessionStorage.removeItem('shopUser'); }
       document.getElementById('login-screen').classList.add('hidden');
+      if (window.__app._loginMousemove) { document.removeEventListener('mousemove', window.__app._loginMousemove); window.__app._loginMousemove = null; }
       document.getElementById('app').classList.remove('hidden');
       document.getElementById('user-info').textContent = `${state.user.name} (${state.user.role})`;
       startClock();
@@ -359,7 +360,9 @@ export function initLoginParticles() {
     const pts = [];
     let mx = W / 2, my = H / 2;
     for (let i = 0; i < 60; i++) pts.push({ x: Math.random() * W, y: Math.random() * H, vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3 });
-    document.addEventListener('mousemove', (e) => { mx = e.clientX; my = e.clientY; });
+    const mousemoveHandler = (e) => { mx = e.clientX; my = e.clientY; };
+    document.addEventListener('mousemove', mousemoveHandler);
+    window.__app._loginMousemove = mousemoveHandler;
     function frame() {
       const visible = !document.getElementById('login-screen').classList.contains('hidden');
       if (visible) {

@@ -1,6 +1,6 @@
 import { logAudit } from './auth.js'
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
-import { closeModal, confirmModal, dbLoad, debounce, escapeHtml, filterByYear, modal, paginate, renderPagination, searchData, toast } from './helpers.js'
+import { closeModal, confirmModal, dbLoad, debounce, escapeHtml, filterByYear, modal, paginate, renderPagination, requireFields, searchData, toast } from './helpers.js'
 import { fmtDate, now, peso, round2, state, today } from './state.js'
 
 export async function viewExpenses(root) {

@@ -420,7 +420,6 @@ export function importInventoryCSV() {
       const existing = state.inventory.find(inv => inv.name.toLowerCase() === name.toLowerCase());
       if (existing) { skipped++; continue; }
       const item = {
-        id: crypto.randomUUID(),
         name: name,
         sku: row.sku || '',
         barcode: row.barcode || '',
@@ -435,13 +434,14 @@ export function importInventoryCSV() {
         createdAt: now(),
         updatedAt: now()
       };
-      await dbAdd('inventory', item);
+      const newId = await dbAdd('inventory', item);
+      item.id = newId;
       state.inventory.push(item);
       imported++;
     }
     renderInvTable();
     updateLowStockBadge();
-    logAudit('import_inventory', { file: file.name, imported, skipped });
+    logAudit('import_inventory', `Imported ${file.name}: ${imported} items added, ${skipped} skipped`);
     toast(`Imported ${imported} items, skipped ${skipped}`, imported > 0 ? 'success' : 'warning');
   };
   input.click();

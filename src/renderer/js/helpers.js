@@ -1,5 +1,5 @@
 import { logAudit } from './auth.js'
-import { cfUpdateRowAmt, cfUpdateTotals } from './clients.js'
+import { cfCart, cfUpdateRowAmt, cfUpdateTotals } from './clients.js'
 import { dbAdd, dbAll, dbDel, dbPut } from './database.js'
 import { renderExpTable } from './expenses.js'
 import { renderPayTable } from './payments.js'
@@ -131,13 +131,13 @@ export function startClock() {
   function tick() {
     const el = document.getElementById('sidebar-clock');
     if (!el) return;
-    const now = new Date();
+    const currentDate = new Date();
     const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const h = String(now.getHours()).padStart(2,'0');
-    const m = String(now.getMinutes()).padStart(2,'0');
-    const s = String(now.getSeconds()).padStart(2,'0');
-    el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>${days[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()} <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mx-1 -mt-0.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${h}:${m}:${s}`;
+    const h = String(currentDate.getHours()).padStart(2,'0');
+    const m = String(currentDate.getMinutes()).padStart(2,'0');
+    const s = String(currentDate.getSeconds()).padStart(2,'0');
+    el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>${days[currentDate.getDay()]}, ${months[currentDate.getMonth()]} ${currentDate.getDate()}, ${currentDate.getFullYear()} <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mx-1 -mt-0.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${h}:${m}:${s}`;
   }
   tick();
   setInterval(tick, 1000);
@@ -734,10 +734,11 @@ export async function applyDailyInterest() {
     } catch (e) {
       for (const snap of snapshots) {
         const orig = state.clients.find(x => x.id === snap.id);
-        if (orig) orig.balance = snap.balance;
+        if (orig) { orig.balance = snap.balance; await dbPut('clients', orig).catch(() => {}); }
       }
       for (const rid of ledgerRows) await dbDel('transactions', rid).catch(() => {});
       state.clients = await dbAll('clients');
+      state.transactions = await dbAll('transactions');
       toast('Interest application failed — balances rolled back', 'error');
       return;
     }
