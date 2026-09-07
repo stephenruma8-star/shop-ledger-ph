@@ -1108,3 +1108,9 @@ Object.defineProperties(window, {
   staggerRows: { get: () => staggerRows, configurable: true },
   formatVATBreakdown: { get: () => formatVATBreakdown, configurable: true }
 });
+
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey) { e.preventDefault(); redo(); }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redo(); }
+});

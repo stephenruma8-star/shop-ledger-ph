@@ -1,6 +1,6 @@
 import { logAudit } from './auth.js'
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
-import { closeModal, confirmModal, dbLoad, debounce, escapeHtml, filterByYear, modal, paginate, renderPagination, requireFields, searchData, toast } from './helpers.js'
+import { closeModal, confirmModal, dbLoad, debounce, escapeHtml, filterByYear, modal, paginate, pushUndo, renderPagination, requireFields, searchData, toast } from './helpers.js'
 import { fmtDate, now, peso, round2, state, today } from './state.js'
 
 export async function viewExpenses(root) {
@@ -94,6 +94,13 @@ export async function saveExpense(id) {
 
 export async function deleteExpense(id) {
   if (!await confirmModal('Delete this expense?')) return;
+  const exp = state.expenses.find(x => x.id === id);
+  if (!exp) return;
+  pushUndo({
+    description: `Delete expense: ${exp.description}`,
+    undo: async () => { await dbAdd('expenses', exp); state.expenses = await dbAll('expenses'); renderExpTable(); },
+    redo: async () => { await dbDel('expenses', exp.id); state.expenses = await dbAll('expenses'); renderExpTable(); }
+  });
   await dbDel('expenses', id);
   state.expenses = await dbAll('expenses');
   renderExpTable();

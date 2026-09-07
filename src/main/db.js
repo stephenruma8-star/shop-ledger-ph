@@ -53,6 +53,225 @@ const MIGRATIONS = [
     db.exec(`DROP INDEX IF EXISTS idx_clients_name`);
     db.exec(`DROP INDEX IF EXISTS idx_auditlogs_date`);
     db.exec(`DROP INDEX IF EXISTS idx_auditlogs_action`);
+  }},
+  { version: 3, name: 'relational schema', up() {
+    db.exec(`CREATE TABLE IF NOT EXISTS r_clients (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL DEFAULT '',
+      phone TEXT DEFAULT '',
+      address TEXT DEFAULT '',
+      balance REAL DEFAULT 0,
+      dueDate TEXT DEFAULT '',
+      createdAt TEXT DEFAULT '',
+      ledgerYear TEXT DEFAULT '',
+      isSC INTEGER DEFAULT 0,
+      isPWD INTEGER DEFAULT 0,
+      loyaltyPoints INTEGER DEFAULT 0,
+      totalSpent REAL DEFAULT 0,
+      redeemedDiscount REAL DEFAULT 0
+    )`);
+    db.exec(`CREATE TABLE IF NOT EXISTS r_transactions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      invoiceNo TEXT DEFAULT '',
+      clientId INTEGER,
+      clientName TEXT DEFAULT '',
+      date TEXT DEFAULT '',
+      createdAt TEXT DEFAULT '',
+      subtotal REAL DEFAULT 0,
+      totalInterest REAL DEFAULT 0,
+      discount REAL DEFAULT 0,
+      scDiscount REAL DEFAULT 0,
+      grandTotal REAL DEFAULT 0,
+      commissionRate REAL DEFAULT 0,
+      commissionAmount REAL DEFAULT 0,
+      paymentMethod TEXT DEFAULT 'Cash',
+      status TEXT DEFAULT 'pending',
+      balanceAdded INTEGER DEFAULT 0,
+      duplicateCheck INTEGER DEFAULT 0,
+      vatExclusive REAL DEFAULT 0,
+      vatAmount REAL DEFAULT 0,
+      vatRate REAL DEFAULT 0.12,
+      editedAt TEXT DEFAULT '',
+      returnReason TEXT DEFAULT '',
+      refundMethod TEXT DEFAULT '',
+      returnNotes TEXT DEFAULT '',
+      refId INTEGER,
+      voidReason TEXT DEFAULT '',
+      voidNotes TEXT DEFAULT '',
+      FOREIGN KEY (clientId) REFERENCES r_clients(id)
+    )`);
+    db.exec(`CREATE TABLE IF NOT EXISTS r_transaction_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      transactionId INTEGER NOT NULL,
+      date TEXT DEFAULT '',
+      description TEXT DEFAULT '',
+      name TEXT DEFAULT '',
+      unitCost REAL DEFAULT 0,
+      intRate REAL DEFAULT 0,
+      amount REAL DEFAULT 0,
+      invId INTEGER,
+      variantName TEXT DEFAULT '',
+      FOREIGN KEY (transactionId) REFERENCES r_transactions(id) ON DELETE CASCADE,
+      FOREIGN KEY (invId) REFERENCES r_inventory(id)
+    )`);
+    db.exec(`CREATE TABLE IF NOT EXISTS r_payments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      clientId INTEGER NOT NULL,
+      clientName TEXT DEFAULT '',
+      amount REAL DEFAULT 0,
+      date TEXT DEFAULT '',
+      type TEXT DEFAULT '',
+      notes TEXT DEFAULT '',
+      createdAt TEXT DEFAULT '',
+      updatedAt TEXT DEFAULT '',
+      FOREIGN KEY (clientId) REFERENCES r_clients(id)
+    )`);
+    db.exec(`CREATE TABLE IF NOT EXISTS r_inventory (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL DEFAULT '',
+      description TEXT DEFAULT '',
+      sku TEXT DEFAULT '',
+      barcode TEXT DEFAULT '',
+      category TEXT DEFAULT '',
+      sellPrice REAL DEFAULT 0,
+      costPrice REAL DEFAULT 0,
+      stock INTEGER DEFAULT 0,
+      minStock INTEGER DEFAULT 5,
+      lowStock INTEGER DEFAULT 5,
+      unit TEXT DEFAULT '',
+      image TEXT DEFAULT '',
+      expiryDate TEXT DEFAULT '',
+      createdAt TEXT DEFAULT '',
+      updatedAt TEXT DEFAULT ''
+    )`);
+    db.exec(`CREATE TABLE IF NOT EXISTS r_inventory_variants (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      inventoryId INTEGER NOT NULL,
+      name TEXT DEFAULT '',
+      stock INTEGER DEFAULT 0,
+      FOREIGN KEY (inventoryId) REFERENCES r_inventory(id) ON DELETE CASCADE
+    )`);
+    db.exec(`CREATE TABLE IF NOT EXISTS r_quickItems (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT DEFAULT '',
+      price REAL DEFAULT 0
+    )`);
+    db.exec(`CREATE TABLE IF NOT EXISTS r_settings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      key TEXT NOT NULL UNIQUE,
+      value TEXT DEFAULT ''
+    )`);
+    db.exec(`CREATE TABLE IF NOT EXISTS r_auditLogs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      action TEXT DEFAULT '',
+      details TEXT DEFAULT '',
+      user TEXT DEFAULT '',
+      createdAt TEXT DEFAULT '',
+      date TEXT DEFAULT ''
+    )`);
+    db.exec(`CREATE TABLE IF NOT EXISTS r_users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL DEFAULT '',
+      password TEXT DEFAULT '',
+      name TEXT DEFAULT '',
+      role TEXT DEFAULT 'staff'
+    )`);
+    db.exec(`CREATE TABLE IF NOT EXISTS r_expenses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      date TEXT DEFAULT '',
+      category TEXT DEFAULT '',
+      description TEXT DEFAULT '',
+      amount REAL DEFAULT 0,
+      payee TEXT DEFAULT '',
+      type TEXT DEFAULT '',
+      refType TEXT DEFAULT '',
+      refId INTEGER,
+      createdAt TEXT DEFAULT ''
+    )`);
+    db.exec(`CREATE TABLE IF NOT EXISTS r_suppliers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT DEFAULT '',
+      contact TEXT DEFAULT '',
+      email TEXT DEFAULT '',
+      category TEXT DEFAULT '',
+      address TEXT DEFAULT '',
+      createdAt TEXT DEFAULT ''
+    )`);
+    db.exec(`CREATE TABLE IF NOT EXISTS r_supplierPriceHistory (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      supplierId INTEGER NOT NULL,
+      itemName TEXT DEFAULT '',
+      price REAL DEFAULT 0,
+      qty INTEGER DEFAULT 0,
+      date TEXT DEFAULT '',
+      poNo TEXT DEFAULT '',
+      FOREIGN KEY (supplierId) REFERENCES r_suppliers(id) ON DELETE CASCADE
+    )`);
+    db.exec(`CREATE TABLE IF NOT EXISTS r_purchaseOrders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      poNo TEXT DEFAULT '',
+      supplierId INTEGER,
+      supplierName TEXT DEFAULT '',
+      date TEXT DEFAULT '',
+      total REAL DEFAULT 0,
+      status TEXT DEFAULT 'Pending',
+      createdAt TEXT DEFAULT '',
+      receivedAt TEXT DEFAULT '',
+      FOREIGN KEY (supplierId) REFERENCES r_suppliers(id)
+    )`);
+    db.exec(`CREATE TABLE IF NOT EXISTS r_purchaseOrder_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      purchaseOrderId INTEGER NOT NULL,
+      invId INTEGER,
+      name TEXT DEFAULT '',
+      price REAL DEFAULT 0,
+      qty INTEGER DEFAULT 0,
+      variantName TEXT DEFAULT '',
+      FOREIGN KEY (purchaseOrderId) REFERENCES r_purchaseOrders(id) ON DELETE CASCADE,
+      FOREIGN KEY (invId) REFERENCES r_inventory(id)
+    )`);
+    db.exec(`CREATE TABLE IF NOT EXISTS r_supplierPayments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      supplierId INTEGER NOT NULL,
+      supplierName TEXT DEFAULT '',
+      amount REAL DEFAULT 0,
+      date TEXT DEFAULT '',
+      notes TEXT DEFAULT '',
+      paymentMethod TEXT DEFAULT 'Cash',
+      referenceNo TEXT DEFAULT '',
+      createdAt TEXT DEFAULT '',
+      FOREIGN KEY (supplierId) REFERENCES r_suppliers(id)
+    )`);
+    db.exec(`CREATE TABLE IF NOT EXISTS r_notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      message TEXT DEFAULT '',
+      type TEXT DEFAULT 'info',
+      read INTEGER DEFAULT 0,
+      createdAt TEXT DEFAULT '',
+      date TEXT DEFAULT ''
+    )`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_r_transactions_client ON r_transactions(clientId)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_r_transactions_date ON r_transactions(date)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_r_transactions_status ON r_transactions(status)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_r_transactions_invoice ON r_transactions(invoiceNo)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_r_transaction_items_txn ON r_transaction_items(transactionId)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_r_transaction_items_inv ON r_transaction_items(invId)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_r_payments_client ON r_payments(clientId)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_r_payments_date ON r_payments(date)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_r_inventory_name ON r_inventory(name)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_r_inventory_sku ON r_inventory(sku)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_r_inventory_barcode ON r_inventory(barcode)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_r_inventory_category ON r_inventory(category)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_r_inventory_expiry ON r_inventory(expiryDate)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_r_expenses_date ON r_expenses(date)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_r_expenses_category ON r_expenses(category)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_r_auditlogs_date ON r_auditLogs(createdAt)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_r_auditlogs_action ON r_auditLogs(action)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_r_supplier_payments_supplier ON r_supplierPayments(supplierId)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_r_purchase_orders_supplier ON r_purchaseOrders(supplierId)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_r_purchase_orders_date ON r_purchaseOrders(date)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_r_po_items_po ON r_purchaseOrder_items(purchaseOrderId)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_r_price_history_supplier ON r_supplierPriceHistory(supplierId)`);
   }}
 ];
 
@@ -188,6 +407,133 @@ function migrate(dump) {
   });
   tx();
   return { migrated: true, counts };
+}
+
+function migrateToRelational() {
+  if (!db) return { ok: false, error: 'SQLite not initialized' };
+  const row = stmt('SELECT value FROM meta WHERE key = ?').get('relationalMigrated');
+  if (row && row.value === 'true') return { migrated: false, reason: 'already migrated' };
+
+  const counts = {};
+  const tx = db.transaction(() => {
+    // Migrate clients
+    const clients = all('clients');
+    const insClient = stmt(`INSERT OR IGNORE INTO r_clients (id, name, phone, address, balance, dueDate, createdAt, ledgerYear, isSC, isPWD, loyaltyPoints, totalSpent, redeemedDiscount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    for (const c of clients) {
+      insClient.run(c.id, c.name||'', c.phone||'', c.address||'', c.balance||0, c.dueDate||'', c.createdAt||'', c.ledgerYear||'', c.isSC?1:0, c.isPWD?1:0, c.loyaltyPoints||0, c.totalSpent||0, c.redeemedDiscount||0);
+    }
+    counts.clients = clients.length;
+
+    // Migrate transactions + items
+    const transactions = all('transactions');
+    const insTx = stmt(`INSERT OR IGNORE INTO r_transactions (id, invoiceNo, clientId, clientName, date, createdAt, subtotal, totalInterest, discount, scDiscount, grandTotal, commissionRate, commissionAmount, paymentMethod, status, balanceAdded, duplicateCheck, vatExclusive, vatAmount, vatRate, editedAt, returnReason, refundMethod, returnNotes, refId, voidReason, voidNotes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    const insTxItem = stmt(`INSERT INTO r_transaction_items (transactionId, date, description, name, unitCost, intRate, amount, invId, variantName) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    for (const t of transactions) {
+      insTx.run(t.id, t.invoiceNo||'', t.clientId||null, t.clientName||'', t.date||'', t.createdAt||'', t.subtotal||0, t.totalInterest||0, t.discount||0, t.scDiscount||0, t.grandTotal||0, t.commissionRate||0, t.commissionAmount||0, t.paymentMethod||'Cash', t.status||'pending', t.balanceAdded?1:0, t.duplicateCheck?1:0, t.vatExclusive||0, t.vatAmount||0, t.vatRate||0.12, t.editedAt||'', t.returnReason||'', t.refundMethod||'', t.returnNotes||'', t.refId||null, t.voidReason||'', t.voidNotes||'');
+      if (Array.isArray(t.items)) {
+        for (const item of t.items) {
+          insTxItem.run(t.id, item.date||'', item.description||'', item.name||'', item.unitCost||0, item.intRate||0, item.amount||0, item.invId||null, item.variantName||'');
+        }
+      }
+    }
+    counts.transactions = transactions.length;
+
+    // Migrate payments
+    const payments = all('payments');
+    const insPay = stmt(`INSERT OR IGNORE INTO r_payments (id, clientId, clientName, amount, date, type, notes, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    for (const p of payments) {
+      insPay.run(p.id, p.clientId||0, p.clientName||'', p.amount||0, p.date||'', p.type||'', p.notes||'', p.createdAt||'', p.updatedAt||'');
+    }
+    counts.payments = payments.length;
+
+    // Migrate inventory + variants
+    const inventory = all('inventory');
+    const insInv = stmt(`INSERT OR IGNORE INTO r_inventory (id, name, description, sku, barcode, category, sellPrice, costPrice, stock, minStock, lowStock, unit, image, expiryDate, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    const insVariant = stmt(`INSERT INTO r_inventory_variants (inventoryId, name, stock) VALUES (?, ?, ?)`);
+    for (const i of inventory) {
+      insInv.run(i.id, i.name||'', i.description||'', i.sku||'', i.barcode||'', i.category||'', i.sellPrice||i.price||0, i.costPrice||0, i.stock||0, i.minStock||5, i.lowStock||5, i.unit||'', i.image||'', i.expiryDate||'', i.createdAt||'', i.updatedAt||'');
+      if (Array.isArray(i.variants)) {
+        for (const v of i.variants) {
+          insVariant.run(i.id, v.name||'', v.stock||0);
+        }
+      }
+    }
+    counts.inventory = inventory.length;
+
+    // Migrate quickItems
+    const qi = all('quickItems');
+    const insQi = stmt(`INSERT OR IGNORE INTO r_quickItems (id, name, price) VALUES (?, ?, ?)`);
+    for (const q of qi) { insQi.run(q.id, q.name||'', q.price||0); }
+    counts.quickItems = qi.length;
+
+    // Migrate settings
+    const settings = all('settings');
+    const insSetting = stmt(`INSERT OR REPLACE INTO r_settings (id, key, value) VALUES (?, ?, ?)`);
+    for (const s of settings) { insSetting.run(s.id, s.key||'', s.value||''); }
+    counts.settings = settings.length;
+
+    // Migrate auditLogs
+    const logs = all('auditLogs');
+    const insLog = stmt(`INSERT OR IGNORE INTO r_auditLogs (id, action, details, user, createdAt, date) VALUES (?, ?, ?, ?, ?, ?)`);
+    for (const l of logs) { insLog.run(l.id, l.action||'', l.details||'', l.user||'', l.createdAt||'', l.date||''); }
+    counts.auditLogs = logs.length;
+
+    // Migrate users
+    const users = all('users');
+    const insUser = stmt(`INSERT OR IGNORE INTO r_users (id, username, password, name, role) VALUES (?, ?, ?, ?, ?)`);
+    for (const u of users) { insUser.run(u.id, u.username||'', u.password||'', u.name||'', u.role||'staff'); }
+    counts.users = users.length;
+
+    // Migrate expenses
+    const expenses = all('expenses');
+    const insExp = stmt(`INSERT OR IGNORE INTO r_expenses (id, date, category, description, amount, payee, type, refType, refId, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    for (const e of expenses) { insExp.run(e.id, e.date||'', e.category||'', e.description||'', e.amount||0, e.payee||'', e.type||'', e.refType||'', e.refId||null, e.createdAt||''); }
+    counts.expenses = expenses.length;
+
+    // Migrate suppliers + price history
+    const suppliers = all('suppliers');
+    const insSup = stmt(`INSERT OR IGNORE INTO r_suppliers (id, name, contact, email, category, address, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+    const insPH = stmt(`INSERT INTO r_supplierPriceHistory (supplierId, itemName, price, qty, date, poNo) VALUES (?, ?, ?, ?, ?, ?)`);
+    for (const s of suppliers) {
+      insSup.run(s.id, s.name||'', s.contact||'', s.email||'', s.category||'', s.address||'', s.createdAt||'');
+      if (Array.isArray(s.priceHistory)) {
+        for (const ph of s.priceHistory) {
+          insPH.run(s.id, ph.itemName||'', ph.price||0, ph.qty||0, ph.date||'', ph.poNo||'');
+        }
+      }
+    }
+    counts.suppliers = suppliers.length;
+
+    // Migrate purchaseOrders + items
+    const pos = all('purchaseOrders');
+    const insPO = stmt(`INSERT OR IGNORE INTO r_purchaseOrders (id, poNo, supplierId, supplierName, date, total, status, createdAt, receivedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    const insPOItem = stmt(`INSERT INTO r_purchaseOrder_items (purchaseOrderId, invId, name, price, qty, variantName) VALUES (?, ?, ?, ?, ?, ?)`);
+    for (const po of pos) {
+      insPO.run(po.id, po.poNo||'', po.supplierId||null, po.supplierName||'', po.date||'', po.total||0, po.status||'Pending', po.createdAt||'', po.receivedAt||'');
+      if (Array.isArray(po.items)) {
+        for (const item of po.items) {
+          insPOItem.run(po.id, item.invId||null, item.name||'', item.price||0, item.qty||0, item.variantName||'');
+        }
+      }
+    }
+    counts.purchaseOrders = pos.length;
+
+    // Migrate supplierPayments
+    const sp = all('supplierPayments');
+    const insSP = stmt(`INSERT OR IGNORE INTO r_supplierPayments (id, supplierId, supplierName, amount, date, notes, paymentMethod, referenceNo, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    for (const p of sp) { insSP.run(p.id, p.supplierId||0, p.supplierName||'', p.amount||0, p.date||'', p.notes||'', p.paymentMethod||'Cash', p.referenceNo||'', p.createdAt||''); }
+    counts.supplierPayments = sp.length;
+
+    // Migrate notifications
+    const notifs = all('notifications');
+    const insNotif = stmt(`INSERT OR IGNORE INTO r_notifications (id, message, type, read, createdAt, date) VALUES (?, ?, ?, ?, ?, ?)`);
+    for (const n of notifs) { insNotif.run(n.id, n.message||'', n.type||'info', n.read?1:0, n.createdAt||'', n.date||''); }
+    counts.notifications = notifs.length;
+
+    stmt('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run('relationalMigrated', 'true');
+  });
+  tx();
+  return { ok: true, counts };
 }
 
 // Online backup (VACUUM-style consistent copy) of the live SQLite file.
@@ -331,6 +677,64 @@ function stats() {
   return { ok: true, backend: 'sqlite', path: dbPath, size: fileSize(), counts };
 }
 
+// Relational table names for each store
+const R_TABLES = {
+  clients: 'r_clients', transactions: 'r_transactions', payments: 'r_payments',
+  inventory: 'r_inventory', quickItems: 'r_quickItems', settings: 'r_settings',
+  auditLogs: 'r_auditLogs', users: 'r_users', expenses: 'r_expenses',
+  suppliers: 'r_suppliers', purchaseOrders: 'r_purchaseOrders',
+  supplierPayments: 'r_supplierPayments', notifications: 'r_notifications'
+};
+
+function isRelationalReady() {
+  try {
+    const row = stmt('SELECT value FROM meta WHERE key = ?').get('relationalMigrated');
+    return row && row.value === 'true';
+  } catch (e) { return false; }
+}
+
+function rAll(store) {
+  const table = R_TABLES[store];
+  if (!table) return [];
+  return stmt(`SELECT * FROM ${table} ORDER BY id`).all();
+}
+
+function rGet(store, id) {
+  const table = R_TABLES[store];
+  if (!table) return undefined;
+  return stmt(`SELECT * FROM ${table} WHERE id = ?`).get(id);
+}
+
+// For stores with nested items, reconstruct the JSON format
+function rAllWithItems(store) {
+  const rows = rAll(store);
+  if (store === 'transactions') {
+    return rows.map(r => {
+      const items = stmt('SELECT * FROM r_transaction_items WHERE transactionId = ?').all(r.id);
+      return { ...r, items, balanceAdded: !!r.balanceAdded, duplicateCheck: !!r.duplicateCheck };
+    });
+  }
+  if (store === 'inventory') {
+    return rows.map(r => {
+      const variants = stmt('SELECT * FROM r_inventory_variants WHERE inventoryId = ?').all(r.id);
+      return { ...r, variants };
+    });
+  }
+  if (store === 'purchaseOrders') {
+    return rows.map(r => {
+      const items = stmt('SELECT * FROM r_purchaseOrder_items WHERE purchaseOrderId = ?').all(r.id);
+      return { ...r, items };
+    });
+  }
+  if (store === 'suppliers') {
+    return rows.map(r => {
+      const priceHistory = stmt('SELECT * FROM r_supplierPriceHistory WHERE supplierId = ?').all(r.id);
+      return { ...r, priceHistory };
+    });
+  }
+  return rows;
+}
+
 function close() {
   if (db) {
     try { db.close(); } catch (e) {}
@@ -389,6 +793,8 @@ function registerDbIpc(ipcMain, userDataPath) {
   ipcMain.handle('db-encrypt', (e, { password }) => encryptDb(password));
   ipcMain.handle('db-decrypt', (e, { password }) => decryptDb(password));
   ipcMain.handle('db-checksum', () => getDbChecksum());
+  ipcMain.handle('db-migrate-relational', () => migrateToRelational());
+  ipcMain.handle('db-is-relational', () => isRelationalReady());
 }
 
-module.exports = { registerDbIpc, init, migrate, get, add, put, del, all, clear, stats, snapshot, integrityCheck, optimize, checkpoint, vacuum, replaceWith, replaceFromDump, runMigrations, schemaVersion, close, closeDb: close, rollbackMigration, scheduleMaintenance, encryptDb, decryptDb, getDbChecksum };
+module.exports = { registerDbIpc, init, migrate, get, add, put, del, all, clear, stats, snapshot, integrityCheck, optimize, checkpoint, vacuum, replaceWith, replaceFromDump, runMigrations, schemaVersion, close, closeDb: close, rollbackMigration, scheduleMaintenance, encryptDb, decryptDb, getDbChecksum, migrateToRelational, isRelationalReady, rAll, rGet, rAllWithItems };

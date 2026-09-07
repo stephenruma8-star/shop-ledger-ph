@@ -1,6 +1,6 @@
 import { logAudit } from './auth.js'
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
-import { closeModal, confirmModal, dbLoad, debounce, escapeHtml, modal, requireFields, searchData, toast } from './helpers.js'
+import { closeModal, confirmModal, dbLoad, debounce, escapeHtml, modal, pushUndo, requireFields, searchData, toast } from './helpers.js'
 import { now, peso, state, today } from './state.js'
 
 export async function viewSuppliers(root) {
@@ -179,9 +179,27 @@ export async function saveSup(id) {
 export async function deleteSup(id) {
   const s = state.suppliers.find(x => x.id === id);
   if (!await confirmModal('Delete this supplier?')) return;
-  await dbDel('suppliers', id);
   const sps = await dbAll('supplierPayments');
-  for (const p of sps.filter(x => x.supplierId === id)) await dbDel('supplierPayments', p.id);
+  const linkedPayments = sps.filter(x => x.supplierId === id);
+  pushUndo({
+    description: `Delete supplier: ${s ? s.name : id}`,
+    undo: async () => {
+      if (s) await dbAdd('suppliers', s);
+      for (const p of linkedPayments) await dbAdd('supplierPayments', p);
+      state.suppliers = await dbAll('suppliers');
+      state.supplierPayments = await dbAll('supplierPayments');
+      renderSupTable();
+    },
+    redo: async () => {
+      await dbDel('suppliers', id);
+      for (const p of linkedPayments) await dbDel('supplierPayments', p.id);
+      state.suppliers = await dbAll('suppliers');
+      state.supplierPayments = await dbAll('supplierPayments');
+      renderSupTable();
+    }
+  });
+  await dbDel('suppliers', id);
+  for (const p of linkedPayments) await dbDel('supplierPayments', p.id);
   state.suppliers = await dbAll('suppliers');
   state.supplierPayments = await dbAll('supplierPayments');
   renderSupTable();

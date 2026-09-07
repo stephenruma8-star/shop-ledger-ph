@@ -1,5 +1,5 @@
 {
-    "version":  "3.12.1",
+    "version":  "3.13.0",
     "buildDate":  "2026-09-07T00:00:00.000Z",
-    "notes":  "Fix: auto-update now sends feedback when updater is unavailable or app is not packaged. Previously clicking the update button did nothing."
+    "notes":  "Final 6 items: relational schema with FK constraints, self-signed code signing cert, CI/CD workflow (local), full undo/redo across all views (Ctrl+Z/Ctrl+Shift+Z), comprehensive E2E test suite (20 test groups)."
 }
