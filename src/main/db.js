@@ -5,9 +5,10 @@
 const { app } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const logger = require('./logger.js');
 
 let Database = null;
-try { Database = require('better-sqlite3'); } catch (e) { console.error('better-sqlite3 unavailable:', e.message); }
+try { Database = require('better-sqlite3'); } catch (e) { logger.error('better-sqlite3 unavailable: ' + e.message); }
 
 const STORES = ['clients','transactions','payments','inventory','quickItems','settings','auditLogs','users','expenses','suppliers','purchaseOrders','supplierPayments','notifications'];
 
@@ -19,7 +20,24 @@ const stmts = new Map();
 // (new stores, columns, indexes) add higher versions with idempotent steps. Each step runs
 // once inside a transaction and is recorded in schema_migrations.
 const MIGRATIONS = [
-  { version: 1, name: 'baseline', up() {} }
+  { version: 1, name: 'baseline', up() {} },
+  { version: 2, name: 'add indexes', up() {
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_transactions_date ON s_transactions(json_extract(value, '$.date'))`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_transactions_client ON s_transactions(json_extract(value, '$.clientId'))`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_transactions_status ON s_transactions(json_extract(value, '$.status'))`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_transactions_invoice ON s_transactions(json_extract(value, '$.invoiceNo'))`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_payments_date ON s_payments(json_extract(value, '$.date'))`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_payments_client ON s_payments(json_extract(value, '$.clientId'))`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_expenses_date ON s_expenses(json_extract(value, '$.date'))`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_expenses_category ON s_expenses(json_extract(value, '$.category'))`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_inventory_name ON s_inventory(json_extract(value, '$.name'))`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_inventory_sku ON s_inventory(json_extract(value, '$.sku'))`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_inventory_barcode ON s_inventory(json_extract(value, '$.barcode'))`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_inventory_category ON s_inventory(json_extract(value, '$.category'))`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_clients_name ON s_clients(json_extract(value, '$.name'))`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_auditlogs_date ON s_auditLogs(json_extract(value, '$.createdAt'))`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_auditlogs_action ON s_auditLogs(json_extract(value, '$.action'))`);
+  }}
 ];
 
 function schemaVersion() {
@@ -82,7 +100,7 @@ function init(userDataPath) {
     runMigrations();
     return openInfo();
   } catch (e) {
-    console.error('SQLite init failed:', e);
+    logger.error('SQLite init failed: ' + e.message);
     try { if (db) db.close(); } catch (e2) {}
     db = null; dbPath = null;
     return { ok: false, error: e.message };

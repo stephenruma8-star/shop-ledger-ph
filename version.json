@@ -1,5 +1,5 @@
 {
-    "version":  "3.10.7",
-    "buildDate":  "2026-09-03T00:00:00.000Z",
-    "notes":  "Bug fixes: missing imports (cfCart, requireFields), CSV import ID fix, audit log details fix, interest rollback fix, variable shadowing fix, mousemove listener leak fix."
+    "version":  "3.10.8",
+    "buildDate":  "2026-09-06T00:00:00.000Z",
+    "notes":  "Backend hardening: rate limiting on LAN API, input validation on sales/expenses/payments endpoints, database indexing, structured logging (all console.error replaced with electron-log), ARIA labels on login/search/sidebar, CSV import validation (file size/row limit/duplicate detection/type checks)."
 }

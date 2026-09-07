@@ -7,8 +7,42 @@ const express = require('express');
 
 const EXPENSE_CATS = ['Purchases','Utilities','Rent','Supplies','Transportation','Salaries','Marketing','Maintenance','Food','Other'];
 
+const _rateBuckets = new Map();
+function rateLimit(maxPerMin = 60) {
+  return (req, res, next) => {
+    const key = req.ip + req.path;
+    const now = Date.now();
+    const bucket = _rateBuckets.get(key);
+    if (!bucket || now - bucket.start > 60000) {
+      _rateBuckets.set(key, { start: now, count: 1 });
+      return next();
+    }
+    bucket.count++;
+    if (bucket.count > maxPerMin) {
+      return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+    }
+    next();
+  };
+}
+
+function sanitize(str) {
+  if (typeof str !== 'string') return '';
+  return str.replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c])).trim().slice(0, 500);
+}
+
+function validateAmount(v) {
+  const n = parseFloat(v);
+  return !isNaN(n) && isFinite(n) && n >= 0 && n <= 999999999;
+}
+
+function validatePhone(v) {
+  if (!v) return true;
+  return /^(\+63|0)?\d{10,11}$/.test(String(v).trim());
+}
+
 function createLanApiRouter(deps) {
   const router = express.Router();
+  router.use(rateLimit(120));
 
   const active = (t) => t.status !== 'voided' && t.status !== 'interest';
   const dayTotal = (arr, f) => arr.filter(f).reduce((s, x) => s + (x.amount || x.grandTotal || 0), 0);
@@ -113,13 +147,17 @@ function createLanApiRouter(deps) {
   router.post('/api/expenses', wrap(async (req, res) => {
     if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
     const { description, amount, category, date, payee } = req.body;
+    if (!validateAmount(amount)) return res.status(400).json({ error: 'Valid amount required (0-999999999)' });
     const amountNum = Math.round((parseFloat(amount) || 0) * 100) / 100;
-    if (amountNum <= 0) return res.status(400).json({ error: 'Valid amount required' });
+    if (amountNum <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' });
     const cat = EXPENSE_CATS.includes(category) ? category : 'Other';
+    const safeDesc = sanitize(description);
+    const safePayee = sanitize(payee);
+    const safeDate = sanitize(date) || todayStr();
     await deps.rendererExec(`
       (async () => {
-        await dbAdd('expenses', { date: ${JSON.stringify(date || todayStr())}, category: ${JSON.stringify(cat)}, description: ${JSON.stringify(String(description || '').trim())}, amount: ${amountNum}, payee: ${JSON.stringify(String(payee || '').trim())}, createdAt: new Date().toISOString() });
-        try { await logAudit('expense-add', ${JSON.stringify(cat)} + ': ₱' + ${amountNum}.toFixed(2) + ' - ' + ${JSON.stringify(String(description || '').trim())}); } catch (e) {}
+        await dbAdd('expenses', { date: ${JSON.stringify(safeDate)}, category: ${JSON.stringify(cat)}, description: ${JSON.stringify(safeDesc)}, amount: ${amountNum}, payee: ${JSON.stringify(safePayee)}, createdAt: new Date().toISOString() });
+        try { await logAudit('expense-add', ${JSON.stringify(cat)} + ': ₱' + ${amountNum}.toFixed(2) + ' - ' + ${JSON.stringify(safeDesc)}); } catch (e) {}
       })()
     `);
     deps.notify({ source: 'api', kind: 'expense' });
@@ -213,16 +251,20 @@ function createLanApiRouter(deps) {
   router.post('/api/payments', wrap(async (req, res) => {
     if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
     const { clientId, amount, type, date } = req.body;
+    if (!validateAmount(amount)) return res.status(400).json({ error: 'Valid amount required' });
+    if (clientId && typeof clientId !== 'number' && typeof clientId !== 'string') return res.status(400).json({ error: 'Invalid client ID' });
     const amtNum = Math.round((parseFloat(amount) || 0) * 100) / 100;
+    if (amtNum <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' });
     const cId = JSON.stringify(clientId);
     const amt = JSON.stringify(amtNum);
     const payType = JSON.stringify(amtNum > 0 ? (type === 'Full' || type === 'Partial' ? type : null) : null);
+    const safeDate = sanitize(date) || new Date().toISOString().split('T')[0];
     await deps.rendererExec(`
       (async () => {
         const c = await dbGet('clients', ${cId});
         const balBefore = c ? (c.balance || 0) : 0;
         const pt = ${payType} || (${amt} >= balBefore ? 'Full' : 'Partial');
-        await dbAdd('payments', { clientId: ${cId}, amount: ${amt}, type: pt, date: ${JSON.stringify(date || new Date().toISOString().split('T')[0])}, notes: ${JSON.stringify('')}, createdAt: new Date().toISOString() });
+        await dbAdd('payments', { clientId: ${cId}, amount: ${amt}, type: pt, date: ${JSON.stringify(safeDate)}, notes: ${JSON.stringify('')}, createdAt: new Date().toISOString() });
         if (c) await dbPut('clients', { ...c, balance: Math.max(0, balBefore - ${amt}) });
         try { await logAudit('payment', 'Mobile payment ' + (c ? c.name : 'client') + ' - ₱' + ${amt}.toFixed(2)); } catch (e) {}
         return { success: true };
@@ -235,7 +277,15 @@ function createLanApiRouter(deps) {
   router.post('/api/sales', wrap(async (req, res) => {
     if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
     const { clientId, items, paymentMethod, discount } = req.body;
-    if (!items || !items.length) return res.status(400).json({ error: 'No items' });
+    if (!items || !Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'At least one item required' });
+    if (items.length > 100) return res.status(400).json({ error: 'Too many items (max 100)' });
+    for (const item of items) {
+      if (!item.description || typeof item.description !== 'string') return res.status(400).json({ error: 'Each item must have a description' });
+      if (!validateAmount(item.unitCost)) return res.status(400).json({ error: 'Invalid item price' });
+      if (item.qty && (isNaN(parseInt(item.qty)) || parseInt(item.qty) < 1)) return res.status(400).json({ error: 'Invalid item quantity' });
+    }
+    if (discount && !validateAmount(discount)) return res.status(400).json({ error: 'Invalid discount' });
+    if (paymentMethod && !['Cash','GCash','Maya','Bank Transfer'].includes(paymentMethod)) return res.status(400).json({ error: 'Invalid payment method' });
     const invNos = JSON.parse(await deps.rendererExec(`JSON.stringify(state.transactions.filter(t=>t.invoiceNo?.startsWith('INV-')).map(t=>parseInt(t.invoiceNo.replace('INV-',''))||0))`));
     const nextNo = invNos.length > 0 ? Math.max(...invNos) + 1 : 1;
     const invoiceNo = 'INV-' + String(nextNo).padStart(5,'0');

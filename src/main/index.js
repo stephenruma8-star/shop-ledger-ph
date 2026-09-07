@@ -40,7 +40,7 @@ try {
   electronLog.transports.file.level = 'info';
   electronLog.transports.console.level = false;
   electronLog.catchErrors({ showDialog: false });
-} catch (e) { console.error('electron-log init failed:', e.message); }
+} catch (e) { logger.error('electron-log init failed: ' + e.message); }
 try { logger.configure(app.getPath('userData')); } catch (e) {}
 const origEmit = process.emit;
 process.emit = function(ev, ...a) {
@@ -72,7 +72,7 @@ const { encryptData, decryptData } = require('./crypto.js');
 const backupService = require('./backupService.js');
 
 let autoUpdater = null;
-try { autoUpdater = require('electron-updater').autoUpdater; if (autoUpdater) autoUpdater.autoCheckUpdates = false; autoUpdater.autoDownload = false; } catch (e) { console.error('autoUpdater not available:', e.message); }
+try { autoUpdater = require('electron-updater').autoUpdater; if (autoUpdater) autoUpdater.autoCheckUpdates = false; autoUpdater.autoDownload = false; } catch (e) { logger.error('autoUpdater not available: ' + e.message); }
 
 let isQuitting = false;
 const LAN_PORT = 3456;
@@ -88,7 +88,7 @@ if (!_savedToken) {
   try {
     const prefs = { ...readAppPrefs(), lanToken: _lanToken };
     fs.writeFileSync(APP_CONFIG_PATH, JSON.stringify(prefs, null, 2));
-  } catch (e) { console.error('Failed to persist LAN token:', e.message); }
+  } catch (e) { logger.error('Failed to persist LAN token: ' + e.message); }
 }
 
 function createWindow() {
@@ -149,7 +149,7 @@ function createTray() {
     { label: 'Quit', click: () => { isQuitting = true; app.quit(); }}
   ]));
   tray.on('double-click', () => mainWindow?.show());
-  } catch (e) { console.error('Tray error:', e.message); }
+  } catch (e) { logger.error('Tray error: ' + e.message); }
 }
 
 function getLocalIP() {
@@ -189,8 +189,8 @@ function ensureFirewallRules() {
     if (exists) continue;
     try {
       cp.execFileSync('netsh', ['advfirewall', 'firewall', 'add', 'rule', `name=${name}`, 'dir=in', 'action=allow', 'protocol=TCP', `localport=${port}`, 'profile=any'], { encoding: 'utf8', timeout: 10000, stdio: 'ignore' });
-      console.log(`Firewall rule added: ${name}`);
-    } catch (e) { console.error('Firewall rule add failed:', e.message); }
+      logger.info('Firewall rule added: ' + name);
+    } catch (e) { logger.error('Firewall rule add failed: ' + e.message); }
   }
 }
 
@@ -225,7 +225,7 @@ function setupAutoUpdater() {
     });
   });
   autoUpdater.on('error', (err) => {
-    console.error('Auto-update error:', err && err.message || err);
+      logger.error('Auto-update error: ' + (err && err.message || err));
     mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-error', (err && err.message) || 'Update check failed');
   });
 }
@@ -235,15 +235,15 @@ function checkForUpdates() {
   const https = require('https');
   https.get('https://api.github.com/repos/stephenruma8-star/shop-ledger-ph/releases/latest', { headers: { 'User-Agent': 'shop-ledger-ph' } }, (res) => {
     if (res.statusCode === 200) autoUpdater.checkForUpdates().catch((err) => {
-      console.error('Auto-update check failed:', err.message);
+      logger.error('Auto-update check failed: ' + err.message);
       mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-error', 'Update check failed: ' + err.message);
     });
     else {
-      console.log('GitHub returned ' + res.statusCode + ', skipping update check');
+      logger.info('GitHub returned ' + res.statusCode + ', skipping update check');
       mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-not-available');
     }
   }).on('error', (err) => {
-    console.error('Update check network error:', err.message);
+    logger.error('Update check network error: ' + err.message);
     mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-error', 'Could not reach GitHub: ' + err.message);
   });
 }
@@ -296,10 +296,10 @@ function startLANServer() {
   try {
     lanServer = expressApp.listen(LAN_PORT, '0.0.0.0', () => {
       const url = `http://${getLocalIP()}:${LAN_PORT}`;
-      console.log(`LAN server at ${url}`);
+      logger.info('LAN server at ' + url);
       logger.info('LAN server at ' + url);
     });
-  } catch (e) { console.error('LAN server error:', e.message); }
+  } catch (e) { logger.error('LAN server error: ' + e.message); }
 }
 
 function startUDPBroadcast() {
@@ -318,7 +318,7 @@ function startUDPBroadcast() {
     udpBroadcast.bind(UDP_PORT, () => {
       udpBroadcast.setBroadcast(true);
     });
-  } catch (e) { console.error('UDP broadcast error:', e.message); }
+  } catch (e) { logger.error('UDP broadcast error: ' + e.message); }
 }
 
 function broadcastUpdateSignal() {
@@ -330,13 +330,13 @@ function broadcastUpdateSignal() {
       hostName: os.hostname()
     });
     udpBroadcast.send(msg, 0, msg.length, UDP_PORT, '255.255.255.255');
-  } catch (e) { console.error('broadcast error:', e.message); }
+  } catch (e) { logger.error('broadcast error: ' + e.message); }
 }
 
 function notifyDataChanged(info) {
   if (wsServer) {
     try { wsServer.broadcast({ type: 'update', source: info?.source || 'app', kind: info?.kind || 'data' }); }
-    catch (e) { console.error('WS broadcast error:', e.message); }
+    catch (e) { logger.error('WS broadcast error: ' + e.message); }
   }
   try {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('lan-data-refresh', info || {});
@@ -401,7 +401,8 @@ function configureBackupService() {
     getSettings: () => serviceSettings(),
     setSetting: (key, value) => setSetting(key, value),
     getRendererDump: () => mainWindow.webContents.executeJavaScript('window.__app.getDBDump()'),
-    notify: (info) => notifyDataChanged(info)
+    notify: (info) => notifyDataChanged(info),
+    logger
   });
 }
 
@@ -426,7 +427,7 @@ async function runCloudBackupCheck() {
     }
     if (!due) return;
     await mainWindow.webContents.executeJavaScript('runCloudBackup()');
-  } catch (e) { console.error('cloud backup plan check failed:', e.message); }
+  } catch (e) { logger.error('cloud backup plan check failed: ' + e.message); }
 }
 
 ipcMain.handle('signal-lan-update', () => {
@@ -575,8 +576,8 @@ ipcMain.on('log-renderer', (event, payload) => {
 
 async function runPlannedJobs() {
   runCloudBackupCheck();
-  try { await backupService.planLocalSnapshot(); } catch (e) { console.error('local snapshot plan failed:', e.message); }
-  try { await backupService.runRetention(); } catch (e) { console.error('retention sweep failed:', e.message); }
+  try { await backupService.planLocalSnapshot(); } catch (e) { logger.error('local snapshot plan failed: ' + e.message); }
+  try { await backupService.runRetention(); } catch (e) { logger.error('retention sweep failed: ' + e.message); }
 }
 
 ipcMain.handle('plan-cloud-backups', async () => {
@@ -613,7 +614,7 @@ ipcMain.handle('generate-mobile-qr', async () => {
 // Rotates the LAN access token: connected phones get disconnected and old codes stop working.
 ipcMain.handle('rotate-lan-token', async () => {
   _lanToken = crypto.randomBytes(24).toString('hex');
-  try { fs.writeFileSync(APP_CONFIG_PATH, JSON.stringify({ ...readAppPrefs(), lanToken: _lanToken }, null, 2)); } catch (e) { console.error('Failed to save rotated token:', e.message); }
+  try { fs.writeFileSync(APP_CONFIG_PATH, JSON.stringify({ ...readAppPrefs(), lanToken: _lanToken }, null, 2)); } catch (e) { logger.error('Failed to save rotated token: ' + e.message); }
   logger.info('LAN access token rotated');
   return { success: true, token: _lanToken };
 });
@@ -630,11 +631,11 @@ ipcMain.handle('get-app-version', () => { try { return app.getVersion(); } catch
 
 ipcMain.handle('set-app-preferences', async (event, prefs) => {
   const next = { ...readAppPrefs(), ...(prefs || {}) };
-  try { fs.writeFileSync(APP_CONFIG_PATH, JSON.stringify(next, null, 2)); } catch (e) { console.error('Failed to save app prefs:', e.message); }
+  try { fs.writeFileSync(APP_CONFIG_PATH, JSON.stringify(next, null, 2)); } catch (e) { logger.error('Failed to save app prefs: ' + e.message); }
   if (typeof next.launchAtStartup === 'boolean') {
     try {
       app.setLoginItemSettings({ openAtLogin: next.launchAtStartup, path: process.execPath });
-    } catch (e) { console.error('setLoginItemSettings failed:', e.message); }
+    } catch (e) { logger.error('setLoginItemSettings failed: ' + e.message); }
   }
   return next;
 });
@@ -769,16 +770,16 @@ app.whenReady().then(() => {
         if (msg.type === 'update') notifyDataChanged({ source: 'mobile', kind: 'data' });
       }
     });
-  } catch (e) { console.error('Startup error:', e); }
+  } catch (e) { logger.error('Startup error: ' + (e && e.message || e)); }
   logger.info('app ready - version ' + app.getVersion());
-}).catch(e => { console.error('whenReady failed:', e); logger.error('whenReady failed: ' + e.message); });
+}).catch(e => { logger.error('whenReady failed: ' + (e && e.message || e)); });
 app.on('before-quit', () => {
   isQuitting = true;
   try {
     const d = require('./db.js');
     d.optimize();
     d.checkpoint();
-  } catch (e) { console.error('quit maintenance failed:', e.message); }
+  } catch (e) { logger.error('quit maintenance failed: ' + e.message); }
   closeDb();
   logger.info('app quitting');
 });

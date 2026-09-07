@@ -11,10 +11,13 @@ let cfg = {
   getSettings: async () => null,
   setSetting: async () => { throw new Error('setSetting not wired'); },
   getRendererDump: async () => null,
-  notify: () => {}
+  notify: () => {},
+  logger: null
 };
 
 function configure(opts) { cfg = { ...cfg, ...(opts || {}) }; }
+
+function logError(msg) { if (cfg.logger && cfg.logger.error) cfg.logger.error(msg); }
 
 function backupsDir() { return cfg.backupsDir; }
 function backupsIndexPath() { return path.join(backupsDir(), 'backups.json'); }
@@ -27,7 +30,7 @@ function writeBackupIndex(list) {
   try {
     fs.mkdirSync(backupsDir(), { recursive: true });
     fs.writeFileSync(backupsIndexPath(), JSON.stringify(list, null, 2));
-  } catch (e) { console.error('backup index write failed:', e.message); }
+  } catch (e) { logError('backup index write failed: ' + e.message); }
 }
 
 function backupFileName() {

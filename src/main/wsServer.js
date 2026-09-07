@@ -1,5 +1,6 @@
 const http = require('http');
 const crypto = require('crypto');
+const logger = require('./logger.js');
 
 function sendFrame(socket, payload) {
   if (!socket || socket.destroyed) return;
@@ -76,8 +77,8 @@ function startWsServer({ port, token, onMessage, onClose }) {
     socket.setTimeout(0);
   });
 
-  server.on('error', (e) => console.error('WebSocket server error:', e.message));
-  server.listen(port, '0.0.0.0', () => console.log('WebSocket server on port ' + port));
+  server.on('error', (e) => logger.error('WebSocket server error: ' + e.message));
+  server.listen(port, '0.0.0.0', () => logger.info('WebSocket server on port ' + port));
 
   return {
     broadcast: (obj) => {

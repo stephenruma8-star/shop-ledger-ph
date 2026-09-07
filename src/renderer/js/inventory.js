@@ -398,27 +398,31 @@ export function importInventoryCSV() {
   input.onchange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { toast('File too large (max 10MB)', 'error'); return; }
     const text = await file.text();
     const lines = text.split('\n').filter(l => l.trim());
     if (lines.length < 2) { toast('CSV must have a header row and at least one item', 'error'); return; }
+    if (lines.length > 5001) { toast('Too many rows (max 5000 items)', 'error'); return; }
     const header = lines[0].toLowerCase();
     const hasName = header.includes('name');
-    const hasPrice = header.includes('price');
-    const hasSku = header.includes('sku');
-    const hasCategory = header.includes('category');
-    const hasBarcode = header.includes('barcode');
-    const hasStock = header.includes('stock');
     if (!hasName) { toast('CSV must have a "name" column', 'error'); return; }
     const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
-    let imported = 0, skipped = 0;
+    let imported = 0, skipped = 0, errors = 0;
+    const seenNames = new Set();
     for (let i = 1; i < lines.length; i++) {
       const parts = lines[i].split(',').map(p => p.trim().replace(/^"|"$/g, ''));
       const row = {};
       headers.forEach((h, idx) => { row[h] = parts[idx] || ''; });
       const name = row.name || '';
       if (!name) { skipped++; continue; }
+      if (seenNames.has(name.toLowerCase())) { skipped++; continue; }
+      seenNames.add(name.toLowerCase());
       const existing = state.inventory.find(inv => inv.name.toLowerCase() === name.toLowerCase());
       if (existing) { skipped++; continue; }
+      const price = parseFloat(row.price);
+      if (row.price && (isNaN(price) || price < 0)) { errors++; continue; }
+      const stock = parseInt(row.stock);
+      if (row.stock && (isNaN(stock) || stock < 0)) { errors++; continue; }
       const item = {
         name: name,
         sku: row.sku || '',
@@ -441,8 +445,11 @@ export function importInventoryCSV() {
     }
     renderInvTable();
     updateLowStockBadge();
-    logAudit('import_inventory', `Imported ${file.name}: ${imported} items added, ${skipped} skipped`);
-    toast(`Imported ${imported} items, skipped ${skipped}`, imported > 0 ? 'success' : 'warning');
+    logAudit('import_inventory', `Imported ${file.name}: ${imported} items added, ${skipped} skipped, ${errors} errors`);
+    const parts = [`Imported ${imported} items`];
+    if (skipped > 0) parts.push(`${skipped} skipped`);
+    if (errors > 0) parts.push(`${errors} errors`);
+    toast(parts.join(', '), imported > 0 ? 'success' : (errors > 0 ? 'error' : 'warning'));
   };
   input.click();
 }
