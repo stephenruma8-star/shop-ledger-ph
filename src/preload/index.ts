@@ -67,10 +67,13 @@ const api = {
   createLocalBackup: (password: string): Promise<unknown> => ipcRenderer.invoke('create-local-backup', { password }),
   retryLocalBackup: (name: string, password: string): Promise<unknown> => ipcRenderer.invoke('retry-local-backup', { name, password }),
   syncSavedSqliteBackups: (): Promise<unknown> => ipcRenderer.invoke('sync-saved-sqlite-backups'),
-  restoreLocalBackup: (name: string, password: string): Promise<unknown> => ipcRenderer.invoke('restore-local-backup', { name, password }),
+  restoreLocalBackup: (name: string, password: string, skipChecksum?: boolean): Promise<unknown> => ipcRenderer.invoke('restore-local-backup', { name, password, skipChecksum }),
   importJsonBackup: (password: string): Promise<unknown> => ipcRenderer.invoke('import-json-backup', { password }),
   runDbHealth: (action: string): Promise<unknown> => ipcRenderer.invoke('run-db-health', { action }),
-  planCloudBackups: (): Promise<unknown> => ipcRenderer.invoke('plan-cloud-backups')
+  planCloudBackups: (): Promise<unknown> => ipcRenderer.invoke('plan-cloud-backups'),
+  dbEncrypt: (password: string): Promise<unknown> => ipcRenderer.invoke('db-encrypt', { password }),
+  dbDecrypt: (password: string): Promise<unknown> => ipcRenderer.invoke('db-decrypt', { password }),
+  dbChecksum: (): Promise<unknown> => ipcRenderer.invoke('db-checksum')
 }
 
 contextBridge.exposeInMainWorld('electronAPI', api)

@@ -1,6 +1,6 @@
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
 import { closeModal, dbLoad, escapeHtml, hashPassword, modal, runCloudBackup, sendOverdueReminders, toast } from './helpers.js'
-import { state } from './state.js'
+import { state, VAT_RATE } from './state.js'
 
 export async function viewSettings(root) {
   await Promise.all([dbLoad('settings'), dbLoad('users')]);
@@ -26,6 +26,22 @@ export async function viewSettings(root) {
            <div><label class="text-xs text-gray-500 block">Loyalty Points Per ₱1</label><input id="set-pointsPerPeso" type="number" min="0" step="0.1" value="${escapeHtml(settingsMap['pointsPerPeso'] || '1')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" placeholder="1" /><p class="text-xs text-gray-400 mt-1">Points earned per ₱1 spent. 100 points = ₱1 discount.</p></div>
          </div>
        </div>
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
+        <h3 class="font-bold text-lg mb-4 flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Tax / BIR Settings</h3>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="text-xs text-gray-500 block">Business TIN (Tax Identification Number)</label><input id="set-businessTin" value="${escapeHtml(settingsMap['businessTin'] || '')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" placeholder="XXX-XXX-XXX-000" /></div>
+          <div><label class="text-xs text-gray-500 block">VAT Registration Number</label><input id="set-vatRegNo" value="${escapeHtml(settingsMap['vatRegNo'] || '')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" placeholder="VAT Registration Number" /></div>
+          <div><label class="text-xs text-gray-500 block">VAT Rate (%)</label><input id="set-vatRate" type="number" min="0" max="100" step="0.1" value="${escapeHtml(settingsMap['vatRate'] || '12')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
+          <div><label class="text-xs text-gray-500 block">Cashier Name (for receipts)</label><input id="set-cashierName" value="${escapeHtml(settingsMap['cashierName'] || '')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" placeholder="Optional cashier name" /></div>
+          <div class="col-span-2">
+            <label class="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" id="set-registeredForVat" ${settingsMap['registeredForVat'] === 'true' ? 'checked' : ''} class="w-4 h-4 text-blue-600 rounded" />
+              Registered for VAT
+            </label>
+            <p class="text-xs text-gray-400 mt-1">Enable this if your business is registered with BIR for VAT. When enabled, VAT breakdown will be shown on receipts and calculated on transactions.</p>
+          </div>
+        </div>
+      </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
         <h3 class="font-bold text-lg mb-4 flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Receipt Branding</h3>
         <div class="space-y-3">
@@ -127,6 +143,9 @@ export async function viewSettings(root) {
         <div class="grid grid-cols-2 gap-3 mb-3">
           <div><label class="text-xs text-gray-500 block">Keep manual backups</label><input id="set-keepManualBackups" type="number" min="0" max="90" value="${escapeHtml(settingsMap['keepManualBackups'] || '0')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" /><p class="text-xs text-gray-400 mt-1">Keep the newest N manual backups, prune the oldest. 0 = keep everything.</p></div>
           <div><label class="text-xs text-gray-500 block">Audit log retention (days)</label><input id="set-auditRetentionDays" type="number" min="0" max="3650" value="${escapeHtml(settingsMap['auditRetentionDays'] || '0')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" /><p class="text-xs text-gray-400 mt-1">Delete audit entries older than this many days (0 = keep everything).</p></div>
+        </div>
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div><label class="text-xs text-gray-500 block">Inventory Valuation Method</label><select id="set-inventoryValuationMethod" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"><option value="fifo" ${(settingsMap['inventoryValuationMethod']||'fifo') === 'fifo' ? 'selected' : ''}>FIFO (First In, First Out)</option><option value="weightedAverage" ${settingsMap['inventoryValuationMethod'] === 'weightedAverage' ? 'selected' : ''}>Weighted Average</option><option value="lastCost" ${settingsMap['inventoryValuationMethod'] === 'lastCost' ? 'selected' : ''}>Last Cost (most recent)</option></select><p class="text-xs text-gray-400 mt-1">Method used to value inventory for reports and valuation display.</p></div>
         </div>
         <div class="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
           <div class="flex items-center justify-between mb-2">
@@ -266,7 +285,7 @@ export async function dbMaintenance(action) {
 }
 
 export async function saveSettings() {
-  const keys = ['shopName','shopContact','shopAddress','weatherLocation','cloudBackupFolder','cloudBackupPassword','cloudBackupInterval','smsApiKey','smsAlertNumber','smsAutoReminderFreq','smsAutoReminderDay','backupEmail','aiApiKey','aiModel','receiptFooter','receiptHeaderText','printStripeColor1','printStripeColor2','thermalHost','thermalPort','snapshotKeepCount','keepManualBackups','auditRetentionDays','pointsPerPeso'];
+  const keys = ['shopName','shopContact','shopAddress','weatherLocation','cloudBackupFolder','cloudBackupPassword','cloudBackupInterval','smsApiKey','smsAlertNumber','smsAutoReminderFreq','smsAutoReminderDay','backupEmail','aiApiKey','aiModel','receiptFooter','receiptHeaderText','printStripeColor1','printStripeColor2','thermalHost','thermalPort','snapshotKeepCount','keepManualBackups','auditRetentionDays','pointsPerPeso','businessTin','vatRegNo','vatRate','cashierName'];
   for (const key of keys) {
     const el = document.getElementById(`set-${key}`);
     if (el) {
@@ -295,6 +314,13 @@ export async function saveSettings() {
     const existing = state.settings.find(s => s.key === 'autoSnapshotEnabled');
     if (existing) { existing.value = val; await dbPut('settings', existing); }
     else { await dbAdd('settings', { key: 'autoSnapshotEnabled', value: val }); }
+  }
+  const vatCb = document.getElementById('set-registeredForVat');
+  if (vatCb) {
+    const val = vatCb.checked ? 'true' : 'false';
+    const existing = state.settings.find(s => s.key === 'registeredForVat');
+    if (existing) { existing.value = val; await dbPut('settings', existing); }
+    else { await dbAdd('settings', { key: 'registeredForVat', value: val }); }
   }
   const smtp = { host: document.getElementById('set-smtp-host')?.value || '', port: document.getElementById('set-smtp-port')?.value || '587', user: document.getElementById('set-smtp-user')?.value || '', pass: document.getElementById('set-smtp-pass')?.value || '', fromName: document.getElementById('set-smtp-fromName')?.value || '' };
   const smtpExisting = state.settings.find(s => s.key === 'smtpConfig');

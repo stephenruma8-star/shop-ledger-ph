@@ -339,6 +339,43 @@ function close() {
   stmts.clear();
 }
 
+function getDbChecksum() {
+  if (!dbPath) return null;
+  const { createHash } = require('crypto');
+  try {
+    const data = fs.readFileSync(dbPath);
+    return createHash('sha256').update(data).digest('hex');
+  } catch (e) { return null; }
+}
+
+function encryptDb(password) {
+  if (!dbPath) return { ok: false, error: 'Database not initialized' };
+  if (!password) return { ok: false, error: 'Password required' };
+  try {
+    const { encryptData } = require('./crypto.js');
+    const data = fs.readFileSync(dbPath);
+    const encrypted = encryptData(data, password);
+    fs.writeFileSync(dbPath, JSON.stringify(encrypted));
+    stmt('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run('_encrypted', 'true');
+    return { ok: true, size: fs.statSync(dbPath).size };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+
+function decryptDb(password) {
+  if (!dbPath) return { ok: false, error: 'Database not initialized' };
+  if (!password) return { ok: false, error: 'Password required' };
+  try {
+    const { decryptData } = require('./crypto.js');
+    const raw = fs.readFileSync(dbPath, 'utf8');
+    const encrypted = JSON.parse(raw);
+    if (!encrypted.salt || !encrypted.iv || !encrypted.data) return { ok: false, error: 'Database is not encrypted' };
+    const decrypted = decryptData(encrypted, password);
+    fs.writeFileSync(dbPath, decrypted);
+    stmt('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run('_encrypted', 'false');
+    return { ok: true, size: fs.statSync(dbPath).size };
+  } catch (e) { return { ok: false, error: 'Wrong password or corrupted database' }; }
+}
+
 function registerDbIpc(ipcMain, userDataPath) {
   ipcMain.handle('db-open', () => init(userDataPath || app.getPath('userData')));
   ipcMain.handle('db-migrate', (e, { dump }) => migrate(dump));
@@ -349,6 +386,9 @@ function registerDbIpc(ipcMain, userDataPath) {
   ipcMain.handle('db-all', (e, { store }) => all(store));
   ipcMain.handle('db-clear', (e, { store }) => clear(store));
   ipcMain.handle('db-stats', () => stats());
+  ipcMain.handle('db-encrypt', (e, { password }) => encryptDb(password));
+  ipcMain.handle('db-decrypt', (e, { password }) => decryptDb(password));
+  ipcMain.handle('db-checksum', () => getDbChecksum());
 }
 
-module.exports = { registerDbIpc, init, migrate, get, add, put, del, all, clear, stats, snapshot, integrityCheck, optimize, checkpoint, vacuum, replaceWith, replaceFromDump, runMigrations, schemaVersion, close, closeDb: close, rollbackMigration, scheduleMaintenance };
+module.exports = { registerDbIpc, init, migrate, get, add, put, del, all, clear, stats, snapshot, integrityCheck, optimize, checkpoint, vacuum, replaceWith, replaceFromDump, runMigrations, schemaVersion, close, closeDb: close, rollbackMigration, scheduleMaintenance, encryptDb, decryptDb, getDbChecksum };

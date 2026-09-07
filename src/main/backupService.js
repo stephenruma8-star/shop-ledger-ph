@@ -2,6 +2,7 @@
 // Pure Node (no electron import) so it can be smoke-tested; wiring is injected via configure().
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const { encryptData, decryptData } = require('./crypto.js');
 const dbm = require('./db.js');
 
@@ -37,6 +38,13 @@ function backupFileName() {
   const d = new Date();
   const p = (n) => String(n).padStart(2, '0');
   return `backup-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.bak`;
+}
+
+function calculateFileChecksum(filePath) {
+  try {
+    const data = fs.readFileSync(filePath);
+    return crypto.createHash('sha256').update(data).digest('hex');
+  } catch (e) { return null; }
 }
 
 function sqliteReady() {
@@ -77,7 +85,7 @@ async function snapshotFile(filePath, password) {
 async function backupEntry(filePath, password, name, auto) {
   fs.mkdirSync(backupsDir(), { recursive: true });
   const list = readBackupIndex();
-  const entry = { name, date: new Date().toISOString(), size: 0, status: 'creating', type: 'snapshot', encrypted: false, auto: !!auto };
+  const entry = { name, date: new Date().toISOString(), size: 0, status: 'creating', type: 'snapshot', encrypted: false, auto: !!auto, checksum: null };
   const idx = list.findIndex(b => b.name === name);
   if (idx >= 0) list[idx] = entry;
   else list.push(entry);
@@ -87,6 +95,7 @@ async function backupEntry(filePath, password, name, auto) {
     entry.size = info.size;
     entry.type = info.type;
     entry.encrypted = info.encrypted;
+    entry.checksum = calculateFileChecksum(filePath);
     entry.status = 'ok';
   } catch (e) {
     entry.status = 'failed';
@@ -118,7 +127,7 @@ function listBackups() {
     const fp = path.join(backupsDir(), b.name);
     let size = b.size || 0;
     try { if (fs.existsSync(fp)) size = fs.statSync(fp).size; } catch (e) {}
-    return { ...b, size };
+    return { ...b, size, checksum: b.checksum || null };
   });
   return { success: true, backups: withSize.reverse() };
 }
@@ -192,7 +201,7 @@ async function planLocalSnapshot() {
 }
 
 // Swaps the live database for a snapshot backup (encrypted ones need the password).
-async function restoreBackup(name, password) {
+async function restoreBackup(name, password, skipChecksum) {
   const entry = readBackupIndex().find(b => b.name === name);
   if (!entry) return { success: false, error: 'Backup not found' };
   const filePath = path.join(backupsDir(), name);
@@ -206,6 +215,12 @@ async function restoreBackup(name, password) {
       catch (e) { return { success: false, error: 'Wrong password or corrupted backup' }; }
       restorePath = filePath + '.tmp';
       fs.writeFileSync(restorePath, dec);
+    }
+    if (!skipChecksum && entry.checksum) {
+      const currentChecksum = calculateFileChecksum(restorePath);
+      if (currentChecksum && currentChecksum !== entry.checksum) {
+        return { success: false, error: 'Checksum mismatch — backup may be corrupted. Re-try with skipChecksum to override.', checksumMismatch: true, expected: entry.checksum, actual: currentChecksum };
+      }
     }
     const head = fs.readFileSync(restorePath);
     if (head.slice(0, 16).toString('ascii') !== 'SQLite format 3\u0000') return { success: false, error: 'Not a valid database snapshot' };

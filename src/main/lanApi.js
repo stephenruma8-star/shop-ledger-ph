@@ -11,6 +11,38 @@ const _offlineQueue = [];
 function getOfflineQueue() { return _offlineQueue.slice(); }
 function clearOfflineQueue() { _offlineQueue.length = 0; return { ok: true }; }
 
+const _ipWhitelist = new Set();
+const _ipBlacklist = new Set();
+
+function getAccessControl() {
+  return {
+    whitelist: [..._ipWhitelist],
+    blacklist: [..._ipBlacklist]
+  };
+}
+
+function addToWhitelist(ip) {
+  _ipWhitelist.add(ip);
+  _ipBlacklist.delete(ip);
+  return { success: true };
+}
+
+function removeFromWhitelist(ip) {
+  _ipWhitelist.delete(ip);
+  return { success: true };
+}
+
+function addToBlacklist(ip) {
+  _ipBlacklist.add(ip);
+  _ipWhitelist.delete(ip);
+  return { success: true };
+}
+
+function removeFromBlacklist(ip) {
+  _ipBlacklist.delete(ip);
+  return { success: true };
+}
+
 const _rateBuckets = new Map();
 function rateLimit(maxPerMin = 60) {
   return (req, res, next) => {
@@ -46,7 +78,45 @@ function validatePhone(v) {
 
 function createLanApiRouter(deps) {
   const router = express.Router();
-  router.use(rateLimit(120));
+  
+  router.use((req, res, next) => {
+    const start = Date.now();
+    res.on('finish', () => {
+      const duration = Date.now() - start;
+      const level = res.statusCode >= 400 ? 'warn' : 'info';
+      const msg = `${req.method} ${req.path} ${res.statusCode} ${duration}ms`;
+      if (deps.logger) deps.logger[level](msg);
+    });
+    next();
+  });
+  
+  router.use(rateLimit(deps.maxRatePerMin || 120));
+  
+  router.use((req, res, next) => {
+    if (req.path === '/api/health') return next();
+    
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : req.query.token;
+    
+    if (!token || token !== deps.lanToken) {
+      return res.status(401).json({ error: 'Unauthorized', code: 'UNAUTHORIZED' });
+    }
+    next();
+  });
+  
+  router.use((req, res, next) => {
+    const clientIp = req.ip || req.connection.remoteAddress;
+    
+    if (_ipBlacklist.has(clientIp)) {
+      return res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
+    }
+    
+    if (_ipWhitelist.size > 0 && !_ipWhitelist.has(clientIp)) {
+      return res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
+    }
+    
+    next();
+  });
 
   const active = (t) => t.status !== 'voided' && t.status !== 'interest';
   const dayTotal = (arr, f) => arr.filter(f).reduce((s, x) => s + (x.amount || x.grandTotal || 0), 0);
@@ -458,7 +528,48 @@ function createLanApiRouter(deps) {
     res.json({ success: true, processed, errors });
   }));
 
+  router.post('/api/auth/verify', wrap(async (req, res) => {
+    const { token } = req.body;
+    if (!token || token !== deps.lanToken) {
+      return res.json({ valid: false });
+    }
+    const dump = await load('settings');
+    const s = {};
+    (dump.settings || []).forEach(x => { s[x.key] = x.value; });
+    res.json({ valid: true, shopName: s.shopName || 'My Sari-Sari Store' });
+  }));
+
+  router.get('/api/access-control', (req, res) => {
+    res.json(getAccessControl());
+  });
+
+  router.post('/api/access-control/whitelist', (req, res) => {
+    const { action, ip } = req.body;
+    if (!ip) return res.status(400).json({ error: 'IP required' });
+    if (action === 'add') {
+      addToWhitelist(ip);
+    } else if (action === 'remove') {
+      removeFromWhitelist(ip);
+    } else {
+      return res.status(400).json({ error: 'Action must be add or remove' });
+    }
+    res.json(getAccessControl());
+  });
+
+  router.post('/api/access-control/blacklist', (req, res) => {
+    const { action, ip } = req.body;
+    if (!ip) return res.status(400).json({ error: 'IP required' });
+    if (action === 'add') {
+      addToBlacklist(ip);
+    } else if (action === 'remove') {
+      removeFromBlacklist(ip);
+    } else {
+      return res.status(400).json({ error: 'Action must be add or remove' });
+    }
+    res.json(getAccessControl());
+  });
+
   return router;
 }
 
-module.exports = { createLanApiRouter, getOfflineQueue, clearOfflineQueue };
+module.exports = { createLanApiRouter, getOfflineQueue, clearOfflineQueue, getAccessControl, addToWhitelist, removeFromWhitelist, addToBlacklist, removeFromBlacklist };

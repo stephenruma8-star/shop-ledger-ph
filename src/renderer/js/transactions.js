@@ -3,7 +3,7 @@ import { renderClientGrid } from './clients.js'
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
 import { calcInterest, closeModal, confirmModal, dbLoad, debounce, escapeHtml, filterByYear, itemThumbHtml, modal, paginate, pushUndo, renderPagination, searchData, showUndoToast, toast, updateLowStockBadge } from './helpers.js'
 import { openPrintWindow } from './printLayout.js'
-import { fmtDate, fmtDateTime, now, peso, round2, state, today } from './state.js'
+import { fmtDate, fmtDateTime, now, peso, round2, state, today, VAT_RATE } from './state.js'
 
 export function getQty(name) { const m = String(name||'1').match(/^-?[\d.]+/); return m ? parseFloat(m[0]) : 1; }
 export async function adjustStock(invId, item, delta) {
@@ -55,6 +55,12 @@ export async function viewTransactions(root) {
     <div class="space-y-4 fade-in">
       <div class="flex gap-2 flex-wrap items-center">
         <input id="txSearch" placeholder="Search transactions..." class="flex-1 min-w-[200px] px-4 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" oninput="debouncedRenderTxTable()" />
+        <select id="tx-status-filter" onchange="filterTxByStatus(this.value)" class="px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm">
+          <option value="all">All Transactions</option>
+          <option value="active">Active Sales</option>
+          <option value="return">Returns/Refunds</option>
+          <option value="voided">Voided</option>
+        </select>
         <input id="txDateFrom" type="date" class="w-36 px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" onchange="renderTxTable()" />
         <input id="txDateTo" type="date" class="w-36 px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" onchange="renderTxTable()" />
         <button onclick="document.getElementById('txDateFrom').value='';document.getElementById('txDateTo').value='';renderTxTable()" class="px-3 py-2 text-sm border dark:border-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Clear</button>
@@ -67,11 +73,19 @@ export async function viewTransactions(root) {
   renderTxTable();
 }
 
+export function filterTxByStatus(status) {
+  renderTxTable();
+}
+
 export function renderTxTable() {
   const q = document.getElementById('txSearch')?.value || '';
   const dFrom = document.getElementById('txDateFrom')?.value || '';
   const dTo = document.getElementById('txDateTo')?.value || '';
+  const statusFilter = document.getElementById('tx-status-filter')?.value || 'all';
   let filtered = filterByYear(searchData(state.transactions, q, ['invoiceNo','clientName','paymentMethod']), 'date');
+  if (statusFilter === 'active') filtered = filtered.filter(t => t.status !== 'voided' && t.status !== 'return');
+  else if (statusFilter === 'return') filtered = filtered.filter(t => t.status === 'return');
+  else if (statusFilter === 'voided') filtered = filtered.filter(t => t.status === 'voided');
   if (dFrom) filtered = filtered.filter(t => (t.date || '') >= dFrom);
   if (dTo) filtered = filtered.filter(t => (t.date || '') <= dTo);
   const sorted = [...filtered].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -125,7 +139,7 @@ export function renderTransactionModal(editTxn) {
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div class="space-y-3">
           <div class="grid grid-cols-2 gap-2">
-            <div><label class="text-xs text-gray-500 block">Client</label><select id="tm-client" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"><option value="">Walk-in</option>${clients.map(c => `<option value="${c.id}" ${c.id === selClient ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}</select></div>
+            <div><label class="text-xs text-gray-500 block">Client</label><select id="tm-client" onchange="autoApplyClientDiscount(this)" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"><option value="">Walk-in</option>${clients.map(c => `<option value="${c.id}" ${c.id === selClient ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}</select></div>
             <div><label class="text-xs text-gray-500 block">Payment</label><select id="tm-payment" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"><option ${selPay==='Cash'?'selected':''}>Cash</option><option ${selPay==='GCash'?'selected':''}>GCash</option><option ${selPay==='Maya'?'selected':''}>Maya</option><option ${selPay==='Bank Transfer'?'selected':''}>Bank Transfer</option></select></div>
           </div>
           <div class="grid grid-cols-2 gap-2">
@@ -244,17 +258,51 @@ export function updateTMTotals() {
   const grandTotal = round2(Math.max(0, subtotal + totalInterest - discount));
   const commissionRate = parseFloat(document.getElementById('tm-commission')?.value || 0);
   const commissionAmount = round2(grandTotal * commissionRate / 100);
+  
+  const registeredForVat = state.settings.find(s => s.key === 'registeredForVat')?.value === 'true';
+  const vatRate = parseFloat(state.settings.find(s => s.key === 'vatRate')?.value) || VAT_RATE;
+  let vatHtml = '';
+  
+  if (registeredForVat && grandTotal > 0) {
+    const vatExclusive = Math.round(grandTotal / (1 + vatRate) * 100) / 100;
+    const vatAmount = Math.round(vatExclusive * vatRate * 100) / 100;
+    vatHtml = `
+      <div class="flex justify-between text-xs text-gray-500 border-t dark:border-gray-700 pt-1 mt-1">
+        <span>VAT Exclusive (${(vatRate * 100).toFixed(0)}%)</span><span>${peso(vatExclusive)}</span>
+      </div>
+      <div class="flex justify-between text-xs text-gray-500">
+        <span>VAT Amount</span><span>${peso(vatAmount)}</span>
+      </div>`;
+  }
+  
   el.innerHTML = `
     <div class="flex justify-between"><span>Subtotal (goods)</span><span>${peso(subtotal)}</span></div>
     ${totalInterest > 0 ? `<div class="flex justify-between text-amber-600"><span>Total Interest</span><span>${peso(totalInterest)}</span></div>` : ''}
     ${scDiscount > 0 ? `<div class="flex justify-between text-green-600"><span>SC/PWD 20%</span><span>-${peso(scDiscount)}</span></div>` : ''}
     ${discount > 0 ? `<div class="flex justify-between text-orange-600"><span>Discount</span><span>-${peso(discount)}</span></div>` : ''}
+    ${vatHtml}
     <div class="flex justify-between font-bold text-lg border-t dark:border-gray-700 pt-1"><span>Total</span><span id="tm-grand-total" class="text-green-600">${peso(grandTotal)}</span></div>
     ${commissionRate > 0 ? `<div class="flex justify-between text-purple-600 text-xs mt-1"><span>Commission (${commissionRate}%)</span><span>${peso(commissionAmount)}</span></div>` : ''}`;
   if (flashTotal(el, grandTotal)) popEl(document.getElementById('tm-grand-total'));
 }
 
 export function toggleSC() { updateTMTotals(); }
+
+export function autoApplyClientDiscount(sel) {
+  const clientId = sel.value ? parseInt(sel.value) : null;
+  const scCheck = document.getElementById('tm-sc');
+  if (!scCheck) return;
+  if (clientId) {
+    const client = state.clients.find(c => c.id === clientId);
+    if (client && (client.isSC || client.isPWD)) {
+      scCheck.checked = true;
+      updateTMTotals();
+      return;
+    }
+  }
+  scCheck.checked = false;
+  updateTMTotals();
+}
 
 export async function saveTransaction() {
   if (window.__app._savingTx) return;
@@ -374,13 +422,47 @@ export async function doSaveTransaction() {
     const invoiceNo = 'INV-' + String(nextNo).padStart(5,'0');
     const commissionRateNew = parseFloat(document.getElementById('tm-commission')?.value || 0);
     const commissionAmountNew = round2(grandTotal * commissionRateNew / 100);
+    const items = txCart.map(i => ({ date: i.date, description: i.description, name: i.name, unitCost: i.unitCost, intRate: i.intRate, amount: lineAmt(i), invId: i.invId, variantName: i.variantName }));
+
+    const recentTx = state.transactions.filter(t =>
+      t.clientId === clientId &&
+      t.date === today() &&
+      t.status !== 'voided' &&
+      t.createdAt && (Date.now() - new Date(t.createdAt).getTime()) < 300000
+    );
+    const isDuplicate = recentTx.some(t => {
+      if ((t.items||[]).length !== items.length) return false;
+      return t.items.every((ti, i) =>
+        ti.description === items[i].description &&
+        ti.name === items[i].name &&
+        ti.unitCost === items[i].unitCost
+      );
+    });
+    if (isDuplicate) {
+      const proceed = await new Promise(resolve => {
+        confirmModal('Similar transaction found within 5 minutes. Continue?', resolve);
+      });
+      if (!proceed) return;
+    }
+
+    const registeredForVat = state.settings.find(s => s.key === 'registeredForVat')?.value === 'true';
+    const vatRateSetting = parseFloat(state.settings.find(s => s.key === 'vatRate')?.value) || VAT_RATE;
+    let vatExclusive = 0;
+    let vatAmount = 0;
+    if (registeredForVat && grandTotal > 0) {
+      vatExclusive = Math.round(grandTotal / (1 + vatRateSetting) * 100) / 100;
+      vatAmount = Math.round(vatExclusive * vatRateSetting * 100) / 100;
+    }
+
     const transaction = {
       invoiceNo, clientId, clientName, date: today(), createdAt: now(),
-      items: txCart.map(i => ({ date: i.date, description: i.description, name: i.name, unitCost: i.unitCost, intRate: i.intRate, amount: lineAmt(i), invId: i.invId, variantName: i.variantName })),
+      items,
       subtotal, totalInterest, discount, scDiscount, grandTotal,
       commissionRate: commissionRateNew, commissionAmount: commissionAmountNew,
       paymentMethod, status: grandTotal <= 0 ? 'paid' : 'pending',
-      balanceAdded: !!(clientId && paymentMethod !== 'Cash')
+      balanceAdded: !!(clientId && paymentMethod !== 'Cash'),
+      duplicateCheck: isDuplicate,
+      vatExclusive, vatAmount, vatRate: vatRateSetting
     };
     const rollback = [];
     try {
@@ -559,8 +641,47 @@ export function viewTransactionDetail(id) {
 
 export async function voidTransaction(id) {
   const t = await dbGet('transactions', id);
-  if (!await confirmModal(`Void sale ${t.invoiceNo} (${peso(t.grandTotal)})? Ibabalik ang stock at iaadjust ang client balance.`)) return;
-  if (t.status === 'voided') { toast('Already voided', 'warning'); return; }
+  if (!t) { toast('Transaction not found', 'error'); return; }
+  if (t.status === 'voided') { toast('Transaction already voided', 'warning'); return; }
+
+  modal(`
+    <div class="p-6">
+      <h3 class="text-lg font-bold mb-4">Void Transaction</h3>
+      <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-4">
+        <p class="text-sm text-red-700 dark:text-red-300"><strong>Invoice:</strong> ${t.invoiceNo}</p>
+        <p class="text-sm text-red-700 dark:text-red-300"><strong>Client:</strong> ${t.clientName || 'Walk-in'}</p>
+        <p class="text-sm text-red-700 dark:text-red-300"><strong>Amount:</strong> ${peso(t.grandTotal)}</p>
+        <p class="text-sm text-red-700 dark:text-red-300"><strong>Date:</strong> ${t.date}</p>
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-medium mb-1">Reason for voiding <span class="text-red-500">*</span></label>
+        <select id="void-reason" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
+          <option value="">Select reason...</option>
+          <option value="duplicate">Duplicate entry</option>
+          <option value="error">Data entry error</option>
+          <option value="cancelled">Customer cancelled</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-medium mb-1">Notes (optional)</label>
+        <textarea id="void-notes" rows="2" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" placeholder="Additional details..."></textarea>
+      </div>
+      <div class="flex justify-end gap-2">
+        <button onclick="closeModal()" class="px-4 py-2 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">Cancel</button>
+        <button onclick="confirmVoidTransaction(${id})" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Void Transaction</button>
+      </div>
+    </div>
+  `);
+}
+
+window.confirmVoidTransaction = async function(id) {
+  const t = await dbGet('transactions', id);
+  if (!t) { toast('Transaction not found', 'error'); closeModal(); return; }
+  const reason = document.getElementById('void-reason')?.value;
+  if (!reason) { toast('Please select a reason', 'error'); return; }
+  const notes = document.getElementById('void-notes')?.value || '';
+  closeModal();
   const origStatus = t.status;
   const origBalanceAdded = t.balanceAdded;
   for (const item of (t.items || [])) {
@@ -570,7 +691,7 @@ export async function voidTransaction(id) {
     const c = await dbGet('clients', t.clientId);
     if (c) { c.balance = Math.max(0, (c.balance || 0) - (t.grandTotal || 0)); await dbPut('clients', c); }
   }
-  t.status = 'voided'; t.voidedAt = now();
+  t.status = 'voided'; t.voidedAt = now(); t.voidReason = reason; t.voidNotes = notes;
   await dbPut('transactions', t);
   pushUndo({
     description: `Voided sale ${t.invoiceNo}`,
@@ -613,7 +734,7 @@ export async function voidTransaction(id) {
   [state.transactions, state.inventory, state.clients] = await Promise.all([dbAll('transactions'), dbAll('inventory'), dbAll('clients')]);
   updateLowStockBadge();
   toast(`Sale ${t.invoiceNo} voided`, 'success');
-  await logAudit('void', `Sale ${t.invoiceNo} voided - ${peso(t.grandTotal)}`);
+  await logAudit('void', `Sale ${t.invoiceNo} voided - ${peso(t.grandTotal)} (reason: ${reason}${notes ? ', notes: ' + notes : ''})`);
   showUndoToast();
   renderTxTable();
 }
@@ -624,12 +745,50 @@ export async function returnTransaction(id) {
   if (orig.status === 'voided') { toast('Cannot return a voided sale', 'warning'); return; }
   const items = orig.items || [];
   if (!items.length) { toast('No items to return', 'warning'); return; }
-  const itemRows = items.map((item, idx) => `<tr><td class="p-1"><input type="checkbox" checked class="ret-item" data-idx="${idx}" /></td><td class="p-1">${escapeHtml(item.description||item.name||'Item')}</td><td class="p-1 text-center">${escapeHtml(item.name||item.qty||'1')}</td><td class="p-1 text-right">${peso(item.unitCost||item.price||0)}</td><td class="p-1 text-right">${peso(getQty(item.name||item.qty||'1') * (item.unitCost||item.price||0))}</td></tr>`).join('');
+  const itemRows = items.map((item, idx) => {
+    const amt = getQty(item.name||item.qty||'1') * (item.unitCost||item.price||0);
+    return `<tr class="border-b dark:border-gray-700">
+      <td class="p-2"><input type="checkbox" checked class="ret-item" data-idx="${idx}" /></td>
+      <td class="p-2">${escapeHtml(item.description||item.name||'Item')}</td>
+      <td class="p-2 text-center">${escapeHtml(item.name||item.qty||'1')}</td>
+      <td class="p-2 text-right">${peso(item.unitCost||item.price||0)}</td>
+      <td class="p-2 text-right font-medium">${peso(amt)}</td>
+    </tr>`;
+  }).join('');
+  const retTotal = items.reduce((s, item) => s + getQty(item.name||item.qty||'1') * (item.unitCost||item.price||0), 0);
   modal(`
     <div class="p-6">
       <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">Return Items — ${orig.invoiceNo}</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
       <p class="text-sm text-gray-500 mb-3">Select items to return. Inventory will be restored and client balance adjusted.</p>
-      <table class="w-full text-xs mb-3"><thead><tr class="bg-gray-50 dark:bg-gray-700"><th class="p-1 w-8"></th><th class="p-1 text-left">Item</th><th class="p-1 text-center">Qty</th><th class="p-1 text-right">Price</th><th class="p-1 text-right">Amount</th></tr></thead><tbody>${itemRows}</tbody></table>
+      <div class="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-3 mb-4">
+        <p class="text-sm text-purple-700 dark:text-purple-300"><strong>Client:</strong> ${orig.clientName || 'Walk-in'} &middot; <strong>Original Total:</strong> ${peso(orig.grandTotal)}</p>
+      </div>
+      <div class="overflow-auto max-h-48 border dark:border-gray-700 rounded-lg mb-4">
+        <table class="w-full text-xs"><thead><tr class="bg-gray-50 dark:bg-gray-700 sticky top-0"><th class="p-2 w-8"></th><th class="p-2 text-left">Item</th><th class="p-2 text-center">Qty</th><th class="p-2 text-right">Price</th><th class="p-2 text-right">Amount</th></tr></thead><tbody>${itemRows}</tbody></table>
+      </div>
+      <div class="flex justify-between text-sm font-semibold mb-4 px-2"><span>Total Return Amount:</span><span class="text-purple-600">${peso(retTotal)}</span></div>
+      <div class="grid grid-cols-2 gap-3 mb-4">
+        <div><label class="block text-sm font-medium mb-1">Reason <span class="text-red-500">*</span></label>
+          <select id="ret-reason" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm">
+            <option value="">Select reason...</option>
+            <option value="defective">Defective item</option>
+            <option value="wrong-item">Wrong item sent</option>
+            <option value="changed-mind">Customer changed mind</option>
+            <option value="damaged">Damaged in transit</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div><label class="block text-sm font-medium mb-1">Refund Method <span class="text-red-500">*</span></label>
+          <select id="ret-refund-method" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm">
+            <option value="cash">Cash Refund</option>
+            <option value="store-credit">Store Credit</option>
+            <option value="original">Original Payment Method</option>
+          </select>
+        </div>
+      </div>
+      <div class="mb-4"><label class="block text-sm font-medium mb-1">Notes (optional)</label>
+        <textarea id="ret-notes" rows="2" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm" placeholder="Additional details about the return..."></textarea>
+      </div>
       <button onclick="confirmReturn(${id})" class="w-full py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="20 6 9 17 4 12"/></svg>Process Return</button>
     </div>`);
 }
@@ -639,6 +798,10 @@ export async function confirmReturn(id) {
   if (!orig) { toast('Transaction not found', 'error'); return; }
   const checked = document.querySelectorAll('.ret-item:checked');
   if (!checked.length) { toast('Select at least one item to return', 'warning'); return; }
+  const reason = document.getElementById('ret-reason')?.value || '';
+  const refundMethod = document.getElementById('ret-refund-method')?.value || 'cash';
+  const notes = document.getElementById('ret-notes')?.value || '';
+  if (!reason) { toast('Please select a reason for the return', 'error'); return; }
   const returnItems = [];
   for (const cb of checked) {
     const idx = parseInt(cb.dataset.idx);
@@ -647,10 +810,10 @@ export async function confirmReturn(id) {
     const qty = getQty(item.name || item.qty || '1');
     returnItems.push({ ...item, name: '-' + (item.name || qty), qty: -qty });
   }
-  await doReturn(orig, returnItems);
+  await doReturn(orig, returnItems, { reason, refundMethod, notes });
 }
 
-export function buildReturnTxn(orig, returnItems, reason = '') {
+export function buildReturnTxn(orig, returnItems, opts = {}) {
   const retTotal = round2(returnItems.reduce((s, i) => s + (getQty(i.name || i.qty || '1') * (i.unitCost || i.price || 0)), 0));
   return {
     invoiceNo: (orig.invoiceNo || '') + '-R',
@@ -668,16 +831,18 @@ export function buildReturnTxn(orig, returnItems, reason = '') {
     status: 'return',
     balanceAdded: false,
     refId: orig.id,
-    reason: reason || ''
+    reason: opts.reason || '',
+    refundMethod: opts.refundMethod || 'cash',
+    returnNotes: opts.notes || ''
   };
 }
 
-export async function doReturn(orig, returnItems) {
+export async function doReturn(orig, returnItems, opts = {}) {
   if (!returnItems.length) { toast('Select at least one item to return', 'warning'); return; }
   for (const item of returnItems) {
     if (item.invId) await adjustStock(item.invId, item, 1);
   }
-  const retTxn = buildReturnTxn(orig, returnItems);
+  const retTxn = buildReturnTxn(orig, returnItems, opts);
   const retTotal = retTxn.grandTotal || 0;
   if (wasBalanceAdded(orig)) {
     const c = await dbGet('clients', orig.clientId);
@@ -689,7 +854,7 @@ export async function doReturn(orig, returnItems) {
   updateLowStockBadge();
   closeModal();
   toast(`Return processed: ${peso(Math.abs(retTotal))}`, 'success');
-  await logAudit('return', `Return on ${orig.invoiceNo} - ${peso(Math.abs(retTotal))}`);
+  await logAudit('return', `Return on ${orig.invoiceNo} - ${peso(Math.abs(retTotal))} (reason: ${opts.reason || 'n/a'}, method: ${opts.refundMethod || 'cash'})`);
   renderTxTable();
 }
 
@@ -702,7 +867,7 @@ export async function refundSale(id) {
   await doReturn(orig, (orig.items || []).map(item => {
     const qty = getQty(item.name || item.qty || '1');
     return { ...item, name: '-' + (item.name || qty), qty: -qty };
-  }));
+  }), { reason: 'full-refund', refundMethod: 'original', notes: 'Full refund processed' });
 }
 
 export async function deleteClientFromSale(id) {
@@ -877,6 +1042,7 @@ Object.defineProperties(window, {
   updateCartRowAmt: { get: () => updateCartRowAmt, configurable: true },
   debouncedRenderTxTable: { get: () => debouncedRenderTxTable, configurable: true },
   viewTransactions: { get: () => viewTransactions, configurable: true },
+  filterTxByStatus: { get: () => filterTxByStatus, configurable: true },
   renderTxTable: { get: () => renderTxTable, configurable: true },
   openTransactionModal: { get: () => openTransactionModal, configurable: true },
   renderTransactionModal: { get: () => renderTransactionModal, configurable: true },
@@ -886,6 +1052,7 @@ Object.defineProperties(window, {
   removeCartItem: { get: () => removeCartItem, configurable: true },
   updateTMTotals: { get: () => updateTMTotals, configurable: true },
   toggleSC: { get: () => toggleSC, configurable: true },
+  autoApplyClientDiscount: { get: () => autoApplyClientDiscount, configurable: true },
   saveTransaction: { get: () => saveTransaction, configurable: true },
   doSaveTransaction: { get: () => doSaveTransaction, configurable: true },
   linkCartToInventory: { get: () => linkCartToInventory, configurable: true },

@@ -4,7 +4,7 @@ import { dbAdd, dbAll, dbDel, dbPut } from './database.js'
 import { renderExpTable } from './expenses.js'
 import { renderPayTable } from './payments.js'
 import { navigate } from './router.js'
-import { now, peso, state, today } from './state.js'
+import { now, peso, state, today, VAT_RATE } from './state.js'
 import { renderTxTable, txCart, updateCartRowAmt, updateTMTotals } from './transactions.js'
 
 export function dp(d) { const p = (d||'').split('-'); return { y: p[0]||'', m: p[1]||'', d: p[2]||'' }; }
@@ -302,6 +302,14 @@ export function intRateOptions(selected) {
 
 export function calcInterest(sub, ratePct, days) {
   return sub === 0 || ratePct === 0 ? 0 : parseFloat((sub * (ratePct / 100) * (days / 30)).toFixed(2));
+}
+
+export function formatVATBreakdown(subtotal) {
+  const vatRate = parseFloat(state.settings.find(s => s.key === 'vatRate')?.value) || VAT_RATE;
+  const vatExclusive = Math.round((Number(subtotal) || 0) / (1 + vatRate) * 100) / 100;
+  const vatAmount = Math.round(vatExclusive * vatRate * 100) / 100;
+  const total = Math.round((Number(subtotal) || 0) * 100) / 100;
+  return { vatExclusive, vatAmount, total };
 }
 
 export function toast(msg, type = 'info') {
@@ -1097,5 +1105,6 @@ Object.defineProperties(window, {
   redo: { get: () => redo, configurable: true },
   showUndoToast: { get: () => showUndoToast, configurable: true },
   animateCounter: { get: () => animateCounter, configurable: true },
-  staggerRows: { get: () => staggerRows, configurable: true }
+  staggerRows: { get: () => staggerRows, configurable: true },
+  formatVATBreakdown: { get: () => formatVATBreakdown, configurable: true }
 });

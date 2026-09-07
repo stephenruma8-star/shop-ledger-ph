@@ -14,6 +14,7 @@ export async function viewInventory(root) {
         <button onclick="openInventoryModal()" title="F5 / Ctrl+I" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Item</button>
         <button onclick="importInventoryCSV()" class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Import CSV</button>
         <button onclick="showReorderSuggestions()" class="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>Reorder</button>
+        <button onclick="filterExpiringSoon()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Expiring Soon</button>
       </div>
       <div id="reorderSection" class="hidden"></div>
       <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden glass-card">
@@ -30,9 +31,18 @@ export function renderInvTable() {
   const container = document.getElementById('invTable');
   if (!container) return;
   if (sorted.length === 0) { container.innerHTML = '<div class="empty-state"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg><p class="font-medium text-gray-500">No inventory items yet</p><p class="text-sm mt-1">Click "New Item" to add your first product</p></div>'; return; }
-  container.innerHTML = `<table class="w-full text-sm"><thead><tr class="bg-gray-50 dark:bg-gray-700 text-left"><th class="p-3 w-10"><input type="checkbox" onchange="document.querySelectorAll('.inv-check').forEach(c=>c.checked=this.checked);toggleInvBulkBar()" /></th><th class="p-3 w-12">Photo</th><th class="p-3">Name</th><th class="p-3">SKU</th><th class="p-3">Category</th><th class="p-3 text-right">Price</th>        <th class="p-3 text-right">Cost</th><th class="p-3 text-center">Stock</th><th class="p-3 text-left">Unit</th><th class="p-3 text-center">Actions</th></tr></thead>
+  container.innerHTML = `<table class="w-full text-sm"><thead><tr class="bg-gray-50 dark:bg-gray-700 text-left"><th class="p-3 w-10"><input type="checkbox" onchange="document.querySelectorAll('.inv-check').forEach(c=>c.checked=this.checked);toggleInvBulkBar()" /></th><th class="p-3 w-12">Photo</th><th class="p-3">Name</th><th class="p-3">SKU</th><th class="p-3">Category</th><th class="p-3 text-right">Price</th>        <th class="p-3 text-right">Cost</th><th class="p-3 text-center">Stock</th><th class="p-3 text-left">Unit</th><th class="p-3">Expiry</th><th class="p-3 text-center">Actions</th></tr></thead>
     <tbody>${sorted.map(i => {
       const low = (i.stock || 0) <= (i.minStock || 5);
+      const todayStr = new Date().toISOString().slice(0,10);
+      let expiryCell = '<span class="text-gray-400">-</span>';
+      if (i.expiryDate) {
+        const expDate = i.expiryDate;
+        const diffDays = Math.ceil((new Date(expDate) - new Date(todayStr)) / 86400000);
+        if (diffDays < 0) expiryCell = `<span class="text-red-600 font-bold">Expired</span>`;
+        else if (diffDays <= 30) expiryCell = `<span class="text-yellow-600 font-semibold">Expiring soon</span>`;
+        else expiryCell = `<span class="text-gray-500">${escapeHtml(expDate)}</span>`;
+      }
       return `<tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
         <td class="p-3 w-10"><input type="checkbox" value="${i.id}" class="inv-check" onchange="toggleInvBulkBar()" /></td>
         <td class="p-3">${itemThumbHtml(i)}</td>
@@ -41,6 +51,7 @@ export function renderInvTable() {
         <td class="p-3 text-right text-gray-500">${peso(i.costPrice||0)}</td>
         <td class="p-3 text-center"><div class="flex flex-col items-center gap-1"><span class="${low ? 'text-red-600 font-bold' : ''}">${i.stock || 0}</span><div class="progress-bar w-16 ${low ? 'progress-red' : (i.stock || 0) > (i.minStock || 5) * 2 ? 'progress-green' : 'progress-yellow'}"><div class="progress-fill" style="width:${Math.min(100, ((i.stock || 0) / Math.max(1, (i.minStock || 5) * 2)) * 100)}%"></div></div></div></td>
         <td class="p-3 text-left text-gray-500 text-xs">${escapeHtml(i.unit||'pcs')}${i.variants && i.variants.length ? `<br><span class="text-blue-500 font-medium">${i.variants.length} vars</span>` : ''}</td>
+        <td class="p-3">${expiryCell}</td>
         <td class="p-3 text-center">
           <button onclick="openInventoryModal(${i.id})" class="text-blue-600 hover:text-blue-800 text-xs mr-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit</button>
           <button onclick="viewItemHistory(${i.id})" class="text-green-600 hover:text-green-800 text-xs mr-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>History</button>
@@ -161,6 +172,10 @@ export function openInventoryModal(id) {
           <div><label class="text-xs text-gray-500 block">Min Stock</label><input id="if-min" type="number" value="${isEdit ? (i.minStock||5) : '5'}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
           <div><label class="text-xs text-gray-500 block">Unit</label><input id="if-unit" value="${isEdit ? escapeHtml(i.unit||'') : ''}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" placeholder="pcs, kg, L..." /></div>
         </div>
+        <div class="mb-3">
+          <label class="block text-sm font-medium mb-1">Expiry Date</label>
+          <input type="date" id="inv-expiry" value="${isEdit ? (i.expiryDate||'') : ''}" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" />
+        </div>
         <div>
           <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="if-hasVariants" onchange="document.getElementById('if-variants-section').classList.toggle('hidden',!this.checked)" ${isEdit && i.variants && i.variants.length ? 'checked' : ''} /> Has Variants (sizes/colors)</label>
           <div id="if-variants-section" class="${isEdit && i.variants && i.variants.length ? '' : 'hidden'} mt-2 space-y-1">
@@ -209,6 +224,8 @@ export async function saveInv(id) {
     }
   }
   const totalStock = variants.length > 0 ? variants.reduce((s, v) => s + v.stock, 0) : (parseInt(stEl.value) || 0);
+  const expiryEl = document.getElementById('inv-expiry');
+  const expiryDate = expiryEl ? expiryEl.value || '' : '';
 
   const obj = {
     name, sku, barcode,
@@ -220,7 +237,8 @@ export async function saveInv(id) {
     lowStock: parseInt(mnEl.value) || 5,
     unit: (unEl ? unEl.value.trim() : '') || 'pcs',
     variants: variants.length > 0 ? variants : undefined,
-    image: _invImage || undefined
+    image: _invImage || undefined,
+    expiryDate
   };
   if (id) {
     const existing = await dbGet('inventory', id);
@@ -409,6 +427,33 @@ export function viewItemHistory(id) {
 }
 
 
+export function filterExpiringSoon() {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const expiring = state.inventory.filter(i => {
+    if (!i.expiryDate) return false;
+    const diffDays = Math.ceil((new Date(i.expiryDate) - new Date(todayStr)) / 86400000);
+    return diffDays <= 30;
+  });
+  if (expiring.length === 0) { toast('No items expiring soon', 'success'); return; }
+  const container = document.getElementById('invTable');
+  if (!container) return;
+  container.innerHTML = `<table class="w-full text-sm"><thead><tr class="bg-gray-50 dark:bg-gray-700 text-left"><th class="p-3 w-12">Photo</th><th class="p-3">Name</th><th class="p-3">SKU</th><th class="p-3 text-center">Stock</th><th class="p-3">Expiry</th><th class="p-3">Status</th></tr></thead>
+    <tbody>${expiring.map(i => {
+      const diffDays = Math.ceil((new Date(i.expiryDate) - new Date(todayStr)) / 86400000);
+      const statusClass = diffDays < 0 ? 'text-red-600 font-bold' : 'text-yellow-600 font-semibold';
+      const statusText = diffDays < 0 ? 'Expired' : `In ${diffDays} day(s)`;
+      return `<tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+        <td class="p-3">${itemThumbHtml(i)}</td>
+        <td class="p-3 font-medium">${escapeHtml(i.name)}</td>
+        <td class="p-3 text-gray-500">${escapeHtml(i.sku || '-')}</td>
+        <td class="p-3 text-center">${i.stock || 0}</td>
+        <td class="p-3">${escapeHtml(i.expiryDate || '')}</td>
+        <td class="p-3 ${statusClass}">${statusText}</td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
+  toast(`Showing ${expiring.length} expiring/expired item(s)`, 'info');
+}
+
 // expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
 Object.defineProperties(window, {
   viewInventory: { get: () => viewInventory, configurable: true },
@@ -429,8 +474,85 @@ Object.defineProperties(window, {
   applyBulkEdit: { get: () => applyBulkEdit, configurable: true },
   viewItemHistory: { get: () => viewItemHistory, configurable: true },
   generateProductBarcode: { get: () => generateProductBarcode, configurable: true },
-  importInventoryCSV: { get: () => importInventoryCSV, configurable: true }
+  importInventoryCSV: { get: () => importInventoryCSV, configurable: true },
+  calculateInventoryValue: { get: () => calculateInventoryValue, configurable: true }
 });
+
+export function calculateInventoryValue(method) {
+  const items = state.inventory || [];
+  const method_ = method || 'fifo';
+  if (method_ === 'lastCost') {
+    let total = 0;
+    const breakdown = [];
+    for (const item of items) {
+      const qty = item.stock || 0;
+      const cost = item.costPrice || 0;
+      const value = qty * cost;
+      total += value;
+      breakdown.push({ name: item.name, qty, unitCost: cost, totalValue: value });
+    }
+    return { total, breakdown, method: 'Last Cost' };
+  }
+  if (method_ === 'weightedAverage') {
+    let total = 0;
+    const breakdown = [];
+    for (const item of items) {
+      const txs = (state.transactions || []).filter(t => t.status !== 'voided' && t.status !== 'interest');
+      let totalPurchased = 0;
+      let totalCost = 0;
+      for (const t of txs) {
+        for (const it of (t.items || [])) {
+          if (it.invId === item.id) {
+            const m = String(it.name || it.qty || '1').match(/^-?[\d.]+/);
+            const qty = m ? parseFloat(m[0]) : 1;
+            if (qty > 0) {
+              totalPurchased += qty;
+              totalCost += qty * (it.unitCost || item.costPrice || 0);
+            }
+          }
+        }
+      }
+      const avgCost = totalPurchased > 0 ? totalCost / totalPurchased : (item.costPrice || 0);
+      const qty = item.stock || 0;
+      const value = qty * avgCost;
+      total += value;
+      breakdown.push({ name: item.name, qty, unitCost: avgCost, totalValue: value });
+    }
+    return { total, breakdown, method: 'Weighted Average' };
+  }
+  // FIFO: oldest purchase costs first
+  let total = 0;
+  const breakdown = [];
+  for (const item of items) {
+    const txs = (state.transactions || []).filter(t => t.status !== 'voided' && t.status !== 'interest');
+    const purchases = [];
+    for (const t of txs) {
+      for (const it of (t.items || [])) {
+        if (it.invId === item.id) {
+          const m = String(it.name || it.qty || '1').match(/^-?[\d.]+/);
+          const qty = m ? parseFloat(m[0]) : 1;
+          if (qty > 0) {
+            purchases.push({ date: t.date || t.createdAt || '', qty, cost: it.unitCost || item.costPrice || 0 });
+          }
+        }
+      }
+    }
+    purchases.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    let remaining = item.stock || 0;
+    let itemValue = 0;
+    for (const p of purchases) {
+      if (remaining <= 0) break;
+      const used = Math.min(remaining, p.qty);
+      itemValue += used * p.cost;
+      remaining -= used;
+    }
+    if (remaining > 0) itemValue += remaining * (item.costPrice || 0);
+    const avgCost = (item.stock || 0) > 0 ? itemValue / (item.stock || 0) : (item.costPrice || 0);
+    total += itemValue;
+    breakdown.push({ name: item.name, qty: item.stock || 0, unitCost: avgCost, totalValue: itemValue });
+  }
+  return { total, breakdown, method: 'FIFO' };
+}
 
 export function importInventoryCSV() {
   const input = document.createElement('input');

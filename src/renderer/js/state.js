@@ -20,6 +20,11 @@ export const state = {
 export const peso = (n) => '₱' + (Math.round(Number(n || 0) * 100) / 100).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 export const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
+export const VAT_RATE = 0.12;
+export const calcVAT = (amount) => Math.round((Number(amount) || 0) * VAT_RATE * 100) / 100;
+export const calcVATinclusive = (amount) => Math.round((Number(amount) || 0) / (1 + VAT_RATE) * 100) / 100;
+export const calcVATexclusive = (amount) => Math.round((Number(amount) || 0) * VAT_RATE * 100) / 100;
+
 export function fmtDate(d) {
   if (!d) return '';
   const dt = new Date(d);
@@ -52,5 +57,9 @@ Object.defineProperties(window, {
   fmtDate: { get: () => fmtDate, configurable: true },
   fmtDateTime: { get: () => fmtDateTime, configurable: true },
   today: { get: () => today, configurable: true },
-  now: { get: () => now, configurable: true }
+  now: { get: () => now, configurable: true },
+  VAT_RATE: { get: () => VAT_RATE, configurable: true },
+  calcVAT: { get: () => calcVAT, configurable: true },
+  calcVATinclusive: { get: () => calcVATinclusive, configurable: true },
+  calcVATexclusive: { get: () => calcVATexclusive, configurable: true }
 });

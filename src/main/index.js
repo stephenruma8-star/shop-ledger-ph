@@ -70,14 +70,16 @@ const { createLanApiRouter } = require('./lanApi.js');
 const { registerDbIpc, closeDb, init: sqliteInit, add: dbAddRow, put: dbPutRow, all: dbAllRows } = require('./db.js');
 const { encryptData, decryptData } = require('./crypto.js');
 const backupService = require('./backupService.js');
+const { getConfig } = require('./config.js');
 
 let autoUpdater = null;
 try { autoUpdater = require('electron-updater').autoUpdater; if (autoUpdater) autoUpdater.autoCheckUpdates = false; autoUpdater.autoDownload = false; } catch (e) { logger.error('autoUpdater not available: ' + e.message); }
 
 let isQuitting = false;
-const LAN_PORT = 3456;
-const UDP_PORT = 3457;
-const WS_PORT = 3458;
+const config = getConfig(app.getPath('userData'));
+const LAN_PORT = config.LAN_PORT;
+const UDP_PORT = config.UDP_PORT;
+const WS_PORT = config.WS_PORT;
 const APP_CONFIG_PATH = path.join(app.getPath('userData'), 'app-prefs.json');
 function readAppPrefs() {
   try { return JSON.parse(fs.readFileSync(APP_CONFIG_PATH, 'utf8')); } catch (e) { return {}; }
@@ -288,15 +290,32 @@ function startLANServer() {
     setSetting: (key, value) => setSetting(key, value),
     backupService,
     logger,
-    notify: (info) => notifyDataChanged(info)
+    notify: (info) => notifyDataChanged(info),
+    lanToken: _lanToken,
+    maxRatePerMin: config.MAX_RATE_PER_MIN
   }));
 
   expressApp.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
+  const https = require('https');
+  const sslCertPath = path.join(app.getPath('userData'), 'ssl', 'cert.pem');
+  const sslKeyPath = path.join(app.getPath('userData'), 'ssl', 'key.pem');
+  let lanServer;
+  let protocol = 'http';
+  
+  if (config.ENABLE_HTTPS && fs.existsSync(sslCertPath) && fs.existsSync(sslKeyPath)) {
+    const options = { key: fs.readFileSync(sslKeyPath), cert: fs.readFileSync(sslCertPath) };
+    lanServer = https.createServer(options, expressApp);
+    protocol = 'https';
+    logger.info('LAN server using HTTPS');
+  } else {
+    lanServer = require('http').createServer(expressApp);
+    logger.info('LAN server using HTTP (no SSL certs found)');
+  }
+  
   try {
-    lanServer = expressApp.listen(LAN_PORT, '0.0.0.0', () => {
-      const url = `http://${getLocalIP()}:${LAN_PORT}`;
-      logger.info('LAN server at ' + url);
+    lanServer.listen(LAN_PORT, '0.0.0.0', () => {
+      const url = `${protocol}://${getLocalIP()}:${LAN_PORT}`;
       logger.info('LAN server at ' + url);
     });
   } catch (e) { logger.error('LAN server error: ' + e.message); }
@@ -525,9 +544,9 @@ ipcMain.handle('retry-local-backup', async (event, { name, password }) => {
   } catch (err) { return { success: false, error: err.message }; }
 });
 
-ipcMain.handle('restore-local-backup', async (event, { name, password }) => {
+ipcMain.handle('restore-local-backup', async (event, { name, password, skipChecksum }) => {
   try {
-    return await backupService.restoreBackup(name, password);
+    return await backupService.restoreBackup(name, password, skipChecksum);
   } catch (err) { return { success: false, error: err.message }; }
 });
 
@@ -602,12 +621,13 @@ ipcMain.handle('load-backup-file', async () => {
 });
 
 ipcMain.handle('generate-mobile-qr', async () => {
-  const url = `http://${getLocalIP()}:${LAN_PORT}?ws=${WS_PORT}&token=${_lanToken}`;
+  const protocol = (config.ENABLE_HTTPS && fs.existsSync(path.join(app.getPath('userData'), 'ssl', 'cert.pem')) && fs.existsSync(path.join(app.getPath('userData'), 'ssl', 'key.pem'))) ? 'https' : 'http';
+  const url = `${protocol}://${getLocalIP()}:${LAN_PORT}?ws=${WS_PORT}&token=${_lanToken}`;
   const qr = await QRCode.toDataURL(url, { width: 300 });
   const tsIp = getTailscaleIP();
   let tailscale = null;
   if (tsIp) {
-    const tsUrl = `http://${tsIp}:${LAN_PORT}?ws=${WS_PORT}&token=${_lanToken}`;
+    const tsUrl = `${protocol}://${tsIp}:${LAN_PORT}?ws=${WS_PORT}&token=${_lanToken}`;
     tailscale = { url: tsUrl, qr: await QRCode.toDataURL(tsUrl, { width: 300 }) };
   }
   return { url, qr, token: _lanToken, wsPort: WS_PORT, tailscale };

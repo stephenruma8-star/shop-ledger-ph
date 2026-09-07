@@ -1,5 +1,5 @@
 import { toast } from './helpers.js'
-import { fmtDateTime, now, state } from './state.js'
+import { fmtDateTime, now, state, VAT_RATE } from './state.js'
 
 export function printCss(pageSize) {
   const size = pageSize || 'A4';
@@ -76,9 +76,13 @@ export function printHeader() {
   const contact = m['shopContact'] || '';
   const logo = m['receiptLogo'] || '';
   const hdr = m['receiptHeaderText'] || '';
+  const vatRegNo = m['vatRegNo'] || '';
+  const businessTin = m['businessTin'] || '';
   const logoHtml = logo ? `<img src="${logo.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}" class="logo" />` : '';
   const p = [addr, contact ? 'Tel: '+contact : ''].filter(Boolean).join(' | ');
-  return `<div class="print-header">${logoHtml}<h1>${escHtml(name)}</h1>${p ? '<p>'+escHtml(p)+'</p>' : ''}${hdr ? '<p>'+hdr.split('\n').map(l=>escHtml(l)).join('<br>')+'</p>' : ''}<p class="print-date">Printed: ${fmtDateTime(now())}</p></div>`;
+  const vatInfo = vatRegNo ? `<p>VAT Reg No: ${escHtml(vatRegNo)}</p>` : '';
+  const tinInfo = businessTin ? `<p>TIN: ${escHtml(businessTin)}</p>` : '';
+  return `<div class="print-header">${logoHtml}<h1>${escHtml(name)}</h1>${p ? '<p>'+escHtml(p)+'</p>' : ''}${vatInfo}${tinInfo}${hdr ? '<p>'+hdr.split('\n').map(l=>escHtml(l)).join('<br>')+'</p>' : ''}<p class="print-date">Printed: ${fmtDateTime(now())}</p></div>`;
 }
 
 export function printFooter() {
@@ -118,17 +122,47 @@ export function thermalReceipt(tx) {
   const contact = m['shopContact'] || '';
   const hdr = m['receiptHeaderText'] || '';
   const msg = m['receiptFooter'] || 'Thank you for your patronage!';
+  const vatRegNo = m['vatRegNo'] || '';
+  const businessTin = m['businessTin'] || '';
+  const registeredForVat = m['registeredForVat'] === 'true';
+  const vatRate = parseFloat(m['vatRate']) || VAT_RATE;
+  const cashierName = m['cashierName'] || '';
+  
   let html = `<div class="receipt"><div class="rct-header"><h2>${escHtml(name)}</h2>`;
   if (addr) html += `<p>${escHtml(addr)}</p>`;
   if (contact) html += `<p>${escHtml(contact)}</p>`;
+  if (vatRegNo) html += `<p>VAT Reg No: ${escHtml(vatRegNo)}</p>`;
+  if (businessTin) html += `<p>TIN: ${escHtml(businessTin)}</p>`;
   if (hdr) html += `<p>${escHtml(hdr)}</p>`;
-  html += `<p>${fmtDateTime(tx.createdAt || tx.date)}</p></div>`;
+  
+  const txnDate = tx.createdAt || tx.date;
+  const dt = new Date(txnDate);
+  const dateStr = dt.toLocaleDateString('en-PH', { year: 'numeric', month: '2-digit', day: '2-digit' });
+  const timeStr = dt.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true });
+  html += `<p>${dateStr} ${timeStr}</p>`;
+  
+  if (tx.invoiceNo) {
+    html += `<p>OR: ${escHtml(tx.invoiceNo)}</p>`;
+  }
+  html += `</div>`;
+  
   html += `<div class="rct-items">`;
   (tx.items || []).forEach(item => {
     html += `<div class="rct-row"><span class="rct-name">${escHtml(item.name)}</span><span class="rct-qty">x${item.quantity || 1}</span><span class="rct-price">₱${(item.total || item.unitCost || 0).toFixed(2)}</span></div>`;
   });
   html += `</div><div class="rct-totals">`;
-  html += `<div class="rct-row"><span>Subtotal</span><span>₱${(tx.subtotal || 0).toFixed(2)}</span></div>`;
+  
+  if (registeredForVat) {
+    const subtotal = tx.subtotal || 0;
+    const vatExclusive = Math.round(subtotal / (1 + vatRate) * 100) / 100;
+    const vatAmount = Math.round(vatExclusive * vatRate * 100) / 100;
+    
+    html += `<div class="rct-row"><span>Subtotal (VAT Excl)</span><span>₱${vatExclusive.toFixed(2)}</span></div>`;
+    html += `<div class="rct-row"><span>VAT (${(vatRate * 100).toFixed(0)}%)</span><span>₱${vatAmount.toFixed(2)}</span></div>`;
+  } else {
+    html += `<div class="rct-row"><span>Subtotal</span><span>₱${(tx.subtotal || 0).toFixed(2)}</span></div>`;
+  }
+  
   if (tx.discount) html += `<div class="rct-row"><span>Discount</span><span>-₱${tx.discount.toFixed(2)}</span></div>`;
   if (tx.vat) html += `<div class="rct-row"><span>VAT</span><span>₱${tx.vat.toFixed(2)}</span></div>`;
   html += `<div class="rct-row grand"><span>TOTAL</span><span>₱${(tx.grandTotal || tx.total || 0).toFixed(2)}</span></div>`;
@@ -136,6 +170,7 @@ export function thermalReceipt(tx) {
   if (tx.amountPaid) html += `<div class="rct-row"><span>Amount Paid</span><span>₱${tx.amountPaid.toFixed(2)}</span></div>`;
   if (tx.change) html += `<div class="rct-row"><span>Change</span><span>₱${tx.change.toFixed(2)}</span></div>`;
   html += `</div><div class="rct-footer"><p>${escHtml(msg)}</p>`;
+  if (cashierName) html += `<p>Cashier: ${escHtml(cashierName)}</p>`;
   if (tx.id) html += `<p>Ref: ${tx.id.slice(-8).toUpperCase()}</p>`;
   html += `</div></div>`;
   return html;

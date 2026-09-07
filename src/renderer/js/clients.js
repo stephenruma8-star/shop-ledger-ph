@@ -39,7 +39,7 @@ export function renderClientGrid() {
     const balColor = bal > 0 ? 'text-red-600' : bal < 0 ? 'text-green-600' : 'text-gray-500';
     return `<div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border hover:shadow-md transition-shadow cursor-pointer glass-card" onclick="viewClientHistory(${c.id})">
       <div class="flex items-center gap-3 mb-2"><div class="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-600 font-bold flex-shrink-0">${c.name?.charAt(0)||'?'}</div>
-        <div class="flex-1 min-w-0"><p class="font-semibold truncate">${escapeHtml(c.name)}</p><p class="text-xs text-gray-500">${escapeHtml(c.phone || 'No phone')}</p></div>
+        <div class="flex-1 min-w-0"><p class="font-semibold truncate">${escapeHtml(c.name)} ${c.isSC ? '<span class="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">SC</span>' : ''} ${c.isPWD ? '<span class="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">PWD</span>' : ''}</p><p class="text-xs text-gray-500">${escapeHtml(c.phone || 'No phone')}</p></div>
         <button onclick="event.stopPropagation();recordClientPayment(${c.id})" class="text-green-500 hover:text-green-700 px-1" title="Payment"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M6 7h9a4 4 0 0 1 0 8H6"/><line x1="4" y1="11" x2="17" y2="11"/></svg></button>
         <button onclick="event.stopPropagation();printClientInfo(${c.id})" class="text-gray-400 hover:text-blue-600 px-1" title="Print"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></button>
         <button onclick="event.stopPropagation();deleteClient(${c.id})" class="text-gray-400 hover:text-red-600 px-1" title="Delete"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></div>
@@ -91,6 +91,16 @@ export function openClientModal(c) {
           <div class="grid grid-cols-2 gap-2">
             <div><label class="text-xs text-gray-500 block mb-1">Phone</label><input id="cf-phone" value="${isEdit ? escapeHtml(c.phone||'') : escapeHtml(draft.phone||'')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" oninput="saveClientDraft()" /></div>
             <div><label class="text-xs text-gray-500 block mb-1">Balance</label><input id="cf-balance" type="number" step="0.01" value="${c?.balance||0}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
+          </div>
+          <div class="flex gap-4 mb-3">
+            <label class="flex items-center gap-2 text-sm">
+              <input type="checkbox" id="client-sc" ${isEdit && c.isSC ? 'checked' : ''} class="rounded" />
+              Senior Citizen
+            </label>
+            <label class="flex items-center gap-2 text-sm">
+              <input type="checkbox" id="client-pwd" ${isEdit && c.isPWD ? 'checked' : ''} class="rounded" />
+              PWD
+            </label>
           </div>
           <div><label class="text-xs text-gray-500 block mb-1">Address</label><input id="cf-address" value="${isEdit ? escapeHtml(c.address||'') : escapeHtml(draft.address||'')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" oninput="saveClientDraft()" /></div>
           <div><label class="text-xs text-gray-500 block mb-1">Due Date</label><input id="cf-dueDate" type="date" value="${isEdit ? (c.dueDate||'') : (draft.dueDate||'')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" onchange="saveClientDraft()" /></div>
@@ -184,6 +194,8 @@ export async function saveClient(id) {
     c.balance = parseFloat(blEl.value) || 0;
     c.dueDate = ddEl.value || '';
     c.ledgerYear = lyEl ? lyEl.value || '' : '';
+    c.isSC = document.getElementById('client-sc')?.checked || false;
+    c.isPWD = document.getElementById('client-pwd')?.checked || false;
     await dbPut('clients', c);
     await logAudit('client-edit', `Updated client ${name}`);
     if (cfCart.length > 0) {
@@ -209,7 +221,7 @@ export async function saveClient(id) {
     toast('Client updated');
     sessionStorage.removeItem('clientFormDraft');
   } else {
-    const clientId = await dbAdd('clients', { name, phone, address, balance: 0, dueDate: ddEl.value || '', createdAt: now(), ledgerYear: lyEl ? lyEl.value || '' : '' });
+    const clientId = await dbAdd('clients', { name, phone, address, balance: 0, dueDate: ddEl.value || '', createdAt: now(), ledgerYear: lyEl ? lyEl.value || '' : '', isSC: document.getElementById('client-sc')?.checked || false, isPWD: document.getElementById('client-pwd')?.checked || false });
     await logAudit('client-add', `Added client ${name}`);
     if (cfCart.length > 0) {
       await resolveInvIds(cfCart);

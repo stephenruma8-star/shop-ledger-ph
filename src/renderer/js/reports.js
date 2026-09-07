@@ -1,9 +1,10 @@
 import { logAudit } from './auth.js'
 import { dbAll, dbClear, dbPut } from './database.js'
 import { closeModal, confirmModal, dbLoad, escapeHtml, filterByYear, modal, paginate, renderPagination, toast } from './helpers.js'
+import { calculateInventoryValue } from './inventory.js'
 import { escHtml, openPrintWindow } from './printLayout.js'
 import { loadAll, render } from './router.js'
-import { fmtDate, now, peso, state, today } from './state.js'
+import { fmtDate, now, peso, state, today, VAT_RATE } from './state.js'
 
 let _restoreResolve = null;
 
@@ -62,13 +63,17 @@ export async function viewReports(root) {
         <button onclick="exportPDF()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Export PDF</button>
         <button onclick="exportAccountingCSV()" class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export CSV</button>
         <button onclick="dailySalesReport()" class="px-4 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>Daily Report</button>
+        <button onclick="showSalesByClient()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Sales by Client</button>
+        <button onclick="showARAging()" class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>AR Aging</button>
         <button onclick="backupJSON()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M21.5 17.5a5 5 0 0 0-4.7-7.5 7 7 0 0 0-13.1 2.5A5 5 0 0 0 6 21h12a4 4 0 0 0 3.5-3.5z"/></svg>Backup JSON</button>
+        <button onclick="showInventoryValuation()" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>Inventory Valuation</button>
         <button onclick="encryptedBackupFlow()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M21.5 17.5a5 5 0 0 0-4.7-7.5 7 7 0 0 0-13.1 2.5A5 5 0 0 0 6 21h12a4 4 0 0 0 3.5-3.5z"/></svg>Encrypted Backup</button>
         <button onclick="fileBackupFlow()" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M21.5 17.5a5 5 0 0 0-4.7-7.5 7 7 0 0 0-13.1 2.5A5 5 0 0 0 6 21h12a4 4 0 0 0 3.5-3.5z"/></svg>File Backup</button>
         <button onclick="emailBackupFlow()" class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Email Backup</button>
         <button onclick="showRestoreModal()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Restore</button>
         <button onclick="signalLanUpdate()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Signal Update on LAN</button>
         <button onclick="viewAuditLog()" class="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Audit Log</button>
+        <button onclick="showBIRFormSelector()" class="px-4 py-2 bg-red-700 text-white rounded-lg hover:bg-red-800"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>BIR Tax Forms</button>
       </div>
     </div>`;
 }
@@ -638,6 +643,28 @@ export async function signalLanUpdate() {
   toast('Update signal sent to LAN', 'success');
 }
 
+export function showInventoryValuation() {
+  const settingsMap = {};
+  state.settings.forEach(s => settingsMap[s.key] = s.value);
+  const method = settingsMap['inventoryValuationMethod'] || 'fifo';
+  const invCost = new Map((state.inventory || []).map(i => [i.id, i.costPrice || 0]));
+  const result = calculateInventoryValue(method);
+  const rows = result.breakdown.filter(i => i.qty > 0).sort((a, b) => b.totalValue - a.totalValue);
+  function fmt(n) { return '₱' + Number(n || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+  const rowsHtml = rows.map(i => `<tr class="border-b dark:border-gray-700"><td class="p-2">${escHtml(i.name)}</td><td class="p-2 text-right">${i.qty}</td><td class="p-2 text-right">${fmt(i.unitCost)}</td><td class="p-2 text-right font-semibold">${fmt(i.totalValue)}</td></tr>`).join('');
+  modal(`<div class="p-4 flex flex-col" style="min-height:60vh">
+    <div class="flex justify-between items-center mb-3 shrink-0">
+      <div><h3 class="text-xl font-bold">Inventory Valuation</h3><p class="text-xs text-gray-500">Method: ${escHtml(result.method)}</p></div>
+      <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="mb-3 shrink-0 bg-cyan-50 dark:bg-cyan-900/20 rounded-lg p-3 flex items-center justify-between"><span class="text-sm font-semibold">Total Inventory Value</span><span class="text-xl font-bold text-cyan-600">${fmt(result.total)}</span></div>
+    <div class="flex-1 overflow-auto min-h-0">
+      <table class="w-full text-sm"><thead><tr class="bg-gray-50 dark:bg-gray-700 text-xs uppercase tracking-wide sticky top-0"><th class="p-2 text-left">Item</th><th class="p-2 text-right">Qty</th><th class="p-2 text-right">Unit Cost</th><th class="p-2 text-right">Total Value</th></tr></thead>
+      <tbody>${rowsHtml || '<tr><td class="p-4 text-center text-gray-400" colspan="4">No items in inventory</td></tr>'}</tbody></table>
+    </div>
+  </div>`);
+}
+
 export function viewAuditLog() {
   const q = document.getElementById('al-search')?.value?.toLowerCase() || '';
   const filtered = (state.auditLogs || []).filter(e =>
@@ -669,6 +696,270 @@ export function viewAuditLog() {
   render();
 }
 
+export function showBIRFormSelector() {
+  const now = new Date();
+  const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+  const currentYear = now.getFullYear();
+  const currentQuarter = Math.ceil((now.getMonth() + 1) / 3);
+  
+  modal(`
+    <div class="p-6">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          BIR Tax Forms
+        </h3>
+        <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="space-y-4">
+        <div class="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+          <h4 class="font-semibold text-blue-800 dark:text-blue-200 mb-2">BIR Form 2550M (Monthly VAT Return)</h4>
+          <p class="text-sm text-blue-600 dark:text-blue-300 mb-3">For VAT-registered businesses. Export monthly VAT summary.</p>
+          <div class="flex gap-2 items-end">
+            <div>
+              <label class="text-xs text-gray-500 block mb-1">Month</label>
+              <select id="bir-month" class="px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm">
+                ${['01','02','03','04','05','06','07','08','09','10','11','12'].map(m => 
+                  `<option value="${m}" ${m === currentMonth ? 'selected' : ''}>${new Date(2000, parseInt(m)-1).toLocaleString('en-PH', {month:'long'})}</option>`
+                ).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 block mb-1">Year</label>
+              <input id="bir-year" type="number" value="${currentYear}" class="px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm w-24" />
+            </div>
+            <button onclick="exportBIR2550M()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Export CSV
+            </button>
+          </div>
+        </div>
+        
+        <div class="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+          <h4 class="font-semibold text-green-800 dark:text-green-200 mb-2">BIR Form 2551Q (Quarterly Percentage Tax Return)</h4>
+          <p class="text-sm text-green-600 dark:text-green-300 mb-3">For non-VAT registered businesses (3% percentage tax).</p>
+          <div class="flex gap-2 items-end">
+            <div>
+              <label class="text-xs text-gray-500 block mb-1">Quarter</label>
+              <select id="bir-quarter" class="px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm">
+                <option value="1" ${currentQuarter === 1 ? 'selected' : ''}>Q1 (Jan-Mar)</option>
+                <option value="2" ${currentQuarter === 2 ? 'selected' : ''}>Q2 (Apr-Jun)</option>
+                <option value="3" ${currentQuarter === 3 ? 'selected' : ''}>Q3 (Jul-Sep)</option>
+                <option value="4" ${currentQuarter === 4 ? 'selected' : ''}>Q4 (Oct-Dec)</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 block mb-1">Year</label>
+              <input id="bir-qyear" type="number" value="${currentYear}" class="px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm w-24" />
+            </div>
+            <button onclick="exportBIR2551Q()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Export CSV
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `);
+}
+
+export async function exportBIR2550M() {
+  try {
+    await dbLoad('transactions');
+    const month = document.getElementById('bir-month')?.value || String(new Date().getMonth() + 1).padStart(2, '0');
+    const year = document.getElementById('bir-year')?.value || new Date().getFullYear();
+    const monthKey = `${year}-${month}`;
+    
+    const vatRate = parseFloat(state.settings.find(s => s.key === 'vatRate')?.value) || VAT_RATE;
+    const settingsMap = {};
+    state.settings.forEach(s => settingsMap[s.key] = s.value);
+    const businessTin = settingsMap['businessTin'] || '';
+    const vatRegNo = settingsMap['vatRegNo'] || '';
+    
+    const txs = filterByYear(state.transactions, 'date').filter(t => 
+      t.status !== 'voided' && t.status !== 'interest' && t.status !== 'return' &&
+      (t.date || '').startsWith(monthKey)
+    );
+    
+    let taxableSales = 0;
+    let zeroRatedSales = 0;
+    let exemptSales = 0;
+    
+    for (const t of txs) {
+      const grandTotal = t.grandTotal || 0;
+      if (t.vatAmount > 0) {
+        taxableSales += grandTotal;
+      } else if (t.vatExclusive === 0 && t.vatAmount === 0) {
+        exemptSales += grandTotal;
+      } else {
+        zeroRatedSales += grandTotal;
+      }
+    }
+    
+    const vatOutput = Math.round(taxableSales / (1 + vatRate) * vatRate * 100) / 100;
+    const totalSales = taxableSales + zeroRatedSales + exemptSales;
+    
+    const headers = [
+      'TIN',
+      'VAT Reg No',
+      'Return Period',
+      'Taxable Sales (Net of VAT)',
+      'VAT Output (12%)',
+      'Zero-Rated Sales',
+      'Exempt Sales',
+      'Total Sales',
+      'Number of Transactions'
+    ];
+    
+    const rows = [
+      [
+        businessTin,
+        vatRegNo,
+        `${year}-${month}`,
+        taxableSales.toFixed(2),
+        vatOutput.toFixed(2),
+        zeroRatedSales.toFixed(2),
+        exemptSales.toFixed(2),
+        totalSales.toFixed(2),
+        txs.length
+      ]
+    ];
+    
+    csvDownload(`BIR_2550M_${year}_${month}.csv`, headers, rows);
+    toast('BIR Form 2550M exported', 'success');
+  } catch (e) { toast('Export error: ' + e.message, 'error'); }
+}
+
+export async function exportBIR2551Q() {
+  try {
+    await dbLoad('transactions');
+    const quarter = parseInt(document.getElementById('bir-quarter')?.value || '1');
+    const year = document.getElementById('bir-qyear')?.value || new Date().getFullYear();
+    
+    const quarterMonths = {
+      1: ['01', '02', '03'],
+      2: ['04', '05', '06'],
+      3: ['07', '08', '09'],
+      4: ['10', '11', '12']
+    };
+    const months = quarterMonths[quarter] || [];
+    
+    const settingsMap = {};
+    state.settings.forEach(s => settingsMap[s.key] = s.value);
+    const businessTin = settingsMap['businessTin'] || '';
+    
+    const txs = filterByYear(state.transactions, 'date').filter(t => 
+      t.status !== 'voided' && t.status !== 'interest' && t.status !== 'return' &&
+      months.some(m => (t.date || '').startsWith(`${year}-${m}`))
+    );
+    
+    let grossSales = 0;
+    for (const t of txs) {
+      grossSales += t.grandTotal || 0;
+    }
+    
+    const percentageTax = Math.round(grossSales * 0.03 * 100) / 100;
+    
+    const headers = [
+      'TIN',
+      'Return Period',
+      'Quarter',
+      'Gross Sales',
+      'Percentage Tax (3%)',
+      'Number of Transactions'
+    ];
+    
+    const rows = [
+      [
+        businessTin,
+        `${year}-Q${quarter}`,
+        `Q${quarter} ${year}`,
+        grossSales.toFixed(2),
+        percentageTax.toFixed(2),
+        txs.length
+      ]
+    ];
+    
+    csvDownload(`BIR_2551Q_${year}_Q${quarter}.csv`, headers, rows);
+    toast('BIR Form 2551Q exported', 'success');
+  } catch (e) { toast('Export error: ' + e.message, 'error'); }
+}
+
+
+export function showSalesByClient() {
+  const activeTx = state.transactions.filter(t => t.status !== 'voided' && t.status !== 'interest' && t.status !== 'return');
+  const clientMap = {};
+  activeTx.forEach(t => {
+    const cid = t.clientId || 'walkin';
+    const cname = t.clientName || 'Walk-in';
+    if (!clientMap[cid]) clientMap[cid] = { name: cname, count: 0, total: 0 };
+    clientMap[cid].count++;
+    clientMap[cid].total += t.grandTotal || 0;
+  });
+  const rows = Object.values(clientMap).sort((a, b) => b.total - a.total);
+  if (rows.length === 0) { toast('No sales data', 'info'); return; }
+  const totalAll = rows.reduce((s, r) => s + r.total, 0);
+  modal(`<div class="p-4 flex flex-col" style="min-height:60vh">
+    <div class="flex justify-between items-center mb-3 shrink-0">
+      <h3 class="text-xl font-bold">Sales by Client (${rows.length})</h3>
+      <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="flex-1 overflow-auto min-h-0">
+      <table class="w-full text-sm"><thead><tr class="bg-gray-50 dark:bg-gray-700 text-xs uppercase tracking-wide sticky top-0"><th class="p-2 text-left">Client</th><th class="p-2 text-center">Sales</th><th class="p-2 text-right">Total Amount</th><th class="p-2 text-right">Avg Order</th></tr></thead>
+        <tbody>${rows.map(r => `<tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50"><td class="p-2 font-medium">${escHtml(r.name)}</td><td class="p-2 text-center">${r.count}</td><td class="p-2 text-right font-semibold">${peso(r.total)}</td><td class="p-2 text-right text-gray-500">${peso(r.total / r.count)}</td></tr>`).join('')}
+        </tbody>
+        <tfoot><tr class="bg-gray-50 dark:bg-gray-700 font-bold"><td class="p-2">Total</td><td class="p-2 text-center">${rows.reduce((s, r) => s + r.count, 0)}</td><td class="p-2 text-right">${peso(totalAll)}</td><td class="p-2 text-right text-gray-500">${peso(rows.length > 0 ? totalAll / rows.reduce((s, r) => s + r.count, 0) : 0)}</td></tr></tfoot>
+      </table>
+    </div>
+  </div>`);
+}
+
+export function showARAging() {
+  const todayMs = new Date(today()).getTime();
+  const clientsWithDebt = state.clients.filter(c => (c.balance || 0) > 0);
+  if (clientsWithDebt.length === 0) { toast('No outstanding AR balances', 'info'); return; }
+  const buckets = { current: { label: 'Current (0-30 days)', total: 0, clients: [] }, '31-60': { label: '31-60 days', total: 0, clients: [] }, '61-90': { label: '61-90 days', total: 0, clients: [] }, '90+': { label: '90+ days', total: 0, clients: [] } };
+  clientsWithDebt.forEach(c => {
+    const dueMs = c.dueDate ? new Date(c.dueDate).getTime() : todayMs;
+    const daysOver = Math.max(0, Math.floor((todayMs - dueMs) / 86400000));
+    let bucket;
+    if (daysOver <= 0) bucket = 'current';
+    else if (daysOver <= 30) bucket = 'current';
+    else if (daysOver <= 60) bucket = '31-60';
+    else if (daysOver <= 90) bucket = '61-90';
+    else bucket = '90+';
+    buckets[bucket].total += c.balance || 0;
+    buckets[bucket].clients.push({ name: c.name, balance: c.balance || 0, dueDate: c.dueDate || '', daysOver });
+  });
+  Object.values(buckets).forEach(b => b.clients.sort((a, b) => b.balance - a.balance));
+  const totalDebt = clientsWithDebt.reduce((s, c) => s + (c.balance || 0), 0);
+  modal(`<div class="p-4 flex flex-col" style="min-height:60vh">
+    <div class="flex justify-between items-center mb-3 shrink-0">
+      <h3 class="text-xl font-bold">AR Aging Report</h3>
+      <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="grid grid-cols-4 gap-2 mb-3 shrink-0">
+      <div class="bg-gray-50 dark:bg-gray-700 p-2 rounded-lg text-center"><p class="text-xs text-gray-500">Current</p><p class="text-lg font-bold text-green-600">${peso(buckets.current.total)}</p></div>
+      <div class="bg-gray-50 dark:bg-gray-700 p-2 rounded-lg text-center"><p class="text-xs text-gray-500">31-60 days</p><p class="text-lg font-bold text-yellow-600">${peso(buckets['31-60'].total)}</p></div>
+      <div class="bg-gray-50 dark:bg-gray-700 p-2 rounded-lg text-center"><p class="text-xs text-gray-500">61-90 days</p><p class="text-lg font-bold text-orange-600">${peso(buckets['61-90'].total)}</p></div>
+      <div class="bg-gray-50 dark:bg-gray-700 p-2 rounded-lg text-center"><p class="text-xs text-gray-500">90+ days</p><p class="text-lg font-bold text-red-600">${peso(buckets['90+'].total)}</p></div>
+    </div>
+    <div class="flex-1 overflow-auto min-h-0">
+      ${Object.values(buckets).filter(b => b.clients.length > 0).map(b => `
+        <div class="mb-3">
+          <h4 class="font-semibold text-sm mb-1">${escHtml(b.label)} — ${peso(b.total)}</h4>
+          <table class="w-full text-sm"><thead><tr class="bg-gray-50 dark:bg-gray-700 text-xs uppercase"><th class="p-1 text-left">Client</th><th class="p-1 text-right">Balance</th><th class="p-1 text-center">Due Date</th><th class="p-1 text-right">Days Overdue</th></tr></thead>
+            <tbody>${b.clients.map(c => `<tr class="border-b dark:border-gray-700"><td class="p-1">${escHtml(c.name)}</td><td class="p-1 text-right font-semibold">${peso(c.balance)}</td><td class="p-1 text-center text-gray-500">${c.dueDate || '-'}</td><td class="p-1 text-right">${c.daysOver > 0 ? c.daysOver + 'd' : '-'}</td></tr>`).join('')}</tbody>
+          </table>
+        </div>
+      `).join('')}
+    </div>
+    <div class="shrink-0 border-t dark:border-gray-700 pt-2 mt-2 flex justify-between font-bold text-sm"><span>Total Outstanding AR</span><span class="text-red-600">${peso(totalDebt)}</span></div>
+  </div>`);
+}
+
 
 // expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
 Object.defineProperties(window, {
@@ -689,5 +980,11 @@ Object.defineProperties(window, {
   restoreJSONFlow: { get: () => restoreJSONFlow, configurable: true },
   restoreEncryptedFlow: { get: () => restoreEncryptedFlow, configurable: true },
   signalLanUpdate: { get: () => signalLanUpdate, configurable: true },
-  viewAuditLog: { get: () => viewAuditLog, configurable: true }
+  viewAuditLog: { get: () => viewAuditLog, configurable: true },
+  showSalesByClient: { get: () => showSalesByClient, configurable: true },
+  showARAging: { get: () => showARAging, configurable: true },
+  showBIRFormSelector: { get: () => showBIRFormSelector, configurable: true },
+  exportBIR2550M: { get: () => exportBIR2550M, configurable: true },
+  exportBIR2551Q: { get: () => exportBIR2551Q, configurable: true },
+  showInventoryValuation: { get: () => showInventoryValuation, configurable: true }
 });

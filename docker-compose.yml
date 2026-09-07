@@ -1,0 +1,13 @@
+version: '3.8'
+services:
+  shop-ledger:
+    build: .
+    ports:
+      - "3456:3456"
+      - "3457:3457/udp"
+      - "3458:3458"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - NODE_ENV=production
+      - LAN_PORT=3456

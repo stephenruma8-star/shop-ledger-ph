@@ -1,5 +1,5 @@
 {
-    "version":  "3.11.0",
+    "version":  "3.12.0",
     "buildDate":  "2026-09-07T00:00:00.000Z",
-    "notes":  "24 nice-to-have features: skeleton loading, barcode generation, undo/redo, real-time WS notifications, structured API errors, DB maintenance scheduling, migration rollback, offline queue, sales commission, loyalty/rewards, supplier price history, petty cash, customer display, product image upload, pre-commit hooks, code coverage, audit scripts, macOS/Linux builds, README, schema docs, seed data, E2E tests, conventional commits."
+    "notes":  "Critical + important gaps: LAN API token auth, HTTPS/TLS support, .env config, VAT/GST (12%), BIR-compliant receipts, BIR tax form exports (2550M/2551Q), Filipino i18n, void transaction UI, returns/refund UI, product expiry tracking, duplicate transaction detection, SC/PWD customer flags, sales-by-client report, AR aging report, request logging, IP whitelist/blacklist, data encryption at rest, Docker support, inventory valuation (FIFO/weighted avg), DB backup checksums."
 }
