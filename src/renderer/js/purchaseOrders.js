@@ -155,6 +155,23 @@ export async function receivePO(id) {
   if (!linkedExp && (po.total || 0) > 0) {
     await dbAdd('expenses', { date: today(), category: 'Purchases', description: `PO ${po.poNo} received`, payee: po.supplierName || '', amount: po.total, createdAt: now(), refType: 'po', refId: po.id });
   }
+  if (po.supplierId) {
+    const supplier = await dbGet('suppliers', po.supplierId);
+    if (supplier) {
+      if (!supplier.priceHistory) supplier.priceHistory = [];
+      for (const item of (po.items || [])) {
+        supplier.priceHistory.push({
+          supplierId: po.supplierId,
+          itemName: item.name,
+          price: item.price,
+          qty: item.qty,
+          date: po.date || today(),
+          poNo: po.poNo
+        });
+      }
+      await dbPut('suppliers', supplier);
+    }
+  }
   state.purchaseOrders = await dbAll('purchaseOrders');
   state.inventory = await dbAll('inventory');
   renderPOTable();

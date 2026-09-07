@@ -1,5 +1,5 @@
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
-import { closeModal, confirmModal, dbLoad, debounce, escapeHtml, filterByYear, modal, paginate, renderPagination, requireFields, searchData, toast } from './helpers.js'
+import { closeModal, confirmModal, dbLoad, debounce, escapeHtml, filterByYear, modal, paginate, pushUndo, renderPagination, requireFields, searchData, showUndoToast, toast } from './helpers.js'
 import { fmtDate, now, peso, round2, state, today } from './state.js'
 
 export async function viewPayments(root) {
@@ -137,6 +137,30 @@ export async function deletePay(id) {
   if (!await confirmModal('Delete this payment?')) return;
   const pay = await dbGet('payments', id);
   if (!pay) { toast('Payment not found', 'error'); return; }
+  const paySnapshot = { ...pay };
+  pushUndo({
+    description: `Deleted payment from ${pay.clientName} (${peso(pay.amount)})`,
+    undo: async () => {
+      const c = await dbGet('clients', paySnapshot.clientId);
+      if (c) { c.balance = Math.max(0, (c.balance || 0) - (paySnapshot.amount || 0)); await dbPut('clients', c); }
+      delete paySnapshot.id;
+      const newId = await dbAdd('payments', paySnapshot);
+      paySnapshot.id = newId;
+      state.payments = await dbAll('payments');
+      state.clients = await dbAll('clients');
+      renderPayTable();
+      toast('Payment restored', 'success');
+    },
+    redo: async () => {
+      const c = await dbGet('clients', paySnapshot.clientId);
+      if (c) { c.balance = (c.balance || 0) + (paySnapshot.amount || 0); await dbPut('clients', c); }
+      await dbDel('payments', paySnapshot.id);
+      state.payments = await dbAll('payments');
+      state.clients = await dbAll('clients');
+      renderPayTable();
+      toast('Payment deleted', 'info');
+    }
+  });
   const c = await dbGet('clients', pay.clientId);
   if (c) { c.balance = (c.balance || 0) + (pay.amount || 0); await dbPut('clients', c); }
   await dbDel('payments', id);
@@ -144,6 +168,7 @@ export async function deletePay(id) {
   state.clients = await dbAll('clients');
   renderPayTable();
   toast('Payment deleted');
+  showUndoToast();
 }
 
 

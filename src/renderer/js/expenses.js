@@ -13,6 +13,7 @@ export async function viewExpenses(root) {
         <span class="text-gray-400 text-sm">—</span>
         <input id="expDateTo" type="date" class="px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" onchange="debouncedRenderExpTable()" />
         <button onclick="openExpenseModal()" title="F6 / Ctrl+E" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Expense</button>
+        <button onclick="openPettyCashModal()" class="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01"/></svg>Petty Cash</button>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden glass-card">
         <div class="overflow-auto table-scroll" id="expTable"></div>
@@ -48,7 +49,7 @@ export let debouncedRenderExpTable = debounce(renderExpTable, 250);
 export function openExpenseModal(id) {
   const isEdit = !!id;
   const e = isEdit ? state.expenses.find(x => x.id === id) : null;
-  const categories = ['Purchases','Utilities','Rent','Supplies','Transportation','Salaries','Marketing','Maintenance','Food','Other'];
+  const categories = ['Purchases','Utilities','Rent','Supplies','Transportation','Salaries','Marketing','Maintenance','Food','Petty Cash','Other'];
   modal(`
     <div class="p-6">
       <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">${isEdit ? 'Edit' : 'New'} Expense</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
@@ -100,6 +101,94 @@ export async function deleteExpense(id) {
   toast('Expense deleted');
 }
 
+export async function openPettyCashModal() {
+  await dbLoad('expenses');
+  await dbLoad('settings');
+  const settingsMap = {};
+  state.settings.forEach(s => settingsMap[s.key] = s.value);
+  const balance = parseFloat(settingsMap['pettyCashBalance'] || '0');
+  const pettyCashTxns = (state.expenses || []).filter(e => e.type === 'petty-cash').sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const historyRows = pettyCashTxns.slice(0, 20).map(e => {
+    const isAdd = e.amount > 0;
+    return `<tr class="border-b dark:border-gray-700 last:border-0">
+      <td class="p-2 text-gray-500">${escapeHtml(e.date || '')}</td>
+      <td class="p-2 ${isAdd ? 'text-green-600' : 'text-red-600'} font-medium">${isAdd ? '+' : ''}${peso(e.amount)}</td>
+      <td class="p-2">${escapeHtml(e.description || '')}</td>
+    </tr>`;
+  }).join('');
+  modal(`
+    <div class="p-6">
+      <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">Petty Cash</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+      <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg mb-4 text-center">
+        <p class="text-xs text-gray-500 mb-1">Current Balance</p>
+        <p class="text-2xl font-bold ${balance > 0 ? 'text-green-600' : 'text-gray-600'}" id="pc-balance">${peso(balance)}</p>
+      </div>
+      <div class="grid grid-cols-2 gap-3 mb-4">
+        <div>
+          <label class="text-xs text-gray-500 block mb-1">Amount (₱)</label>
+          <input id="pc-amount" type="number" step="0.01" min="0" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" />
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 block mb-1">Description</label>
+          <input id="pc-desc" type="text" placeholder="Note..." class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" />
+        </div>
+      </div>
+      <div class="flex gap-2 mb-4">
+        <button onclick="pettyCashAdd()" class="flex-1 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Funds</button>
+        <button onclick="pettyCashWithdraw()" class="flex-1 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>Withdraw</button>
+      </div>
+      <div class="max-h-48 overflow-auto border dark:border-gray-700 rounded-lg">
+        ${pettyCashTxns.length === 0 ? '<p class="text-gray-400 text-xs text-center py-4">No petty cash transactions</p>' : `<table class="w-full text-xs"><thead><tr class="bg-gray-50 dark:bg-gray-700 sticky top-0"><th class="p-2 text-left">Date</th><th class="p-2 text-left">Amount</th><th class="p-2 text-left">Description</th></tr></thead><tbody>${historyRows}</tbody></table>`}
+      </div>
+    </div>`);
+}
+
+export async function pettyCashAdd() {
+  const amtEl = document.getElementById('pc-amount');
+  const descEl = document.getElementById('pc-desc');
+  if (!amtEl) { toast('Form not ready', 'error'); return; }
+  const amount = parseFloat(amtEl.value);
+  if (!amount || amount <= 0) { toast('Valid amount required', 'error'); return; }
+  const desc = descEl ? descEl.value.trim() : '';
+  const settingsMap = {};
+  state.settings.forEach(s => settingsMap[s.key] = s.value);
+  const newBalance = (parseFloat(settingsMap['pettyCashBalance'] || '0')) + amount;
+  const existing = state.settings.find(s => s.key === 'pettyCashBalance');
+  if (existing) { existing.value = String(newBalance); await dbPut('settings', existing); }
+  else { await dbAdd('settings', { key: 'pettyCashBalance', value: String(newBalance) }); }
+  await dbAdd('expenses', { date: today(), category: 'Petty Cash', description: desc || 'Petty cash add funds', payee: '', amount, type: 'petty-cash', createdAt: now() });
+  await logAudit('petty-cash', `Added ${peso(amount)} to petty cash`);
+  state.settings = await dbAll('settings');
+  state.expenses = await dbAll('expenses');
+  closeModal();
+  openPettyCashModal();
+  toast(`${peso(amount)} added to petty cash`, 'success');
+}
+
+export async function pettyCashWithdraw() {
+  const amtEl = document.getElementById('pc-amount');
+  const descEl = document.getElementById('pc-desc');
+  if (!amtEl) { toast('Form not ready', 'error'); return; }
+  const amount = parseFloat(amtEl.value);
+  if (!amount || amount <= 0) { toast('Valid amount required', 'error'); return; }
+  const desc = descEl ? descEl.value.trim() : '';
+  const settingsMap = {};
+  state.settings.forEach(s => settingsMap[s.key] = s.value);
+  const currentBalance = parseFloat(settingsMap['pettyCashBalance'] || '0');
+  if (amount > currentBalance) { toast('Insufficient petty cash balance', 'error'); return; }
+  const newBalance = currentBalance - amount;
+  const existing = state.settings.find(s => s.key === 'pettyCashBalance');
+  if (existing) { existing.value = String(newBalance); await dbPut('settings', existing); }
+  else { await dbAdd('settings', { key: 'pettyCashBalance', value: String(newBalance) }); }
+  await dbAdd('expenses', { date: today(), category: 'Petty Cash', description: desc || 'Petty cash withdrawal', payee: '', amount: -amount, type: 'petty-cash', createdAt: now() });
+  await logAudit('petty-cash', `Withdrew ${peso(amount)} from petty cash`);
+  state.settings = await dbAll('settings');
+  state.expenses = await dbAll('expenses');
+  closeModal();
+  openPettyCashModal();
+  toast(`${peso(amount)} withdrawn from petty cash`, 'success');
+}
+
 
 // expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
 Object.defineProperties(window, {
@@ -108,5 +197,8 @@ Object.defineProperties(window, {
   debouncedRenderExpTable: { get: () => debouncedRenderExpTable, configurable: true },
   openExpenseModal: { get: () => openExpenseModal, configurable: true },
   saveExpense: { get: () => saveExpense, configurable: true },
-  deleteExpense: { get: () => deleteExpense, configurable: true }
+  deleteExpense: { get: () => deleteExpense, configurable: true },
+  openPettyCashModal: { get: () => openPettyCashModal, configurable: true },
+  pettyCashAdd: { get: () => pettyCashAdd, configurable: true },
+  pettyCashWithdraw: { get: () => pettyCashWithdraw, configurable: true }
 });

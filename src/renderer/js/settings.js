@@ -23,6 +23,7 @@ export async function viewSettings(root) {
           <div><label class="text-xs text-gray-500 block">Contact Number</label><input id="set-shopContact" value="${escapeHtml(settingsMap['shopContact'] || '')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
            <div class="col-span-2"><label class="text-xs text-gray-500 block">Address</label><input id="set-shopAddress" value="${escapeHtml(settingsMap['shopAddress'] || '')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
            <div><label class="text-xs text-gray-500 block">Weather Location</label><input id="set-weatherLocation" value="${escapeHtml(settingsMap['weatherLocation'] || 'Manila')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" placeholder="e.g. Manila, Quezon City, Cebu" /></div>
+           <div><label class="text-xs text-gray-500 block">Loyalty Points Per ₱1</label><input id="set-pointsPerPeso" type="number" min="0" step="0.1" value="${escapeHtml(settingsMap['pointsPerPeso'] || '1')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" placeholder="1" /><p class="text-xs text-gray-400 mt-1">Points earned per ₱1 spent. 100 points = ₱1 discount.</p></div>
          </div>
        </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
@@ -265,7 +266,7 @@ export async function dbMaintenance(action) {
 }
 
 export async function saveSettings() {
-  const keys = ['shopName','shopContact','shopAddress','weatherLocation','cloudBackupFolder','cloudBackupPassword','cloudBackupInterval','smsApiKey','smsAlertNumber','smsAutoReminderFreq','smsAutoReminderDay','backupEmail','aiApiKey','aiModel','receiptFooter','receiptHeaderText','printStripeColor1','printStripeColor2','thermalHost','thermalPort','snapshotKeepCount','keepManualBackups','auditRetentionDays'];
+  const keys = ['shopName','shopContact','shopAddress','weatherLocation','cloudBackupFolder','cloudBackupPassword','cloudBackupInterval','smsApiKey','smsAlertNumber','smsAutoReminderFreq','smsAutoReminderDay','backupEmail','aiApiKey','aiModel','receiptFooter','receiptHeaderText','printStripeColor1','printStripeColor2','thermalHost','thermalPort','snapshotKeepCount','keepManualBackups','auditRetentionDays','pointsPerPeso'];
   for (const key of keys) {
     const el = document.getElementById(`set-${key}`);
     if (el) {

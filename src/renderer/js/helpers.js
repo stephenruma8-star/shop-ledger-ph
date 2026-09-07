@@ -949,8 +949,66 @@ export function initRipple() {
   });
 }
 
+const _undoStack = [];
+const _redoStack = [];
+const _UNDO_MAX = 30;
+
+export function pushUndo(action) {
+  _undoStack.push(action);
+  if (_undoStack.length > _UNDO_MAX) _undoStack.shift();
+  _redoStack.length = 0;
+}
+
+export function undo() {
+  if (_undoStack.length === 0) { toast('Nothing to undo', 'warning'); return; }
+  const action = _undoStack.pop();
+  action.undo();
+  _redoStack.push(action);
+  toast('Undid: ' + action.description, 'info');
+  showUndoToast();
+}
+
+export function redo() {
+  if (_redoStack.length === 0) { toast('Nothing to redo', 'warning'); return; }
+  const action = _redoStack.pop();
+  action.redo();
+  _undoStack.push(action);
+  toast('Redid: ' + action.description, 'info');
+  showUndoToast();
+}
+
+export function showUndoToast() {
+  if (_undoStack.length === 0) return;
+  const last = _undoStack[_undoStack.length - 1];
+  const c = document.getElementById('toasts');
+  if (!c) return;
+  const existing = document.getElementById('undo-toast');
+  if (existing) existing.remove();
+  const el = document.createElement('div');
+  el.id = 'undo-toast';
+  el.className = 'bg-gray-800 text-white px-4 py-3 rounded-xl shadow-lg text-sm max-w-sm toast-enter flex items-center gap-2';
+  el.innerHTML = `<span class="flex-1">${escapeHtml(last.description)}</span><button onclick="undo();this.closest('#undo-toast')?.remove()" class="px-3 py-1 bg-white/20 rounded-lg text-xs font-semibold hover:bg-white/30 shrink-0">Undo</button><button onclick="this.closest('#undo-toast')?.remove()" class="text-white/50 hover:text-white shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`;
+  c.appendChild(el);
+  setTimeout(() => { el.classList.remove('toast-enter'); el.classList.add('toast-exit'); setTimeout(() => el.remove(), 200); }, 6000);
+}
+
 export function skeletonRow(count = 3) {
   return Array(count).fill('<div class="flex items-center gap-4 p-4"><div class="skeleton w-10 h-10 rounded-lg shrink-0"></div><div class="flex-1 space-y-2"><div class="skeleton h-4 w-3/4 rounded"></div><div class="skeleton h-3 w-1/2 rounded"></div></div></div>').join('');
+}
+
+export function showSkeleton(viewId, rows = 5, cols = 4) {
+  const container = document.getElementById(viewId);
+  if (!container) return () => {};
+  const colWidths = ['1/4', '1/3', '1/6', '1/5'];
+  const html = Array.from({ length: rows }, () => {
+    const cells = Array.from({ length: cols }, (_, ci) => {
+      const w = colWidths[ci % colWidths.length];
+      return `<td class="p-3"><div class="skeleton h-4 rounded" style="width:${w}"></div></td>`;
+    }).join('');
+    return `<tr class="border-b dark:border-gray-700">${cells}</tr>`;
+  }).join('');
+  container.innerHTML = `<table class="w-full text-sm"><tbody>${html}</tbody></table>`;
+  return () => { if (container) container.innerHTML = ''; };
 }
 
 export function animateCounter(el, target, fmt) {
@@ -1033,6 +1091,11 @@ Object.defineProperties(window, {
   createRipple: { get: () => createRipple, configurable: true },
   initRipple: { get: () => initRipple, configurable: true },
   skeletonRow: { get: () => skeletonRow, configurable: true },
+  showSkeleton: { get: () => showSkeleton, configurable: true },
+  pushUndo: { get: () => pushUndo, configurable: true },
+  undo: { get: () => undo, configurable: true },
+  redo: { get: () => redo, configurable: true },
+  showUndoToast: { get: () => showUndoToast, configurable: true },
   animateCounter: { get: () => animateCounter, configurable: true },
   staggerRows: { get: () => staggerRows, configurable: true }
 });

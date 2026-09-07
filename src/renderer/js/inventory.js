@@ -1,6 +1,6 @@
 import { logAudit } from './auth.js'
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
-import { closeModal, confirmModal, dbLoad, debounce, escapeHtml, itemThumbHtml, modal, searchData, toast, updateLowStockBadge } from './helpers.js'
+import { closeModal, confirmModal, dbLoad, debounce, escapeHtml, itemThumbHtml, modal, pushUndo, searchData, showUndoToast, toast, updateLowStockBadge } from './helpers.js'
 import { escHtml } from './printLayout.js'
 import { now, peso, state } from './state.js'
 import { getQty } from './transactions.js'
@@ -105,6 +105,26 @@ export function renderInvImagePreview() {
     : `<div class="w-20 h-20 rounded-lg border border-dashed dark:border-gray-600 flex items-center justify-center text-3xl text-gray-400">📦</div>`;
   const rm = document.getElementById('if-image-remove');
   if (rm) rm.classList.toggle('hidden', !_invImage);
+}
+
+export function generateProductBarcode(id) {
+  const item = state.inventory.find(i => i.id === id);
+  if (!item) return null;
+  const canvas = document.createElement('canvas');
+  try {
+    if (typeof JsBarcode !== 'undefined') {
+      JsBarcode(canvas, item.sku || String(item.id), {
+        format: 'CODE128',
+        width: 2,
+        height: 40,
+        displayValue: true,
+        fontSize: 14,
+        margin: 5
+      });
+      return canvas.toDataURL();
+    }
+  } catch (e) { /* JsBarcode not available */ }
+  return null;
 }
 
 export function openInventoryModal(id) {
@@ -227,10 +247,30 @@ export async function deleteInv(id) {
   } else {
     if (!await confirmModal(`Delete "${item.name}"?`)) return;
   }
+  const snapshot = { ...item, variants: item.variants ? item.variants.map(v => ({ ...v })) : undefined };
+  pushUndo({
+    description: `Deleted item "${item.name}"`,
+    undo: async () => {
+      delete snapshot.id;
+      const newId = await dbAdd('inventory', snapshot);
+      snapshot.id = newId;
+      state.inventory = await dbAll('inventory');
+      updateLowStockBadge();
+      renderInvTable();
+      toast('Item restored: ' + snapshot.name, 'success');
+    },
+    redo: async () => {
+      await dbDel('inventory', snapshot.id);
+      state.inventory = await dbAll('inventory');
+      renderInvTable();
+      toast('Item deleted: ' + snapshot.name, 'info');
+    }
+  });
   await dbDel('inventory', id);
   state.inventory = await dbAll('inventory');
   renderInvTable();
   toast('Item deleted');
+  showUndoToast();
 }
 
 export function showReorderSuggestions() {
@@ -388,6 +428,7 @@ Object.defineProperties(window, {
   bulkEditInv: { get: () => bulkEditInv, configurable: true },
   applyBulkEdit: { get: () => applyBulkEdit, configurable: true },
   viewItemHistory: { get: () => viewItemHistory, configurable: true },
+  generateProductBarcode: { get: () => generateProductBarcode, configurable: true },
   importInventoryCSV: { get: () => importInventoryCSV, configurable: true }
 });
 

@@ -337,6 +337,8 @@ function notifyDataChanged(info) {
   if (wsServer) {
     try { wsServer.broadcast({ type: 'update', source: info?.source || 'app', kind: info?.kind || 'data' }); }
     catch (e) { logger.error('WS broadcast error: ' + e.message); }
+    try { wsServer.sendNotification('data-changed', info || {}); }
+    catch (e) { logger.error('WS notification error: ' + e.message); }
   }
   try {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('lan-data-refresh', info || {});

@@ -709,7 +709,45 @@ export function drawProfitChart(profitData) {
 }
 
 
-// expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
+export function showCustomerDisplay(items, total) {
+  let overlay = document.getElementById('customer-display-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'customer-display-overlay';
+    overlay.className = 'fixed inset-0 z-[600] bg-white dark:bg-gray-900 overflow-auto';
+    overlay.style.fontFamily = 'system-ui, -apple-system, sans-serif';
+    document.body.appendChild(overlay);
+  }
+  const itemList = (items || []).map(item => {
+    const qty = typeof item.name === 'string' ? (item.name.match(/^-?[\d.]+/) || ['1'])[0] : '1';
+    const desc = item.description || item.name || 'Item';
+    const amt = (parseFloat(qty) || 1) * (item.unitCost || 0);
+    return `<div class="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
+      <div class="flex-1 min-w-0">
+        <div class="text-xl font-medium text-gray-800 dark:text-white truncate">${escapeHtml(desc)}</div>
+        <div class="text-base text-gray-500">${qty} × ${peso(item.unitCost || 0)}</div>
+      </div>
+      <div class="text-xl font-bold text-gray-800 dark:text-white ml-4">${peso(amt)}</div>
+    </div>`;
+  }).join('');
+  overlay.innerHTML = `
+    <div class="max-w-2xl mx-auto p-8">
+      <div class="text-center mb-8">
+        <h1 class="text-3xl font-bold text-gray-800 dark:text-white mb-2">Shop Ledger PH</h1>
+        <p class="text-lg text-gray-400">Customer Display</p>
+      </div>
+      <div class="mb-6">${itemList || '<p class="text-center text-gray-400 text-xl py-8">No items</p>'}</div>
+      <div class="border-t-4 border-gray-800 dark:border-white pt-4 mt-4">
+        <div class="flex justify-between items-center">
+          <span class="text-2xl font-bold text-gray-800 dark:text-white">TOTAL</span>
+          <span class="text-4xl font-bold text-green-600">${peso(total || 0)}</span>
+        </div>
+      </div>
+      <div class="text-center mt-12 text-gray-400 text-sm">
+        <p>Thank you for your purchase!</p>
+      </div>
+    </div>`;
+}
 Object.defineProperties(window, {
   viewDashboard: { get: () => viewDashboard, configurable: true },
   getDashWidgets: { get: () => getDashWidgets, configurable: true },
@@ -732,5 +770,6 @@ Object.defineProperties(window, {
   drawDashChart: { get: () => drawDashChart, configurable: true },
   drawPayMethodChart: { get: () => drawPayMethodChart, configurable: true },
   getProfitData: { get: () => getProfitData, configurable: true },
-  drawProfitChart: { get: () => drawProfitChart, configurable: true }
+  drawProfitChart: { get: () => drawProfitChart, configurable: true },
+  showCustomerDisplay: { get: () => showCustomerDisplay, configurable: true }
 });

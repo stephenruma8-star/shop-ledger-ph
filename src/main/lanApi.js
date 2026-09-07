@@ -7,6 +7,10 @@ const express = require('express');
 
 const EXPENSE_CATS = ['Purchases','Utilities','Rent','Supplies','Transportation','Salaries','Marketing','Maintenance','Food','Other'];
 
+const _offlineQueue = [];
+function getOfflineQueue() { return _offlineQueue.slice(); }
+function clearOfflineQueue() { _offlineQueue.length = 0; return { ok: true }; }
+
 const _rateBuckets = new Map();
 function rateLimit(maxPerMin = 60) {
   return (req, res, next) => {
@@ -71,7 +75,21 @@ function createLanApiRouter(deps) {
   function wrap(fn) {
     return (req, res) => fn(req, res).catch((err) => {
       log('lanApi ' + req.path + ' failed: ' + (err && err.message ? err.message : err));
-      res.status(err && err.status === 503 ? 503 : 500).json({ error: err.message });
+      let status = 500;
+      let code = 'INTERNAL_ERROR';
+      const msg = (err && err.message) || 'Internal server error';
+      if (err && err.status) {
+        status = err.status;
+        if (status === 400) code = 'VALIDATION_ERROR';
+        else if (status === 404) code = 'NOT_FOUND';
+        else if (status === 429) code = 'RATE_LIMITED';
+        else if (status === 503) code = 'SERVICE_UNAVAILABLE';
+      } else if (msg && /validation|invalid/i.test(msg)) {
+        status = 400; code = 'VALIDATION_ERROR';
+      } else if (msg && /not found/i.test(msg)) {
+        status = 404; code = 'NOT_FOUND';
+      }
+      res.status(status).json({ error: msg, code, status });
     });
   }
 
@@ -145,6 +163,11 @@ function createLanApiRouter(deps) {
   }));
 
   router.post('/api/expenses', wrap(async (req, res) => {
+    if (req.query.offline === 'true') {
+      const { description, amount, category, date, payee } = req.body;
+      _offlineQueue.push({ type: 'expense', body: req.body, timestamp: Date.now() });
+      return res.json({ success: true, queued: true, queueLength: _offlineQueue.length });
+    }
     if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
     const { description, amount, category, date, payee } = req.body;
     if (!validateAmount(amount)) return res.status(400).json({ error: 'Valid amount required (0-999999999)' });
@@ -249,6 +272,10 @@ function createLanApiRouter(deps) {
   }));
 
   router.post('/api/payments', wrap(async (req, res) => {
+    if (req.query.offline === 'true') {
+      _offlineQueue.push({ type: 'payment', body: req.body, timestamp: Date.now() });
+      return res.json({ success: true, queued: true, queueLength: _offlineQueue.length });
+    }
     if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
     const { clientId, amount, type, date } = req.body;
     if (!validateAmount(amount)) return res.status(400).json({ error: 'Valid amount required' });
@@ -275,6 +302,10 @@ function createLanApiRouter(deps) {
   }));
 
   router.post('/api/sales', wrap(async (req, res) => {
+    if (req.query.offline === 'true') {
+      _offlineQueue.push({ type: 'sale', body: req.body, timestamp: Date.now() });
+      return res.json({ success: true, queued: true, queueLength: _offlineQueue.length });
+    }
     if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
     const { clientId, items, paymentMethod, discount } = req.body;
     if (!items || !Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'At least one item required' });
@@ -368,7 +399,66 @@ function createLanApiRouter(deps) {
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
+  router.get('/api/offline-queue', (req, res) => {
+    res.json({ queue: getOfflineQueue(), length: _offlineQueue.length });
+  });
+
+  router.post('/api/offline-queue/process', wrap(async (req, res) => {
+    if (_offlineQueue.length === 0) return res.json({ success: true, processed: 0 });
+    if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready', code: 'SERVICE_UNAVAILABLE', status: 503 });
+    const items = _offlineQueue.slice();
+    _offlineQueue.length = 0;
+    let processed = 0;
+    const errors = [];
+    for (const item of items) {
+      try {
+        if (item.type === 'expense') {
+          const { description, amount, category, date, payee } = item.body;
+          if (!validateAmount(amount)) { errors.push({ type: 'expense', error: 'Invalid amount' }); continue; }
+          const amountNum = Math.round((parseFloat(amount) || 0) * 100) / 100;
+          if (amountNum <= 0) { errors.push({ type: 'expense', error: 'Amount must be greater than 0' }); continue; }
+          const cat = EXPENSE_CATS.includes(category) ? category : 'Other';
+          await deps.rendererExec(`dbAdd('expenses', { date: ${JSON.stringify(sanitize(date) || todayStr())}, category: ${JSON.stringify(cat)}, description: ${JSON.stringify(sanitize(description))}, amount: ${amountNum}, payee: ${JSON.stringify(sanitize(payee))}, createdAt: new Date().toISOString() })`);
+        } else if (item.type === 'payment') {
+          const { clientId, amount, type, date } = item.body;
+          if (!validateAmount(amount)) { errors.push({ type: 'payment', error: 'Invalid amount' }); continue; }
+          const amtNum = Math.round((parseFloat(amount) || 0) * 100) / 100;
+          if (amtNum <= 0) { errors.push({ type: 'payment', error: 'Amount must be greater than 0' }); continue; }
+          const safeDate = sanitize(date) || new Date().toISOString().split('T')[0];
+          await deps.rendererExec(`(async()=>{const c=await dbGet('clients',${JSON.stringify(clientId)});const balBefore=c?(c.balance||0):0;const pt=${JSON.stringify(type)}||(amtNum>=balBefore?'Full':'Partial');await dbAdd('payments',{clientId:${JSON.stringify(clientId)},amount:${amtNum},type:pt,date:${JSON.stringify(safeDate)},notes:'',createdAt:new Date().toISOString()});if(c)await dbPut('clients',{...c,balance:Math.max(0,balBefore-${amtNum})});})()`);
+        } else if (item.type === 'sale') {
+          const { clientId, items, paymentMethod, discount } = item.body;
+          if (!items || !Array.isArray(items) || items.length === 0) { errors.push({ type: 'sale', error: 'No items' }); continue; }
+          const invNos = JSON.parse(await deps.rendererExec(`JSON.stringify(state.transactions.filter(t=>t.invoiceNo?.startsWith('INV-')).map(t=>parseInt(t.invoiceNo.replace('INV-',''))||0))`));
+          const nextNo = invNos.length > 0 ? Math.max(...invNos) + 1 : 1;
+          const invoiceNo = 'INV-' + String(nextNo).padStart(5,'0');
+          const subtotal = items.reduce((s, i) => s + ((i.qty||1) * (i.unitCost || 0)), 0);
+          const totalInterest = items.reduce((s, i) => s + ((i.qty||1) * (i.unitCost || 0)) * ((i.intRate||0)/100), 0);
+          const d = parseFloat(discount) || 0;
+          const grandTotal = Math.max(0, subtotal + totalInterest - d);
+          const clientData = clientId ? JSON.parse(await deps.rendererExec(`JSON.stringify(await dbGet('clients', ${JSON.stringify(clientId)}))`)) : null;
+          const clientName = clientData ? clientData.name : 'Walk-in';
+          const payMethod = paymentMethod || 'Cash';
+          const txnData = JSON.stringify({ invoiceNo, clientId: clientId || null, clientName, date: todayStr(), createdAt: new Date().toISOString(), items: items.map(i => ({ ...i, amount: ((i.qty||1) * (i.unitCost || 0)) + ((i.qty||1) * (i.unitCost || 0)) * ((i.intRate||0)/100) })), subtotal, totalInterest, discount: d, scDiscount: 0, grandTotal, paymentMethod: payMethod, status: grandTotal <= 0 ? 'paid' : 'pending', balanceAdded: !!(clientId && payMethod !== 'Cash') });
+          await deps.rendererExec(`dbAdd('transactions', ${txnData})`);
+          for (const item of items) {
+            let invId = item.invId;
+            if (!invId && item.description) {
+              invId = await deps.rendererExec(`(async()=>{const desc=${JSON.stringify(String(item.description).trim())};const qty=${Math.max(1,parseInt(item.qty)||1)};const unitCost=${item.unitCost||0};if(!desc)return null;const all=await dbAll('inventory');const f=all.find(i=>String(i.name||'').trim().toLowerCase()===desc.toLowerCase());if(f)return f.id;const n={name:desc,description:'',sku:'',category:'',stock:qty,minStock:5,lowStock:5,costPrice:0,sellPrice:unitCost,price:unitCost,image:null,variants:[],createdAt:new Date().toISOString()};const id=await dbAdd('inventory',n);return id;})()`);
+              item.invId = invId;
+            }
+            if (invId) await deps.rendererExec(`(async()=>{const i=await dbGet('inventory',${JSON.stringify(invId)});if(i){i.stock=(i.stock||0)-${parseInt(item.qty)||1};const vn=${JSON.stringify(item.variantName||null)};if(vn&&i.variants){const v=i.variants.find(x=>x.name===vn);if(v)v.stock=(v.stock||0)-${parseInt(item.qty)||1};}await dbPut('inventory',i);}})()`);
+          }
+          if (clientId) await deps.rendererExec(`(async()=>{const c=await dbGet('clients',${JSON.stringify(clientId)});if(c && ${JSON.stringify(payMethod)} !== 'Cash'){c.balance=(c.balance||0)+${grandTotal};await dbPut('clients',c);}})()`);
+        }
+        processed++;
+      } catch (e) { errors.push({ type: item.type, error: e.message }); }
+    }
+    deps.notify({ source: 'api', kind: 'offline-process' });
+    res.json({ success: true, processed, errors });
+  }));
+
   return router;
 }
 
-module.exports = { createLanApiRouter };
+module.exports = { createLanApiRouter, getOfflineQueue, clearOfflineQueue };

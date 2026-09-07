@@ -37,6 +37,22 @@ const MIGRATIONS = [
     db.exec(`CREATE INDEX IF NOT EXISTS idx_clients_name ON s_clients(json_extract(value, '$.name'))`);
     db.exec(`CREATE INDEX IF NOT EXISTS idx_auditlogs_date ON s_auditLogs(json_extract(value, '$.createdAt'))`);
     db.exec(`CREATE INDEX IF NOT EXISTS idx_auditlogs_action ON s_auditLogs(json_extract(value, '$.action'))`);
+  }, down() {
+    db.exec(`DROP INDEX IF EXISTS idx_transactions_date`);
+    db.exec(`DROP INDEX IF EXISTS idx_transactions_client`);
+    db.exec(`DROP INDEX IF EXISTS idx_transactions_status`);
+    db.exec(`DROP INDEX IF EXISTS idx_transactions_invoice`);
+    db.exec(`DROP INDEX IF EXISTS idx_payments_date`);
+    db.exec(`DROP INDEX IF EXISTS idx_payments_client`);
+    db.exec(`DROP INDEX IF EXISTS idx_expenses_date`);
+    db.exec(`DROP INDEX IF EXISTS idx_expenses_category`);
+    db.exec(`DROP INDEX IF EXISTS idx_inventory_name`);
+    db.exec(`DROP INDEX IF EXISTS idx_inventory_sku`);
+    db.exec(`DROP INDEX IF EXISTS idx_inventory_barcode`);
+    db.exec(`DROP INDEX IF EXISTS idx_inventory_category`);
+    db.exec(`DROP INDEX IF EXISTS idx_clients_name`);
+    db.exec(`DROP INDEX IF EXISTS idx_auditlogs_date`);
+    db.exec(`DROP INDEX IF EXISTS idx_auditlogs_action`);
   }}
 ];
 
@@ -98,6 +114,7 @@ function init(userDataPath) {
     db.exec('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)');
     for (const s of STORES) db.exec(`CREATE TABLE IF NOT EXISTS s_${s} (id INTEGER PRIMARY KEY AUTOINCREMENT, value TEXT NOT NULL)`);
     runMigrations();
+    scheduleMaintenance();
     return openInfo();
   } catch (e) {
     logger.error('SQLite init failed: ' + e.message);
@@ -210,6 +227,45 @@ function vacuum() {
   catch (e) { return { ok: false, error: e.message }; }
 }
 
+function rollbackMigration(targetVersion) {
+  if (!db) return { ok: false, error: 'SQLite not initialized' };
+  try {
+    db.exec('CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, name TEXT, applied_at TEXT)');
+    const applied = stmt('SELECT version FROM schema_migrations ORDER BY version DESC').all();
+    const toRollback = applied.filter(r => r.version > targetVersion).sort((a, b) => b.version - a.version);
+    const rolledBack = [];
+    for (const m of toRollback) {
+      const migration = MIGRATIONS.find(x => x.version === m.version);
+      if (migration && typeof migration.down === 'function') {
+        db.transaction(() => {
+          migration.down();
+          stmt('DELETE FROM schema_migrations WHERE version = ?').run(m.version);
+        })();
+        rolledBack.push(m.version);
+      }
+    }
+    return { ok: true, rolledBack };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+
+let _maintenanceInterval = null;
+
+function scheduleMaintenance() {
+  if (_maintenanceInterval) return;
+  _maintenanceInterval = setInterval(() => {
+    if (!db) return;
+    try { db.pragma('wal_checkpoint(PASSIVE)'); } catch (e) {}
+    try {
+      const row = stmt('SELECT value FROM meta WHERE key = ?').get('lastVacuum');
+      const today = new Date().toISOString().split('T')[0];
+      if (!row || row.value !== today) {
+        db.exec('VACUUM');
+        stmt('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run('lastVacuum', today);
+      }
+    } catch (e) {}
+  }, 5 * 60 * 1000);
+}
+
 // Swaps the live database for the given file (a previously made snapshot):
 // keeps a .prerestore safety copy of the current DB, drops stale WAL/SHM sidecars,
 // reopens, and stamps meta so the renderer never re-migrates over a restored store.
@@ -295,4 +351,4 @@ function registerDbIpc(ipcMain, userDataPath) {
   ipcMain.handle('db-stats', () => stats());
 }
 
-module.exports = { registerDbIpc, init, migrate, get, add, put, del, all, clear, stats, snapshot, integrityCheck, optimize, checkpoint, vacuum, replaceWith, replaceFromDump, runMigrations, schemaVersion, close, closeDb: close };
+module.exports = { registerDbIpc, init, migrate, get, add, put, del, all, clear, stats, snapshot, integrityCheck, optimize, checkpoint, vacuum, replaceWith, replaceFromDump, runMigrations, schemaVersion, close, closeDb: close, rollbackMigration, scheduleMaintenance };

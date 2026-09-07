@@ -41,7 +41,7 @@ export function renderSupTable() {
       return `<tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
       <td class="p-3 font-medium">${escapeHtml(s.name)}</td><td class="p-3">${escapeHtml(s.contact || '-')}</td>
       <td class="p-3 text-right">${peso(purchased)}</td><td class="p-3 text-right text-green-600">${peso(paid)}</td><td class="p-3 text-right ${balCls}">${peso(owed)}</td>
-      <td class="p-3 text-center whitespace-nowrap"><button onclick="openSupplierPayModal(${s.id})" class="px-2 py-1 bg-green-600 text-white rounded text-xs mr-2">Pay</button><button onclick="openSupplierModal(${s.id})" class="text-blue-600 hover:text-blue-800 text-xs mr-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit</button><button onclick="deleteSup(${s.id})" class="text-red-600 hover:text-red-800 text-xs"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Del</button></td>
+      <td class="p-3 text-center whitespace-nowrap"><button onclick="openSupplierPayModal(${s.id})" class="px-2 py-1 bg-green-600 text-white rounded text-xs mr-2">Pay</button><button onclick="showSupplierPaymentHistory(${s.id})" class="px-2 py-1 bg-indigo-600 text-white rounded text-xs mr-2">Payments</button><button onclick="showSupplierPriceHistory(${s.id})" class="px-2 py-1 bg-purple-600 text-white rounded text-xs mr-2">Price History</button><button onclick="openSupplierModal(${s.id})" class="text-blue-600 hover:text-blue-800 text-xs mr-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit</button><button onclick="deleteSup(${s.id})" class="text-red-600 hover:text-red-800 text-xs"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Del</button></td>
     </tr>`;
     }).join('')}</tbody></table>`;
 }
@@ -55,6 +55,10 @@ export async function openSupplierPayModal(id) {
       <div class="space-y-3">
         <div><label class="text-xs text-gray-500 block">Date</label><input id="sp-date" type="date" value="${today()}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
         <div><label class="text-xs text-gray-500 block">Amount (₱) *</label><input id="sp-amount" type="number" step="0.01" min="0" placeholder="0.00" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="text-xs text-gray-500 block">Payment Method</label><select id="sp-method" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"><option>Cash</option><option>Bank Transfer</option><option>GCash</option><option>Maya</option></select></div>
+          <div><label class="text-xs text-gray-500 block">Reference No.</label><input id="sp-ref" type="text" placeholder="Optional" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
+        </div>
         <div><label class="text-xs text-gray-500 block">Notes</label><input id="sp-notes" type="text" placeholder="Optional" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
         <div class="flex gap-2 pt-2">
           <button onclick="saveSupplierPayment(${s.id})" class="flex-1 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="20 6 9 17 4 12"/></svg>Save Payment</button>
@@ -69,17 +73,59 @@ export async function saveSupplierPayment(supplierId) {
   const amtEl = document.getElementById('sp-amount');
   const dtEl = document.getElementById('sp-date');
   const ntEl = document.getElementById('sp-notes');
+  const methodEl = document.getElementById('sp-method');
+  const refEl = document.getElementById('sp-ref');
   if (!amtEl || !dtEl) { toast('Form not ready', 'error'); return; }
   const amount = parseFloat(amtEl.value) || 0;
   if (amount <= 0) { toast('Valid amount required', 'error'); return; }
   const s = state.suppliers.find(x => x.id === supplierId);
-  await dbAdd('supplierPayments', { supplierId, supplierName: s ? s.name : '', amount, date: dtEl.value || today(), notes: (ntEl ? ntEl.value : '').trim(), createdAt: now() });
-  await logAudit('supplier-payment', `Payment to ${s ? s.name : 'Supplier'} - ${peso(amount)}`);
+  const paymentMethod = methodEl ? methodEl.value : 'Cash';
+  const referenceNo = refEl ? refEl.value.trim() : '';
+  await dbAdd('supplierPayments', { supplierId, supplierName: s ? s.name : '', amount, date: dtEl.value || today(), notes: (ntEl ? ntEl.value : '').trim(), paymentMethod, referenceNo, createdAt: now() });
+  await logAudit('supplier-payment', `Payment to ${s ? s.name : 'Supplier'} - ${peso(amount)} via ${paymentMethod}`);
   state.supplierPayments = await dbAll('supplierPayments');
   closeModal();
   renderSupTable();
   if (window.electronAPI) window.electronAPI.signalLanUpdate();
   toast('Supplier payment recorded ✓');
+}
+
+export async function showSupplierPaymentHistory(supplierId) {
+  await Promise.all([dbLoad('supplierPayments'), dbLoad('purchaseOrders')]);
+  const s = state.suppliers.find(x => x.id === supplierId);
+  if (!s) { toast('Supplier not found', 'error'); return; }
+  const payments = (state.supplierPayments || []).filter(p => p.supplierId === supplierId).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const receivedBySupp = {};
+  for (const po of (state.purchaseOrders || [])) {
+    if (po.status !== 'Received' || po.supplierId !== supplierId) continue;
+    receivedBySupp[po.supplierId] = (receivedBySupp[po.supplierId] || 0) + (po.total || 0);
+  }
+  const purchased = receivedBySupp[supplierId] || 0;
+  let runningBalance = purchased;
+  const rows = payments.map(p => {
+    runningBalance -= p.amount || 0;
+    const methodBadge = p.paymentMethod ? `<span class="px-1.5 py-0.5 rounded text-xs ${p.paymentMethod === 'Cash' ? 'bg-green-100 text-green-700' : p.paymentMethod === 'GCash' ? 'bg-blue-100 text-blue-700' : p.paymentMethod === 'Maya' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700'}">${escapeHtml(p.paymentMethod)}</span>` : '';
+    return `<tr class="border-b dark:border-gray-700 last:border-0">
+      <td class="p-2 text-gray-500">${escapeHtml(p.date || '')}</td>
+      <td class="p-2 font-medium text-green-600">${peso(p.amount || 0)}</td>
+      <td class="p-2">${methodBadge}</td>
+      <td class="p-2 text-gray-500">${escapeHtml(p.referenceNo || '')}</td>
+      <td class="p-2 text-gray-500">${escapeHtml(p.notes || '')}</td>
+      <td class="p-2 font-medium ${runningBalance > 0 ? 'text-red-600' : 'text-green-600'}">${peso(runningBalance)}</td>
+    </tr>`;
+  }).join('');
+  modal(`
+    <div class="p-6">
+      <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">Payment History — ${escapeHtml(s.name)}</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+      <div class="grid grid-cols-3 gap-2 mb-3">
+        <div class="bg-gray-50 dark:bg-gray-700 p-2 rounded-lg text-center"><p class="text-xs text-gray-500">Purchased</p><p class="font-bold">${peso(purchased)}</p></div>
+        <div class="bg-gray-50 dark:bg-gray-700 p-2 rounded-lg text-center"><p class="text-xs text-gray-500">Total Paid</p><p class="font-bold text-green-600">${peso(payments.reduce((s, p) => s + (p.amount || 0), 0))}</p></div>
+        <div class="bg-gray-50 dark:bg-gray-700 p-2 rounded-lg text-center"><p class="text-xs text-gray-500">Remaining</p><p class="font-bold ${runningBalance > 0 ? 'text-red-600' : 'text-green-600'}">${peso(Math.max(0, runningBalance))}</p></div>
+      </div>
+      <div class="max-h-64 overflow-auto border dark:border-gray-700 rounded-lg">
+        ${payments.length === 0 ? '<p class="text-gray-400 text-xs text-center py-4">No payments recorded</p>' : `<table class="w-full text-xs"><thead><tr class="bg-gray-50 dark:bg-gray-700 sticky top-0"><th class="p-2 text-left">Date</th><th class="p-2 text-left">Amount</th><th class="p-2 text-left">Method</th><th class="p-2 text-left">Ref No</th><th class="p-2 text-left">Notes</th><th class="p-2 text-left">Balance</th></tr></thead><tbody>${rows}</tbody></table>`}
+      </div>
+    </div>`);
 }
 
 export function openSupplierModal(id) {
@@ -143,6 +189,42 @@ export async function deleteSup(id) {
   toast('Supplier deleted');
 }
 
+export async function showSupplierPriceHistory(supplierId) {
+  await dbLoad('suppliers');
+  const s = state.suppliers.find(x => x.id === supplierId);
+  if (!s) { toast('Supplier not found', 'error'); return; }
+  const history = (s.priceHistory || []).sort((a, b) => new Date(b.date) - new Date(a.date));
+  const groupedByItem = {};
+  for (const h of history) {
+    if (!groupedByItem[h.itemName]) groupedByItem[h.itemName] = [];
+    groupedByItem[h.itemName].push(h);
+  }
+  let content = '';
+  if (history.length === 0) {
+    content = '<p class="text-gray-400 text-sm text-center py-4">No price history yet. Prices are recorded when POs are received.</p>';
+  } else {
+    content = Object.entries(groupedByItem).map(([itemName, records]) => {
+      const rows = records.map((r, i) => {
+        const prevPrice = i < records.length - 1 ? records[i + 1].price : null;
+        let trend = '';
+        if (prevPrice !== null) {
+          if (r.price > prevPrice) trend = '<span class="text-red-500 text-xs ml-1">&#9650; Up</span>';
+          else if (r.price < prevPrice) trend = '<span class="text-green-500 text-xs ml-1">&#9660; Down</span>';
+          else trend = '<span class="text-gray-400 text-xs ml-1">= Same</span>';
+        }
+        return `<tr class="border-b dark:border-gray-700 last:border-0"><td class="p-2 text-gray-500">${escapeHtml(r.date || '')}</td><td class="p-2 font-medium">${peso(r.price)}</td><td class="p-2 text-center">${r.qty || '-'}</td><td class="p-2 text-gray-500">${escapeHtml(r.poNo || '')}</td><td class="p-2">${trend}</td></tr>`;
+      }).join('');
+      return `<div class="mb-3"><h5 class="font-semibold text-sm text-blue-600 mb-1">${escapeHtml(itemName)}</h5><table class="w-full text-xs"><thead><tr class="bg-gray-50 dark:bg-gray-700"><th class="p-2 text-left">Date</th><th class="p-2 text-left">Price</th><th class="p-2 text-center">Qty</th><th class="p-2 text-left">PO No</th><th class="p-2 text-left">Trend</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }).join('');
+  }
+  modal(`
+    <div class="p-6">
+      <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">Price History — ${escapeHtml(s.name)}</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+      <p class="text-xs text-gray-400 mb-3">Total records: ${history.length}</p>
+      <div class="max-h-96 overflow-auto">${content}</div>
+    </div>`);
+}
+
 
 // expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
 Object.defineProperties(window, {
@@ -153,5 +235,7 @@ Object.defineProperties(window, {
   saveSup: { get: () => saveSup, configurable: true },
   deleteSup: { get: () => deleteSup, configurable: true },
   openSupplierPayModal: { get: () => openSupplierPayModal, configurable: true },
-  saveSupplierPayment: { get: () => saveSupplierPayment, configurable: true }
+  saveSupplierPayment: { get: () => saveSupplierPayment, configurable: true },
+  showSupplierPriceHistory: { get: () => showSupplierPriceHistory, configurable: true },
+  showSupplierPaymentHistory: { get: () => showSupplierPaymentHistory, configurable: true }
 });

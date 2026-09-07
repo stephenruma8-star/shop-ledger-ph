@@ -1,5 +1,5 @@
 {
-    "version":  "3.10.8",
-    "buildDate":  "2026-09-06T00:00:00.000Z",
-    "notes":  "Backend hardening: rate limiting on LAN API, input validation on sales/expenses/payments endpoints, database indexing, structured logging (all console.error replaced with electron-log), ARIA labels on login/search/sidebar, CSV import validation (file size/row limit/duplicate detection/type checks)."
+    "version":  "3.11.0",
+    "buildDate":  "2026-09-07T00:00:00.000Z",
+    "notes":  "24 nice-to-have features: skeleton loading, barcode generation, undo/redo, real-time WS notifications, structured API errors, DB maintenance scheduling, migration rollback, offline queue, sales commission, loyalty/rewards, supplier price history, petty cash, customer display, product image upload, pre-commit hooks, code coverage, audit scripts, macOS/Linux builds, README, schema docs, seed data, E2E tests, conventional commits."
 }

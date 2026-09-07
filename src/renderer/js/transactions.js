@@ -1,7 +1,7 @@
 import { logAudit } from './auth.js'
 import { renderClientGrid } from './clients.js'
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
-import { calcInterest, closeModal, confirmModal, dbLoad, debounce, escapeHtml, filterByYear, itemThumbHtml, modal, paginate, renderPagination, searchData, toast, updateLowStockBadge } from './helpers.js'
+import { calcInterest, closeModal, confirmModal, dbLoad, debounce, escapeHtml, filterByYear, itemThumbHtml, modal, paginate, pushUndo, renderPagination, searchData, showUndoToast, toast, updateLowStockBadge } from './helpers.js'
 import { openPrintWindow } from './printLayout.js'
 import { fmtDate, fmtDateTime, now, peso, round2, state, today } from './state.js'
 
@@ -130,7 +130,7 @@ export function renderTransactionModal(editTxn) {
           </div>
           <div class="grid grid-cols-2 gap-2">
             <div><label class="text-xs text-gray-500 block">Discount (₱)</label><input id="tm-discount" type="number" value="${selDisc}" min="0" step="0.01" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" oninput="updateTMTotals()" /></div>
-            <div></div>
+            <div><label class="text-xs text-gray-500 block">Commission (%)</label><input id="tm-commission" type="number" value="${isEdit ? (editTxn.commissionRate || 0) : 0}" min="0" max="100" step="0.1" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" oninput="updateTMTotals()" /></div>
           </div>
           <div class="flex gap-2">
             <label class="flex items-center gap-1 text-sm"><input type="checkbox" id="tm-sc" onchange="toggleSC()" ${selSC ? 'checked' : ''} /> SC/PWD 20% Discount</label>
@@ -242,12 +242,15 @@ export function updateTMTotals() {
   const scDiscount = scCheck && scCheck.checked ? subtotal * 0.2 : 0;
   const discount = parseFloat(document.getElementById('tm-discount')?.value || 0) + scDiscount;
   const grandTotal = round2(Math.max(0, subtotal + totalInterest - discount));
+  const commissionRate = parseFloat(document.getElementById('tm-commission')?.value || 0);
+  const commissionAmount = round2(grandTotal * commissionRate / 100);
   el.innerHTML = `
     <div class="flex justify-between"><span>Subtotal (goods)</span><span>${peso(subtotal)}</span></div>
     ${totalInterest > 0 ? `<div class="flex justify-between text-amber-600"><span>Total Interest</span><span>${peso(totalInterest)}</span></div>` : ''}
     ${scDiscount > 0 ? `<div class="flex justify-between text-green-600"><span>SC/PWD 20%</span><span>-${peso(scDiscount)}</span></div>` : ''}
     ${discount > 0 ? `<div class="flex justify-between text-orange-600"><span>Discount</span><span>-${peso(discount)}</span></div>` : ''}
-    <div class="flex justify-between font-bold text-lg border-t dark:border-gray-700 pt-1"><span>Total</span><span id="tm-grand-total" class="text-green-600">${peso(grandTotal)}</span></div>`;
+    <div class="flex justify-between font-bold text-lg border-t dark:border-gray-700 pt-1"><span>Total</span><span id="tm-grand-total" class="text-green-600">${peso(grandTotal)}</span></div>
+    ${commissionRate > 0 ? `<div class="flex justify-between text-purple-600 text-xs mt-1"><span>Commission (${commissionRate}%)</span><span>${peso(commissionAmount)}</span></div>` : ''}`;
   if (flashTotal(el, grandTotal)) popEl(document.getElementById('tm-grand-total'));
 }
 
@@ -264,11 +267,13 @@ export async function saveTransaction() {
     const scDiscount = scCheck && scCheck.checked ? subtotal * 0.2 : 0;
     const discount = parseFloat(document.getElementById('tm-discount')?.value || 0) + scDiscount;
     const grandTotal = round2(Math.max(0, subtotal + totalInterest - discount));
+    const commissionRate = parseFloat(document.getElementById('tm-commission')?.value || 0);
+    const commissionAmount = round2(grandTotal * commissionRate / 100);
     if (txEditingId) { await doSaveTransaction(); return; }
     if (!await confirmModal(`Review Sale:
     Subtotal: ${peso(subtotal)}
     ${totalInterest > 0 ? 'Interest: ' + peso(totalInterest) + '\n  ' : ''}${scDiscount > 0 ? 'SC/PWD: -' + peso(scDiscount) + '\n  ' : ''}${discount > 0 ? 'Discount: -' + peso(discount) + '\n  ' : ''}→ Total: ${peso(grandTotal)}
-    
+    ${commissionRate > 0 ? 'Commission (' + commissionRate + '%): ' + peso(commissionAmount) + '\n' : ''}
     Proceed with this sale? (Save the sale?)`)) return;
     await doSaveTransaction();
   } finally { window.__app._savingTx = false; }
@@ -351,7 +356,9 @@ export async function doSaveTransaction() {
         if (c) { c.balance = (c.balance || 0) + grandTotal; await dbPut('clients', c); }
         editRollback.push(() => dbGet('clients', clientId).then(cc => { if (cc) { cc.balance = (cc.balance || 0) - grandTotal; return dbPut('clients', cc); } }));
       }
-      const updated = { ...oldTxn, clientId, clientName, paymentMethod, items: newItems, subtotal, totalInterest, discount, scDiscount, grandTotal, balanceAdded: !!(clientId && paymentMethod !== 'Cash'), editedAt: now() };
+      const commissionRateEdit = parseFloat(document.getElementById('tm-commission')?.value || 0);
+      const commissionAmountEdit = round2(grandTotal * commissionRateEdit / 100);
+      const updated = { ...oldTxn, clientId, clientName, paymentMethod, items: newItems, subtotal, totalInterest, discount, scDiscount, grandTotal, commissionRate: commissionRateEdit, commissionAmount: commissionAmountEdit, balanceAdded: !!(clientId && paymentMethod !== 'Cash'), editedAt: now() };
       await dbPut('transactions', updated);
       toast(`Sale ${oldTxn.invoiceNo} updated`, 'success');
       await logAudit('sale-edit', `Sale ${oldTxn.invoiceNo} updated: ${peso(oldTxn.grandTotal)} → ${peso(grandTotal)}`);
@@ -365,10 +372,13 @@ export async function doSaveTransaction() {
     const invNos = state.transactions.filter(t => t.invoiceNo?.startsWith('INV-')).map(t => parseInt(t.invoiceNo.replace('INV-','')) || 0);
     const nextNo = invNos.length > 0 ? Math.max(...invNos) + 1 : 1;
     const invoiceNo = 'INV-' + String(nextNo).padStart(5,'0');
+    const commissionRateNew = parseFloat(document.getElementById('tm-commission')?.value || 0);
+    const commissionAmountNew = round2(grandTotal * commissionRateNew / 100);
     const transaction = {
       invoiceNo, clientId, clientName, date: today(), createdAt: now(),
       items: txCart.map(i => ({ date: i.date, description: i.description, name: i.name, unitCost: i.unitCost, intRate: i.intRate, amount: lineAmt(i), invId: i.invId, variantName: i.variantName })),
       subtotal, totalInterest, discount, scDiscount, grandTotal,
+      commissionRate: commissionRateNew, commissionAmount: commissionAmountNew,
       paymentMethod, status: grandTotal <= 0 ? 'paid' : 'pending',
       balanceAdded: !!(clientId && paymentMethod !== 'Cash')
     };
@@ -398,6 +408,19 @@ export async function doSaveTransaction() {
     toast(`Sale completed! Invoice: ${invoiceNo}`, 'success');
     playSound('sale');
     await logAudit('sale', `Sale ${invoiceNo} - ${peso(grandTotal)}`);
+    if (clientId) {
+      const pointsPerPesoSetting = state.settings.find(s => s.key === 'pointsPerPeso');
+      const pointsPerPeso = pointsPerPesoSetting ? parseFloat(pointsPerPesoSetting.value) || 1 : 1;
+      const earnedPoints = Math.floor(grandTotal * pointsPerPeso);
+      if (earnedPoints > 0) {
+        const c = await dbGet('clients', clientId);
+        if (c) {
+          c.loyaltyPoints = (c.loyaltyPoints || 0) + earnedPoints;
+          c.totalSpent = (c.totalSpent || 0) + grandTotal;
+          await dbPut('clients', c);
+        }
+      }
+    }
   }
   [state.transactions, state.inventory, state.clients] = await Promise.all([
     dbAll('transactions'), dbAll('inventory'), dbAll('clients')
@@ -519,6 +542,7 @@ export function viewTransactionDetail(id) {
         ${t.scDiscount > 0 ? `<div class="flex justify-between text-green-600"><span>SC/PWD 20%</span><span>-${peso(t.scDiscount)}</span></div>` : ''}
         ${t.discount > 0 ? `<div class="flex justify-between text-orange-600"><span>Discount</span><span>-${peso(t.discount)}</span></div>` : ''}
         <div class="flex justify-between font-bold text-lg border-t dark:border-gray-700 pt-1"><span>Total</span><span class="text-green-600">${peso(dynTotal)}</span></div>
+        ${t.commissionRate > 0 ? `<div class="flex justify-between text-purple-600"><span>Commission (${t.commissionRate}%)</span><span>${peso(t.commissionAmount || 0)}</span></div>` : ''}
       </div>
       <div class="flex gap-2 mt-4">
         <button onclick="closeModal();printReceipt(${t.id})" class="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print Receipt</button>
@@ -537,6 +561,8 @@ export async function voidTransaction(id) {
   const t = await dbGet('transactions', id);
   if (!await confirmModal(`Void sale ${t.invoiceNo} (${peso(t.grandTotal)})? Ibabalik ang stock at iaadjust ang client balance.`)) return;
   if (t.status === 'voided') { toast('Already voided', 'warning'); return; }
+  const origStatus = t.status;
+  const origBalanceAdded = t.balanceAdded;
   for (const item of (t.items || [])) {
     if (item.invId) await adjustStock(item.invId, item, 1);
   }
@@ -546,10 +572,49 @@ export async function voidTransaction(id) {
   }
   t.status = 'voided'; t.voidedAt = now();
   await dbPut('transactions', t);
+  pushUndo({
+    description: `Voided sale ${t.invoiceNo}`,
+    undo: async () => {
+      const tx = await dbGet('transactions', id);
+      if (!tx) return;
+      for (const item of (tx.items || [])) {
+        if (item.invId) await adjustStock(item.invId, item, -1);
+      }
+      if (origBalanceAdded && tx.clientId) {
+        const c = await dbGet('clients', tx.clientId);
+        if (c) { c.balance = (c.balance || 0) + (tx.grandTotal || 0); await dbPut('clients', c); }
+      }
+      tx.status = origStatus;
+      delete tx.voidedAt;
+      await dbPut('transactions', tx);
+      [state.transactions, state.inventory, state.clients] = await Promise.all([dbAll('transactions'), dbAll('inventory'), dbAll('clients')]);
+      updateLowStockBadge();
+      toast('Void reversed: ' + tx.invoiceNo, 'success');
+      renderTxTable();
+    },
+    redo: async () => {
+      const tx = await dbGet('transactions', id);
+      if (!tx) return;
+      for (const item of (tx.items || [])) {
+        if (item.invId) await adjustStock(item.invId, item, 1);
+      }
+      if (wasBalanceAdded(tx)) {
+        const c = await dbGet('clients', tx.clientId);
+        if (c) { c.balance = Math.max(0, (c.balance || 0) - (tx.grandTotal || 0)); await dbPut('clients', c); }
+      }
+      tx.status = 'voided'; tx.voidedAt = now();
+      await dbPut('transactions', tx);
+      [state.transactions, state.inventory, state.clients] = await Promise.all([dbAll('transactions'), dbAll('inventory'), dbAll('clients')]);
+      updateLowStockBadge();
+      toast('Sale re-voided: ' + tx.invoiceNo, 'info');
+      renderTxTable();
+    }
+  });
   [state.transactions, state.inventory, state.clients] = await Promise.all([dbAll('transactions'), dbAll('inventory'), dbAll('clients')]);
   updateLowStockBadge();
   toast(`Sale ${t.invoiceNo} voided`, 'success');
   await logAudit('void', `Sale ${t.invoiceNo} voided - ${peso(t.grandTotal)}`);
+  showUndoToast();
   renderTxTable();
 }
 

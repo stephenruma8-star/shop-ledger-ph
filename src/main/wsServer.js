@@ -85,6 +85,11 @@ function startWsServer({ port, token, onMessage, onClose }) {
       const data = Buffer.from(JSON.stringify(obj));
       for (const c of clients) { if (c.authed) sendFrame(c.socket, data); }
     },
+    sendNotification: (type, data) => {
+      const msg = JSON.stringify({ type: 'notification', notifType: type, data, timestamp: Date.now() });
+      const buf = Buffer.from(msg);
+      for (const c of clients) { if (c.authed) sendFrame(c.socket, buf); }
+    },
     close: () => { try { server.close(); } catch (e) {} }
   };
 }

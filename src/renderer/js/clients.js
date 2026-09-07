@@ -285,15 +285,16 @@ export async function viewClientHistory(id) {
       <div class="flex gap-1 flex-wrap justify-end">
         <button onclick="closeModal();openClientModal(${c.id})" class="px-2 py-1 text-xs bg-blue-600 text-white rounded"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-0.5 -mt-0.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit</button>
         <button onclick="closeModal();recordClientPayment(${c.id})" class="px-2 py-1 text-xs bg-green-600 text-white rounded"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-0.5 -mt-0.5"><path d="M12 2v20M6 7h9a4 4 0 0 1 0 8H6"/><line x1="4" y1="11" x2="17" y2="11"/></svg>Payment</button>
+        ${(c.loyaltyPoints || 0) >= 100 ? `<button onclick="closeModal();redeemClientPoints(${c.id})" class="px-2 py-1 text-xs bg-amber-600 text-white rounded">Redeem Points</button>` : ''}
         <button onclick="closeModal();printClientInfo(${c.id})" class="px-2 py-1 text-xs bg-gray-600 text-white rounded"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-0.5 -mt-0.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print</button>
         <button onclick="closeModal();deleteClient(${c.id})" class="px-2 py-1 text-xs bg-red-600 text-white rounded"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-0.5 -mt-0.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Del</button>
       </div>
     </div>
     <div class="grid grid-cols-4 gap-2 mb-3 shrink-0">
       <div class="bg-gray-50 dark:bg-gray-700 p-2 rounded-lg text-center"><p class="text-xs text-gray-500">Balance</p><p class="text-lg font-bold ${(c.balance||0)>0?'text-red-600':'text-green-600'}">${peso(c.balance)}</p></div>
-      <div class="bg-gray-50 dark:bg-gray-700 p-2 rounded-lg text-center"><p class="text-xs text-gray-500">Spent</p><p class="text-lg font-bold">${peso(totalSpent)}</p></div>
+      <div class="bg-gray-50 dark:bg-gray-700 p-2 rounded-lg text-center"><p class="text-xs text-gray-500">Spent</p><p class="text-lg font-bold">${peso(c.totalSpent || totalSpent)}</p></div>
       <div class="bg-gray-50 dark:bg-gray-700 p-2 rounded-lg text-center"><p class="text-xs text-gray-500">Paid</p><p class="text-lg font-bold text-green-600">${peso(totalPaid)}</p></div>
-      <div class="bg-gray-50 dark:bg-gray-700 p-2 rounded-lg text-center"><p class="text-xs text-gray-500">Due</p><p class="text-lg font-bold ${c.dueDate && c.dueDate < today() ? 'text-red-600' : 'text-gray-600'}">${c.dueDate ? fmtDate(c.dueDate) : '—'}</p></div>
+      <div class="bg-gray-50 dark:bg-gray-700 p-2 rounded-lg text-center"><p class="text-xs text-gray-500">Points</p><p class="text-lg font-bold text-amber-600">${c.loyaltyPoints || 0}</p></div>
     </div>
     <div class="flex gap-1 mb-2 shrink-0 border-b dark:border-gray-700">
       <button class="px-3 py-1.5 text-xs font-semibold rounded-t ${activeTab==='all'?'bg-white dark:bg-gray-700 border border-b-0 dark:border-gray-600':'text-gray-500 hover:text-gray-700'}" onclick="document.getElementById('cht-tab-all').classList.remove('hidden');document.getElementById('cht-tab-sales').classList.add('hidden');document.getElementById('cht-tab-payments').classList.add('hidden');this.classList.add('bg-white','dark:bg-gray-700','border','border-b-0');this.parentElement.querySelectorAll('button').forEach(b=>{if(b!==this){b.classList.remove('bg-white','dark:bg-gray-700','border','border-b-0');b.classList.add('text-gray-500')}})">All (${allTx.length + allPays.length})</button>
@@ -520,6 +521,39 @@ function exportClientHistory(id) {
   toast('CSV exported');
 }
 
+export async function redeemClientPoints(id) {
+  const c = await dbGet('clients', id);
+  if (!c) { toast('Client not found', 'error'); return; }
+  const pts = c.loyaltyPoints || 0;
+  if (pts < 100) { toast('Need at least 100 points to redeem', 'warning'); return; }
+  const discountAmount = Math.floor(pts / 100);
+  const pointsToRedeem = discountAmount * 100;
+  modal(`
+    <div class="p-6">
+      <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">Redeem Points — ${escapeHtml(c.name)}</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+      <p class="text-sm text-gray-500 mb-3">Current points: <strong class="text-amber-600">${pts}</strong> (100 points = ₱1 discount)</p>
+      <div class="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg mb-3">
+        <p class="text-sm">Points to redeem: <strong>${pointsToRedeem}</strong></p>
+        <p class="text-sm text-green-600 font-semibold">Discount amount: ${peso(discountAmount)}</p>
+      </div>
+      <p class="text-xs text-gray-400 mb-3">This discount can be applied to the client's next sale. Remaining points: ${pts - pointsToRedeem}</p>
+      <button onclick="confirmRedeemPoints(${c.id}, ${pointsToRedeem}, ${discountAmount})" class="w-full py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-semibold">Confirm Redemption</button>
+    </div>`);
+}
+
+export async function confirmRedeemPoints(clientId, points, discountAmount) {
+  const c = await dbGet('clients', clientId);
+  if (!c) { toast('Client not found', 'error'); return; }
+  c.loyaltyPoints = (c.loyaltyPoints || 0) - points;
+  c.redeemedDiscount = (c.redeemedDiscount || 0) + discountAmount;
+  await dbPut('clients', c);
+  state.clients = await dbAll('clients');
+  await logAudit('loyalty-redeem', `${c.name} redeemed ${points} points for ${peso(discountAmount)} discount`);
+  closeModal();
+  toast(`Redeemed ${points} points for ${peso(discountAmount)} discount`, 'success');
+  await viewClientHistory(clientId);
+}
+
 
 // expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
 Object.defineProperties(window, {
@@ -547,5 +581,7 @@ Object.defineProperties(window, {
   deleteClientSale: { get: () => deleteClientSale, configurable: true },
   importClients: { get: () => importClients, configurable: true },
   deleteClient: { get: () => deleteClient, configurable: true },
-  exportAllClientsCSV: { get: () => exportAllClientsCSV, configurable: true }
+  exportAllClientsCSV: { get: () => exportAllClientsCSV, configurable: true },
+  redeemClientPoints: { get: () => redeemClientPoints, configurable: true },
+  confirmRedeemPoints: { get: () => confirmRedeemPoints, configurable: true }
 });
