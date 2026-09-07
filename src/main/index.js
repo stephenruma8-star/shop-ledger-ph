@@ -197,7 +197,20 @@ function ensureFirewallRules() {
 }
 
 function setupAutoUpdater() {
-  ipcMain.handle('download-update', () => { if (autoUpdater) autoUpdater.downloadUpdate(); });
+  ipcMain.handle('download-update', () => {
+    if (!autoUpdater) {
+      mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-error', 'Auto-updater not available');
+      return { success: false, error: 'Auto-updater not available' };
+    }
+    try {
+      autoUpdater.downloadUpdate();
+      return { success: true };
+    } catch (err) {
+      logger.error('downloadUpdate failed: ' + err.message);
+      mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-error', 'Download failed: ' + err.message);
+      return { success: false, error: err.message };
+    }
+  });
   ipcMain.handle('install-update', () => { if (autoUpdater) { isQuitting = true; autoUpdater.quitAndInstall(); } });
   ipcMain.handle('check-update', () => {
     if (!autoUpdater || !app.isPackaged) {

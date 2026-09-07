@@ -80,7 +80,11 @@ if (window.electronAPI) {
     toast(v ? `You are up to date (v${v})` : 'You are up to date', 'success');
   });
   window.electronAPI.onUpdateError((message) => {
-    toast('Update check failed: ' + message, 'warning');
+    // Dismiss progress modal if visible
+    const progressBar = document.getElementById('update-progress-bar');
+    if (progressBar) closeModal();
+    dismissSysNotif('update');
+    toast('Update failed: ' + message, 'error');
   });
   window.electronAPI.onUpdateDownloaded((info) => {
     const version = info.version || info.name || 'new version';
