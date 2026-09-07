@@ -233,7 +233,14 @@ function setupAutoUpdater() {
 }
 
 function checkForUpdates() {
-  if (!autoUpdater || !app.isPackaged) return;
+  if (!autoUpdater) {
+    mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-error', 'Auto-updater not available');
+    return;
+  }
+  if (!app.isPackaged) {
+    mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-not-available');
+    return;
+  }
   const https = require('https');
   https.get('https://api.github.com/repos/stephenruma8-star/shop-ledger-ph/releases/latest', { headers: { 'User-Agent': 'shop-ledger-ph' } }, (res) => {
     if (res.statusCode === 200) autoUpdater.checkForUpdates().catch((err) => {

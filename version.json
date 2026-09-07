@@ -1,5 +1,5 @@
 {
-    "version":  "3.12.0",
+    "version":  "3.12.1",
     "buildDate":  "2026-09-07T00:00:00.000Z",
-    "notes":  "Critical + important gaps: LAN API token auth, HTTPS/TLS support, .env config, VAT/GST (12%), BIR-compliant receipts, BIR tax form exports (2550M/2551Q), Filipino i18n, void transaction UI, returns/refund UI, product expiry tracking, duplicate transaction detection, SC/PWD customer flags, sales-by-client report, AR aging report, request logging, IP whitelist/blacklist, data encryption at rest, Docker support, inventory valuation (FIFO/weighted avg), DB backup checksums."
+    "notes":  "Fix: auto-update now sends feedback when updater is unavailable or app is not packaged. Previously clicking the update button did nothing."
 }
