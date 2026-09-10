@@ -11,6 +11,8 @@ const _offlineQueue = [];
 function getOfflineQueue() { return _offlineQueue.slice(); }
 function clearOfflineQueue() { _offlineQueue.length = 0; return { ok: true }; }
 
+let _invoiceMutex = Promise.resolve();
+
 const _ipWhitelist = new Set();
 const _ipBlacklist = new Set();
 
@@ -387,42 +389,46 @@ function createLanApiRouter(deps) {
     }
     if (discount && !validateAmount(discount)) return res.status(400).json({ error: 'Invalid discount' });
     if (paymentMethod && !['Cash','GCash','Maya','Bank Transfer'].includes(paymentMethod)) return res.status(400).json({ error: 'Invalid payment method' });
-    const invNos = JSON.parse(await deps.rendererExec(`JSON.stringify(state.transactions.filter(t=>t.invoiceNo?.startsWith('INV-')).map(t=>parseInt(t.invoiceNo.replace('INV-',''))||0))`));
-    const nextNo = invNos.length > 0 ? Math.max(...invNos) + 1 : 1;
-    const invoiceNo = 'INV-' + String(nextNo).padStart(5,'0');
-    const subtotal = items.reduce((s, i) => s + ((i.qty||1) * (i.unitCost || 0)), 0);
-    const totalInterest = items.reduce((s, i) => s + ((i.qty||1) * (i.unitCost || 0)) * ((i.intRate||0)/100), 0);
-    const d = parseFloat(discount) || 0;
-    const grandTotal = Math.max(0, subtotal + totalInterest - d);
-    const clientData = clientId ? JSON.parse(await deps.rendererExec(`JSON.stringify(await dbGet('clients', ${JSON.stringify(clientId)}))`)) : null;
-    const clientName = clientData ? clientData.name : 'Walk-in';
-    const payMethod = paymentMethod || 'Cash';
-    const txnData = JSON.stringify({ invoiceNo, clientId: clientId || null, clientName, date: todayStr(), createdAt: new Date().toISOString(), items: items.map(i => ({ ...i, amount: ((i.qty||1) * (i.unitCost || 0)) + ((i.qty||1) * (i.unitCost || 0)) * ((i.intRate||0)/100) })), subtotal, totalInterest, discount: d, scDiscount: 0, grandTotal, paymentMethod: payMethod, status: grandTotal <= 0 ? 'paid' : 'pending', balanceAdded: !!(clientId && payMethod !== 'Cash') });
-    await deps.rendererExec(`dbAdd('transactions', ${txnData})`);
-    await deps.rendererExec(`(async()=>{try{await logAudit('sale','Mobile sale ${invoiceNo} - ₱${grandTotal.toFixed(2)}');}catch(e){}})()`);
-    for (const item of items) {
-      let invId = item.invId;
-      if (!invId && item.description) {
-        invId = await deps.rendererExec(`(async()=>{
-          const desc = ${JSON.stringify(String(item.description).trim())};
-          const qty = ${Math.max(1, parseInt(item.qty) || 1)};
-          const unitCost = ${item.unitCost || 0};
-          if (!desc) return null;
-          const all = await dbAll('inventory');
-          const f = all.find(i => String(i.name || '').trim().toLowerCase() === desc.toLowerCase());
-          if (f) return f.id;
-          const n = { name: desc, description: '', sku: '', category: '', stock: qty, minStock: 5, lowStock: 5, costPrice: 0, sellPrice: unitCost, price: unitCost, image: null, variants: [], createdAt: new Date().toISOString() };
-          const id = await dbAdd('inventory', n);
-          try { await logAudit('inventory', 'Auto-created from sale: ' + desc); } catch (e) {}
-          return id;
-        })()`);
-        item.invId = invId;
+    _invoiceMutex = _invoiceMutex.then(async () => {
+      const invNos = JSON.parse(await deps.rendererExec(`JSON.stringify(state.transactions.filter(t=>t.invoiceNo?.startsWith('INV-')).map(t=>parseInt(t.invoiceNo.replace('INV-',''))||0))`));
+      const nextNo = invNos.length > 0 ? Math.max(...invNos) + 1 : 1;
+      const invoiceNo = 'INV-' + String(nextNo).padStart(5,'0');
+      const subtotal = items.reduce((s, i) => s + ((i.qty||1) * (i.unitCost || 0)), 0);
+      const totalInterest = items.reduce((s, i) => s + ((i.qty||1) * (i.unitCost || 0)) * ((i.intRate||0)/100), 0);
+      const d = parseFloat(discount) || 0;
+      const grandTotal = Math.max(0, subtotal + totalInterest - d);
+      const clientData = clientId ? JSON.parse(await deps.rendererExec(`JSON.stringify(await dbGet('clients', ${JSON.stringify(clientId)}))`)) : null;
+      const clientName = clientData ? clientData.name : 'Walk-in';
+      const payMethod = paymentMethod || 'Cash';
+      const txnData = JSON.stringify({ invoiceNo, clientId: clientId || null, clientName, date: todayStr(), createdAt: new Date().toISOString(), items: items.map(i => ({ ...i, amount: ((i.qty||1) * (i.unitCost || 0)) + ((i.qty||1) * (i.unitCost || 0)) * ((i.intRate||0)/100) })), subtotal, totalInterest, discount: d, scDiscount: 0, grandTotal, paymentMethod: payMethod, status: grandTotal <= 0 ? 'paid' : 'pending', balanceAdded: !!(clientId && payMethod !== 'Cash') });
+      await deps.rendererExec(`dbAdd('transactions', ${txnData})`);
+      await deps.rendererExec(`(async()=>{try{await logAudit('sale','Mobile sale ${invoiceNo} - ₱${grandTotal.toFixed(2)}');}catch(e){}})()`);
+      for (const item of items) {
+        let invId = item.invId;
+        if (!invId && item.description) {
+          invId = await deps.rendererExec(`(async()=>{
+            const desc = ${JSON.stringify(String(item.description).trim())};
+            const qty = ${Math.max(1, parseInt(item.qty) || 1)};
+            const unitCost = ${item.unitCost || 0};
+            if (!desc) return null;
+            const all = await dbAll('inventory');
+            const f = all.find(i => String(i.name || '').trim().toLowerCase() === desc.toLowerCase());
+            if (f) return f.id;
+            const n = { name: desc, description: '', sku: '', category: '', stock: qty, minStock: 5, lowStock: 5, costPrice: 0, sellPrice: unitCost, price: unitCost, image: null, variants: [], createdAt: new Date().toISOString() };
+            const id = await dbAdd('inventory', n);
+            try { await logAudit('inventory', 'Auto-created from sale: ' + desc); } catch (e) {}
+            return id;
+          })()`);
+          item.invId = invId;
+        }
+        if (invId) await deps.rendererExec(`(async()=>{const i=await dbGet('inventory',${JSON.stringify(invId)});if(i){i.stock=(i.stock||0)-${parseInt(item.qty)||1};const vn=${JSON.stringify(item.variantName || null)};if(vn&&i.variants){const v=i.variants.find(x=>x.name===vn);if(v)v.stock=(v.stock||0)-${parseInt(item.qty)||1};}await dbPut('inventory',i);}})()`);
       }
-      if (invId) await deps.rendererExec(`(async()=>{const i=await dbGet('inventory',${JSON.stringify(invId)});if(i){i.stock=(i.stock||0)-${parseInt(item.qty)||1};const vn=${JSON.stringify(item.variantName || null)};if(vn&&i.variants){const v=i.variants.find(x=>x.name===vn);if(v)v.stock=(v.stock||0)-${parseInt(item.qty)||1};}await dbPut('inventory',i);}})()`);
-    }
-    if (clientId) await deps.rendererExec(`(async()=>{const c=await dbGet('clients',${JSON.stringify(clientId)});if(c && ${JSON.stringify(payMethod)} !== 'Cash'){c.balance=(c.balance||0)+${grandTotal};await dbPut('clients',c);}})()`);
-    deps.notify({ source: 'api', kind: 'sale' });
-    res.json({ success: true, invoiceNo });
+      if (clientId) await deps.rendererExec(`(async()=>{const c=await dbGet('clients',${JSON.stringify(clientId)});if(c && ${JSON.stringify(payMethod)} !== 'Cash'){c.balance=(c.balance||0)+${grandTotal};await dbPut('clients',c);}})()`);
+      deps.notify({ source: 'api', kind: 'sale' });
+      return { success: true, invoiceNo };
+    });
+    await _invoiceMutex;
+    res.json(_invoiceMutex.__result || { success: true });
   }));
 
   router.get('/api/sqlite-status', (req, res) => {

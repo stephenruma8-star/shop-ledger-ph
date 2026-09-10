@@ -601,15 +601,13 @@ function scheduleMaintenance() {
   _maintenanceInterval = setInterval(() => {
     if (!db) return;
     try { db.pragma('wal_checkpoint(PASSIVE)'); } catch (e) {}
-    try {
-      const row = stmt('SELECT value FROM meta WHERE key = ?').get('lastVacuum');
-      const today = new Date().toISOString().split('T')[0];
-      if (!row || row.value !== today) {
-        db.exec('VACUUM');
-        stmt('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run('lastVacuum', today);
-      }
-    } catch (e) {}
   }, 5 * 60 * 1000);
+  setInterval(() => {
+    if (!db) return;
+    try {
+      db.exec('VACUUM');
+    } catch (e) {}
+  }, 86400000);
 }
 
 // Swaps the live database for the given file (a previously made snapshot):
@@ -757,9 +755,17 @@ function encryptDb(password) {
   if (!password) return { ok: false, error: 'Password required' };
   try {
     const { encryptData } = require('./crypto.js');
+    db.close();
     const data = fs.readFileSync(dbPath);
     const encrypted = encryptData(data, password);
     fs.writeFileSync(dbPath, JSON.stringify(encrypted));
+    db = new Database(dbPath);
+    db.pragma('journal_mode = WAL');
+    db.pragma('synchronous = NORMAL');
+    db.pragma('busy_timeout = 5000');
+    stmts.clear();
+    db.exec('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)');
+    for (const s of STORES) db.exec(`CREATE TABLE IF NOT EXISTS s_${s} (id INTEGER PRIMARY KEY AUTOINCREMENT, value TEXT NOT NULL)`);
     stmt('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run('_encrypted', 'true');
     return { ok: true, size: fs.statSync(dbPath).size };
   } catch (e) { return { ok: false, error: e.message }; }
@@ -770,11 +776,19 @@ function decryptDb(password) {
   if (!password) return { ok: false, error: 'Password required' };
   try {
     const { decryptData } = require('./crypto.js');
+    db.close();
     const raw = fs.readFileSync(dbPath, 'utf8');
     const encrypted = JSON.parse(raw);
     if (!encrypted.salt || !encrypted.iv || !encrypted.data) return { ok: false, error: 'Database is not encrypted' };
     const decrypted = decryptData(encrypted, password);
     fs.writeFileSync(dbPath, decrypted);
+    db = new Database(dbPath);
+    db.pragma('journal_mode = WAL');
+    db.pragma('synchronous = NORMAL');
+    db.pragma('busy_timeout = 5000');
+    stmts.clear();
+    db.exec('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)');
+    for (const s of STORES) db.exec(`CREATE TABLE IF NOT EXISTS s_${s} (id INTEGER PRIMARY KEY AUTOINCREMENT, value TEXT NOT NULL)`);
     stmt('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run('_encrypted', 'false');
     return { ok: true, size: fs.statSync(dbPath).size };
   } catch (e) { return { ok: false, error: 'Wrong password or corrupted database' }; }

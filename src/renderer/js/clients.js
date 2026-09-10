@@ -200,6 +200,11 @@ export async function saveClient(id) {
     await logAudit('client-edit', `Updated client ${name}`);
     if (cfCart.length > 0) {
       await resolveInvIds(cfCart);
+      const newSub = cfCart.reduce((s, i) => s + cfLineSub(i), 0);
+      const newInt = cfCart.reduce((s, i) => s + cfLineInt(i), 0);
+      const newGT = newSub + newInt;
+      const items = cfCart.map(i => ({ date: i.date, description: i.description, name: i.name, unitCost: i.unitCost, intRate: i.intRate, amount: cfLineAmt(i), invId: i.invId }));
+      const existingTx = state.transactions.find(t => t.clientId === id && t.status !== 'voided' && t.status !== 'return');
       const cfPay = document.getElementById('cf-payment')?.value || 'Cash';
       if (existingTx) {
         existingTx.items = [...(existingTx.items || []), ...items];
@@ -423,9 +428,10 @@ export async function saveClientPayment(id) {
   const c = await dbGet('clients', id);
   if (!c) { toast('Client not found', 'error'); return; }
   const wasFullyPaid = (c.balance || 0) <= 0;
+  const wasFull = amount >= (c.balance || 0);
   c.balance = Math.max(0, (c.balance || 0) - amount);
   await dbPut('clients', c);
-  await dbAdd('payments', { clientId: id, clientName: c.name, amount, date: dtEl.value || today(), type: amount >= (c.balance + amount) ? 'Full' : 'Partial', notes: ntEl.value.trim(), createdAt: now() });
+  await dbAdd('payments', { clientId: id, clientName: c.name, amount, date: dtEl.value || today(), type: wasFull ? 'Full' : 'Partial', notes: ntEl.value.trim(), createdAt: now() });
   await logAudit('payment', `${c.name} - ${peso(amount)}`);
   state.payments = await dbAll('payments');
   state.clients = await dbAll('clients');

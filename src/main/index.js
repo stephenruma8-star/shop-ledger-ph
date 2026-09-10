@@ -734,8 +734,9 @@ ipcMain.handle('print-receipt', async (event, { html, width }) => {
     });
     await printWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
     await new Promise(r => setTimeout(r, 500));
-    printWin.webContents.print({ silent: true, printBackground: true, margins: { marginType: 'none' } }, () => {
-      printWin.close();
+    printWin.webContents.print({ silent: true, printBackground: true, margins: { marginType: 'none' } }, (success) => {
+      if (!success) logger.error('Print failed for receipt');
+      setTimeout(() => { try { printWin.close(); } catch(e) {} }, 1000);
     });
     return { success: true };
   } catch (err) { return { success: false, error: err.message }; }

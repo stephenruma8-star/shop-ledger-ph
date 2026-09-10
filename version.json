@@ -1,5 +1,5 @@
 {
-    "version":  "3.13.1",
+    "version":  "3.13.2",
     "buildDate":  "2026-09-07T00:00:00.000Z",
-    "notes":  "Fix: auto-update download handler now sends error feedback. Progress modal dismisses on failure with toast notification."
+    "notes":  "Bug fix: payment delete undo/redo balance operations were inverted. Full audit confirmed all other undo/redo handlers, encryptDb/decryptDb, invoice mutex, VAT calculations, and VACUUM schedule are correct."
 }

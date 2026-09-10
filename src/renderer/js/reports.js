@@ -649,6 +649,7 @@ export function showInventoryValuation() {
   const method = settingsMap['inventoryValuationMethod'] || 'fifo';
   const invCost = new Map((state.inventory || []).map(i => [i.id, i.costPrice || 0]));
   const result = calculateInventoryValue(method);
+  if (!result || !result.breakdown) { toast('Inventory valuation unavailable', 'error'); return; }
   const rows = result.breakdown.filter(i => i.qty > 0).sort((a, b) => b.totalValue - a.totalValue);
   function fmt(n) { return '₱' + Number(n || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
   const rowsHtml = rows.map(i => `<tr class="border-b dark:border-gray-700"><td class="p-2">${escHtml(i.name)}</td><td class="p-2 text-right">${i.qty}</td><td class="p-2 text-right">${fmt(i.unitCost)}</td><td class="p-2 text-right font-semibold">${fmt(i.totalValue)}</td></tr>`).join('');
@@ -671,9 +672,9 @@ export function viewAuditLog() {
     !q || e.action?.toLowerCase().includes(q) || (e.details || '').toLowerCase().includes(q) || (e.user || '').toLowerCase().includes(q)
   );
   const sorted = [...filtered].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-  const { items, page, totalPages } = paginate(sorted, 'log');
 
   function render() {
+    const { items, page, totalPages } = paginate(sorted, 'log');
     const rows = items.map(e => {
       const actionColors = { sale: 'text-green-600', 'sale-edit': 'text-blue-600', expense: 'text-red-500', payment: 'text-green-500', inventory: 'text-amber-600', 'interest': 'text-purple-600', backup: 'text-gray-500', 'user-login': 'text-cyan-600', 'user-logout': 'text-gray-400' };
       const color = Object.entries(actionColors).find(([k]) => e.action?.startsWith(k))?.[1] || 'text-gray-600';
@@ -798,7 +799,8 @@ export async function exportBIR2550M() {
       }
     }
     
-    const vatOutput = Math.round(taxableSales / (1 + vatRate) * vatRate * 100) / 100;
+    const netTaxable = taxableSales / (1 + vatRate);
+    const vatOutput = Math.round((taxableSales - netTaxable) * 100) / 100;
     const totalSales = taxableSales + zeroRatedSales + exemptSales;
     
     const headers = [
