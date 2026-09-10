@@ -70,6 +70,8 @@ button:not(:disabled):active{transform:scale(.97)}
 .dark .glass-card:hover{box-shadow:0 4px 20px rgba(0,0,0,.3)}
 .toast-enter{animation:toastIn .3s cubic-bezier(.21,1.02,.73,1) forwards}
 .toast-exit{animation:toastOut .2s ease-in forwards}
+.success-pop{animation:toastSuccessPop .5s cubic-bezier(.175,.885,.32,1.275)}
+@keyframes toastSuccessPop{0%{transform:scale(.95);opacity:.7}40%{transform:scale(1.05)}100%{transform:scale(1);opacity:1}}
 @keyframes toastIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
 @keyframes toastOut{from{transform:translateX(0);opacity:1}to{transform:translateX(100%);opacity:0}}
 .empty-state{text-align:center;padding:3rem 1rem;color:#9ca3af}
@@ -132,9 +134,12 @@ button:focus:not(:focus-visible),a:focus:not(:focus-visible),input:focus:not(:fo
 .modal-exit{animation:modalOut .2s ease-in forwards}
 @keyframes modalIn{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
 @keyframes modalOut{from{opacity:1;transform:scale(1)}to{opacity:0;transform:scale(.95)}}
-.skeleton{background:linear-gradient(90deg,#e5e7eb 25%,#f3f4f6 50%,#e5e7eb 75%);background-size:200% 100%;animation:skeletonShimmer 1.5s infinite;border-radius:6px}
-.dark .skeleton{background:linear-gradient(90deg,#374151 25%,#4b5563 50%,#374151 75%);background-size:200% 100%}
-@keyframes skeletonShimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.skeleton{background:linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%);background-size:200% 100%;animation:skeleton-shimmer 1.5s infinite;border-radius:0.375rem}
+.skeleton-row{height:2.5rem;margin-bottom:0.5rem}
+.skeleton-text{height:1rem;width:60%;margin-bottom:0.25rem}
+.skeleton-circle{width:2rem;height:2rem;border-radius:50%}
+@keyframes skeleton-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@media(prefers-color-scheme:dark){.skeleton{background:linear-gradient(90deg,#374151 25%,#4b5563 50%,#374151 75%);background-size:200% 100%}}
 .counter-enter{animation:counterPop .4s ease-out}
 @keyframes counterPop{0%{transform:scale(.8);opacity:0}60%{transform:scale(1.05)}100%{transform:scale(1);opacity:1}}
 .row-enter{animation:rowSlide .3s ease-out both}
@@ -151,6 +156,11 @@ button:focus:not(:focus-visible),a:focus:not(:focus-visible),input:focus:not(:fo
 .progress-green .progress-fill{background:linear-gradient(90deg,#22c55e,#16a34a)}
 .progress-red .progress-fill{background:linear-gradient(90deg,#ef4444,#dc2626)}
 .progress-yellow .progress-fill{background:linear-gradient(90deg,#f59e0b,#d97706)}
+html{transition:background-color 0.3s,color 0.3s}
+.success-check{display:inline-flex;align-items:center;justify-content:center;width:3rem;height:3rem;border-radius:50%;background:#10b981;color:white;animation:success-pop 0.4s cubic-bezier(0.175,0.885,0.32,1.275)}
+@keyframes success-pop{0%{transform:scale(0)}50%{transform:scale(1.2)}100%{transform:scale(1)}}
+.rounded-card{border-radius:0.75rem}
+.rounded-card-lg{border-radius:1rem}
 </style>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen">

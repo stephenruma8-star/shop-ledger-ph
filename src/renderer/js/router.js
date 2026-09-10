@@ -106,7 +106,7 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   if (!isInput) {
-    if (key === 'F1') { e.preventDefault(); navigate('dashboard'); }
+    if (key === 'F1') { e.preventDefault(); showShortcuts(); }
     else if (key === 'F2') { e.preventDefault(); navigate('transactions'); }
     else if (key === 'F3') { e.preventDefault(); navigate('payments'); }
     else if (key === 'F4') { e.preventDefault(); navigate('clients'); }

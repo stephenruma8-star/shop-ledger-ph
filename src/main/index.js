@@ -742,6 +742,21 @@ ipcMain.handle('print-receipt', async (event, { html, width }) => {
   } catch (err) { return { success: false, error: err.message }; }
 });
 
+ipcMain.on('print-statement', (e, html) => {
+  try {
+    const printWin = new BrowserWindow({
+      show: false, width: 800, height: 1100, webPreferences: { offscreen: true }
+    });
+    printWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+    printWin.webContents.on('did-finish-load', () => {
+      printWin.webContents.print({ silent: false, printBackground: true }, (success) => {
+        if (!success) logger.error('Print statement failed');
+        setTimeout(() => { try { printWin.close(); } catch(e) {} }, 1000);
+      });
+    });
+  } catch (err) { logger.error('Print statement error: ' + err.message); }
+});
+
 function buildEscPos(lines) {
   const parts = [Buffer.from([0x1b, 0x40])];
   const align = (a) => Buffer.from([0x1b, 0x61, a]);

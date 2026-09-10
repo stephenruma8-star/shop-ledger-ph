@@ -301,6 +301,17 @@ export async function boot() {
     if (typeof initRipple === 'function') initRipple();
     if (window.electronAPI?.planCloudBackups) window.electronAPI.planCloudBackups().catch(() => {});
     verifyBackups().catch(() => {});
+
+    // Auto-backup reminder
+    const settingsMap = {};
+    state.settings.forEach(s => settingsMap[s.key] = s.value);
+    const lastBackup = settingsMap['lastCloudBackup'] || settingsMap['lastBackupDate'];
+    if (lastBackup) {
+      const daysSince = Math.floor((Date.now() - new Date(lastBackup).getTime()) / 86400000);
+      if (daysSince > 7) {
+        setTimeout(() => toast(`Last backup was ${daysSince} days ago. Consider backing up your data.`, 'warning'), 3000);
+      }
+    }
   } catch (e) {
     console.error('Boot error:', e);
     const ls = document.getElementById('loading-screen');

@@ -30,7 +30,7 @@ export function renderInvTable() {
   const sorted = [...filtered].sort((a, b) => a.name?.localeCompare(b.name));
   const container = document.getElementById('invTable');
   if (!container) return;
-  if (sorted.length === 0) { container.innerHTML = '<div class="empty-state"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg><p class="font-medium text-gray-500">No inventory items yet</p><p class="text-sm mt-1">Click "New Item" to add your first product</p></div>'; return; }
+  if (sorted.length === 0) { container.innerHTML = '<div class="text-center py-12 text-gray-400"><svg class="mx-auto mb-3" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg><p class="font-medium">No inventory items</p><p class="text-sm mt-1">Add products to track stock levels</p></div>'; return; }
   container.innerHTML = `<table class="w-full text-sm"><thead><tr class="bg-gray-50 dark:bg-gray-700 text-left"><th class="p-3 w-10"><input type="checkbox" onchange="document.querySelectorAll('.inv-check').forEach(c=>c.checked=this.checked);toggleInvBulkBar()" /></th><th class="p-3 w-12">Photo</th><th class="p-3">Name</th><th class="p-3">SKU</th><th class="p-3">Category</th><th class="p-3 text-right">Price</th>        <th class="p-3 text-right">Cost</th><th class="p-3 text-center">Stock</th><th class="p-3 text-left">Unit</th><th class="p-3">Expiry</th><th class="p-3 text-center">Actions</th></tr></thead>
     <tbody>${sorted.map(i => {
       const low = (i.stock || 0) <= (i.minStock || 5);
@@ -74,7 +74,7 @@ export function addVariantRow() {
   list.appendChild(div);
 }
 
-export let debouncedRenderInvTable = debounce(renderInvTable, 250);
+export let debouncedRenderInvTable = debounce(renderInvTable, 300);
 
 let _invImage = null;
 

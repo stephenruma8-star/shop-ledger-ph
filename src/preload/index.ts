@@ -61,6 +61,7 @@ const api = {
   onConfirmExit: (callback: Listener<void>): void => on('confirm-exit', callback),
   exitConfirmed: (): void => ipcRenderer.send('exit-confirmed'),
   printReceipt: (config: unknown): Promise<unknown> => ipcRenderer.invoke('print-receipt', config),
+  printStatement: (html: string): void => ipcRenderer.send('print-statement', html),
   printThermal: (config: unknown): Promise<unknown> => ipcRenderer.invoke('print-thermal', config),
   onLanDataRefresh: (callback: Listener<unknown>): void => on('lan-data-refresh', callback, (_e, info) => info),
   getLocalBackups: (): Promise<unknown> => ipcRenderer.invoke('get-local-backups'),

@@ -400,6 +400,32 @@ function csvDownload(filename, headers, rows) {
   URL.revokeObjectURL(url);
 }
 
+export function exportFormattedXlsx(filename, headers, rows, options = {}) {
+  const X = window.XLSX;
+  if (!X || !X.utils || typeof X.writeFile !== 'function') { toast('Excel library not loaded', 'error'); return; }
+  const ws = X.utils.aoa_to_sheet([headers, ...rows]);
+
+  if (options.headerStyle) {
+    const range = X.utils.decode_range(ws['!ref']);
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const cell = X.utils.encode_cell({ r: 0, c });
+      if (ws[cell]) {
+        ws[cell].s = { font: { bold: true }, fill: { fgColor: { rgb: options.headerStyle.bg || '4472C4' } }, alignment: { horizontal: 'center' } };
+      }
+    }
+  }
+
+  const colWidths = headers.map((h, i) => {
+    const maxLen = Math.max(h.length, ...rows.map(r => String(r[i] || '').length));
+    return { wch: Math.min(maxLen + 2, 40) };
+  });
+  ws['!cols'] = colWidths;
+
+  const wb = X.utils.book_new();
+  X.utils.book_append_sheet(wb, ws, options.sheetName || 'Sheet1');
+  X.writeFile(wb, filename);
+}
+
 export async function exportAccountingCSV() {
   try {
     await Promise.all([dbLoad('transactions'), dbLoad('payments'), dbLoad('expenses'), dbLoad('inventory')]);
@@ -988,5 +1014,6 @@ Object.defineProperties(window, {
   showBIRFormSelector: { get: () => showBIRFormSelector, configurable: true },
   exportBIR2550M: { get: () => exportBIR2550M, configurable: true },
   exportBIR2551Q: { get: () => exportBIR2551Q, configurable: true },
-  showInventoryValuation: { get: () => showInventoryValuation, configurable: true }
+  showInventoryValuation: { get: () => showInventoryValuation, configurable: true },
+  exportFormattedXlsx: { get: () => exportFormattedXlsx, configurable: true }
 });

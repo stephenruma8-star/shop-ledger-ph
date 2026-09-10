@@ -92,7 +92,8 @@ export function viewHelp(root) {
           Keyboard Shortcuts
         </h3>
         <div class="grid grid-cols-2 gap-2 text-sm text-gray-600 dark:text-gray-300">
-          <div><kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">F1</kbd> Dashboard</div>
+          <div><kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">F1</kbd> Shortcuts</div>
+          <div><kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">Ctrl+D</kbd> Dashboard</div>
           <div><kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">F2</kbd> Sales</div>
           <div><kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">F3</kbd> Payments</div>
           <div><kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">F4</kbd> Clients</div>

@@ -318,7 +318,7 @@ export function toast(msg, type = 'info') {
   const c = document.getElementById('toasts');
   if (!c) return;
   const el = document.createElement('div');
-  el.className = `${colors[type] || colors.info} text-white px-4 py-3 rounded-xl shadow-lg text-sm max-w-sm toast-enter flex items-center gap-2`;
+  el.className = `${colors[type] || colors.info} text-white px-4 py-3 rounded-xl shadow-lg text-sm max-w-sm toast-enter flex items-center gap-2${type === 'success' ? ' success-pop' : ''}`;
   el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">${icons[type] || icons.info}</svg><span>${msg}</span>`;
   c.appendChild(el);
   if (type === 'error') playSound('error');
@@ -480,7 +480,8 @@ export function showShortcuts() {
       <div class="space-y-2 text-sm">
         <div class="grid grid-cols-2 gap-2">
           <div class="p-2 bg-blue-50 dark:bg-blue-900/20 rounded col-span-2 font-semibold text-xs text-blue-600">Navigation</div>
-          <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>F1 / Ctrl+D</span><span class="text-gray-500">Dashboard</span></div>
+          <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>F1</span><span class="text-gray-500">Shortcuts</span></div>
+          <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>Ctrl+D</span><span class="text-gray-500">Dashboard</span></div>
           <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>F2 / Ctrl+T</span><span class="text-gray-500">Sales</span></div>
           <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>F3 / Ctrl+Shift+P</span><span class="text-gray-500">Payments</span></div>
           <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>F4 / Ctrl+Shift+C</span><span class="text-gray-500">Clients</span></div>

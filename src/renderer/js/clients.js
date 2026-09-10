@@ -24,14 +24,14 @@ export let _clientFiltered = [];
 export let _clientPage = 0;
 export const CLIENT_PAGE_SIZE = 20;
 
-export let debouncedRenderClientGrid = debounce(() => { _clientPage = 0; renderClientGrid(); }, 250);
+export let debouncedRenderClientGrid = debounce(() => { _clientPage = 0; renderClientGrid(); }, 300);
 export function renderClientGrid() {
   const q = document.getElementById('clientSearch')?.value || '';
   _clientFiltered = searchData(state.clients, q, ['name','phone','address']);
   const grid = document.getElementById('clientGrid');
   if (!grid) return;
   if (_clientFiltered.length === 0) {
-    grid.innerHTML = '<div class="col-span-full text-center py-10 text-gray-400">No clients found</div>'; return;
+    grid.innerHTML = '<div class="col-span-full text-center py-12 text-gray-400"><svg class="mx-auto mb-3" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><p class="font-medium">No clients yet</p><p class="text-sm mt-1">Add your first client to get started</p></div>'; return;
   }
   const page = _clientFiltered.slice(0, (_clientPage + 1) * CLIENT_PAGE_SIZE);
   grid.innerHTML = page.map(c => {
@@ -304,6 +304,7 @@ export async function viewClientHistory(id) {
         <button onclick="closeModal();recordClientPayment(${c.id})" class="px-2 py-1 text-xs bg-green-600 text-white rounded"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-0.5 -mt-0.5"><path d="M12 2v20M6 7h9a4 4 0 0 1 0 8H6"/><line x1="4" y1="11" x2="17" y2="11"/></svg>Payment</button>
         ${(c.loyaltyPoints || 0) >= 100 ? `<button onclick="closeModal();redeemClientPoints(${c.id})" class="px-2 py-1 text-xs bg-amber-600 text-white rounded">Redeem Points</button>` : ''}
         <button onclick="closeModal();printClientInfo(${c.id})" class="px-2 py-1 text-xs bg-gray-600 text-white rounded"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-0.5 -mt-0.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print</button>
+        <button onclick="closeModal();printClientStatement(${c.id})" class="px-2 py-1 text-xs bg-blue-700 text-white rounded">Statement</button>
         <button onclick="closeModal();deleteClient(${c.id})" class="px-2 py-1 text-xs bg-red-600 text-white rounded"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-0.5 -mt-0.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Del</button>
       </div>
     </div>
@@ -325,6 +326,56 @@ export async function viewClientHistory(id) {
     </div>
     ${allTx.length > 50 || allPays.length > 50 ? '<p class="text-xs text-gray-400 text-center shrink-0 pt-1">Showing last 50 entries</p>' : ''}
   </div>`);
+}
+
+export function printClientStatement(id) {
+  const c = state.clients.find(x => x.id === id);
+  if (!c) { toast('Client not found', 'error'); return; }
+  const txs = state.transactions.filter(t => t.clientId === id && t.status !== 'voided' && t.status !== 'interest').sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  function amt(n) { return '₱' + Number(n || 0).toFixed(2); }
+
+  let html = `<!DOCTYPE html><html><head><style>
+    body { font-family: Arial, sans-serif; padding: 40px; color: #333; }
+    h1 { font-size: 20px; margin-bottom: 5px; }
+    .header { border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; }
+    .info { font-size: 12px; color: #666; margin-bottom: 20px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th { background: #f3f4f6; text-align: left; padding: 8px; border-bottom: 2px solid #ddd; }
+    td { padding: 8px; border-bottom: 1px solid #eee; }
+    .total { font-weight: bold; border-top: 2px solid #333; }
+    .right { text-align: right; }
+  </style></head><body>
+    <div class="header">
+      <h1>Client Statement</h1>
+      <p>${escapeHtml(c.name)} — ${escapeHtml(c.phone || '')}</p>
+    </div>
+    <div class="info">
+      <p>Address: ${escapeHtml(c.address || 'N/A')}</p>
+      <p>Generated: ${new Date().toLocaleDateString()}</p>
+      <p>Outstanding Balance: ${amt(c.balance || 0)}</p>
+    </div>
+    <table>
+      <thead><tr><th>Date</th><th>Invoice</th><th>Description</th><th class="right">Amount</th><th class="right">Payment</th><th class="right">Balance</th></tr></thead>
+      <tbody>`;
+
+  let runningBalance = 0;
+  for (const t of txs) {
+    runningBalance += (t.grandTotal || 0);
+    const payment = (state.payments || []).filter(p => p.clientId === id && p.date === t.date).reduce((s, p) => s + (p.amount || 0), 0);
+    runningBalance -= payment;
+    html += `<tr><td>${escapeHtml(t.date || '')}</td><td>${escapeHtml(t.invoiceNo || '')}</td><td>${escapeHtml((t.items || []).map(i => i.description || i.name).join(', '))}</td><td class="right">${amt(t.grandTotal || 0)}</td><td class="right">${amt(payment)}</td><td class="right">${amt(runningBalance)}</td></tr>`;
+  }
+
+  html += `<tr class="total"><td colspan="5">Outstanding Balance</td><td class="right">${amt(c.balance || 0)}</td></tr>`;
+  html += `</tbody></table></body></html>`;
+
+  if (window.electronAPI && window.electronAPI.printStatement) {
+    window.electronAPI.printStatement(html);
+  } else {
+    const printWin = window.open('', '_blank', 'width=800,height=600');
+    if (printWin) { printWin.document.write(html); printWin.document.close(); }
+  }
 }
 
 export async function printClientInfo(id) {
@@ -601,5 +652,6 @@ Object.defineProperties(window, {
   deleteClient: { get: () => deleteClient, configurable: true },
   exportAllClientsCSV: { get: () => exportAllClientsCSV, configurable: true },
   redeemClientPoints: { get: () => redeemClientPoints, configurable: true },
-  confirmRedeemPoints: { get: () => confirmRedeemPoints, configurable: true }
+  confirmRedeemPoints: { get: () => confirmRedeemPoints, configurable: true },
+  printClientStatement: { get: () => printClientStatement, configurable: true }
 });

@@ -1,5 +1,5 @@
 {
-    "version":  "3.13.2",
-    "buildDate":  "2026-09-07T00:00:00.000Z",
-    "notes":  "Bug fix: payment delete undo/redo balance operations were inverted. Full audit confirmed all other undo/redo handlers, encryptDb/decryptDb, invoice mutex, VAT calculations, and VACUUM schedule are correct."
+    "version":  "3.14.0",
+    "buildDate":  "2026-09-10T00:00:00.000Z",
+    "notes":  "UX refinements: loading skeletons, success animations, keyboard shortcuts cheat sheet (F1), styled empty states, dark mode transitions, print receipt polish, auto-backup reminder, Excel export with formatting, client statement PDF, debounced search inputs."
 }

@@ -42,18 +42,22 @@ body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#1e293b;backgr
 .print-summary .card.blue{background:#eff6ff;border-left:4px solid #3b82f6}
 .print-summary .card.orange{background:#fff7ed;border-left:4px solid #f97316}
 .receipt{max-width:300px;margin:0 auto;font-family:'Courier New',monospace;font-size:11px;line-height:1.4;color:#000}
-.receipt .rct-header{text-align:center;border-bottom:1px dashed #000;padding-bottom:8px;margin-bottom:8px}
-.receipt .rct-header h2{font-size:14px;font-weight:700;margin-bottom:2px}
-.receipt .rct-header p{font-size:9px;color:#444}
-.receipt .rct-items{margin:8px 0}
-.receipt .rct-row{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px dotted #ddd}
-.receipt .rct-row .rct-name{flex:1}
-.receipt .rct-row .rct-qty{width:30px;text-align:center}
-.receipt .rct-row .rct-price{width:70px;text-align:right}
-.receipt .rct-totals{border-top:1px solid #000;margin-top:6px;padding-top:6px}
-.receipt .rct-totals .rct-row{border-bottom:none;font-weight:600}
-.receipt .rct-totals .rct-row.grand{font-size:13px;border-top:2px solid #000;margin-top:4px;padding-top:4px}
-.receipt .rct-footer{text-align:center;border-top:1px dashed #000;padding-top:8px;margin-top:8px;font-size:9px;color:#444}
+.receipt .rct-header{text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:10px}
+.receipt .rct-header h2{font-size:16px;font-weight:700;margin:0 0 4px;letter-spacing:0.5px}
+.receipt .rct-header p{font-size:9px;color:#444;margin:1px 0;line-height:1.3}
+.receipt .rct-header .rct-subtitle{font-size:11px;font-weight:600;margin-top:6px;letter-spacing:1px;text-transform:uppercase}
+.receipt .rct-items{margin:10px 0}
+.receipt .rct-row{display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px dotted #ccc}
+.receipt .rct-row:last-child{border-bottom:none}
+.receipt .rct-row .rct-name{flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.receipt .rct-row .rct-qty{width:30px;text-align:center;font-size:10px;color:#555}
+.receipt .rct-row .rct-price{width:72px;text-align:right;font-variant-numeric:tabular-nums}
+.receipt .rct-divider{border:none;border-top:1px dashed #000;margin:8px 0}
+.receipt .rct-totals{border-top:2px solid #000;margin-top:8px;padding-top:8px}
+.receipt .rct-totals .rct-row{border-bottom:none;padding:2px 0;font-weight:600}
+.receipt .rct-totals .rct-row.grand{font-size:14px;border-top:2px solid #000;margin-top:6px;padding-top:6px;font-weight:800;letter-spacing:0.5px}
+.receipt .rct-footer{text-align:center;border-top:2px solid #000;padding-top:10px;margin-top:10px;font-size:9px;color:#444;line-height:1.5}
+.receipt .rct-footer .rct-thanks{font-size:11px;font-weight:600;margin-bottom:4px}
 @media print{*{-webkit-print-color-adjust:exact;print-color-adjust:exact}body{background:#fff;padding:0}.print-preview{box-shadow:none;border-radius:0;padding:24px 32px;max-width:none;min-height:auto;margin:0}.print-toolbar{display:none}.receipt{max-width:none}}`;
 }
 
@@ -121,57 +125,70 @@ export function thermalReceipt(tx) {
   const addr = m['shopAddress'] || '';
   const contact = m['shopContact'] || '';
   const hdr = m['receiptHeaderText'] || '';
-  const msg = m['receiptFooter'] || 'Thank you for your patronage!';
+  const msg = m['receiptFooter'] || 'Thank you for your purchase!';
   const vatRegNo = m['vatRegNo'] || '';
   const businessTin = m['businessTin'] || '';
   const registeredForVat = m['registeredForVat'] === 'true';
   const vatRate = parseFloat(m['vatRate']) || VAT_RATE;
   const cashierName = m['cashierName'] || '';
-  
-  let html = `<div class="receipt"><div class="rct-header"><h2>${escHtml(name)}</h2>`;
-  if (addr) html += `<p>${escHtml(addr)}</p>`;
-  if (contact) html += `<p>${escHtml(contact)}</p>`;
-  if (vatRegNo) html += `<p>VAT Reg No: ${escHtml(vatRegNo)}</p>`;
-  if (businessTin) html += `<p>TIN: ${escHtml(businessTin)}</p>`;
-  if (hdr) html += `<p>${escHtml(hdr)}</p>`;
-  
+
   const txnDate = tx.createdAt || tx.date;
   const dt = new Date(txnDate);
   const dateStr = dt.toLocaleDateString('en-PH', { year: 'numeric', month: '2-digit', day: '2-digit' });
   const timeStr = dt.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true });
-  html += `<p>${dateStr} ${timeStr}</p>`;
-  
-  if (tx.invoiceNo) {
-    html += `<p>OR: ${escHtml(tx.invoiceNo)}</p>`;
-  }
+  const nowStr = new Date().toLocaleString('en-PH', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true });
+
+  let html = `<div class="receipt">`;
+  html += `<div class="rct-header">`;
+  html += `<h2>${escHtml(name)}</h2>`;
+  if (addr) html += `<p>${escHtml(addr)}</p>`;
+  if (contact) html += `<p>${escHtml(contact)}</p>`;
+  const infoLine = [vatRegNo ? 'VAT Reg: ' + vatRegNo : '', businessTin ? 'TIN: ' + businessTin : ''].filter(Boolean).join('  |  ');
+  if (infoLine) html += `<p>${escHtml(infoLine)}</p>`;
+  if (hdr) html += `<p>${escHtml(hdr)}</p>`;
+  html += `<div class="rct-subtitle">OFFICIAL RECEIPT</div>`;
   html += `</div>`;
-  
+
+  html += `<p style="text-align:left;margin:4px 0;font-size:10px">Invoice: <strong>${escHtml(tx.invoiceNo || 'N/A')}</strong></p>`;
+  html += `<p style="text-align:left;margin:2px 0;font-size:10px">Date: ${dateStr} ${timeStr}</p>`;
+  if (tx.clientName && tx.clientName !== 'Walk-in') html += `<p style="text-align:left;margin:2px 0;font-size:10px">Customer: ${escHtml(tx.clientName)}</p>`;
+  html += `<hr class="rct-divider">`;
+
   html += `<div class="rct-items">`;
   (tx.items || []).forEach(item => {
-    html += `<div class="rct-row"><span class="rct-name">${escHtml(item.name)}</span><span class="rct-qty">x${item.quantity || 1}</span><span class="rct-price">₱${(item.total || item.unitCost || 0).toFixed(2)}</span></div>`;
+    const qty = item.quantity || 1;
+    const itemTotal = item.total || (item.unitCost || 0) * qty;
+    html += `<div class="rct-row"><span class="rct-name">${escHtml(item.description || item.name || 'Item')}</span><span class="rct-qty">x${qty}</span><span class="rct-price">₱${itemTotal.toFixed(2)}</span></div>`;
   });
-  html += `</div><div class="rct-totals">`;
-  
+  html += `</div>`;
+
+  html += `<hr class="rct-divider">`;
+  html += `<div class="rct-totals">`;
+
   if (registeredForVat) {
     const subtotal = tx.subtotal || 0;
     const vatExclusive = Math.round(subtotal / (1 + vatRate) * 100) / 100;
     const vatAmount = Math.round(vatExclusive * vatRate * 100) / 100;
-    
+
     html += `<div class="rct-row"><span>Subtotal (VAT Excl)</span><span>₱${vatExclusive.toFixed(2)}</span></div>`;
     html += `<div class="rct-row"><span>VAT (${(vatRate * 100).toFixed(0)}%)</span><span>₱${vatAmount.toFixed(2)}</span></div>`;
   } else {
-    html += `<div class="rct-row"><span>Subtotal</span><span>₱${(tx.subtotal || 0).toFixed(2)}</span></div>`;
+    html += `<div class="rct-row"><span>SUBTOTAL</span><span>₱${(tx.subtotal || 0).toFixed(2)}</span></div>`;
   }
-  
+
   if (tx.discount) html += `<div class="rct-row"><span>Discount</span><span>-₱${tx.discount.toFixed(2)}</span></div>`;
   if (tx.vat) html += `<div class="rct-row"><span>VAT</span><span>₱${tx.vat.toFixed(2)}</span></div>`;
   html += `<div class="rct-row grand"><span>TOTAL</span><span>₱${(tx.grandTotal || tx.total || 0).toFixed(2)}</span></div>`;
   if (tx.paymentMethod) html += `<div class="rct-row"><span>Payment</span><span>${escHtml(tx.paymentMethod)}</span></div>`;
   if (tx.amountPaid) html += `<div class="rct-row"><span>Amount Paid</span><span>₱${tx.amountPaid.toFixed(2)}</span></div>`;
   if (tx.change) html += `<div class="rct-row"><span>Change</span><span>₱${tx.change.toFixed(2)}</span></div>`;
-  html += `</div><div class="rct-footer"><p>${escHtml(msg)}</p>`;
+  html += `</div>`;
+
+  html += `<div class="rct-footer">`;
+  html += `<div class="rct-thanks">${escHtml(msg)}</div>`;
   if (cashierName) html += `<p>Cashier: ${escHtml(cashierName)}</p>`;
   if (tx.id) html += `<p>Ref: ${tx.id.slice(-8).toUpperCase()}</p>`;
+  html += `<p>Printed: ${nowStr}</p>`;
   html += `</div></div>`;
   return html;
 }
