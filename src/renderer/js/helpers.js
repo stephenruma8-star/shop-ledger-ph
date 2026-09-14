@@ -1161,6 +1161,35 @@ export function validateField(input, rules = {}) {
   return isValid;
 }
 
+export function openFullScreenModal(title, renderFn) {
+  const existing = document.querySelector('.fs-modal-overlay');
+  if (existing) return;
+  
+  const overlay = document.createElement('div');
+  overlay.className = 'fs-modal-overlay';
+  overlay.innerHTML = `
+    <div class="fs-modal-header">
+      <button class="fs-modal-back" onclick="window.__closeFSModal()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        Back
+      </button>
+      <span class="fs-modal-title">${escapeHtml(title)}</span>
+    </div>
+    <div class="fs-modal-body" id="fs-modal-content"></div>
+  `;
+  
+  document.body.appendChild(overlay);
+  
+  window.__closeFSModal = () => {
+    overlay.classList.add('exit');
+    setTimeout(() => overlay.remove(), 200);
+  };
+  
+  const content = document.getElementById('fs-modal-content');
+  if (typeof renderFn === 'function') renderFn(content);
+  else if (typeof renderFn === 'string') content.innerHTML = renderFn;
+}
+
 Object.defineProperties(window, {
   dp: { get: () => dp, configurable: true },
   PAGE_SIZE: { get: () => PAGE_SIZE, configurable: true },
@@ -1235,7 +1264,9 @@ Object.defineProperties(window, {
   formatVATBreakdown: { get: () => formatVATBreakdown, configurable: true },
   checkPasswordStrength: { get: () => checkPasswordStrength, configurable: true },
   addCharCounter: { get: () => addCharCounter, configurable: true },
-  validateField: { get: () => validateField, configurable: true }
+  validateField: { get: () => validateField, configurable: true },
+  openFullScreenModal: { get: () => openFullScreenModal, configurable: true },
+  __closeFSModal: { get: () => window.__closeFSModal, configurable: true }
 });
 
 document.addEventListener('keydown', (e) => {

@@ -3,7 +3,7 @@ import { viewClients } from './clients.js'
 import { viewDashboard } from './dashboard.js'
 import { dbAll } from './database.js'
 import { viewExpenses } from './expenses.js'
-import { applyDailyInterest, checkCloudBackupDue, checkSmsReminderDue, closeModal, focusPageSearch, populateYearSelector, saveCurrentModal, showShortcuts, toggleTheme, updateLowStockBadge, updateNotifications } from './helpers.js'
+import { applyDailyInterest, checkCloudBackupDue, checkSmsReminderDue, closeModal, focusPageSearch, openFullScreenModal, populateYearSelector, saveCurrentModal, showShortcuts, toggleTheme, updateLowStockBadge, updateNotifications } from './helpers.js'
 import { viewHelp } from './help.js'
 import { viewInventory } from './inventory.js'
 import { AppParticles } from './particles.js'
@@ -20,6 +20,8 @@ import { viewUtang } from './utang.js'
 export let _navToken = 0;
 export async function navigate(route) {
   closeModal();
+  const existingFS = document.querySelector('.fs-modal-overlay');
+  if (existingFS) existingFS.remove();
   const token = ++_navToken;
   state.currentRoute = route;
   const titles = {
@@ -39,36 +41,44 @@ export async function navigate(route) {
     b.classList.toggle('active', isActive);
   });
   const root = document.getElementById('view');
-  root.className = 'flex-1 overflow-auto p-6';
-  root.style.opacity = '0';
-  root.style.transform = 'translateY(8px)';
-  root.innerHTML = '<div class="flex items-center justify-center py-20"><div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div></div>';
-  await new Promise(r => setTimeout(r, 15));
-  if (token !== _navToken) return;
+  if (route === 'dashboard') {
+    root.className = 'flex-1 overflow-auto p-6';
+    root.style.opacity = '0';
+    root.style.transform = 'translateY(8px)';
+    root.innerHTML = '<div class="flex items-center justify-center py-20"><div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div></div>';
+    await new Promise(r => setTimeout(r, 15));
+    if (token !== _navToken) return;
+  }
   populateYearSelector();
   switch (route) {
-    case 'dashboard': await viewDashboard(root); break;
-    case 'clients': await viewClients(root); break;
-    case 'utang': await viewUtang(root); break;
-    case 'transactions': await viewTransactions(root); break;
-    case 'catalog': await viewCatalog(root); break;
-    case 'inventory': await viewInventory(root); break;
-    case 'stocktake': await viewStockTake(root); break;
-    case 'expenses': await viewExpenses(root); break;
-    case 'suppliers': await viewSuppliers(root); break;
-    case 'payments': await viewPayments(root); break;
-    case 'purchase-orders': await viewPurchaseOrders(root); break;
-    case 'reports': await viewReports(root); break;
-    case 'settings': await viewSettings(root); break;
-    case 'help': viewHelp(root); break;
-    default: root.innerHTML = '<div class="text-center py-20 text-gray-500">Page not found</div>';
+    case 'dashboard': 
+      await viewDashboard(root); 
+      break;
+    default: {
+      const viewFns = {
+        clients: viewClients, utang: viewUtang, transactions: viewTransactions,
+        catalog: viewCatalog, inventory: viewInventory, stocktake: viewStockTake,
+        expenses: viewExpenses, suppliers: viewSuppliers, payments: viewPayments,
+        'purchase-orders': viewPurchaseOrders, reports: viewReports,
+        settings: viewSettings, help: viewHelp
+      };
+      const fn = viewFns[route];
+      if (fn) {
+        openFullScreenModal(titles[route] || route, async (container) => {
+          await fn(container);
+        });
+      }
+      break;
+    }
   }
-  root.style.transition = 'opacity .25s ease-out, transform .25s ease-out';
-  root.style.opacity = '1';
-  root.style.transform = 'translateY(0)';
-  root.querySelectorAll('.glass-card, .bg-white, [class*="rounded-xl"]').forEach((el, i) => {
-    if (!el.classList.contains('card-enter')) { el.classList.add('card-enter'); el.style.animationDelay = (i * 0.04) + 's'; }
-  });
+  if (route === 'dashboard') {
+    root.style.transition = 'opacity .25s ease-out, transform .25s ease-out';
+    root.style.opacity = '1';
+    root.style.transform = 'translateY(0)';
+    root.querySelectorAll('.glass-card, .bg-white, [class*="rounded-xl"]').forEach((el, i) => {
+      if (!el.classList.contains('card-enter')) { el.classList.add('card-enter'); el.style.animationDelay = (i * 0.04) + 's'; }
+    });
+  }
   if (typeof AppParticles !== 'undefined') AppParticles.switchScene(route);
   const aside = document.querySelector('#app > aside');
   if (aside && aside.classList.contains('open')) { aside.classList.remove('open'); document.getElementById('sidebar-overlay')?.classList.remove('open'); }
@@ -95,7 +105,7 @@ export function render() {
 document.addEventListener('keydown', (e) => {
   const key = e.key;
   const isInput = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable;
-  if (key === 'Escape') { closeModal(); return; }
+  if (key === 'Escape') { closeModal(); if (window.__closeFSModal) window.__closeFSModal(); return; }
   if (key === 'Enter' && e.target.tagName !== 'TEXTAREA' && document.getElementById('modal-root').children.length > 0) { e.preventDefault(); saveCurrentModal(); return; }
   const cartMatch = e.target.id?.match(/^(tx|cf)-(desc|qty|cost)-(\d+)$/);
   if (cartMatch && (key === 'ArrowDown' || key === 'ArrowUp')) {

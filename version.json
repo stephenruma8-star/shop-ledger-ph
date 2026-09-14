@@ -1,5 +1,5 @@
 {
-    "version":  "3.16.0",
+    "version":  "3.17.0",
     "buildDate":  "2026-09-10T00:00:00.000Z",
-    "notes":  "Micro-interactions (hover lift, ripple, counters, page transitions), form improvements (floating labels, password strength, char counter, inline validation), notification improvements (toast stacking, dismiss-all, auto-dismiss), layout (breadcrumbs, split view), accessibility (skip-to-content, ARIA landmarks, focus rings), print (thermal receipt 58mm/80mm, landscape PDF)."
+    "notes":  "Full-screen section modals: all sections (Clients, Sales, Inventory, etc.) now open as full-screen overlays with back button. Dashboard stays visible underneath. Press Escape or click Back to return."
 }
