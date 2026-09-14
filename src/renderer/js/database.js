@@ -19,7 +19,6 @@ export async function runMigrations(dbApi) {
   } catch (e) { /* first run */ }
   for (const m of MIGRATIONS) {
     if (m.version > current) {
-      console.log(`Migration ${m.version}: ${m.name}`);
       await m.up(dbApi);
       try {
         const rows = await dbApi.all('settings');
