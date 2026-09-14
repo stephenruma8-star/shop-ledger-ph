@@ -3,7 +3,7 @@ import { viewClients } from './clients.js'
 import { viewDashboard } from './dashboard.js'
 import { dbAll } from './database.js'
 import { viewExpenses } from './expenses.js'
-import { applyDailyInterest, checkCloudBackupDue, checkSmsReminderDue, closeModal, focusPageSearch, openFullScreenModal, populateYearSelector, saveCurrentModal, showShortcuts, toggleTheme, updateLowStockBadge, updateNotifications } from './helpers.js'
+import { applyDailyInterest, checkCloudBackupDue, checkSmsReminderDue, closeModal, focusPageSearch, populateYearSelector, saveCurrentModal, showShortcuts, toggleTheme, updateLowStockBadge, updateNotifications } from './helpers.js'
 import { viewHelp } from './help.js'
 import { viewInventory } from './inventory.js'
 import { AppParticles } from './particles.js'
@@ -20,8 +20,6 @@ import { viewUtang } from './utang.js'
 export let _navToken = 0;
 export async function navigate(route) {
   closeModal();
-  const existingFS = document.querySelector('.fs-modal-overlay');
-  if (existingFS) existingFS.remove();
   const token = ++_navToken;
   state.currentRoute = route;
   const titles = {
@@ -64,9 +62,9 @@ export async function navigate(route) {
       };
       const fn = viewFns[route];
       if (fn) {
-        await openFullScreenModal(titles[route] || route, async (container) => {
-          await fn(container);
-        });
+        root.className = 'flex-1 overflow-auto p-6';
+        root.innerHTML = '';
+        await fn(root);
       }
       break;
     }
@@ -105,7 +103,7 @@ export function render() {
 document.addEventListener('keydown', (e) => {
   const key = e.key;
   const isInput = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable;
-  if (key === 'Escape') { closeModal(); if (window.__closeFSModal) window.__closeFSModal(); return; }
+  if (key === 'Escape') { closeModal(); return; }
   if (key === 'Enter' && e.target.tagName !== 'TEXTAREA' && document.getElementById('modal-root').children.length > 0) { e.preventDefault(); saveCurrentModal(); return; }
   const cartMatch = e.target.id?.match(/^(tx|cf)-(desc|qty|cost)-(\d+)$/);
   if (cartMatch && (key === 'ArrowDown' || key === 'ArrowUp')) {
