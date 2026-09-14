@@ -1123,6 +1123,8 @@ export function checkPasswordStrength(password) {
 export function addCharCounter(inputId, maxLen) {
   const input = document.getElementById(inputId);
   if (!input) return;
+  if (input.dataset.charCounter === 'true') return;
+  input.dataset.charCounter = 'true';
   const counter = document.createElement('div');
   counter.className = 'char-counter';
   counter.textContent = `0 / ${maxLen}`;
@@ -1148,9 +1150,9 @@ export function validateField(input, rules = {}) {
   input.classList.remove('form-input-valid', 'form-input-invalid');
   input.classList.add(isValid ? 'form-input-valid' : 'form-input-invalid');
   
-  let hint = input.parentNode.querySelector('.form-error');
+  let hint = input.parentNode?.querySelector(`[data-validation-for="${input.id || input.name || ''}"]`);
   if (!isValid && message) {
-    if (!hint) { hint = document.createElement('div'); hint.className = 'form-error'; input.parentNode.appendChild(hint); }
+    if (!hint) { hint = document.createElement('div'); hint.className = 'form-error'; hint.dataset.validationFor = input.id || input.name || ''; input.parentNode?.appendChild(hint); }
     hint.textContent = message;
   } else if (hint) {
     hint.remove();
