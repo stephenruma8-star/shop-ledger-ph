@@ -1161,15 +1161,15 @@ export function validateField(input, rules = {}) {
   return isValid;
 }
 
-export function openFullScreenModal(title, renderFn) {
+export async function openFullScreenModal(title, renderFn) {
   const existing = document.querySelector('.fs-modal-overlay');
-  if (existing) return;
+  if (existing) existing.remove();
   
   const overlay = document.createElement('div');
   overlay.className = 'fs-modal-overlay';
   overlay.innerHTML = `
     <div class="fs-modal-header">
-      <button class="fs-modal-back" onclick="window.__closeFSModal()">
+      <button class="fs-modal-back" id="fs-modal-back-btn">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         Back
       </button>
@@ -1180,13 +1180,29 @@ export function openFullScreenModal(title, renderFn) {
   
   document.body.appendChild(overlay);
   
-  window.__closeFSModal = () => {
+  const closeFn = () => {
     overlay.classList.add('exit');
     setTimeout(() => overlay.remove(), 200);
   };
+  window.__closeFSModal = closeFn;
+  
+  const backBtn = document.getElementById('fs-modal-back-btn');
+  if (backBtn) {
+    backBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      closeFn();
+    });
+  }
+  
+  overlay.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeFn();
+  });
   
   const content = document.getElementById('fs-modal-content');
-  if (typeof renderFn === 'function') renderFn(content);
+  if (typeof renderFn === 'function') {
+    const result = renderFn(content);
+    if (result && typeof result.then === 'function') await result;
+  }
   else if (typeof renderFn === 'string') content.innerHTML = renderFn;
 }
 

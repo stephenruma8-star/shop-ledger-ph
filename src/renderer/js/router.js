@@ -64,7 +64,7 @@ export async function navigate(route) {
       };
       const fn = viewFns[route];
       if (fn) {
-        openFullScreenModal(titles[route] || route, async (container) => {
+        await openFullScreenModal(titles[route] || route, async (container) => {
           await fn(container);
         });
       }
