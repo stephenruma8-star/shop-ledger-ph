@@ -312,18 +312,87 @@ export function formatVATBreakdown(subtotal) {
   return { vatExclusive, vatAmount, total };
 }
 
+const _toastTimers = new Map();
+const _MAX_VISIBLE_TOASTS = 5;
+
+function _dismissAllToasts() {
+  const c = document.getElementById('toasts');
+  if (!c) return;
+  c.querySelectorAll('.toast-item').forEach(el => _removeToast(el));
+  const dismissBtn = document.getElementById('dismiss-all-toasts');
+  if (dismissBtn) dismissBtn.remove();
+}
+
+function _removeToast(el) {
+  if (!el || el.classList.contains('exit')) return;
+  const id = el.dataset.toastId;
+  if (id && _toastTimers.has(id)) { clearTimeout(_toastTimers.get(id)); _toastTimers.delete(id); }
+  el.classList.add('exit');
+  setTimeout(() => { el.remove(); _updateDismissAllBtn(); }, 200);
+}
+
+function _updateDismissAllBtn() {
+  const c = document.getElementById('toasts');
+  if (!c) return;
+  let btn = document.getElementById('dismiss-all-toasts');
+  const count = c.querySelectorAll('.toast-item:not(.exit)').length;
+  if (count >= 2) {
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.id = 'dismiss-all-toasts';
+      btn.className = 'dismiss-all-btn';
+      btn.textContent = 'Dismiss All';
+      btn.onclick = _dismissAllToasts;
+    }
+    c.appendChild(btn);
+  } else {
+    if (btn) btn.remove();
+  }
+}
+
+function _evictOldestToast() {
+  const c = document.getElementById('toasts');
+  if (!c) return;
+  const items = c.querySelectorAll('.toast-item:not(.exit)');
+  if (items.length >= _MAX_VISIBLE_TOASTS) _removeToast(items[0]);
+}
+
+function _toastIdCounter() { return String(Date.now()) + String(Math.random()).slice(2, 6); }
+
 export function toast(msg, type = 'info') {
   const colors = { info: 'bg-blue-600', success: 'bg-green-600', error: 'bg-red-600', warning: 'bg-yellow-600' };
   const icons = { info: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>', success: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>', error: '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>', warning: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>' };
+  const durations = { info: 4000, success: 4000, error: 6000, warning: 6000 };
   const c = document.getElementById('toasts');
   if (!c) return;
+
+  _evictOldestToast();
+
+  const toastId = _toastIdCounter();
+  const duration = durations[type] || 4000;
   const el = document.createElement('div');
-  el.className = `${colors[type] || colors.info} text-white px-4 py-3 rounded-xl shadow-lg text-sm max-w-sm toast-enter flex items-center gap-2${type === 'success' ? ' success-pop' : ''}`;
-  el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">${icons[type] || icons.info}</svg><span>${msg}</span>`;
-  c.appendChild(el);
+  el.className = `${colors[type] || colors.info} text-white rounded-xl shadow-lg text-sm max-w-sm toast-item relative flex items-center gap-2 px-4 py-3`;
+  el.dataset.toastId = toastId;
+  el.style.minWidth = '300px';
+  el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">${icons[type] || icons.info}</svg><span class="flex-1">${msg}</span><button class="toast-dismiss shrink-0 text-white/70 hover:text-white" aria-label="Dismiss" title="Dismiss"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button><div class="toast-progress" style="width:100%;transition-duration:${duration}ms"></div>`;
+  el.querySelector('.toast-dismiss').onclick = () => _removeToast(el);
+
+  const insertBefore = c.querySelector('#dismiss-all-toasts');
+  if (insertBefore) c.insertBefore(el, insertBefore);
+  else c.appendChild(el);
+
+  requestAnimationFrame(() => {
+    const bar = el.querySelector('.toast-progress');
+    if (bar) bar.style.width = '0%';
+  });
+
+  const timer = setTimeout(() => _removeToast(el), duration);
+  _toastTimers.set(toastId, timer);
+
   if (type === 'error') playSound('error');
   else if (type === 'success') playSound('success');
-  setTimeout(() => { el.classList.remove('toast-enter'); el.classList.add('toast-exit'); setTimeout(() => el.remove(), 200); }, 3500);
+
+  _updateDismissAllBtn();
 }
 
 // Sound effects
@@ -1036,6 +1105,60 @@ export function staggerRows(container) {
   });
 }
 
+export function checkPasswordStrength(password) {
+  if (!password) return { score: 0, label: '', class: '' };
+  let score = 0;
+  if (password.length >= 8) score++;
+  if (password.length >= 12) score++;
+  if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score++;
+  if (/\d/.test(password)) score++;
+  if (/[^A-Za-z0-9]/.test(password)) score++;
+  
+  if (score <= 1) return { score, label: 'Weak', class: 'password-strength-weak' };
+  if (score <= 2) return { score, label: 'Fair', class: 'password-strength-fair' };
+  if (score <= 3) return { score, label: 'Good', class: 'password-strength-good' };
+  return { score, label: 'Strong', class: 'password-strength-strong' };
+}
+
+export function addCharCounter(inputId, maxLen) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const counter = document.createElement('div');
+  counter.className = 'char-counter';
+  counter.textContent = `0 / ${maxLen}`;
+  input.parentNode.appendChild(counter);
+  input.addEventListener('input', () => {
+    const len = input.value.length;
+    counter.textContent = `${len} / ${maxLen}`;
+    counter.className = 'char-counter' + (len >= maxLen ? ' char-counter-full' : len >= maxLen * 0.8 ? ' char-counter-near' : '');
+  });
+}
+
+export function validateField(input, rules = {}) {
+  const value = input.value.trim();
+  let isValid = true;
+  let message = '';
+  
+  if (rules.required && !value) { isValid = false; message = rules.requiredMsg || 'Required'; }
+  else if (rules.minLength && value.length < rules.minLength) { isValid = false; message = `Min ${rules.minLength} characters`; }
+  else if (rules.maxLength && value.length > rules.maxLength) { isValid = false; message = `Max ${rules.maxLength} characters`; }
+  else if (rules.pattern && !rules.pattern.test(value)) { isValid = false; message = rules.patternMsg || 'Invalid format'; }
+  else if (rules.custom && !rules.custom(value)) { isValid = false; message = rules.customMsg || 'Invalid'; }
+  
+  input.classList.remove('form-input-valid', 'form-input-invalid');
+  input.classList.add(isValid ? 'form-input-valid' : 'form-input-invalid');
+  
+  let hint = input.parentNode.querySelector('.form-error');
+  if (!isValid && message) {
+    if (!hint) { hint = document.createElement('div'); hint.className = 'form-error'; input.parentNode.appendChild(hint); }
+    hint.textContent = message;
+  } else if (hint) {
+    hint.remove();
+  }
+  
+  return isValid;
+}
+
 Object.defineProperties(window, {
   dp: { get: () => dp, configurable: true },
   PAGE_SIZE: { get: () => PAGE_SIZE, configurable: true },
@@ -1107,7 +1230,10 @@ Object.defineProperties(window, {
   showUndoToast: { get: () => showUndoToast, configurable: true },
   animateCounter: { get: () => animateCounter, configurable: true },
   staggerRows: { get: () => staggerRows, configurable: true },
-  formatVATBreakdown: { get: () => formatVATBreakdown, configurable: true }
+  formatVATBreakdown: { get: () => formatVATBreakdown, configurable: true },
+  checkPasswordStrength: { get: () => checkPasswordStrength, configurable: true },
+  addCharCounter: { get: () => addCharCounter, configurable: true },
+  validateField: { get: () => validateField, configurable: true }
 });
 
 document.addEventListener('keydown', (e) => {

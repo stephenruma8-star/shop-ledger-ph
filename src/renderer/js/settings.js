@@ -54,6 +54,7 @@ export async function viewSettings(root) {
           </div>
           <div><label class="text-xs text-gray-500 block">Custom Header Text</label><textarea id="set-receiptHeaderText" rows="2" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm">${escapeHtml(settingsMap['receiptHeaderText'] || '')}</textarea></div>
           <div><label class="text-xs text-gray-500 block">Receipt Footer Message</label><input id="set-receiptFooter" value="${escapeHtml(settingsMap['receiptFooter'] || 'Thank you for your patronage!')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
+          <div><label class="text-xs text-gray-500 block">Receipt Size</label><select id="set-receiptSize" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"><option value="80mm" ${(settingsMap['receiptSize']||'80mm') === '80mm' ? 'selected' : ''}>80mm (Standard)</option><option value="58mm" ${settingsMap['receiptSize'] === '58mm' ? 'selected' : ''}>58mm (Thermal)</option></select></div>
         </div>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
@@ -285,7 +286,7 @@ export async function dbMaintenance(action) {
 }
 
 export async function saveSettings() {
-  const keys = ['shopName','shopContact','shopAddress','weatherLocation','cloudBackupFolder','cloudBackupPassword','cloudBackupInterval','smsApiKey','smsAlertNumber','smsAutoReminderFreq','smsAutoReminderDay','backupEmail','aiApiKey','aiModel','receiptFooter','receiptHeaderText','printStripeColor1','printStripeColor2','thermalHost','thermalPort','snapshotKeepCount','keepManualBackups','auditRetentionDays','pointsPerPeso','businessTin','vatRegNo','vatRate','cashierName'];
+  const keys = ['shopName','shopContact','shopAddress','weatherLocation','cloudBackupFolder','cloudBackupPassword','cloudBackupInterval','smsApiKey','smsAlertNumber','smsAutoReminderFreq','smsAutoReminderDay','backupEmail','aiApiKey','aiModel','receiptFooter','receiptHeaderText','printStripeColor1','printStripeColor2','thermalHost','thermalPort','snapshotKeepCount','keepManualBackups','auditRetentionDays','pointsPerPeso','businessTin','vatRegNo','vatRate','cashierName','receiptSize'];
   for (const key of keys) {
     const el = document.getElementById(`set-${key}`);
     if (el) {

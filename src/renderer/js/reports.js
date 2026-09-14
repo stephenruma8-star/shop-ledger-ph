@@ -860,6 +860,34 @@ export async function exportBIR2550M() {
   } catch (e) { toast('Export error: ' + e.message, 'error'); }
 }
 
+export function exportLandscapePdf(filename, title, headers, rows) {
+  if (typeof XLSX === 'undefined') { toast('PDF library not loaded', 'error'); return; }
+
+  let html = `<!DOCTYPE html><html><head><style>
+    @page { size: landscape; margin: 1cm; }
+    body { font-family: Arial, sans-serif; font-size: 10px; color: #333; }
+    h1 { font-size: 16px; margin-bottom: 4px; }
+    .subtitle { font-size: 11px; color: #666; margin-bottom: 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 10px; }
+    th { background: #f3f4f6; text-align: left; padding: 6px 8px; border-bottom: 2px solid #333; font-weight: 600; }
+    td { padding: 5px 8px; border-bottom: 1px solid #e5e7eb; }
+    tr:nth-child(even) { background: #fafbfc; }
+    .footer { margin-top: 16px; font-size: 9px; color: #999; text-align: right; }
+  </style></head><body>
+    <h1>${escapeHtml(title)}</h1>
+    <div class="subtitle">Generated: ${new Date().toLocaleDateString()}</div>
+    <table>
+      <thead><tr>${headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead>
+      <tbody>${rows.map(row => `<tr>${row.map(cell => `<td>${escapeHtml(String(cell || ''))}</td>`).join('')}</tr>`).join('')}</tbody>
+    </table>
+    <div class="footer">Shop Ledger PH</div>
+  </body></html>`;
+
+  if (window.electronAPI) {
+    window.electronAPI.printStatement(html);
+  }
+}
+
 export async function exportBIR2551Q() {
   try {
     await dbLoad('transactions');
@@ -1015,5 +1043,6 @@ Object.defineProperties(window, {
   exportBIR2550M: { get: () => exportBIR2550M, configurable: true },
   exportBIR2551Q: { get: () => exportBIR2551Q, configurable: true },
   showInventoryValuation: { get: () => showInventoryValuation, configurable: true },
-  exportFormattedXlsx: { get: () => exportFormattedXlsx, configurable: true }
+  exportFormattedXlsx: { get: () => exportFormattedXlsx, configurable: true },
+  exportLandscapePdf: { get: () => exportLandscapePdf, configurable: true }
 });

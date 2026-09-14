@@ -58,6 +58,14 @@ body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#1e293b;backgr
 .receipt .rct-totals .rct-row.grand{font-size:14px;border-top:2px solid #000;margin-top:6px;padding-top:6px;font-weight:800;letter-spacing:0.5px}
 .receipt .rct-footer{text-align:center;border-top:2px solid #000;padding-top:10px;margin-top:10px;font-size:9px;color:#444;line-height:1.5}
 .receipt .rct-footer .rct-thanks{font-size:11px;font-weight:600;margin-bottom:4px}
+.thermal-58{width:58mm;font-size:10px}
+.thermal-80{width:80mm;font-size:11px}
+.thermal-58 .rct-header h2{font-size:14px}
+.thermal-80 .rct-header h2{font-size:16px}
+.thermal-58 .rct-divider{margin:4px 0}
+.thermal-80 .rct-divider{margin:6px 0}
+.thermal-58 td,.thermal-58 th{padding:2px 4px}
+.thermal-80 td,.thermal-80 th{padding:3px 6px}
 @media print{*{-webkit-print-color-adjust:exact;print-color-adjust:exact}body{background:#fff;padding:0}.print-preview{box-shadow:none;border-radius:0;padding:24px 32px;max-width:none;min-height:auto;margin:0}.print-toolbar{display:none}.receipt{max-width:none}}`;
 }
 
@@ -138,7 +146,8 @@ export function thermalReceipt(tx) {
   const timeStr = dt.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true });
   const nowStr = new Date().toLocaleString('en-PH', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true });
 
-  let html = `<div class="receipt">`;
+  const sizeClass = m['receiptSize'] === '58mm' ? 'thermal-58' : m['receiptSize'] === '80mm' ? 'thermal-80' : '';
+  let html = `<div class="receipt ${sizeClass}">`;
   html += `<div class="rct-header">`;
   html += `<h2>${escHtml(name)}</h2>`;
   if (addr) html += `<p>${escHtml(addr)}</p>`;
