@@ -1,5 +1,5 @@
 {
-    "version":  "3.14.0",
+    "version":  "3.15.0",
     "buildDate":  "2026-09-10T00:00:00.000Z",
-    "notes":  "UX refinements: loading skeletons, success animations, keyboard shortcuts cheat sheet (F1), styled empty states, dark mode transitions, print receipt polish, auto-backup reminder, Excel export with formatting, client statement PDF, debounced search inputs."
+    "notes":  "Design system: CSS custom properties, standardized buttons (primary/success/danger/warning/ghost), card system, data tables with zebra stripes, form inputs, status badges, stat cards, section headers, tab system, money display classes, tooltips, and consistent spacing."
 }

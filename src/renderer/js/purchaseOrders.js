@@ -11,7 +11,7 @@ export async function viewPurchaseOrders(root) {
     <div class="space-y-4 fade-in">
       <div class="flex gap-2 flex-wrap items-center">
         <input id="poSearch" placeholder="Search POs..." class="flex-1 min-w-[200px] px-4 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" oninput="debouncedRenderPOTable()" />
-        <button onclick="openPOModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New PO</button>
+        <button onclick="openPOModal()" class="btn btn-primary"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New PO</button>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden glass-card">
         <div class="overflow-auto" id="poTable"></div>
@@ -28,16 +28,16 @@ export function renderPOTable() {
   const container = document.getElementById('poTable');
   if (!container) return;
   if (sorted.length === 0) { container.innerHTML = '<div class="p-6 text-center text-gray-400">No purchase orders</div>'; return; }
-  container.innerHTML = `<table class="w-full text-sm"><thead><tr class="bg-gray-50 dark:bg-gray-700 text-left"><th class="p-3">PO No</th><th class="p-3">Supplier</th><th class="p-3">Date</th><th class="p-3">Items</th><th class="p-3 text-right">Total</th><th class="p-3">Status</th><th class="p-3 text-center">Actions</th></tr></thead>
+  container.innerHTML = `<table class="data-table"><thead><tr><th class="p-3">PO No</th><th class="p-3">Supplier</th><th class="p-3">Date</th><th class="p-3">Items</th><th class="p-3 text-right">Total</th><th class="p-3">Status</th><th class="p-3 text-center">Actions</th></tr></thead>
     <tbody>${sorted.map(po => {
-      const statusColors = { Pending: 'bg-yellow-100 text-yellow-700', Received: 'bg-green-100 text-green-700', Cancelled: 'bg-red-100 text-red-700' };
+      const statusColors = { Pending: 'badge-pending', Received: 'badge-paid', Cancelled: 'badge-returned' };
       return `<tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
         <td class="p-3 font-medium">${po.poNo || 'N/A'}</td><td class="p-3">${escapeHtml(po.supplierName || '-')}</td><td class="p-3 text-gray-500">${fmtDate(po.date)}</td>
         <td class="p-3">${(po.items||[]).length}</td><td class="p-3 text-right font-bold">${peso(po.total||0)}</td>
-        <td class="p-3"><span class="px-2 py-0.5 rounded-full text-xs ${statusColors[po.status] || 'bg-gray-100'}">${escapeHtml(po.status || 'Pending')}</span></td>
+        <td class="p-3"><span class="badge ${statusColors[po.status] || 'badge-pending'}">${escapeHtml(po.status || 'Pending')}</span></td>
         <td class="p-3 text-center">
-          <button onclick="receivePO(${po.id})" class="text-green-600 hover:text-green-800 text-xs mr-2" ${po.status === 'Received' ? 'disabled' : ''}><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Receive</button>
-          <button onclick="deletePO(${po.id})" class="text-red-600 hover:text-red-800 text-xs"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Del</button>
+          <button onclick="receivePO(${po.id})" class="btn btn-success btn-sm mr-2" ${po.status === 'Received' ? 'disabled' : ''}><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Receive</button>
+          <button onclick="deletePO(${po.id})" class="btn btn-danger btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Del</button>
         </td></tr>`;
     }).join('')}</tbody></table>`;
 }
