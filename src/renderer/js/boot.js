@@ -1,6 +1,6 @@
 import { applyPermissions } from './auth.js'
 import { cfCart, cfRenderCart } from './clients.js'
-import { dbAdd, dbAll, dbPut, openDB } from './database.js'
+import { completeUnlock, dbAdd, dbAll, dbPut, needDbPassword, openDB } from './database.js'
 import { closeModal, confirmModal, dismissSysNotif, escapeHtml, hashPassword, initConnIndicator, modal, playSound, pushSysNotif, startClock, toast } from './helpers.js'
 import { AppParticles } from './particles.js'
 import { emailBackupFlow, fileBackupFlow, redactSettings } from './reports.js'
@@ -239,8 +239,21 @@ export async function verifyBackups() {
     const h = await window.electronAPI.runDbHealth('status');
     if (!h?.success) return;
     const d = h.details || {};
+    if (d.integrityOk === false) {
+      pushSysNotif('db-integrity', 'Database integrity check FAILED — create a backup, then run Compact in Settings → Database', 'backup', '⚠️');
+      setTimeout(() => toast('Database integrity check failed: ' + (d.integrityResult || 'unknown error') + '. Back up your data, then run Compact in Settings → Database.', 'error'), 2500);
+    }
+    if (d.lastSnapshot && window.electronAPI?.verifyLocalBackup) {
+      try {
+        const v = await window.electronAPI.verifyLocalBackup(d.lastSnapshot);
+        if (v && v.success && v.ok === false) {
+          pushSysNotif('backup-corrupt', `Latest backup ${d.lastSnapshot} failed its checksum — it may be corrupted. Create a fresh backup now.`, 'backup', '⚠️');
+          setTimeout(() => toast(`Latest backup (${d.lastSnapshot}) failed its checksum and may be corrupted. Create a fresh backup now.`, 'error'), 4000);
+        }
+      } catch (e) { /* silent */ }
+    }
     if (d.snapshotCount > 0 && d.lastSnapshot) {
-      const lastDate = new Date(d.lastSnapshot);
+      const lastDate = new Date(d.lastSnapshotDate || d.lastSnapshot);
       const daysSince = Math.floor((Date.now() - lastDate.getTime()) / 86400000);
       if (daysSince > 3) {
         pushSysNotif('backup-stale', `Last backup was ${daysSince} days ago. Consider creating a new backup.`, 'backup', '💾');
@@ -270,11 +283,70 @@ export async function checkForNewBuild() {
   } catch (e) { /* offline or no version.json */ }
 }
 
+let _unlockResolve = null;
+export function promptDbUnlock() {
+  return new Promise((resolve) => {
+    _unlockResolve = resolve;
+    document.getElementById('login-form')?.classList.add('hidden');
+    document.getElementById('recovery-form')?.classList.add('hidden');
+    const ls = document.getElementById('login-screen');
+    if (ls) ls.classList.remove('hidden');
+    if (document.getElementById('unlock-panel')) return;
+    const card = ls ? ls.querySelector('div') : null;
+    if (!card) { resolve(false); return; }
+    const panel = document.createElement('div');
+    panel.id = 'unlock-panel';
+    panel.className = 'space-y-3';
+    panel.innerHTML = `
+      <div class="text-center mb-2">
+        <p class="text-5xl mb-3">🔒</p>
+        <h2 class="text-xl font-bold text-gray-800 dark:text-white">Database Locked</h2>
+        <p class="text-gray-500 dark:text-gray-400 text-sm mt-1">This database is encrypted. Enter the password to unlock it.</p>
+      </div>
+      <div onkeydown="if(event.key==='Enter')submitDbUnlock()">
+        <input id="unlock-pass" type="password" placeholder="Encryption password" autofocus class="w-full px-4 py-3 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+      </div>
+      <p id="unlock-error" class="text-red-500 text-sm text-center hidden"></p>
+      <button onclick="submitDbUnlock()" class="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-indigo-700 transition-all">Unlock</button>
+      ${window.electronAPI?.exitConfirmed ? '<button onclick="window.electronAPI.exitConfirmed()" class="w-full py-2 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">Exit App</button>' : ''}`;
+    card.appendChild(panel);
+    setTimeout(() => document.getElementById('unlock-pass')?.focus(), 50);
+  });
+}
+
+export async function submitDbUnlock() {
+  const inp = document.getElementById('unlock-pass');
+  const err = document.getElementById('unlock-error');
+  if (!inp) return;
+  const pw = inp.value;
+  if (!pw) { if (err) { err.textContent = 'Enter the encryption password'; err.classList.remove('hidden'); } return; }
+  inp.disabled = true;
+  try {
+    const res = await completeUnlock(pw);
+    if (!res || !res.ok) {
+      if (err) { err.textContent = res?.error || 'Wrong password'; err.classList.remove('hidden'); }
+      inp.disabled = false; inp.value = ''; inp.focus();
+      return;
+    }
+  } catch (e) {
+    if (err) { err.textContent = 'Unlock failed: ' + e.message; err.classList.remove('hidden'); }
+    inp.disabled = false;
+    return;
+  }
+  document.getElementById('unlock-panel')?.remove();
+  document.getElementById('login-form')?.classList.remove('hidden');
+  if (_unlockResolve) { const r = _unlockResolve; _unlockResolve = null; r(true); }
+}
+
 export async function boot() {
   try {
     const ls = document.getElementById('loading-screen');
     if (ls) ls.classList.add('hidden');
     await openDB();
+    if (needDbPassword) {
+      const unlocked = await promptDbUnlock();
+      if (!unlocked) return;
+    }
     await seedIfEmpty();
     await loadAll();
     const savedUser = sessionStorage.getItem('shopUser');
@@ -454,6 +526,8 @@ Object.defineProperties(window, {
   showUpdateProgress: { get: () => showUpdateProgress, configurable: true },
   verifyBackups: { get: () => verifyBackups, configurable: true },
   boot: { get: () => boot, configurable: true },
+  promptDbUnlock: { get: () => promptDbUnlock, configurable: true },
+  submitDbUnlock: { get: () => submitDbUnlock, configurable: true },
   _loginParticleRAF: { get: () => _loginParticleRAF, set: (v) => { _loginParticleRAF = v; }, configurable: true },
   initLoginParticles: { get: () => initLoginParticles, configurable: true }
 });

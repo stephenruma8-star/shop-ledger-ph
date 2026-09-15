@@ -1,5 +1,5 @@
 {
-    "version":  "3.17.2",
+    "version":  "3.17.3",
     "buildDate":  "2026-09-15T00:00:00.000Z",
-    "notes":  "Protection hardening: per-section error boundaries with retry, sandboxed renderer, pinned Electron version, external-link protocol allowlist."
+    "notes":  "Security round: dependency vulnerabilities fixed, at-rest DB encryption with boot unlock, login brute-force lockout, backup checksum verification on boot."
 }

@@ -326,6 +326,7 @@ function init(userDataPath) {
   if (db) return openInfo();
   try {
     dbPath = path.join(userDataPath, 'shop-ledger-ph.sqlite');
+    if (fs.existsSync(dbPath) && isDbEncrypted().encrypted) return { ok: false, needPassword: true };
     db = new Database(dbPath);
     db.pragma('journal_mode = WAL');
     db.pragma('synchronous = NORMAL');
@@ -750,48 +751,172 @@ function getDbChecksum() {
   } catch (e) { return null; }
 }
 
+// --- At-rest encryption ----------------------------------------------------
+// The live DB is a plain SQLite file while the app runs. When locked, the whole
+// file is an AES-256-CBC blob (see crypto.js). Safety rules, applied everywhere
+// below: never overwrite the live file before a decrypt/encrypt round-trip has
+// been verified in memory, always write via temp-file + rename, and never leave
+// the connection pointing at a file it cannot read.
+const SQLITE_MAGIC = 'SQLite format 3\0';
+let sessionPassword = null; // memory only; re-locks the DB on quit, never logged
+function reopenDb() {
+  close();
+  db = new Database(dbPath);
+  db.pragma('journal_mode = WAL');
+  db.pragma('synchronous = NORMAL');
+  db.pragma('busy_timeout = 5000');
+  stmts.clear();
+}
+function isDbEncrypted() {
+  try {
+    if (!dbPath || !fs.existsSync(dbPath)) return { encrypted: false };
+    const fd = fs.openSync(dbPath, 'r');
+    const head = Buffer.alloc(16);
+    fs.readSync(fd, head, 0, 16, 0);
+    fs.closeSync(fd);
+    if (head.toString('utf8').startsWith(SQLITE_MAGIC)) return { encrypted: false };
+    const blob = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+    return { encrypted: !!(blob && blob.salt && blob.iv && blob.data) };
+  } catch (e) { return { encrypted: false }; }
+}
+function readVault() {
+  let raw;
+  try { raw = fs.readFileSync(dbPath, 'utf8'); }
+  catch (e) { return { error: 'Cannot read database file: ' + e.message }; }
+  if (raw.startsWith(SQLITE_MAGIC)) return { error: 'Database is not encrypted' };
+  let blob;
+  try { blob = JSON.parse(raw); } catch (e) { return { error: 'Database file is corrupted (neither SQLite nor an encrypted vault)' }; }
+  if (!blob || typeof blob !== 'object' || !blob.salt || !blob.iv || !blob.data) return { error: 'Database file is corrupted (neither SQLite nor an encrypted vault)' };
+  return { blob };
+}
+function isWrongPassword(e) { return /bad decrypt|wrong password|incorrect|error:1C|error:060|error:061/i.test(String((e && e.message) || e)); }
+function dropSidecars() {
+  for (const ext of ['-wal', '-shm']) { try { fs.unlinkSync(dbPath + ext); } catch (e) {} }
+}
 function encryptDb(password) {
   if (!dbPath) return { ok: false, error: 'Database not initialized' };
-  if (!password) return { ok: false, error: 'Password required' };
+  if (!password || String(password).length < 8) return { ok: false, error: 'Password must be at least 8 characters' };
+  if (!db) return { ok: false, error: 'Database not open' };
+  const bakPath = dbPath + '.pre-encrypt.bak';
+  const tmpPath = dbPath + '.encrypt.tmp';
   try {
-    const { encryptData } = require('./crypto.js');
-    db.close();
-    const data = fs.readFileSync(dbPath);
-    const encrypted = encryptData(data, password);
-    fs.writeFileSync(dbPath, JSON.stringify(encrypted));
-    db = new Database(dbPath);
-    db.pragma('journal_mode = WAL');
-    db.pragma('synchronous = NORMAL');
-    db.pragma('busy_timeout = 5000');
-    stmts.clear();
-    db.exec('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)');
-    for (const s of STORES) db.exec(`CREATE TABLE IF NOT EXISTS s_${s} (id INTEGER PRIMARY KEY AUTOINCREMENT, value TEXT NOT NULL)`);
-    stmt('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run('_encrypted', 'true');
-    return { ok: true, size: fs.statSync(dbPath).size };
-  } catch (e) { return { ok: false, error: e.message }; }
+    const { encryptData, decryptData } = require('./crypto.js');
+    checkpoint();
+    close();
+    const plain = fs.readFileSync(dbPath);
+    if (!plain.toString('utf8', 0, 16).startsWith(SQLITE_MAGIC)) throw new Error('Database file is not a valid SQLite database — refusing to encrypt');
+    fs.writeFileSync(bakPath, plain);
+    const vault = encryptData(plain, String(password));
+    fs.writeFileSync(tmpPath, JSON.stringify(vault));
+    const check = JSON.parse(fs.readFileSync(tmpPath, 'utf8'));
+    if (!decryptData(check, String(password)).equals(plain)) throw new Error('Encryption self-check failed');
+    fs.renameSync(tmpPath, dbPath);
+    try { fs.unlinkSync(bakPath); } catch (e) {}
+    dropSidecars();
+    db = null; stmts.clear();
+    sessionPassword = null; // session ends — the app restarts through the unlock screen
+    return { ok: true, size: fileSize() };
+  } catch (e) {
+    logger.error('encryptDb failed: ' + e.message);
+    for (const p of [tmpPath, bakPath]) { try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch (e2) {} }
+    try { init(path.dirname(dbPath)); } catch (e2) {}
+    return { ok: false, error: e.message };
+  }
 }
-
 function decryptDb(password) {
   if (!dbPath) return { ok: false, error: 'Database not initialized' };
   if (!password) return { ok: false, error: 'Password required' };
+  const wasOpen = !!db;
   try {
+    if (wasOpen) { checkpoint(); close(); }
+    const { blob, error } = readVault();
+    if (error) throw new Error(error);
     const { decryptData } = require('./crypto.js');
-    db.close();
-    const raw = fs.readFileSync(dbPath, 'utf8');
-    const encrypted = JSON.parse(raw);
-    if (!encrypted.salt || !encrypted.iv || !encrypted.data) return { ok: false, error: 'Database is not encrypted' };
-    const decrypted = decryptData(encrypted, password);
-    fs.writeFileSync(dbPath, decrypted);
-    db = new Database(dbPath);
-    db.pragma('journal_mode = WAL');
-    db.pragma('synchronous = NORMAL');
-    db.pragma('busy_timeout = 5000');
-    stmts.clear();
-    db.exec('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)');
-    for (const s of STORES) db.exec(`CREATE TABLE IF NOT EXISTS s_${s} (id INTEGER PRIMARY KEY AUTOINCREMENT, value TEXT NOT NULL)`);
-    stmt('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run('_encrypted', 'false');
-    return { ok: true, size: fs.statSync(dbPath).size };
-  } catch (e) { return { ok: false, error: 'Wrong password or corrupted database' }; }
+    const plain = decryptData(blob, String(password));
+    if (!plain.toString('utf8', 0, 16).startsWith(SQLITE_MAGIC)) throw new Error('Wrong password or corrupted vault');
+    const tmpPath = dbPath + '.decrypt.tmp';
+    fs.writeFileSync(tmpPath, plain);
+    fs.renameSync(tmpPath, dbPath);
+    dropSidecars();
+    const info = init(path.dirname(dbPath));
+    if (!info.ok) throw new Error(info.error || 'Reopen failed');
+    sessionPassword = null;
+    return { ok: true, size: fileSize() };
+  } catch (e) {
+    if (wasOpen) { try { init(path.dirname(dbPath)); } catch (e2) {} }
+    else { db = null; }
+    return { ok: false, error: isWrongPassword(e) ? 'Wrong password or corrupted vault' : e.message };
+  }
+}
+function changeDbPassword(oldPw, newPw) {
+  if (!dbPath) return { ok: false, error: 'Database not initialized' };
+  if (!newPw || String(newPw).length < 8) return { ok: false, error: 'New password must be at least 8 characters' };
+  try {
+    const { blob, error } = readVault();
+    if (error) throw new Error(error);
+    const { encryptData, decryptData } = require('./crypto.js');
+    const plain = decryptData(blob, String(oldPw));
+    if (!plain.toString('utf8', 0, 16).startsWith(SQLITE_MAGIC)) throw new Error('Current password is incorrect');
+    const reVault = encryptData(plain, String(newPw));
+    const tmpPath = dbPath + '.rekey.tmp';
+    fs.writeFileSync(tmpPath, JSON.stringify(reVault));
+    const check = JSON.parse(fs.readFileSync(tmpPath, 'utf8'));
+    if (!decryptData(check, String(newPw)).equals(plain)) throw new Error('Re-encryption self-check failed');
+    fs.renameSync(tmpPath, dbPath);
+    return { ok: true, size: fileSize() };
+  } catch (e) {
+    return { ok: false, error: isWrongPassword(e) || /current password/i.test(e.message) ? 'Current password is incorrect or vault is corrupted' : e.message };
+  }
+}
+function unlockDb(password) {
+  if (!dbPath) return { ok: false, error: 'Database not initialized' };
+  if (!password) return { ok: false, error: 'Password required' };
+  try {
+    const { blob, error } = readVault();
+    if (error) throw new Error(error);
+    const { decryptData } = require('./crypto.js');
+    const plain = decryptData(blob, String(password));
+    if (!plain.toString('utf8', 0, 16).startsWith(SQLITE_MAGIC)) throw new Error('Wrong password');
+    const tmpPath = dbPath + '.unlock.tmp';
+    fs.writeFileSync(tmpPath, plain);
+    fs.renameSync(tmpPath, dbPath);
+    dropSidecars();
+    const info = init(path.dirname(dbPath));
+    if (!info.ok) throw new Error(info.error || 'Failed to open database');
+    sessionPassword = String(password);
+    return info;
+  } catch (e) {
+    db = null;
+    return { ok: false, error: isWrongPassword(e) ? 'Wrong password' : e.message };
+  }
+}
+// Re-locks the DB on quit. Synchronous by design (before-quit cannot await).
+function lockDb() {
+  const pw = sessionPassword;
+  sessionPassword = null;
+  if (!pw || !dbPath) return { ok: true, skipped: true };
+  try {
+    const head = Buffer.alloc(16);
+    const fd = fs.openSync(dbPath, 'r');
+    fs.readSync(fd, head, 0, 16, 0);
+    fs.closeSync(fd);
+    if (!head.toString('utf8').startsWith(SQLITE_MAGIC)) return { ok: true, skipped: true }; // already locked
+    if (db) { try { checkpoint(); } catch (e) {} close(); }
+    const { encryptData, decryptData } = require('./crypto.js');
+    const plain = fs.readFileSync(dbPath);
+    const vault = encryptData(plain, pw);
+    const tmpPath = dbPath + '.lock.tmp';
+    fs.writeFileSync(tmpPath, JSON.stringify(vault));
+    const check = JSON.parse(fs.readFileSync(tmpPath, 'utf8'));
+    if (!decryptData(check, pw).equals(plain)) throw new Error('Lock self-check failed');
+    fs.renameSync(tmpPath, dbPath);
+    dropSidecars();
+    db = null; stmts.clear();
+    return { ok: true };
+  } catch (e) {
+    logger.error('lockDb failed: ' + e.message);
+    return { ok: false, error: e.message };
+  }
 }
 
 function registerDbIpc(ipcMain, userDataPath) {
@@ -807,8 +932,11 @@ function registerDbIpc(ipcMain, userDataPath) {
   ipcMain.handle('db-encrypt', (e, { password }) => encryptDb(password));
   ipcMain.handle('db-decrypt', (e, { password }) => decryptDb(password));
   ipcMain.handle('db-checksum', () => getDbChecksum());
+  ipcMain.handle('db-unlock', (e, { password }) => unlockDb(password));
+  ipcMain.handle('db-encryption-status', () => ({ success: true, ...isDbEncrypted() }));
+  ipcMain.handle('db-change-password', (e, { oldPassword, newPassword }) => changeDbPassword(oldPassword, newPassword));
   ipcMain.handle('db-migrate-relational', () => migrateToRelational());
   ipcMain.handle('db-is-relational', () => isRelationalReady());
 }
 
-module.exports = { registerDbIpc, init, migrate, get, add, put, del, all, clear, stats, snapshot, integrityCheck, optimize, checkpoint, vacuum, replaceWith, replaceFromDump, runMigrations, schemaVersion, close, closeDb: close, rollbackMigration, scheduleMaintenance, encryptDb, decryptDb, getDbChecksum, migrateToRelational, isRelationalReady, rAll, rGet, rAllWithItems };
+module.exports = { registerDbIpc, init, migrate, get, add, put, del, all, clear, stats, snapshot, integrityCheck, optimize, checkpoint, vacuum, replaceWith, replaceFromDump, runMigrations, schemaVersion, close, closeDb: close, rollbackMigration, scheduleMaintenance, encryptDb, decryptDb, getDbChecksum, unlockDb, lockDb, isDbEncrypted, changeDbPassword, migrateToRelational, isRelationalReady, rAll, rGet, rAllWithItems };

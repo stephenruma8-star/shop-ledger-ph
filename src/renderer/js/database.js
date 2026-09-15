@@ -72,10 +72,14 @@ function legacyOpenIDB() {
   });
 }
 
+export let needDbPassword = false;
 export async function openDB() {
   if (!window.electronAPI || !window.electronAPI.db) return legacyOpenIDB();
   try {
     const res = await window.electronAPI.db.open();
+    // Encrypted at rest: never fall back to (empty) IndexedDB — that would
+    // fork the dataset. Boot shows the unlock screen instead.
+    if (res && res.needPassword) { needDbPassword = true; sqlite = null; return { needPassword: true }; }
     if (!res || !res.ok) return legacyOpenIDB();
     if (res.needMigration) {
       const dump = await dumpAllStoresIDB();
@@ -88,6 +92,21 @@ export async function openDB() {
     console.error('SQLite backend unavailable, using IndexedDB:', e);
     return legacyOpenIDB();
   }
+}
+
+// Called by the boot unlock screen after the user enters the DB password.
+export async function completeUnlock(password) {
+  if (!window.electronAPI?.dbUnlock) return { ok: false, error: 'Desktop app only' };
+  const res = await window.electronAPI.dbUnlock(password);
+  if (!res || !res.ok) return res || { ok: false, error: 'Unlock failed' };
+  if (res.needMigration) {
+    const dump = await dumpAllStoresIDB();
+    await window.electronAPI.db.migrate(dump);
+  }
+  sqlite = window.electronAPI.db;
+  await runMigrations(sqlite);
+  needDbPassword = false;
+  return res;
 }
 
 export function dbOp(store, mode, fn) {
@@ -177,6 +196,8 @@ Object.defineProperties(window, {
   db: { get: () => db, set: (v) => { db = v; }, configurable: true },
   sqlite: { get: () => sqlite, configurable: true },
   openDB: { get: () => openDB, configurable: true },
+  needDbPassword: { get: () => needDbPassword, set: (v) => { needDbPassword = v; }, configurable: true },
+  completeUnlock: { get: () => completeUnlock, configurable: true },
   dbOp: { get: () => dbOp, configurable: true },
   dbAll: { get: () => dbAll, configurable: true },
   dbGet: { get: () => dbGet, configurable: true },

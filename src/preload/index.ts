@@ -74,7 +74,11 @@ const api = {
   planCloudBackups: (): Promise<unknown> => ipcRenderer.invoke('plan-cloud-backups'),
   dbEncrypt: (password: string): Promise<unknown> => ipcRenderer.invoke('db-encrypt', { password }),
   dbDecrypt: (password: string): Promise<unknown> => ipcRenderer.invoke('db-decrypt', { password }),
-  dbChecksum: (): Promise<unknown> => ipcRenderer.invoke('db-checksum')
+  dbChecksum: (): Promise<unknown> => ipcRenderer.invoke('db-checksum'),
+  dbUnlock: (password: string): Promise<unknown> => ipcRenderer.invoke('db-unlock', { password }),
+  dbEncryptionStatus: (): Promise<unknown> => ipcRenderer.invoke('db-encryption-status'),
+  dbChangePassword: (oldPassword: string, newPassword: string): Promise<unknown> => ipcRenderer.invoke('db-change-password', { oldPassword, newPassword }),
+  verifyLocalBackup: (name: string): Promise<unknown> => ipcRenderer.invoke('verify-local-backup', { name })
 }
 
 contextBridge.exposeInMainWorld('electronAPI', api)

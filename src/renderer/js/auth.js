@@ -3,6 +3,17 @@ import { closeModal, escapeHtml, hashPassword, modal, requireFields, setFieldErr
 import { navigate } from './router.js'
 import { now, state, today } from './state.js'
 
+// Brute-force protection: 5 failures → escalating lockout (1min, doubling, max 5min).
+const LOGIN_MAX_ATTEMPTS = 5;
+const LOGIN_BASE_LOCK_MS = 60000;
+const LOGIN_MAX_LOCK_MS = 300000;
+function getLoginFailState() {
+  try { return JSON.parse(localStorage.getItem('slp_login_fails') || '{"count":0,"lockUntil":0}'); }
+  catch (e) { return { count: 0, lockUntil: 0 }; }
+}
+function setLoginFailState(s) {
+  try { localStorage.setItem('slp_login_fails', JSON.stringify(s)); } catch (e) {}
+}
 export async function doLogin() {
   const uEl = document.getElementById('login-user');
   const pEl = document.getElementById('login-pass');
@@ -13,6 +24,13 @@ export async function doLogin() {
   setFieldError(uEl, u ? null : 'Please fill out this field');
   setFieldError(pEl, p ? null : 'Please fill out this field');
   if (!u || !p) { err.classList.add('hidden'); return; }
+  const failState = getLoginFailState();
+  if (failState.lockUntil && Date.now() < failState.lockUntil) {
+    const secs = Math.ceil((failState.lockUntil - Date.now()) / 1000);
+    err.textContent = `Too many failed attempts. Try again in ${secs} second${secs === 1 ? '' : 's'}.`;
+    err.classList.remove('hidden');
+    return;
+  }
   const users = await dbAll('users');
   let user = users.find(x => x.username === u);
   if (user && await verifyPassword(p, user.password)) {
@@ -24,8 +42,20 @@ export async function doLogin() {
     user = null;
   }
   if (!user) {
-    err.textContent = 'Invalid username or password'; err.classList.remove('hidden'); return;
+    failState.count += 1;
+    if (failState.count >= LOGIN_MAX_ATTEMPTS) {
+      const lockMs = Math.min(LOGIN_BASE_LOCK_MS * Math.pow(2, failState.count - LOGIN_MAX_ATTEMPTS), LOGIN_MAX_LOCK_MS);
+      failState.lockUntil = Date.now() + lockMs;
+      err.textContent = `Too many failed attempts. Locked for ${Math.round(lockMs / 60000)} minute${lockMs === 60000 ? '' : 's'}.`;
+    } else {
+      err.textContent = `Invalid username or password (${LOGIN_MAX_ATTEMPTS - failState.count} attempt${LOGIN_MAX_ATTEMPTS - failState.count === 1 ? '' : 's'} left)`;
+    }
+    err.classList.remove('hidden');
+    setLoginFailState(failState);
+    await logAudit('login_failed', `Failed login for username "${u}"`);
+    return;
   }
+  setLoginFailState({ count: 0, lockUntil: 0 });
   err.classList.add('hidden');
   setFieldError(uEl, null);
   setFieldError(pEl, null);

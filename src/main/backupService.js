@@ -122,6 +122,21 @@ async function retryBackup(name, password) {
   return backupEntry(path.join(backupsDir(), name), password, name, !!(ex && ex.auto));
 }
 
+// Re-validates a recorded backup against its stored checksum (bit-rot / tamper check).
+function verifyBackup(name) {
+  try {
+    const list = readBackupIndex();
+    const entry = list.find(b => b.name === name);
+    if (!entry) return { success: false, error: 'Backup not found in index' };
+    if (!entry.checksum) return { success: false, error: 'No checksum recorded for this backup' };
+    const fp = path.join(backupsDir(), name);
+    if (!fs.existsSync(fp)) return { success: false, error: 'Backup file is missing from disk' };
+    const actual = calculateFileChecksum(fp);
+    if (actual !== entry.checksum) return { success: true, ok: false, expected: entry.checksum, actual };
+    return { success: true, ok: true, checksum: actual };
+  } catch (e) { return { success: false, error: e.message }; }
+}
+
 function listBackups() {
   const withSize = readBackupIndex().map(b => {
     const fp = path.join(backupsDir(), b.name);
@@ -347,7 +362,7 @@ function dbHealth(action) {
     details.counts = st.counts;
   }
   const lastOk = [...list].reverse().find(b => b.status === 'ok');
-  if (lastOk) details.lastSnapshot = lastOk.name;
+  if (lastOk) { details.lastSnapshot = lastOk.name; details.lastSnapshotDate = lastOk.date || null; }
   if (action === 'status' || action === 'integrity') {
     const chk = dbm.integrityCheck();
     details.integrityOk = chk.ok;
@@ -364,4 +379,4 @@ function dbHealth(action) {
   return out;
 }
 
-module.exports = { configure, createBackup, retryBackup, listBackups, pruneAutoSnapshots, pruneManualBackups, runRetention, planLocalSnapshot, restoreBackup, importJsonBackup, importJsonDump, validateImportDump, syncSavedSqliteBackups, dbHealth, readBackupIndex };
+module.exports = { configure, createBackup, retryBackup, listBackups, pruneAutoSnapshots, pruneManualBackups, runRetention, planLocalSnapshot, restoreBackup, importJsonBackup, importJsonDump, validateImportDump, syncSavedSqliteBackups, dbHealth, readBackupIndex, verifyBackup };

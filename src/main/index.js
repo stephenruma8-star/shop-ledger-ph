@@ -587,6 +587,12 @@ ipcMain.handle('run-db-health', async (event, { action }) => {
   } catch (err) { return { success: false, error: err.message }; }
 });
 
+ipcMain.handle('verify-local-backup', async (event, { name }) => {
+  try {
+    return backupService.verifyBackup(name);
+  } catch (err) { return { success: false, error: err.message }; }
+});
+
 ipcMain.handle('sync-saved-sqlite-backups', async () => {
   try {
     return await backupService.syncSavedSqliteBackups();
@@ -842,6 +848,7 @@ app.on('before-quit', () => {
   isQuitting = true;
   try {
     const d = require('./db.js');
+    try { const r = d.lockDb(); if (r && r.ok === false) logger.error('quit re-lock failed: ' + r.error); } catch (e) { logger.error('quit re-lock failed: ' + e.message); }
     d.optimize();
     d.checkpoint();
   } catch (e) { logger.error('quit maintenance failed: ' + e.message); }

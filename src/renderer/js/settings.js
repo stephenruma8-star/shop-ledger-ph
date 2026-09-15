@@ -161,6 +161,20 @@ export async function viewSettings(root) {
           </div>
           <div id="db-health-status" class="text-xs text-gray-400">Loading…</div>
         </div>
+        <div class="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 mt-3">
+          <div class="mb-2">
+            <p class="text-sm font-semibold">At-Rest Encryption</p>
+            <p class="text-xs text-gray-400">Encrypts the database file on disk. You will enter the password each time the app starts. <span class="text-red-500 font-semibold">If you forget it, your data cannot be recovered.</span> The password is never stored anywhere.</p>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <span id="db-encryption-status" class="text-xs text-gray-400">Checking…</span>
+            <div class="flex gap-2 ml-auto">
+              <button id="btn-db-enc-enable" onclick="dbEncryptionFlow('enable')" class="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700">Enable</button>
+              <button id="btn-db-enc-change" onclick="dbEncryptionFlow('change')" class="px-3 py-1.5 bg-gray-600 text-white rounded-lg text-sm hover:bg-gray-700">Change Password</button>
+              <button id="btn-db-enc-disable" onclick="dbEncryptionFlow('disable')" class="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700">Disable</button>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
         <h3 class="font-bold text-lg mb-4 flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Logs</h3>
@@ -218,6 +232,7 @@ export async function viewSettings(root) {
       <div class="sticky bottom-0 bg-white dark:bg-gray-800 -mx-6 px-6 py-3 border-t dark:border-gray-700"><button onclick="saveSettings()" class="w-full py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="20 6 9 17 4 12"/></svg>Save All Settings</button></div>
     </div>`;
   if (window.electronAPI?.runDbHealth) loadDbHealth();
+  if (window.electronAPI?.dbEncryptionStatus) loadDbEncryptionStatus();
   if (window.electronAPI?.getLogsInfo) loadLogsInfo();
 }
 
@@ -283,6 +298,78 @@ export async function dbMaintenance(action) {
     else toast((r?.error || 'Maintenance failed') + (r?.details ? ' — ' + (r.details.integrityResult || r.details.error || '') : ''), 'error');
   } catch (e) { toast('Maintenance failed: ' + e.message, 'error'); }
   loadDbHealth();
+}
+
+export async function loadDbEncryptionStatus() {
+  const holder = document.getElementById('db-encryption-status');
+  const bE = document.getElementById('btn-db-enc-enable');
+  const bC = document.getElementById('btn-db-enc-change');
+  const bD = document.getElementById('btn-db-enc-disable');
+  if (!holder) return;
+  if (!window.electronAPI?.dbEncryptionStatus) {
+    holder.textContent = 'Desktop app only';
+    [bE, bC, bD].forEach(b => { if (b) b.style.display = 'none'; });
+    return;
+  }
+  try {
+    const r = await window.electronAPI.dbEncryptionStatus();
+    const on = !!(r && r.encrypted);
+    holder.innerHTML = on ? '<span class="text-green-600 font-semibold">Enabled — database file is encrypted</span>' : 'Disabled — database file is plain SQLite';
+    if (bE) bE.style.display = on ? 'none' : '';
+    if (bC) bC.style.display = on ? '' : 'none';
+    if (bD) bD.style.display = on ? '' : 'none';
+  } catch (e) { holder.textContent = 'Failed to load: ' + e.message; }
+}
+
+export function dbEncryptionFlow(mode) {
+  if (!window.electronAPI?.dbEncrypt) { toast('Desktop app only', 'warning'); return; }
+  const isEnable = mode === 'enable';
+  const isChange = mode === 'change';
+  const title = isEnable ? 'Enable Database Encryption' : isChange ? 'Change Encryption Password' : 'Disable Database Encryption';
+  modal(`
+    <div class="p-6">
+      <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">${title}</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+      <div class="space-y-3" onkeydown="if(event.key==='Enter')doDbEncryptionSubmit('${mode}')">
+        ${!isEnable ? '<div><label class="text-xs text-gray-500 block mb-1">Current Password</label><input id="dbenc-current" type="password" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>' : ''}
+        ${mode !== 'disable' ? '<div><label class="text-xs text-gray-500 block mb-1">New Password (min 8 characters)</label><input id="dbenc-new" type="password" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div><div><label class="text-xs text-gray-500 block mb-1">Confirm New Password</label><input id="dbenc-confirm" type="password" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>' : ''}
+        <p class="text-xs ${mode === 'disable' ? 'text-red-500' : 'text-gray-400'}">${isEnable ? 'The app will restart and ask for this password on every launch. There is no recovery if you forget it.' : isChange ? 'The app will restart afterwards.' : 'The database file will be stored unencrypted on this PC.'}</p>
+        <p id="dbenc-error" class="text-red-500 text-sm hidden"></p>
+        <div class="flex gap-2 pt-1">
+          <button onclick="doDbEncryptionSubmit('${mode}')" class="flex-1 py-2 ${mode === 'disable' ? 'bg-red-600 hover:bg-red-700' : 'bg-purple-600 hover:bg-purple-700'} text-white rounded-lg font-semibold">${isEnable ? 'Encrypt & Restart' : isChange ? 'Change & Restart' : 'Disable & Restart'}</button>
+          <button onclick="closeModal()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg">Cancel</button>
+        </div>
+      </div>
+    </div>`);
+}
+
+export async function doDbEncryptionSubmit(mode) {
+  const err = document.getElementById('dbenc-error');
+  const fail = (m) => { if (err) { err.textContent = m; err.classList.remove('hidden'); } };
+  const val = (id) => document.getElementById(id)?.value || '';
+  try {
+    if (mode === 'enable') {
+      const a = val('dbenc-new'), b = val('dbenc-confirm');
+      if (a.length < 8) return fail('Password must be at least 8 characters');
+      if (a !== b) return fail('Passwords do not match');
+      const r = await window.electronAPI.dbEncrypt(a);
+      if (!r || r.ok === false) return fail(r?.error || 'Encryption failed');
+    } else if (mode === 'change') {
+      const cur = val('dbenc-current'), a = val('dbenc-new'), b = val('dbenc-confirm');
+      if (!cur) return fail('Enter the current password');
+      if (a.length < 8) return fail('New password must be at least 8 characters');
+      if (a !== b) return fail('New passwords do not match');
+      const r = await window.electronAPI.dbChangePassword(cur, a);
+      if (!r || r.ok === false) return fail(r?.error || 'Password change failed');
+    } else {
+      const cur = val('dbenc-current');
+      if (!cur) return fail('Enter the current password');
+      const r = await window.electronAPI.dbDecrypt(cur);
+      if (!r || r.ok === false) return fail(r?.error || 'Decryption failed');
+    }
+    closeModal();
+    toast('Done. Restarting…', 'success');
+    setTimeout(() => location.reload(), 800);
+  } catch (e) { fail('Failed: ' + e.message); }
 }
 
 export async function saveSettings() {
@@ -562,6 +649,9 @@ Object.defineProperties(window, {
   openUserModal: { get: () => openUserModal, configurable: true },
   saveUser: { get: () => saveUser, configurable: true },
   dbMaintenance: { get: () => dbMaintenance, configurable: true },
+  loadDbEncryptionStatus: { get: () => loadDbEncryptionStatus, configurable: true },
+  dbEncryptionFlow: { get: () => dbEncryptionFlow, configurable: true },
+  doDbEncryptionSubmit: { get: () => doDbEncryptionSubmit, configurable: true },
   loadLogsInfo: { get: () => loadLogsInfo, configurable: true },
   openLogsFolder: { get: () => openLogsFolder, configurable: true },
   rebuildApp: { get: () => rebuildApp, configurable: true }
