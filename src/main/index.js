@@ -27,7 +27,7 @@ process.on('exit', () => { if (lockFd !== null) { try { require('fs').closeSync(
 process.on('SIGTERM', () => process.exit(0));
 process.on('SIGINT', () => process.exit(0));
 
-let mainWindow, tray, lanServer, udpBroadcast, wsServer;
+let mainWindow, tray, udpBroadcast, wsServer;
 app.on('second-instance', () => { if (mainWindow) { if (mainWindow.isMinimized()) mainWindow.restore(); mainWindow.show(); mainWindow.focus(); } });
 
 const _log = function(m) {
@@ -384,26 +384,26 @@ function notifyDataChanged(info) {
   } catch (e) {}
 }
 
-function settingsFromDb() {
-  const rows = dbAllRows('settings') || [];
+async function settingsFromDb() {
+  const rows = await dbAllRows('settings') || [];
   const m = {};
   rows.forEach(r => { m[r.key] = r.value; });
   return m;
 }
 
-function sqliteReady() {
+async function sqliteReady() {
   try {
-    const s = sqliteInit(app.getPath('userData'));
+    const s = await sqliteInit(app.getPath('userData'));
     return !!(s && s.ok);
   } catch (e) { return false; }
 }
 
 async function setSetting(key, value) {
-  if (sqliteReady()) {
-    const rows = dbAllRows('settings') || [];
+  if (await sqliteReady()) {
+    const rows = await dbAllRows('settings') || [];
     const existing = rows.find(r => r.key === key);
-    if (existing) dbPutRow('settings', { ...existing, value });
-    else dbAddRow('settings', { key, value });
+    if (existing) await dbPutRow('settings', { ...existing, value });
+    else await dbAddRow('settings', { key, value });
     notifyDataChanged({ source: 'api', kind: 'settings' });
     return { success: true };
   }
@@ -422,7 +422,7 @@ async function setSetting(key, value) {
 }
 
 async function serviceSettings() {
-  if (sqliteReady()) return settingsFromDb();
+  if (await sqliteReady()) return settingsFromDb();
   if (mainWindow && !mainWindow.isDestroyed()) {
     try {
       const dump = await mainWindow.webContents.executeJavaScript('window.__app.getDBDump()');
@@ -846,17 +846,14 @@ app.whenReady().then(() => {
 }).catch(e => { logger.error('whenReady failed: ' + (e && e.message || e)); });
 app.on('before-quit', () => {
   isQuitting = true;
-  try {
-    const d = require('./db.js');
-    try { const r = d.lockDb(); if (r && r.ok === false) logger.error('quit re-lock failed: ' + r.error); } catch (e) { logger.error('quit re-lock failed: ' + e.message); }
-    d.optimize();
-    d.checkpoint();
-  } catch (e) { logger.error('quit maintenance failed: ' + e.message); }
-  closeDb();
+  // Page-level encryption needs no re-lock at quit: closing the connection leaves
+  // the file ciphertext. WAL recovery on next boot makes an abrupt exit safe, so
+  // the async maintenance calls are intentionally skipped here (they run every
+  // 5 minutes via scheduleMaintenance instead).
+  try { closeDb(); } catch (e) { logger.error('quit close failed: ' + e.message); }
   logger.info('app quitting');
 });
 app.on('window-all-closed', () => {
-  if (lanServer) lanServer.close();
   if (udpBroadcast) try { udpBroadcast.close(); } catch(e) {}
   if (wsServer) try { wsServer.close(); } catch(e) {}
   if (process.platform !== 'darwin') app.quit();

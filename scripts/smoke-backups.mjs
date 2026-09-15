@@ -40,11 +40,11 @@ ok(raw.length > 0, 'snapshot is non-empty (' + raw.length + ' bytes)');
 ok(snap.size === raw.length, 'snapshot reports matching size');
 
 // 2 snapshot contents match the live DB
-const Database = require('better-sqlite3');
-const backupDb = new Database(snapPath);
-const row = backupDb.prepare('SELECT value FROM s_clients WHERE id = ?').get(1);
+const sqlcipher = require('@journeyapps/sqlcipher');
+const backupDb = await new Promise((res, rej) => { const d = new sqlcipher.Database(snapPath, (e) => (e ? rej(e) : res(d))); });
+const row = await new Promise((res, rej) => backupDb.get('SELECT value FROM s_clients WHERE id = ?', [1], (e, r) => (e ? rej(e) : res(r))));
 ok(row && JSON.parse(row.value).name === 'Aling Nena', 'snapshot contains live data');
-backupDb.close();
+backupDb.close(() => {});
 
 // 3 utf8 string round trip (legacy JSON backup path)
 const encStr = encryptData(JSON.stringify({ clients: [{ id: 1, name: 'Nena' }] }), 'pw123');
@@ -74,10 +74,10 @@ ok(restored.equals(raw), 'encrypted snapshot file decrypts back to identical byt
 
 // 7 db maintenance primitives
 const { integrityCheck, optimize, checkpoint, vacuum } = require('../src/main/db.js');
-ok(integrityCheck().ok === true, 'integrityCheck passes on live DB');
-ok(optimize().ok === true, 'optimize (PRAGMA optimize) runs');
-ok(checkpoint().ok === true, 'wal_checkpoint(TRUNCATE) runs');
-const vac = vacuum();
+ok((await integrityCheck()).ok === true, 'integrityCheck passes on live DB');
+ok((await optimize()).ok === true, 'optimize (PRAGMA optimize) runs');
+ok((await checkpoint()).ok === true, 'wal_checkpoint(TRUNCATE) runs');
+const vac = await vacuum();
 ok(vac.ok === true && vac.size > 0, 'VACUUM runs and reports size');
 
 // 8 backupService wiring (pure Node with injected cfg)
@@ -120,12 +120,12 @@ ok(afterPrune.backups.some(b => b.name === manual.name), 'manual backup never pr
 ok(!afterPrune.backups.some(b => b.name === plan1.entry.name), 'oldest auto snapshot removed from index');
 ok(!existsSync(join(svcDir, 'backups', plan1.entry.name)), 'pruned snapshot file deleted');
 
-const health = svc.dbHealth('status');
+const health = await svc.dbHealth('status');
 ok(health.success === true && health.backend === 'sqlite', 'dbHealth status reports sqlite backend');
 ok(health.details && health.details.integrityOk === true, 'dbHealth status runs integrity check');
 ok(health.details.tableCount > 0 && health.details.dbSizeBytes > 0, 'dbHealth status reports table count and size');
 ok(health.details.snapshotCount >= 2, 'dbHealth status reports snapshot count');
-const compact = svc.dbHealth('compact');
+const compact = await svc.dbHealth('compact');
 ok(compact.success === true && compact.details.compacted === true, 'dbHealth compact runs VACUUM');
 
 // 9 restore flow (encrypted round trip through replaceWith)
@@ -146,9 +146,9 @@ ok(rr.success === true, 'restore with correct password succeeds');
 const gone = await invoke(h, 'db-get', { store: 'clients', id: 99 });
 ok(!gone, 'restored database no longer contains the temp client');
 ok(existsSync(join(userData, 'shop-ledger-ph.sqlite.prerestore')), '.prerestore safety copy kept');
-const restoredDb = new Database(join(userData, 'shop-ledger-ph.sqlite'));
-const metaVal = restoredDb.prepare('SELECT value FROM meta WHERE key = ?').get('sqliteMigrated');
-restoredDb.close();
+const restoredDb = await new Promise((res, rej) => { const d = new sqlcipher.Database(join(userData, 'shop-ledger-ph.sqlite'), (e) => (e ? rej(e) : res(d))); });
+const metaVal = await new Promise((res, rej) => restoredDb.get('SELECT value FROM meta WHERE key = ?', ['sqliteMigrated'], (e, r) => (e ? rej(e) : res(r))));
+restoredDb.close(() => {});
 ok(metaVal && metaVal.value === 'true', 'sqliteMigrated stamped so renderer never re-migrates');
 
 // 10 non-SQLite (json-type) backup cannot be restored as a database
@@ -254,7 +254,7 @@ ok(retNone.auditPruned === 0, 'auditRetentionDays 0 keeps every audit log');
 
 rmSync(dir, { recursive: true, force: true });
 rmSync(svcDir, { recursive: true, force: true });
-closeDb();
+await closeDb();
 rmSync(userData, { recursive: true, force: true });
 
 console.log(`\nBackup smoke: ${passed} passed, ${failed} failed`);

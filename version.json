@@ -1,5 +1,5 @@
 {
-    "version":  "3.17.3",
+    "version":  "3.18.0",
     "buildDate":  "2026-09-15T00:00:00.000Z",
-    "notes":  "Security round: dependency vulnerabilities fixed, at-rest DB encryption with boot unlock, login brute-force lockout, backup checksum verification on boot."
+    "notes":  "SQLCipher engine: page-level database encryption replaces the file vault (no plaintext window, crash-safe), same unlock UI; storage backend rewritten on the async SQLCipher API."
 }

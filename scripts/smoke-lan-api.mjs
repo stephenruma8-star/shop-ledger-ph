@@ -49,6 +49,7 @@ const router = createLanApiRouter({
   getRendererDump: () => { throw new Error('getRendererDump must not be called on the SQLite path'); },
   rendererExec: () => { throw new Error('rendererExec must not be called on the SQLite path'); },
   setSetting: async (key, value) => { setCalls.push([key, value]); return { success: true }; },
+  lanToken: 'test-token-123',
   backupService: { readBackupIndex: () => [{ name: 'backup-1.bak', date: TODAY, size: 100, status: 'ok', type: 'snapshot', encrypted: false }] },
   notify: () => {}
 });
@@ -60,9 +61,13 @@ const server = app.listen(0, '127.0.0.1', async () => {
   const base = `http://127.0.0.1:${server.address().port}`;
   try {
     const json = async (p, opts) => {
-      const r = await fetch(base + p, opts);
+      const r = await fetch(base + p + (p.includes('?') ? '&' : '?') + 'token=test-token-123', opts);
       return { status: r.status, body: await r.json() };
     };
+
+    // auth enforced
+    const unauth = await fetch(base + '/api/clients');
+    ok(unauth.status === 401, 'GET /api/clients without token is rejected (401)');
 
     // clients
     let r = await json('/api/clients');
@@ -132,9 +137,11 @@ const server = app.listen(0, '127.0.0.1', async () => {
   } finally {
     try { server.closeAllConnections?.(); } catch (e) {}
     server.close(() => {});
-    closeDb();
-    rmSync(userData, { recursive: true, force: true });
-    console.log(`\nLAN API smoke: ${passed} passed, ${failed} failed`);
-    setTimeout(() => process.exit(failed ? 1 : 0), 250);
+    // closeDb is async now (native handle release): cleanup must wait for it.
+    closeDb().then(() => {
+      rmSync(userData, { recursive: true, force: true });
+      console.log(`\nLAN API smoke: ${passed} passed, ${failed} failed`);
+      setTimeout(() => process.exit(failed ? 1 : 0), 250);
+    });
   }
 });

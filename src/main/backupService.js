@@ -47,9 +47,9 @@ function calculateFileChecksum(filePath) {
   } catch (e) { return null; }
 }
 
-function sqliteReady() {
+async function sqliteReady() {
   try {
-    const s = dbm.init(cfg.userDataPath);
+    const s = await dbm.init(cfg.userDataPath);
     return !!(s && s.ok);
   } catch (e) { return false; }
 }
@@ -59,15 +59,15 @@ function sqliteReady() {
 async function snapshotFile(filePath, password) {
   let type = 'snapshot';
   let encrypted = false;
-  if (sqliteReady()) {
+  if (await sqliteReady()) {
     const s = await dbm.snapshot(filePath);
     if (password) {
       fs.writeFileSync(filePath, JSON.stringify(encryptData(fs.readFileSync(filePath), password)));
       encrypted = true;
     }
-    const chk = dbm.integrityCheck();
+    const chk = await dbm.integrityCheck();
     if (!chk.ok) throw new Error('Snapshot failed integrity check: ' + (chk.result || chk.error));
-    dbm.optimize();
+    await dbm.optimize();
     return { size: s.size, type, encrypted };
   }
   type = 'json';
@@ -189,9 +189,9 @@ async function runRetention() {
     try {
       const cutoff = new Date(Date.now() - days * 86400000).toISOString();
       let pruned = 0;
-      for (const r of (dbm.all ? (dbm.all('auditLogs') || []) : [])) {
+      for (const r of ((await dbm.all('auditLogs')) || [])) {
         if (r.createdAt && r.createdAt < cutoff) {
-          try { dbm.del('auditLogs', r.id); pruned++; } catch (e) {}
+          try { await dbm.del('auditLogs', r.id); pruned++; } catch (e) {}
         }
       }
       out.auditPruned = pruned;
@@ -239,7 +239,7 @@ async function restoreBackup(name, password, skipChecksum) {
     }
     const head = fs.readFileSync(restorePath);
     if (head.slice(0, 16).toString('ascii') !== 'SQLite format 3\u0000') return { success: false, error: 'Not a valid database snapshot' };
-    const r = dbm.replaceWith(restorePath);
+    const r = await dbm.replaceWith(restorePath);
     if (!r.ok) return { success: false, error: r.error };
     cfg.notify({ source: 'app', kind: 'restore', backup: name });
     return { success: true, info: r };
@@ -334,25 +334,25 @@ async function importJsonBackup({ filePath, password }) {
 async function importJsonDump(dump, opts = {}) {
   const v = validateImportDump(dump);
   if (!v.ok) return { success: false, error: v.error };
-  const r = dbm.replaceFromDump(dump);
+  const r = await dbm.replaceFromDump(dump);
   if (!r.ok) return { success: false, error: r.error };
   cfg.notify({ source: 'app', kind: 'import', file: opts.file || '' });
   return { success: true, counts: r.counts, validated: v.counts };
 }
 
 // Database health + maintenance: status / integrity / compact (VACUUM).
-function dbHealth(action) {
-  const info = dbm.init(cfg.userDataPath);
+async function dbHealth(action) {
+  const info = await dbm.init(cfg.userDataPath);
   if (!info.ok) return { success: false, backend: 'indexeddb', error: info.error || 'SQLite unavailable' };
   const out = { success: true, backend: 'sqlite' };
-  const st = dbm.stats();
+  const st = await dbm.stats();
   const list = readBackupIndex();
   const details = {
     backend: 'sqlite',
     sqlitePath: (st.ok && st.path) || info.path || '',
     dbSizeBytes: (st.ok && st.size) || info.size || 0,
     tableCount: 0,
-    schemaVersion: dbm.schemaVersion(),
+    schemaVersion: await dbm.schemaVersion(),
     lastSnapshot: null,
     snapshotCount: list.length,
     counts: {}
@@ -364,13 +364,13 @@ function dbHealth(action) {
   const lastOk = [...list].reverse().find(b => b.status === 'ok');
   if (lastOk) { details.lastSnapshot = lastOk.name; details.lastSnapshotDate = lastOk.date || null; }
   if (action === 'status' || action === 'integrity') {
-    const chk = dbm.integrityCheck();
+    const chk = await dbm.integrityCheck();
     details.integrityOk = chk.ok;
     details.integrityResult = chk.ok ? 'ok' : (chk.result || chk.error);
     details.lastIntegrityCheck = new Date().toISOString();
   }
   if (action === 'compact') {
-    const v = dbm.vacuum();
+    const v = await dbm.vacuum();
     details.compacted = v.ok;
     if (v.ok) details.dbSizeBytes = v.size;
     else details.error = v.error;

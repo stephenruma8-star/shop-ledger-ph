@@ -1,8 +1,9 @@
 // Boot smoke: launches the REAL Electron binary against the built app (out/main)
 // and asserts the main process stays alive long enough to come up cleanly.
-// Validates the better-sqlite3 Electron-ABI build, preload, window creation and
-// startup path under actual Electron, not just the node-renderer harnesses.
-// Usage: node scripts/smoke-boot.mjs   (run `npm run build` + `npm run rebuild:electron` first)
+// Validates the SQLCipher N-API binding, preload, window creation and startup path
+// under actual Electron, not just the node-renderer harnesses.
+// Usage: node scripts/smoke-boot.mjs   (run `npm run build` first; no ABI rebuild
+// needed since the binding is N-API)
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { resolve, join } from 'node:path';

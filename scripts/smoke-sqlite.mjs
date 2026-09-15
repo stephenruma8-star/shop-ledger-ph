@@ -1,7 +1,7 @@
 // Smoke test for the main-process SQLite storage layer (src/main/db.js).
 // Runs in plain Node with a fake ipcMain and a temp user-data dir.
 import { createRequire } from 'node:module';
-import { mkdtempSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -108,13 +108,45 @@ const st = await invoke(h, 'db-stats');
 ok(st.ok === true && st.counts.clients === 2 && st.counts.transactions === 2 && st.size > 0, 'db-stats counts + size');
 
 // 14 persistence across reopen
-closeDb();
+await closeDb();
 const h2 = register();
 const reopen = await invoke(h2, 'db-open');
 ok(reopen.needMigration === false, 'reopen after close: data persisted, no migration');
 ok((await invoke(h2, 'db-all', { store: 'clients' })).length === 2, 'reopen: records persisted');
 
-closeDb();
+// 15 SQLCipher at-rest encryption round trip
+const shortPw = await invoke(h2, 'db-encrypt', { password: 'short' });
+ok(shortPw && shortPw.ok === false, 'db-encrypt rejects short passwords');
+const enc1 = await invoke(h2, 'db-encrypt', { password: 'sqlcipher-test-pw' });
+ok(enc1 && enc1.ok === true, 'db-encrypt enables page-level encryption');
+const st1 = await invoke(h2, 'db-encryption-status');
+ok(st1 && st1.success === true && st1.encrypted === true, 'encryption status reports encrypted');
+ok(!readFileSync(reopen.path).slice(0, 15).toString('utf8').startsWith('SQLite'), 'live file is ciphertext at rest');
+
+// 16 close + reopen demands the password (no silent fallback)
+await closeDb();
+const hE = register();
+const locked = await invoke(hE, 'db-open');
+ok(locked && locked.ok === false && locked.needPassword === true, 'reopen of vault reports needPassword');
+const badUnlock = await invoke(hE, 'db-unlock', { password: 'wrong-pw' });
+ok(badUnlock && badUnlock.ok === false, 'wrong password rejected');
+const goodUnlock = await invoke(hE, 'db-unlock', { password: 'sqlcipher-test-pw' });
+ok(goodUnlock && goodUnlock.ok === true, 'correct password unlocks');
+ok((await invoke(hE, 'db-all', { store: 'clients' })).length === 2, 'data intact after unlock');
+
+// 17 change password + disable
+const chgBad = await invoke(hE, 'db-change-password', { oldPassword: 'nope', newPassword: 'sqlcipher-test-pw2' });
+ok(chgBad && chgBad.ok === false, 'change with wrong current password rejected');
+const chg = await invoke(hE, 'db-change-password', { oldPassword: 'sqlcipher-test-pw', newPassword: 'sqlcipher-test-pw2' });
+ok(chg && chg.ok === true, 'db-change-password rekeys');
+const dis = await invoke(hE, 'db-decrypt', { password: 'sqlcipher-test-pw2' });
+ok(dis && dis.ok === true, 'db-decrypt returns to plaintext');
+const st2 = await invoke(hE, 'db-encryption-status');
+ok(st2 && st2.encrypted === false, 'encryption status reports plaintext after disable');
+ok((await invoke(hE, 'db-all', { store: 'clients' })).length === 2, 'data intact after disable');
+ok(readFileSync(reopen.path).slice(0, 16).toString('ascii') === 'SQLite format 3\u0000', 'file is plaintext SQLite after disable');
+
+await closeDb();
 rmSync(userData, { recursive: true, force: true });
 
 console.log(`\nSQLite smoke: ${passed} passed, ${failed} failed`);

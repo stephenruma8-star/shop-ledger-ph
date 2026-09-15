@@ -73,11 +73,6 @@ function validateAmount(v) {
   return !isNaN(n) && isFinite(n) && n >= 0 && n <= 999999999;
 }
 
-function validatePhone(v) {
-  if (!v) return true;
-  return /^(\+63|0)?\d{10,11}$/.test(String(v).trim());
-}
-
 function createLanApiRouter(deps) {
   const router = express.Router();
   
@@ -129,10 +124,10 @@ function createLanApiRouter(deps) {
 
   // Rows for the named stores: straight from SQLite, or from the renderer dump as a fallback.
   async function load(...names) {
-    const info = deps.db.init(deps.userDataPath());
+    const info = await deps.db.init(deps.userDataPath());
     if (info && info.ok) {
       const out = {};
-      for (const n of names) out[n] = deps.db.all(n);
+      for (const n of names) out[n] = await deps.db.all(n);
       return out;
     }
     if (!deps.rendererReady()) throw Object.assign(new Error('Window not ready'), { status: 503 });
@@ -236,7 +231,6 @@ function createLanApiRouter(deps) {
 
   router.post('/api/expenses', wrap(async (req, res) => {
     if (req.query.offline === 'true') {
-      const { description, amount, category, date, payee } = req.body;
       _offlineQueue.push({ type: 'expense', body: req.body, timestamp: Date.now() });
       return res.json({ success: true, queued: true, queueLength: _offlineQueue.length });
     }
@@ -431,16 +425,16 @@ function createLanApiRouter(deps) {
     res.json(_invoiceMutex.__result || { success: true });
   }));
 
-  router.get('/api/sqlite-status', (req, res) => {
+  router.get('/api/sqlite-status', async (req, res) => {
     try {
-      const s = deps.db.init(deps.userDataPath());
+      const s = await deps.db.init(deps.userDataPath());
       res.json({ ok: !!s.ok, backend: s.ok ? 'sqlite' : 'indexeddb', path: s.path || null, size: s.size || 0, stores: s.stores || 0, needMigration: s.ok ? !!s.needMigration : false, error: s.error || null });
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
-  router.post('/api/sqlite/enable', (req, res) => {
+  router.post('/api/sqlite/enable', async (req, res) => {
     try {
-      const s = deps.db.init(deps.userDataPath());
+      const s = await deps.db.init(deps.userDataPath());
       res.json({ ok: !!s.ok, backend: s.ok ? 'sqlite' : 'indexeddb', path: s.path || null, size: s.size || 0, stores: s.stores || 0, needMigration: s.ok ? !!s.needMigration : false, error: s.error || null });
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
