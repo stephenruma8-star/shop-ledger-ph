@@ -100,7 +100,7 @@ function createWindow() {
     icon: path.join(__dirname, '../renderer/assets/icon.png'),
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
-      contextIsolation: true, nodeIntegration: false
+      contextIsolation: true, nodeIntegration: false, sandbox: true
     }
   });
   if (process.env['ELECTRON_RENDERER_URL']) {
@@ -708,7 +708,14 @@ ipcMain.handle('select-folder', async () => {
   } catch (err) { return { success: false, error: err.message }; }
 });
 
-ipcMain.handle('open-external', async (event, url) => { require('electron').shell.openExternal(url); });
+ipcMain.handle('open-external', async (event, url) => {
+  try {
+    const parsed = new URL(String(url));
+    if (!['http:', 'https:', 'mailto:'].includes(parsed.protocol)) return { success: false, error: 'Blocked protocol' };
+    await require('electron').shell.openExternal(parsed.href);
+    return { success: true };
+  } catch (err) { return { success: false, error: err.message }; }
+});
 ipcMain.handle('rebuild-app', async () => {
   try {
     const { execSync } = require('child_process');

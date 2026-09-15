@@ -3,7 +3,7 @@ import { viewClients } from './clients.js'
 import { viewDashboard } from './dashboard.js'
 import { dbAll } from './database.js'
 import { viewExpenses } from './expenses.js'
-import { applyDailyInterest, checkCloudBackupDue, checkSmsReminderDue, closeModal, focusPageSearch, populateYearSelector, saveCurrentModal, showShortcuts, toggleTheme, updateLowStockBadge, updateNotifications } from './helpers.js'
+import { applyDailyInterest, checkCloudBackupDue, checkSmsReminderDue, closeModal, escapeHtml, focusPageSearch, populateYearSelector, saveCurrentModal, showShortcuts, toast, toggleTheme, updateLowStockBadge, updateNotifications } from './helpers.js'
 import { viewHelp } from './help.js'
 import { viewInventory } from './inventory.js'
 import { AppParticles } from './particles.js'
@@ -18,6 +18,27 @@ import { viewTransactions } from './transactions.js'
 import { viewUtang } from './utang.js'
 
 export let _navToken = 0;
+// Error boundary: a crashing section must never leave a blank screen.
+// Shows a retry panel, toasts the failure, and forwards details to main-process logs.
+export function renderViewError(root, route, title, err) {
+  const msg = (err && err.message) || String(err);
+  try { window.electronAPI?.logRenderer?.('error', `view render failed [${route}]: ${msg}`); } catch (e) {}
+  try { toast(`Failed to load ${title || route}`, 'error'); } catch (e) {}
+  try {
+    root.className = 'flex-1 overflow-auto p-6';
+    root.innerHTML = `
+      <div class="max-w-lg mx-auto mt-10 p-6 bg-white dark:bg-gray-800 rounded-xl border border-red-200 dark:border-red-900 shadow-sm text-center">
+        <p class="text-4xl mb-3">⚠️</p>
+        <h3 class="text-lg font-bold mb-1">Couldn't load ${escapeHtml(title || route)}</h3>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">Something went wrong while opening this section. Your data is safe — details were saved to the app logs.</p>
+        <pre class="text-left text-xs bg-gray-100 dark:bg-gray-900 rounded-lg p-3 mb-4 overflow-auto max-h-32 text-red-600 dark:text-red-400">${escapeHtml(msg)}</pre>
+        <div class="flex gap-2 justify-center">
+          <button onclick="navigate('${escapeHtml(route)}')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold text-sm">Try Again</button>
+          <button onclick="navigate('dashboard')" class="px-4 py-2 border dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-sm">Go to Dashboard</button>
+        </div>
+      </div>`;
+  } catch (e) { /* last resort: leave existing content visible */ }
+}
 export async function navigate(route) {
   closeModal();
   const token = ++_navToken;
@@ -49,8 +70,9 @@ export async function navigate(route) {
   }
   populateYearSelector();
   switch (route) {
-    case 'dashboard': 
-      await viewDashboard(root); 
+    case 'dashboard':
+      try { await viewDashboard(root); }
+      catch (err) { renderViewError(root, route, titles[route] || route, err); }
       break;
     default: {
       const viewFns = {
@@ -64,7 +86,8 @@ export async function navigate(route) {
       if (fn) {
         root.className = 'flex-1 overflow-auto p-6';
         root.innerHTML = '';
-        await fn(root);
+        try { await fn(root); }
+        catch (err) { renderViewError(root, route, titles[route] || route, err); }
       }
       break;
     }
@@ -155,5 +178,6 @@ Object.defineProperties(window, {
   _navToken: { get: () => _navToken, set: (v) => { _navToken = v; }, configurable: true },
   navigate: { get: () => navigate, configurable: true },
   loadAll: { get: () => loadAll, configurable: true },
-  render: { get: () => render, configurable: true }
+  render: { get: () => render, configurable: true },
+  renderViewError: { get: () => renderViewError, configurable: true }
 });

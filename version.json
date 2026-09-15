@@ -1,5 +1,5 @@
 {
-    "version":  "3.17.0",
-    "buildDate":  "2026-09-10T00:00:00.000Z",
-    "notes":  "Full-screen section modals: all sections (Clients, Sales, Inventory, etc.) now open as full-screen overlays with back button. Dashboard stays visible underneath. Press Escape or click Back to return."
+    "version":  "3.17.2",
+    "buildDate":  "2026-09-15T00:00:00.000Z",
+    "notes":  "Protection hardening: per-section error boundaries with retry, sandboxed renderer, pinned Electron version, external-link protocol allowlist."
 }
