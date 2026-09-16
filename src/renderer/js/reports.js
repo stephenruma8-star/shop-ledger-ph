@@ -2,7 +2,7 @@ import { logAudit } from './auth.js'
 import { dbAll, dbClear, dbPut } from './database.js'
 import { closeModal, confirmModal, dbLoad, escapeHtml, filterByYear, modal, paginate, renderPagination, toast } from './helpers.js'
 import { calculateInventoryValue } from './inventory.js'
-import { escHtml, openPrintWindow } from './printLayout.js'
+import { escHtml, excelTableCss, openPrintWindow } from './printLayout.js'
 import { loadAll, render } from './router.js'
 import { fmtDate, now, peso, state, today, VAT_RATE } from './state.js'
 
@@ -167,12 +167,12 @@ export async function exportExcel() {
       const align = opts && opts.align ? ` text-align:${opts.align}` : '';
       const fmt = opts && opts.fmt ? opts.fmt : '';
       const cls = opts && opts.cls ? ` class="${opts.cls}"` : '';
-      return `<td${cls} style="padding:5px 8px;border:1px solid #cbd5e1;vertical-align:top${align}">${fmt}${esc(v)}</td>`;
+      return `<td${cls} style="padding:4px 8px;border:1px solid #BFBFBF;vertical-align:top;font-family:Calibri,'Segoe UI',Arial,sans-serif;font-size:11pt;color:#000${align}">${fmt}${esc(v)}</td>`;
     }
 
     function th(label, align) {
-      const a = align ? ` text-align:${align}` : '';
-      return `<th style="padding:7px 8px;border:1px solid #1e40af;background:#2563eb;color:#fff;font-weight:700;font-size:11px;white-space:nowrap${a}">${esc(label)}</th>`;
+      const a = align && align !== 'left' ? ` text-align:${align}` : ' text-align:center';
+      return `<th style="padding:5px 8px;border:1px solid #BFBFBF;background:#217346;color:#fff;font-weight:700;font-family:Calibri,'Segoe UI',Arial,sans-serif;font-size:11pt;white-space:nowrap${a}">${esc(label)}</th>`;
     }
 
     const settingsMap = {};
@@ -183,19 +183,19 @@ export async function exportExcel() {
     function section(title, headers, rows) {
       let h = headers.map(h => th(h.label, h.align)).join('');
       let r = rows.map((row, i) => {
-        const bg = i % 2 === 0 ? '#ffffff' : '#f8fafc';
+        const bg = i % 2 === 0 ? '#ffffff' : '#E2EFDA';
         return `<tr style="background:${bg}">${row.map(c => td(c.v, c.opts)).join('')}</tr>`;
       }).join('');
-      return `<tr style="background:#f1f5f9"><td colspan="${headers.length}" style="padding:10px 8px 6px;border:1px solid #cbd5e1;font-size:13px;font-weight:700;color:#1e293b">${esc(title)}</td></tr>
-<tr style="background:#2563eb">${h}</tr>${r}`;
+      return `<tr style="background:#D9D9D9"><td colspan="${headers.length}" style="padding:8px;border:1px solid #BFBFBF;font-family:Calibri,'Segoe UI',Arial,sans-serif;font-size:12pt;font-weight:700;color:#217346">${esc(title)}</td></tr>
+<tr style="background:#217346">${h}</tr>${r}`;
     }
 
     function pesoVal(n) { return Number(n||0).toFixed(2); }
 
-    let html = `<table style="width:100%;border-collapse:collapse;font-family:'Segoe UI',Arial,sans-serif;font-size:11px;color:#1e293b">`;
+    let html = `<table style="width:100%;border-collapse:collapse;font-family:Calibri,'Segoe UI',Arial,sans-serif;font-size:11pt;color:#000;background:#fff">`;
 
     // Shop header row
-    html += `<tr><td colspan="20" style="padding:14px 10px;border:1px solid #cbd5e1;background:#0f172a;color:#fff;font-size:18px;font-weight:700;text-align:center">${esc(shopName)} ${shopAddr ? '&mdash; '+esc(shopAddr) : ''}</td></tr>`;
+    html += `<tr><td colspan="20" style="padding:14px 10px;border:1px solid #BFBFBF;background:#217346;color:#fff;font-family:Calibri,'Segoe UI',Arial,sans-serif;font-size:18px;font-weight:700;text-align:center">${esc(shopName)} ${shopAddr ? '&mdash; '+esc(shopAddr) : ''}</td></tr>`;
 
     // Summary row
     const expTx = filterByYear(state.transactions, 'date').filter(t => t.status !== 'voided' && t.status !== 'interest');
@@ -210,7 +210,7 @@ export async function exportExcel() {
     const totalUtang = state.clients.reduce((s, c) => s + (c.balance || 0), 0);
     const totalPayments = expPay.reduce((s, p) => s + (p.amount || 0), 0);
     const sumColor = netProfit >= 0 ? '#059669' : '#dc2626';
-    html += `<tr><td colspan="20" style="padding:8px 10px;border:1px solid #cbd5e1;background:#f8fafc">
+    html += `<tr><td colspan="20" style="padding:8px 10px;border:1px solid #BFBFBF;background:#fff;font-family:Calibri,'Segoe UI',Arial,sans-serif;font-size:11pt;color:#000">
       <span style="margin-right:24px"><strong>Revenue:</strong> ₱${pesoVal(totalRevenue)}</span>
       <span style="margin-right:24px"><strong style="color:#c026d3">Refunds:</strong> <span style="color:#c026d3">-₱${pesoVal(totalRefunds)}</span></span>
       <span style="margin-right:24px"><strong>COGS:</strong> ₱${pesoVal(totalCOGS)}</span>
@@ -315,7 +315,7 @@ export async function exportExcel() {
       [{label:'PO No'},{label:'Supplier'},{label:'Date',align:'center'},{label:'Items'},{label:'Total',align:'right'},{label:'Status',align:'center'}],
       pos.map(r => r.cells));
 
-    html += `<tr><td colspan="20" style="padding:10px;border:1px solid #cbd5e1;background:#f8fafc;text-align:center;font-size:10px;color:#94a3b8">Generated ${fmtDateTime(now())} &mdash; Shop Ledger PH</td></tr></table>`;
+    html += `<tr><td colspan="20" style="padding:10px;border:1px solid #BFBFBF;background:#fff;text-align:center;font-family:Calibri,'Segoe UI',Arial,sans-serif;font-size:10pt;color:#595959">Generated ${fmtDateTime(now())} &mdash; Shop Ledger PH</td></tr></table>`;
 
     const blob = new Blob([
       '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">',
@@ -354,32 +354,52 @@ export async function exportXlsx() {
     const shopName = settingsMap['shopName'] || 'Shop Ledger PH';
 
     const wb = X.utils.book_new();
+    const genStamp = new Date().toLocaleString();
     X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([
-      [shopName], ['Generated', new Date().toLocaleString()], [],
+      [`${shopName} — Summary`], [`Generated ${genStamp}`],
       ['Revenue', totalRevenue], ['Refunds', -totalRefunds],
       ['Cost of Goods', totalCOGS], ['Expenses', totalExpenses],
       ['Net Profit', netProfit], ['Outstanding Debts', totalUtang], ['Payments Collected', totalPayments]
     ]), 'Summary');
+    {
+      const ws = wb.Sheets['Summary'];
+      ws['A1'].s = { font: { name: 'Calibri', sz: 14, bold: true, color: { rgb: XL_GREEN } }, alignment: { horizontal: 'center' } };
+      ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }];
+      ws['A2'].s = { font: { name: 'Calibri', sz: 10, italic: true, color: { rgb: '595959' } }, alignment: { horizontal: 'center' } };
+      ws['!merges'].push({ s: { r: 1, c: 0 }, e: { r: 1, c: 1 } });
+      for (let r = 2; r <= 8; r++) {
+        const label = X.utils.encode_cell({ r, c: 0 });
+        const val = X.utils.encode_cell({ r, c: 1 });
+        if (ws[label]) ws[label].s = { font: { name: 'Calibri', sz: 11, bold: true }, border: xlThinBorder() };
+        if (ws[val]) { ws[val].s = { font: { name: 'Calibri', sz: 11 }, alignment: { horizontal: 'right' }, border: xlThinBorder() }; ws[val].z = '#,##0.00'; }
+      }
+      ws['!cols'] = [{ wch: 22 }, { wch: 20 }];
+    }
 
-    const sheet = (headers, rows) => X.utils.aoa_to_sheet([[shopName, ...headers], ...rows]);
-    X.utils.book_append_sheet(wb, sheet(['Invoice', 'Date', 'Client', 'Items', 'Total', 'Payment', 'Status'],
+    const sheet = (title, headers, rows, numCols = [], centerCols = []) => {
+      const ws = X.utils.aoa_to_sheet([[title], headers, ...rows]);
+      styleXlsxTable(X, ws, { title, titleRow: 0, headerRow: 1, nDataRows: rows.length, nCols: headers.length, numCols, centerCols });
+      ws['!cols'] = xlsxColWidths(headers, rows, title);
+      return ws;
+    };
+    X.utils.book_append_sheet(wb, sheet(`${shopName} — Transactions`, ['Invoice', 'Date', 'Client', 'Items', 'Total', 'Payment', 'Status'],
       xTx.filter(t => t.invoiceNo).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(t => [
         t.invoiceNo, t.date ? fmtDate(t.date) : '', t.clientName || 'Walk-in',
         (t.items || []).map(i => `${i.description || ''} x${i.name || '1'}`).join('; '),
         t.grandTotal, t.paymentMethod || '', t.status || ''
-      ])), 'Transactions');
-    X.utils.book_append_sheet(wb, sheet(['Name', 'Phone', 'Address', 'Balance', 'Due Date'],
-      (state.clients || []).filter(c => c.name).map(c => [c.name, c.phone || '', c.address || '', c.balance || 0, c.dueDate ? fmtDate(c.dueDate) : ''])), 'Clients');
-    X.utils.book_append_sheet(wb, sheet(['Date', 'Client', 'Amount', 'Type', 'Notes'],
-      xPay.filter(p => p.clientName).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(p => [p.date ? fmtDate(p.date) : '', p.clientName, p.amount, p.type || '', p.notes || ''])), 'Payments');
-    X.utils.book_append_sheet(wb, sheet(['Date', 'Category', 'Description', 'Amount', 'Payee'],
-      xEx.filter(e => e.description).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(e => [e.date ? fmtDate(e.date) : '', e.category || '', e.description, e.amount, e.payee || ''])), 'Expenses');
-    X.utils.book_append_sheet(wb, sheet(['Name', 'SKU', 'Category', 'Sell Price', 'Stock', 'Min Stock'],
-      (state.inventory || []).filter(i => i.name).map(i => [i.name, i.sku || '', i.category || '', i.sellPrice, i.stock || 0, i.minStock || 5])), 'Inventory');
-    X.utils.book_append_sheet(wb, sheet(['Name', 'Contact', 'Email', 'Category', 'Address'],
+      ]), [4], [1, 5, 6]), 'Transactions');
+    X.utils.book_append_sheet(wb, sheet(`${shopName} — Clients`, ['Name', 'Phone', 'Address', 'Balance', 'Due Date'],
+      (state.clients || []).filter(c => c.name).map(c => [c.name, c.phone || '', c.address || '', c.balance || 0, c.dueDate ? fmtDate(c.dueDate) : '']), [3], [4]), 'Clients');
+    X.utils.book_append_sheet(wb, sheet(`${shopName} — Payments`, ['Date', 'Client', 'Amount', 'Type', 'Notes'],
+      xPay.filter(p => p.clientName).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(p => [p.date ? fmtDate(p.date) : '', p.clientName, p.amount, p.type || '', p.notes || '']), [2], [0, 3]), 'Payments');
+    X.utils.book_append_sheet(wb, sheet(`${shopName} — Expenses`, ['Date', 'Category', 'Description', 'Amount', 'Payee'],
+      xEx.filter(e => e.description).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(e => [e.date ? fmtDate(e.date) : '', e.category || '', e.description, e.amount, e.payee || '']), [3], [0]), 'Expenses');
+    X.utils.book_append_sheet(wb, sheet(`${shopName} — Inventory`, ['Name', 'SKU', 'Category', 'Sell Price', 'Stock', 'Min Stock'],
+      (state.inventory || []).filter(i => i.name).map(i => [i.name, i.sku || '', i.category || '', i.sellPrice, i.stock || 0, i.minStock || 5]), [3, 4, 5], []), 'Inventory');
+    X.utils.book_append_sheet(wb, sheet(`${shopName} — Suppliers`, ['Name', 'Contact', 'Email', 'Category', 'Address'],
       (state.suppliers || []).filter(s => s.name).map(s => [s.name, s.contact || '', s.email || '', s.category || '', s.address || ''])), 'Suppliers');
-    X.utils.book_append_sheet(wb, sheet(['PO No', 'Supplier', 'Date', 'Items', 'Total', 'Status'],
-      (state.purchaseOrders || []).filter(po => po.poNo).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(po => [po.poNo, po.supplierName || '', po.date ? fmtDate(po.date) : '', (po.items || []).map(i => `${i.name || ''} x${i.qty || 0}`).join('; '), po.total, po.status || ''])), 'Purchase Orders');
+    X.utils.book_append_sheet(wb, sheet(`${shopName} — Purchase Orders`, ['PO No', 'Supplier', 'Date', 'Items', 'Total', 'Status'],
+      (state.purchaseOrders || []).filter(po => po.poNo).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(po => [po.poNo, po.supplierName || '', po.date ? fmtDate(po.date) : '', (po.items || []).map(i => `${i.name || ''} x${i.qty || 0}`).join('; '), po.total, po.status || '']), [4], [2, 5]), 'Purchase Orders');
     X.writeFile(wb, `ShopLedgerPH_Report_${today()}.xlsx`);
     toast('Excel (.xlsx) exported');
   } catch (e) { toast('Export error: ' + e.message, 'error'); }
@@ -400,30 +420,87 @@ function csvDownload(filename, headers, rows) {
   URL.revokeObjectURL(url);
 }
 
+// Shared "Microsoft Excel table" design for every .xlsx download: Calibri, green
+// banded header, gray gridlines, light-green banded rows, fitted columns, filter.
+// Mirrors the .excel-table print CSS so screen, print, PDF and Excel all match.
+const XL_GREEN = '217346';
+const XL_GRID = 'BFBFBF';
+const XL_BAND = 'E2EFDA';
+function xlThinBorder() {
+  const s = { style: 'thin', color: { rgb: XL_GRID } };
+  return { top: s, bottom: s, left: s, right: s };
+}
+function xlFont(bold) {
+  return { name: 'Calibri', sz: 11, bold: !!bold, color: { rgb: '000000' } };
+}
+// opts: { title, titleRow=0, headerRow, nDataRows, nCols, numCols=[], centerCols=[],
+//         totalRow=null (data-row index to emphasize), headerBg }
+function styleXlsxTable(X, ws, opts) {
+  const { title, titleRow = 0, headerRow, nDataRows, nCols, numCols = [], centerCols = [], totalRow = null, headerBg = XL_GREEN } = opts;
+  const border = xlThinBorder();
+  if (title) {
+    const addr = X.utils.encode_cell({ r: titleRow, c: 0 });
+    if (!ws[addr]) ws[addr] = { t: 's', v: '' };
+    ws[addr].s = { font: { name: 'Calibri', sz: 14, bold: true, color: { rgb: XL_GREEN } }, alignment: { horizontal: 'center', vertical: 'center' } };
+    ws['!merges'] = [...(ws['!merges'] || []), { s: { r: titleRow, c: 0 }, e: { r: titleRow, c: nCols - 1 } }];
+    ws['!rows'] = ws['!rows'] || [];
+    ws['!rows'][titleRow] = { hpt: 24 };
+  }
+  for (let c = 0; c < nCols; c++) {
+    const addr = X.utils.encode_cell({ r: headerRow, c });
+    if (!ws[addr]) ws[addr] = { t: 's', v: '' };
+    ws[addr].s = {
+      font: { name: 'Calibri', sz: 11, bold: true, color: { rgb: 'FFFFFF' } },
+      fill: { patternType: 'solid', fgColor: { rgb: headerBg } },
+      alignment: { horizontal: 'center', vertical: 'center' },
+      border
+    };
+  }
+  for (let r = 0; r < nDataRows; r++) {
+    const rowIdx = headerRow + 1 + r;
+    const isTotal = totalRow != null && r === totalRow;
+    for (let c = 0; c < nCols; c++) {
+      const addr = X.utils.encode_cell({ r: rowIdx, c });
+      if (!ws[addr]) ws[addr] = { t: 's', v: '' };
+      const s = { font: xlFont(isTotal), border: isTotal
+        ? { top: { style: 'medium', color: { rgb: XL_GREEN } }, bottom: border.bottom, left: border.left, right: border.right }
+        : border };
+      if (!isTotal && r % 2 === 1) s.fill = { patternType: 'solid', fgColor: { rgb: XL_BAND } };
+      if (numCols.includes(c)) { s.alignment = { horizontal: 'right' }; ws[addr].z = '#,##0.00'; }
+      else if (centerCols.includes(c)) s.alignment = { horizontal: 'center' };
+      ws[addr].s = s;
+    }
+  }
+  const lastRow = headerRow + Math.max(nDataRows, 1);
+  ws['!autofilter'] = { ref: X.utils.encode_range({ s: { r: headerRow, c: 0 }, e: { r: lastRow, c: nCols - 1 } }) };
+}
+
+function xlsxColWidths(headers, rows, title) {
+  return headers.map((h, i) => {
+    const contentLen = rows.length ? Math.max(...rows.map(r => String(r[i] ?? '').length)) : 0;
+    const titleShare = title ? Math.ceil(title.length / headers.length) : 0;
+    return { wch: Math.min(Math.max(String(h).length, contentLen, titleShare) + 2, 45) };
+  });
+}
+
 export function exportFormattedXlsx(filename, headers, rows, options = {}) {
   const X = window.XLSX;
   if (!X || !X.utils || typeof X.writeFile !== 'function') { toast('Excel library not loaded', 'error'); return; }
-  const ws = X.utils.aoa_to_sheet([headers, ...rows]);
-
-  if (options.headerStyle) {
-    const range = X.utils.decode_range(ws['!ref']);
-    for (let c = range.s.c; c <= range.e.c; c++) {
-      const cell = X.utils.encode_cell({ r: 0, c });
-      if (ws[cell]) {
-        ws[cell].s = { font: { bold: true }, fill: { fgColor: { rgb: options.headerStyle.bg || '4472C4' } }, alignment: { horizontal: 'center' } };
-      }
-    }
-  }
-
-  const colWidths = headers.map((h, i) => {
-    const maxLen = Math.max(h.length, ...rows.map(r => String(r[i] || '').length));
-    return { wch: Math.min(maxLen + 2, 40) };
+  const title = options.title || '';
+  const headerRow = title ? 1 : 0;
+  const ws = X.utils.aoa_to_sheet(title ? [[title], headers, ...rows] : [headers, ...rows]);
+  styleXlsxTable(X, ws, {
+    title, titleRow: 0, headerRow,
+    nDataRows: rows.length, nCols: headers.length,
+    numCols: options.numCols || [], centerCols: options.centerCols || [],
+    totalRow: options.totalRow != null ? options.totalRow : null,
+    headerBg: (options.headerStyle && options.headerStyle.bg) || XL_GREEN
   });
-  ws['!cols'] = colWidths;
-
+  ws['!cols'] = xlsxColWidths(headers, rows, title);
   const wb = X.utils.book_new();
   X.utils.book_append_sheet(wb, ws, options.sheetName || 'Sheet1');
   X.writeFile(wb, filename);
+  if (options.toast !== false) toast('Excel (.xlsx) exported', 'success');
 }
 
 export async function exportAccountingCSV() {
@@ -865,20 +942,17 @@ export function exportLandscapePdf(filename, title, headers, rows) {
 
   let html = `<!DOCTYPE html><html><head><style>
     @page { size: landscape; margin: 1cm; }
-    body { font-family: Arial, sans-serif; font-size: 10px; color: #333; }
-    h1 { font-size: 16px; margin-bottom: 4px; }
-    .subtitle { font-size: 11px; color: #666; margin-bottom: 12px; }
-    table { width: 100%; border-collapse: collapse; font-size: 10px; }
-    th { background: #f3f4f6; text-align: left; padding: 6px 8px; border-bottom: 2px solid #333; font-weight: 600; }
-    td { padding: 5px 8px; border-bottom: 1px solid #e5e7eb; }
-    tr:nth-child(even) { background: #fafbfc; }
-    .footer { margin-top: 16px; font-size: 9px; color: #999; text-align: right; }
+    body { font-family: Calibri, 'Segoe UI', Arial, sans-serif; color: #000; background: #fff; }
+    ${excelTableCss()}
+    .footer { margin-top: 16px; font-size: 9pt; color: #595959; text-align: right; }
   </style></head><body>
-    <h1>${escapeHtml(title)}</h1>
-    <div class="subtitle">Generated: ${new Date().toLocaleDateString()}</div>
-    <table>
+    <div class="excel-sheet-head">
+      <div class="excel-sheet-title">${escapeHtml(title)}</div>
+      <div class="excel-sheet-sub">Generated: ${new Date().toLocaleDateString()}</div>
+    </div>
+    <table class="excel-table">
       <thead><tr>${headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead>
-      <tbody>${rows.map(row => `<tr>${row.map(cell => `<td>${escapeHtml(String(cell || ''))}</td>`).join('')}</tr>`).join('')}</tbody>
+      <tbody>${rows.map(row => `<tr>${row.map(cell => `<td>${escapeHtml(String(cell ?? ''))}</td>`).join('')}</tr>`).join('')}</tbody>
     </table>
     <div class="footer">Shop Ledger PH</div>
   </body></html>`;

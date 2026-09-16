@@ -33,6 +33,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#1e293b;backgr
 .print-table tbody tr:nth-child(odd){background:${s2}}
 .print-table .num{text-align:right;font-variant-numeric:tabular-nums}
 .print-table .ctr{text-align:center}
+${excelTableCss()}
 .print-summary{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px}
 .print-summary .card{padding:12px 16px;border-radius:6px;flex:1;min-width:120px}
 .print-summary .card .lbl{font-size:10px;text-transform:uppercase;color:#64748b}
@@ -67,6 +68,24 @@ body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#1e293b;backgr
 .thermal-58 td,.thermal-58 th{padding:2px 4px}
 .thermal-80 td,.thermal-80 th{padding:3px 6px}
 @media print{*{-webkit-print-color-adjust:exact;print-color-adjust:exact}body{background:#fff;padding:0}.print-preview{box-shadow:none;border-radius:0;padding:24px 32px;max-width:none;min-height:auto;margin:0}.print-toolbar{display:none}.receipt{max-width:none}}`;
+}
+
+// Shared "Microsoft Excel table" look: Calibri, green banded header, gray gridlines,
+// light-green banded rows. Used by printCss (.excel-table), the client statement and
+// the landscape PDF export so printouts and downloads share one visual language.
+export function excelTableCss() {
+  return `
+.excel-sheet-head{margin-bottom:12px}
+.excel-sheet-title{font-family:Calibri,'Segoe UI',Arial,sans-serif;font-size:14pt;font-weight:700;color:#217346;margin:0 0 2px}
+.excel-sheet-sub{font-family:Calibri,'Segoe UI',Arial,sans-serif;font-size:10pt;color:#595959;margin:1px 0}
+table.excel-table{width:100%;border-collapse:collapse;background:#fff;font-family:Calibri,'Segoe UI',Arial,sans-serif;font-size:11pt;color:#000;margin-bottom:14px}
+.excel-table caption{font-size:12pt;font-weight:700;text-align:left;padding:6px 0;color:#217346;caption-side:top}
+.excel-table thead th{background:#217346;color:#fff;font-weight:700;font-size:11pt;text-align:center;border:1px solid #BFBFBF;padding:5px 8px;white-space:nowrap}
+.excel-table tbody td{border:1px solid #BFBFBF;padding:4px 8px;vertical-align:top;background:#fff}
+.excel-table tbody tr:nth-child(even) td{background:#E2EFDA}
+.excel-table tbody tr.excel-total td{font-weight:700;border-top:2px solid #217346;background:#fff}
+.excel-table td.num,.excel-table th.num{text-align:right;font-variant-numeric:tabular-nums}
+.excel-table td.ctr,.excel-table th.ctr{text-align:center}`;
 }
 
 export function printToolbar(activeSize) {
@@ -211,6 +230,7 @@ Object.defineProperties(window, {
   printFooter: { get: () => printFooter, configurable: true },
   printScript: { get: () => printScript, configurable: true },
   openPrintWindow: { get: () => openPrintWindow, configurable: true },
+  excelTableCss: { get: () => excelTableCss, configurable: true },
   escHtml: { get: () => escHtml, configurable: true },
   thermalReceipt: { get: () => thermalReceipt, configurable: true }
 });

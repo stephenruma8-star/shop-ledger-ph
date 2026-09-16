@@ -1,7 +1,7 @@
 import { logAudit } from './auth.js'
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
 import { calcInterest, closeModal, confetti, confirmModal, debounce, escapeHtml, filterByYear, modal, parseCSVLine, playSound, searchData, toast, validatePhone } from './helpers.js'
-import { escHtml, openPrintWindow } from './printLayout.js'
+import { escHtml, excelTableCss, openPrintWindow } from './printLayout.js'
 import { fmtDate, fmtDateTime, now, peso, state, today } from './state.js'
 import { adjustStock, getQty, resolveInvIds, undoSale } from './transactions.js'
 
@@ -336,27 +336,17 @@ export function printClientStatement(id) {
   function amt(n) { return '₱' + Number(n || 0).toFixed(2); }
 
   let html = `<!DOCTYPE html><html><head><style>
-    body { font-family: Arial, sans-serif; padding: 40px; color: #333; }
-    h1 { font-size: 20px; margin-bottom: 5px; }
-    .header { border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; }
-    .info { font-size: 12px; color: #666; margin-bottom: 20px; }
-    table { width: 100%; border-collapse: collapse; font-size: 12px; }
-    th { background: #f3f4f6; text-align: left; padding: 8px; border-bottom: 2px solid #ddd; }
-    td { padding: 8px; border-bottom: 1px solid #eee; }
-    .total { font-weight: bold; border-top: 2px solid #333; }
-    .right { text-align: right; }
+    body { font-family: Calibri, 'Segoe UI', Arial, sans-serif; padding: 40px; color: #000; background: #fff; }
+    ${excelTableCss()}
   </style></head><body>
-    <div class="header">
-      <h1>Client Statement</h1>
-      <p>${escapeHtml(c.name)} — ${escapeHtml(c.phone || '')}</p>
+    <div class="excel-sheet-head">
+      <div class="excel-sheet-title">Client Statement — ${escapeHtml(c.name)}</div>
+      <div class="excel-sheet-sub">${escapeHtml(c.phone || '')}</div>
+      <div class="excel-sheet-sub">Address: ${escapeHtml(c.address || 'N/A')}</div>
+      <div class="excel-sheet-sub">Generated: ${new Date().toLocaleDateString()} &nbsp;|&nbsp; Outstanding Balance: ${amt(c.balance || 0)}</div>
     </div>
-    <div class="info">
-      <p>Address: ${escapeHtml(c.address || 'N/A')}</p>
-      <p>Generated: ${new Date().toLocaleDateString()}</p>
-      <p>Outstanding Balance: ${amt(c.balance || 0)}</p>
-    </div>
-    <table>
-      <thead><tr><th>Date</th><th>Invoice</th><th>Description</th><th class="right">Amount</th><th class="right">Payment</th><th class="right">Balance</th></tr></thead>
+    <table class="excel-table">
+      <thead><tr><th>Date</th><th>Invoice</th><th>Description</th><th class="num">Amount</th><th class="num">Payment</th><th class="num">Balance</th></tr></thead>
       <tbody>`;
 
   let runningBalance = 0;
@@ -364,10 +354,10 @@ export function printClientStatement(id) {
     runningBalance += (t.grandTotal || 0);
     const payment = (state.payments || []).filter(p => p.clientId === id && p.date === t.date).reduce((s, p) => s + (p.amount || 0), 0);
     runningBalance -= payment;
-    html += `<tr><td>${escapeHtml(t.date || '')}</td><td>${escapeHtml(t.invoiceNo || '')}</td><td>${escapeHtml((t.items || []).map(i => i.description || i.name).join(', '))}</td><td class="right">${amt(t.grandTotal || 0)}</td><td class="right">${amt(payment)}</td><td class="right">${amt(runningBalance)}</td></tr>`;
+    html += `<tr><td>${escapeHtml(t.date || '')}</td><td>${escapeHtml(t.invoiceNo || '')}</td><td>${escapeHtml((t.items || []).map(i => i.description || i.name).join(', '))}</td><td class="num">${amt(t.grandTotal || 0)}</td><td class="num">${amt(payment)}</td><td class="num">${amt(runningBalance)}</td></tr>`;
   }
 
-  html += `<tr class="total"><td colspan="5">Outstanding Balance</td><td class="right">${amt(c.balance || 0)}</td></tr>`;
+  html += `<tr class="excel-total"><td colspan="5">Outstanding Balance</td><td class="num">${amt(c.balance || 0)}</td></tr>`;
   html += `</tbody></table></body></html>`;
 
   if (window.electronAPI && window.electronAPI.printStatement) {
@@ -388,9 +378,9 @@ export async function printClientInfo(id) {
 
   let html = '';
 
-  html += `<div style="margin-bottom:16px"><h2 style="margin:0 0 4px;font-size:18px">${escHtml(c.name)}</h2>`;
-  if (c.address) html += `<p style="margin:1px 0;color:#475569">${escHtml(c.address)}</p>`;
-  if (c.phone) html += `<p style="margin:1px 0;color:#475569">${escHtml(c.phone)}</p>`;
+  html += `<div class="excel-sheet-head"><div class="excel-sheet-title">${escHtml(c.name)}</div>`;
+  if (c.address) html += `<div class="excel-sheet-sub">${escHtml(c.address)}</div>`;
+  if (c.phone) html += `<div class="excel-sheet-sub">${escHtml(c.phone)}</div>`;
   html += `</div>`;
 
   if (txns.length > 0) {
@@ -400,14 +390,14 @@ export async function printClientInfo(id) {
       runningBal += t.grandTotal || 0;
       html += `<div style="page-break-inside:avoid;margin-bottom:14px">`;
       html += `<h4 style="margin:0 0 4px;font-size:12px;color:#0f172a">${escHtml(t.invoiceNo||'Sale')} — ${escHtml(fmtDate(t.date||t.createdAt))} — ₱${amt(t.grandTotal)} <span style="color:#d97706;font-weight:600">Bal: ₱${amt(runningBal)}</span></h4>`;
-      html += `<table class="print-table"><thead><tr><th>Date</th><th>Description</th><th class="ctr">Name/Qty</th><th class="num">Unit Cost</th><th class="num">Amount</th><th class="num">Interest</th><th class="num">Total</th></tr></thead><tbody>`;
+      html += `<table class="excel-table"><thead><tr><th>Date</th><th>Description</th><th class="ctr">Name/Qty</th><th class="num">Unit Cost</th><th class="num">Amount</th><th class="num">Interest</th><th class="num">Total</th></tr></thead><tbody>`;
       (t.items||[]).forEach(item => {
         const sub = getQty(item.name||item.qty) * (item.unitCost||item.price||0);
         const r = item.intRate || 0;
         const iDate = item.date || t.date;
         const days = r > 0 && sub > 0 ? Math.max(1, Math.floor((new Date(today()) - new Date(iDate)) / 86400000)) : 0;
         const intr = days > 0 ? calcInterest(sub, r, days) : 0;
-        html += `<tr><td style="color:#000">${item.date ? escHtml(item.date) : escHtml(fmtDate(t.date||t.createdAt))}</td><td style="color:#000">${escHtml(item.description||'')}</td><td class="ctr" style="color:#000">${escHtml(item.name||item.qty||'1')}</td><td class="num" style="color:#000">₱${amt(item.unitCost||item.price||0)}</td><td class="num" style="color:#000">₱${amt(sub)}</td><td class="num" style="color:#000">${intr > 0 ? '₱'+amt(intr) : '-'}</td><td class="num" style="font-weight:600;color:#000">₱${amt(sub + intr)}</td></tr>`;
+        html += `<tr><td>${item.date ? escHtml(item.date) : escHtml(fmtDate(t.date||t.createdAt))}</td><td>${escHtml(item.description||'')}</td><td class="ctr">${escHtml(item.name||item.qty||'1')}</td><td class="num">₱${amt(item.unitCost||item.price||0)}</td><td class="num">₱${amt(sub)}</td><td class="num">${intr > 0 ? '₱'+amt(intr) : '-'}</td><td class="num" style="font-weight:600">₱${amt(sub + intr)}</td></tr>`;
       });
       html += `</tbody></table>`;
       if (t.totalInterest > 0 || t.discount > 0 || t.scDiscount > 0) {
@@ -424,7 +414,7 @@ export async function printClientInfo(id) {
   if (pays.length > 0) {
     html += `<div style="page-break-inside:avoid;margin-bottom:14px">`;
     html += `<h4 style="margin:0 0 4px;font-size:12px;color:#0f172a">Payments</h4>`;
-    html += `<table class="print-table"><thead><tr><th>Date</th><th class="num">Amount</th><th class="num">Bal.</th><th>Type</th><th>Notes</th></tr></thead><tbody>`;
+    html += `<table class="excel-table"><thead><tr><th>Date</th><th class="num">Amount</th><th class="num">Bal.</th><th>Type</th><th>Notes</th></tr></thead><tbody>`;
     let runningBal = (c.balance || 0) + pays.reduce((s, p) => s + (p.amount||0), 0);
     pays.forEach(p => {
       runningBal -= p.amount || 0;
