@@ -12,6 +12,7 @@ export const state = {
   purchaseOrders: [],
   supplierPayments: [],
   notifications: [],
+  balanceSnapshots: [],
   user: null,
   currentRoute: 'dashboard',
   selectedYear: localStorage.getItem('selectedYear') || 'all'

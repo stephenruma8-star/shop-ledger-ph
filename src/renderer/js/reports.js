@@ -163,6 +163,7 @@ export async function getAllData() {
     quickItems: await dbAll('quickItems'), expenses: await dbAll('expenses'),
     suppliers: await dbAll('suppliers'), purchaseOrders: await dbAll('purchaseOrders'),
     supplierPayments: await dbAll('supplierPayments'),
+    balanceSnapshots: await dbAll('balanceSnapshots'),
     notifications: await dbAll('notifications'),
     auditLogs: await dbAll('auditLogs'), users,
     settings: redactSettings(await dbAll('settings')), exportedAt: now()
@@ -745,7 +746,7 @@ export async function restoreEncryptedFlow() {
     const decryptResult = await window.electronAPI.decryptBackupData(fileResult.data, pw);
     if (!decryptResult.success) { toast('Decryption failed: ' + (decryptResult.error || 'Wrong password?'), 'error'); return; }
     const data = decryptResult.data;
-    const stores = ['clients','transactions','payments','inventory','quickItems','settings','users','expenses','suppliers','purchaseOrders','supplierPayments','notifications','auditLogs'];
+    const stores = ['clients','transactions','payments','inventory','quickItems','settings','users','expenses','suppliers','purchaseOrders','supplierPayments','notifications','auditLogs','balanceSnapshots'];
     await Promise.all(stores.map(s => dbClear(s)));
     for (const store of stores) {
       const items = data[store];
@@ -1152,7 +1153,61 @@ export function monthlyReportData(monthKey) {
     .sort((a, b) => (b.balance || 0) - (a.balance || 0))
     .map(c => ({ name: c.name, phone: c.phone || '', balance: c.balance || 0, dueDate: c.dueDate || '' }));
   const debtTotal = debtors.reduce((s, c) => s + c.balance, 0);
-  return { monthKey, label, sales, returns, pays, exps, revenue, refunds, cogs, expTotal, payTotal, profit, creditSales, topItems, topClients, debtors, debtTotal };
+  // Collections vs month-opening snapshot: per-client opening, paid-in-month, current.
+  const openingSnap = (state.balanceSnapshots || []).find(s => s.month === monthKey) || null;
+  const openingMap = {};
+  (openingSnap?.balances || []).forEach(b => { openingMap[b.id] = b.balance || 0; });
+  const paidMap = {};
+  pays.forEach(p => { if (p.clientId != null) paidMap[p.clientId] = (paidMap[p.clientId] || 0) + (p.amount || 0); });
+  const collections = [];
+  const seenColl = new Set();
+  const pushColl = (id, name) => {
+    const key = (id != null ? 'i:' + id : 'n:' + name);
+    if (seenColl.has(key)) return null;
+    seenColl.add(key);
+    const row = { id, name, opening: 0, paid: 0, current: 0 };
+    collections.push(row);
+    return row;
+  };
+  (state.clients || []).forEach(c => {
+    const row = pushColl(c.id, c.name);
+    if (row) { row.opening = openingMap[c.id] || 0; row.current = c.balance || 0; }
+  });
+  Object.entries(paidMap).forEach(([id, amt]) => {
+    const cid = Number(id);
+    let row = collections.find(r => r.id === cid);
+    if (!row) {
+      const c = (state.clients || []).find(x => x.id === cid);
+      row = pushColl(cid, c ? c.name : 'Unknown');
+      if (row) row.current = c ? (c.balance || 0) : 0;
+    }
+    if (row) row.paid = amt;
+  });
+  pays.forEach(p => {
+    if (p.clientId != null) return;
+    const nm = p.clientName || 'Walk-in';
+    // Name-only payments resolve to the matching client record first so the
+    // client never appears twice; only truly unknown names get their own row.
+    const known = (state.clients || []).find(c => (c.name || '') === nm);
+    if (known) {
+      let row = collections.find(r => r.id === known.id);
+      if (!row) {
+        row = pushColl(known.id, known.name);
+        if (row) row.current = known.balance || 0;
+      }
+      if (row) row.paid += p.amount || 0;
+      return;
+    }
+    let row = collections.find(r => r.id == null && r.name === nm);
+    if (!row) row = pushColl(null, nm);
+    if (row) row.paid += p.amount || 0;
+  });
+  const collShown = collections
+    .filter(r => r.opening > 0 || r.paid > 0 || r.current > 0)
+    .sort((a, b) => b.current - a.current);
+  const openingTotal = collShown.reduce((s, r) => s + r.opening, 0);
+  const paidTotal = collShown.reduce((s, r) => s + r.paid, 0);
+  return { monthKey, label, sales, returns, pays, exps, revenue, refunds, cogs, expTotal, payTotal, profit, creditSales, topItems, topClients, debtors, debtTotal, openingSnap, openingTotal, collections: collShown, paidTotal };
 }
 
 export function monthlyReportHtml(d) {
@@ -1196,9 +1251,17 @@ export function monthlyReportHtml(d) {
   html += d.topClients.length ? d.topClients.map(c => `<tr><td>${escHtml(c.name)}</td><td class="num">${peso(c.spent)}</td><td class="ctr">${c.txns}</td></tr>`).join('') : `<tr><td colspan="3">No client sales in ${escHtml(d.label)}</td></tr>`;
   html += `</tbody></table>`;
 
-  html += `<table class="excel-table"><caption>Receivables — as of today (${peso(d.debtTotal)})</caption><thead><tr><th>Client</th><th>Phone</th><th class="num">Balance</th><th class="ctr">Due Date</th></tr></thead><tbody>`;
-  html += d.debtors.length ? d.debtors.map(c => `<tr><td>${escHtml(c.name)}</td><td>${escHtml(c.phone)}</td><td class="num" style="color:#dc2626;font-weight:600">${peso(c.balance)}</td><td class="ctr">${escHtml(c.dueDate)}</td></tr>`).join('') : `<tr><td colspan="4">No outstanding balances</td></tr>`;
-  html += `</tbody></table>`;
+  if (d.openingSnap) {
+    html += `<table class="excel-table"><caption>Receivables — opening vs collected vs current (opening taken ${escHtml(fmtDate(d.openingSnap.takenAt))})</caption><thead><tr><th>Client</th><th class="num">Opening</th><th class="num">Paid (${escHtml(d.label)})</th><th class="num">Current</th></tr></thead><tbody>`;
+    html += d.collections.length ? d.collections.map(c => `<tr><td>${escHtml(c.name)}</td><td class="num">${peso(c.opening)}</td><td class="num" style="color:#059669;font-weight:600">${peso(c.paid)}</td><td class="num" style="color:#dc2626;font-weight:600">${peso(c.current)}</td></tr>`).join('') : `<tr><td colspan="4">No receivables movement</td></tr>`;
+    html += `<tr class="excel-total"><td>Total</td><td class="num">${peso(d.openingTotal)}</td><td class="num">${peso(d.paidTotal)}</td><td class="num">${peso(d.debtTotal)}</td></tr>`;
+    html += `</tbody></table>`;
+  } else {
+    html += `<table class="excel-table"><caption>Receivables — as of today (${peso(d.debtTotal)})</caption><thead><tr><th>Client</th><th>Phone</th><th class="num">Balance</th><th class="ctr">Due Date</th></tr></thead><tbody>`;
+    html += d.debtors.length ? d.debtors.map(c => `<tr><td>${escHtml(c.name)}</td><td>${escHtml(c.phone)}</td><td class="num" style="color:#dc2626;font-weight:600">${peso(c.balance)}</td><td class="ctr">${escHtml(c.dueDate)}</td></tr>`).join('') : `<tr><td colspan="4">No outstanding balances</td></tr>`;
+    html += `</tbody></table>`;
+    html += `<p class="text-xs text-gray-400 mt-2">No opening snapshot exists for ${escHtml(d.label)} yet — snapshots start automatically from this version onward.</p>`;
+  }
 
   html += `<p class="text-xs text-gray-400 mt-2">Credit sales in ${escHtml(d.label)}: ${peso(d.creditSales)}. Balances above are live figures as of today, not month-end snapshots.</p>`;
   return html;
@@ -1259,9 +1322,9 @@ export async function exportMonthlyReportXlsx() {
     wsS['!cols'] = [{ wch: 22 }, { wch: 20 }];
   }
   X.utils.book_append_sheet(wb, wsS, 'Summary');
-  const sheet = (title, headers, rows, numCols = [], centerCols = []) => {
+  const sheet = (title, headers, rows, numCols = [], centerCols = [], totalRow = null) => {
     const ws = X.utils.aoa_to_sheet([[title], headers, ...rows]);
-    styleXlsxTable(X, ws, { title, titleRow: 0, headerRow: 1, nDataRows: rows.length, nCols: headers.length, numCols, centerCols });
+    styleXlsxTable(X, ws, { title, titleRow: 0, headerRow: 1, nDataRows: rows.length, nCols: headers.length, numCols, centerCols, totalRow });
     ws['!cols'] = xlsxColWidths(headers, rows, title);
     return ws;
   };
@@ -1275,6 +1338,10 @@ export async function exportMonthlyReportXlsx() {
     d.topItems.map(i => [i.name, i.qty, i.amount]), [1, 2], []), 'Top Items');
   X.utils.book_append_sheet(wb, sheet(`${d.label} — Top Clients`, ['Client', 'Spent', 'Sales'],
     d.topClients.map(c => [c.name, c.spent, c.txns]), [1, 2], []), 'Top Clients');
+  const recRows = d.collections.map(c => [c.name, c.opening, c.paid, c.current]);
+  recRows.push(['TOTAL', d.openingTotal, d.paidTotal, d.debtTotal]);
+  X.utils.book_append_sheet(wb, sheet(`${d.label} — Receivables`, ['Client', 'Opening', 'Paid', 'Current'],
+    recRows, [1, 2, 3], [], recRows.length - 1), 'Receivables');
   X.writeFile(wb, `Monthly_Report_${monthKey}.xlsx`);
   toast('Monthly Excel report exported', 'success');
 }

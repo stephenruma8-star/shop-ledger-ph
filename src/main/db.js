@@ -20,7 +20,7 @@ const logger = require('./logger.js');
 let sqlite3 = null;
 try { sqlite3 = require('@journeyapps/sqlcipher'); } catch (e) { logger.error('sqlcipher unavailable: ' + e.message); }
 
-const STORES = ['clients','transactions','payments','inventory','quickItems','settings','auditLogs','users','expenses','suppliers','purchaseOrders','supplierPayments','notifications'];
+const STORES = ['clients','transactions','payments','inventory','quickItems','settings','auditLogs','users','expenses','suppliers','purchaseOrders','supplierPayments','notifications','balanceSnapshots'];
 
 // Versioned schema migrations. Baseline (v1) is the current schema; future schema changes
 // (new stores, columns, indexes) add higher versions with idempotent steps. Each step runs

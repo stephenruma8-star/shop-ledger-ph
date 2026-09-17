@@ -1,5 +1,5 @@
 import { applyPermissions } from './auth.js'
-import { cfCart, cfRenderCart } from './clients.js'
+import { cfCart, cfRenderCart, ensureBalanceSnapshot } from './clients.js'
 import { completeUnlock, dbAdd, dbAll, dbPut, needDbPassword, openDB } from './database.js'
 import { closeModal, confirmModal, dismissSysNotif, escapeHtml, hashPassword, initConnIndicator, modal, playSound, pushSysNotif, startClock, toast } from './helpers.js'
 import { AppParticles } from './particles.js'
@@ -40,7 +40,7 @@ export function showUpdateProgress(msg = 'Starting download…') {
 window.__app = window.__app || {};
 if (window.electronAPI) {
   window.__app.getDBDump = async () => {
-    const stores = ['clients','transactions','payments','inventory','quickItems','settings','users','expenses','suppliers','purchaseOrders','supplierPayments','notifications','auditLogs'];
+    const stores = ['clients','transactions','payments','inventory','quickItems','settings','users','expenses','suppliers','purchaseOrders','supplierPayments','notifications','auditLogs','balanceSnapshots'];
     const results = await Promise.all(stores.map(s => dbAll(s).catch(() => [])));
     const dump = {};
     stores.forEach((s, i) => {
@@ -349,6 +349,8 @@ export async function boot() {
     }
     await seedIfEmpty();
     await loadAll();
+    // Month-opening balance snapshot (no-op when already taken or no clients yet).
+    ensureBalanceSnapshot().catch(() => {});
     const savedUser = sessionStorage.getItem('shopUser');
     if (savedUser) {
       try { state.user = JSON.parse(savedUser); } catch (e) { sessionStorage.removeItem('shopUser'); }

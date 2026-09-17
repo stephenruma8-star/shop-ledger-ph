@@ -496,9 +496,7 @@ export async function doSaveTransaction() {
     playSound('sale');
     await logAudit('sale', `Sale ${invoiceNo} - ${peso(grandTotal)}`);
     if (clientId) {
-      const pointsPerPesoSetting = state.settings.find(s => s.key === 'pointsPerPeso');
-      const pointsPerPeso = pointsPerPesoSetting ? parseFloat(pointsPerPesoSetting.value) || 1 : 1;
-      const earnedPoints = Math.floor(grandTotal * pointsPerPeso);
+      const earnedPoints = calcLoyaltyPoints(grandTotal);
       if (earnedPoints > 0) {
         const c = await dbGet('clients', clientId);
         if (c) {
@@ -516,6 +514,14 @@ export async function doSaveTransaction() {
   if (window.electronAPI) window.electronAPI.signalLanUpdate();
   closeModal();
   renderTxTable();
+}
+
+// Loyalty points earned for a purchase amount, per the pointsPerPeso setting
+// (default 1 point per peso). Pure and unit-testable.
+export function calcLoyaltyPoints(amount) {
+  const pointsPerPesoSetting = state.settings.find(s => s.key === 'pointsPerPeso');
+  const pointsPerPeso = pointsPerPesoSetting ? parseFloat(pointsPerPesoSetting.value) || 1 : 1;
+  return Math.floor((Number(amount) || 0) * pointsPerPeso);
 }
 
 export function buildReceiptHTML(t) {
@@ -818,14 +824,23 @@ export async function confirmReturn(id) {
   await doReturn(orig, returnItems, { reason, refundMethod, notes });
 }
 
+export function normalizeReturnLine(i) {
+  const q = getQty(i.name || i.qty || '1');
+  const nm = String(i.name ?? i.qty ?? '1');
+  return { ...i, name: nm.startsWith('-') ? nm : '-' + nm, qty: -Math.abs(q) };
+}
+
 export function buildReturnTxn(orig, returnItems, opts = {}) {
   if (typeof opts === 'string') opts = { reason: opts };
-  const retTotal = round2(returnItems.reduce((s, i) => s + (getQty(i.name || i.qty || '1') * (i.unitCost || i.price || 0)), 0));
+  // Return lines are always negative: stock math (adjustStock/undoSale) and totals
+  // depend on the sign convention, so positive-qty input is normalized, never trusted.
+  const lines = (returnItems || []).map(normalizeReturnLine);
+  const retTotal = round2(lines.reduce((s, i) => s + (getQty(i.name) * (i.unitCost || i.price || 0)), 0));
   return {
     invoiceNo: (orig.invoiceNo || '') + '-R',
     clientId: orig.clientId,
     clientName: orig.clientName,
-    items: returnItems,
+    items: lines,
     subtotal: retTotal,
     totalInterest: 0,
     discount: 0,
@@ -845,10 +860,12 @@ export function buildReturnTxn(orig, returnItems, opts = {}) {
 
 export async function doReturn(orig, returnItems, opts = {}) {
   if (!returnItems.length) { toast('Select at least one item to return', 'warning'); return; }
-  for (const item of returnItems) {
-    if (item.invId) await adjustStock(item.invId, item, 1);
+  const lines = returnItems.map(normalizeReturnLine);
+  // Lines are negative-qty, so delta -1 ADDS the units back to stock.
+  for (const item of lines) {
+    if (item.invId) await adjustStock(item.invId, item, -1);
   }
-  const retTxn = buildReturnTxn(orig, returnItems, opts);
+  const retTxn = buildReturnTxn(orig, lines, opts);
   const retTotal = retTxn.grandTotal || 0;
   if (wasBalanceAdded(orig)) {
     const c = await dbGet('clients', orig.clientId);
@@ -1062,6 +1079,9 @@ Object.defineProperties(window, {
   saveTransaction: { get: () => saveTransaction, configurable: true },
   doSaveTransaction: { get: () => doSaveTransaction, configurable: true },
   isDuplicateTx: { get: () => isDuplicateTx, configurable: true },
+  checkDuplicateSale: { get: () => isDuplicateTx, configurable: true },
+  normalizeReturnLine: { get: () => normalizeReturnLine, configurable: true },
+  calcLoyaltyPoints: { get: () => calcLoyaltyPoints, configurable: true },
   linkCartToInventory: { get: () => linkCartToInventory, configurable: true },
   undoSale: { get: () => undoSale, configurable: true },
   wasBalanceAdded: { get: () => wasBalanceAdded, configurable: true },

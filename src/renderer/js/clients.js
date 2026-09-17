@@ -5,6 +5,29 @@ import { escHtml, excelTableCss, openPrintWindow } from './printLayout.js'
 import { fmtDate, fmtDateTime, now, peso, state, today } from './state.js'
 import { adjustStock, getQty, resolveInvIds, undoSale } from './transactions.js'
 
+// Month-opening balance snapshots: one record per month capturing every client's
+// balance the first time the app runs that month. Powers historical receivables
+// (opening vs collected vs current) in the monthly report. Never backfilled:
+// months before this feature simply have no snapshot.
+export async function ensureBalanceSnapshot() {
+  const monthKey = today().slice(0, 7);
+  const existing = (state.balanceSnapshots || []).find(s => s.month === monthKey);
+  if (existing) return existing;
+  if (!state.clients || state.clients.length === 0) return null;
+  const snap = {
+    month: monthKey,
+    takenAt: now(),
+    balances: state.clients.map(c => ({ id: c.id, balance: c.balance || 0 }))
+  };
+  snap.id = await dbAdd('balanceSnapshots', snap);
+  state.balanceSnapshots = await dbAll('balanceSnapshots');
+  return snap;
+}
+
+export function getBalanceSnapshot(monthKey) {
+  return (state.balanceSnapshots || []).find(s => s.month === monthKey) || null;
+}
+
 export async function viewClients(root) {
   state.clients = await dbAll('clients');
   root.innerHTML = `
@@ -643,5 +666,7 @@ Object.defineProperties(window, {
   exportAllClientsCSV: { get: () => exportAllClientsCSV, configurable: true },
   redeemClientPoints: { get: () => redeemClientPoints, configurable: true },
   confirmRedeemPoints: { get: () => confirmRedeemPoints, configurable: true },
-  printClientStatement: { get: () => printClientStatement, configurable: true }
+  printClientStatement: { get: () => printClientStatement, configurable: true },
+  ensureBalanceSnapshot: { get: () => ensureBalanceSnapshot, configurable: true },
+  getBalanceSnapshot: { get: () => getBalanceSnapshot, configurable: true }
 });

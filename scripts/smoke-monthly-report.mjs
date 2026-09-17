@@ -136,6 +136,22 @@ try {
   ok(d.topItems.length === 1 && d.topItems[0].name === 'Coke 500ml' && d.topItems[0].qty === 2, 'top items aggregates qty');
   ok(d.topClients[0].name === 'Maria Santos' && d.topClients[0].spent === 250, 'top client Maria 250');
   ok(d.debtors.length === 1 && d.debtTotal === 200, 'live debtor balance carried with as-of-today note');
+  const mRow = d.collections.find(r => r.name === 'Maria Santos');
+  ok(mRow && mRow.opening === 0 && mRow.paid === 50 && mRow.current === 200, 'collections merges name-only payment into client row');
+  ok(d.collections.filter(r => r.name === 'Maria Santos').length === 1, 'no duplicate client rows');
+
+  // --- opening snapshots ---
+  const nowKey = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0');
+  const snap1 = await win.ensureBalanceSnapshot();
+  ok(snap1 && snap1.month === nowKey, 'snapshot recorded for current month');
+  const snapCount = (await win.dbAll('balanceSnapshots')).length;
+  await win.ensureBalanceSnapshot();
+  ok((await win.dbAll('balanceSnapshots')).length === snapCount, 'snapshot is idempotent within a month');
+  ok(win.getBalanceSnapshot(nowKey) && win.getBalanceSnapshot(nowKey).balances.some(b => b.balance === 200), 'snapshot captured Maria balance 200');
+  const dNow = win.monthlyReportData(nowKey);
+  ok(dNow.openingTotal === 200, 'report opening total 200 from snapshot');
+  const mNow = dNow.collections.find(r => r.name === 'Maria Santos');
+  ok(mNow && mNow.opening === 200 && mNow.paid === 0 && mNow.current === 200, 'collections row: opening 200, paid 0, current 200');
 
   // --- modal HTML ---
   getEl('rep-month').value = '2025-01';
@@ -151,7 +167,13 @@ try {
   ok(printed.length === 1 && printed[0].includes('excel-table'), 'print output uses Excel-table styling');
   ok(printed[0].includes('January 2025'), 'print output titled for the month');
 
+  // --- modal with snapshot month shows opening columns ---
+  getEl('rep-month').value = nowKey;
+  await win.generateMonthlyReport();
+  ok(getEl('modal-root').innerHTML.includes('Opening'), 'modal shows opening columns when snapshot exists');
+
   // --- Excel export (stub engine: plain sheets, no styling crash) ---
+  getEl('rep-month').value = '2025-01';
   await win.exportMonthlyReportXlsx();
   ok(xlsxCalls.length === 1 && xlsxCalls[0].name === 'Monthly_Report_2025-01.xlsx', 'monthly xlsx downloaded with month filename');
 

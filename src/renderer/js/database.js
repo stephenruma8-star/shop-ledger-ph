@@ -1,10 +1,10 @@
 export const DB_NAME = 'ShopLedgerPH';
-export const DB_VERSION = 4;
+export const DB_VERSION = 5;
 export const SCHEMA_VERSION = 1;
 export let db = null;
 export let sqlite = null;
 
-const STORES = ['clients','transactions','payments','inventory','quickItems','settings','auditLogs','users','expenses','suppliers','purchaseOrders','supplierPayments','notifications'];
+const STORES = ['clients','transactions','payments','inventory','quickItems','settings','auditLogs','users','expenses','suppliers','purchaseOrders','supplierPayments','notifications','balanceSnapshots'];
 
 const MIGRATIONS = [
   { version: 1, name: 'initial schema', up: async (dbApi) => { /* tables created on init */ } },

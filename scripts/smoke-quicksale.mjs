@@ -357,6 +357,15 @@ try {
   await win.undoSale(await win.dbGet('transactions', 1));
   eq((await win.dbGet('clients', cliId)).balance, 0, 'undo GCash sale reverses the added balance');
 
+  // --- returns restock inventory (positive-qty input normalized to negative lines) ---
+  const stockBeforeRet = (await win.dbGet('inventory', invId1)).stock;
+  await win.doReturn(await win.dbGet('transactions', 2), [{ description: 'Coke 500ml', name: '1', unitCost: 100, invId: invId1 }], { reason: 'defective' });
+  eq((await win.dbGet('inventory', invId1)).stock, stockBeforeRet + 1, 'return restocks 1 unit');
+  const retTx = (await win.dbAll('transactions')).find(t => t.status === 'return');
+  ok(!!retTx && retTx.grandTotal < 0, 'return recorded with negative total');
+  await win.undoSale(retTx);
+  eq((await win.dbGet('inventory', invId1)).stock, stockBeforeRet, 'undoing a return removes the restocked units');
+
   // --- daily interest writes an INT- ledger row per client ---
   const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
   await win.dbAdd('settings', { key: 'lastInterestDate', value: yesterday });

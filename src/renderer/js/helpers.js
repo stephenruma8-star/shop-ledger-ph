@@ -848,6 +848,7 @@ export async function runCloudBackup() {
     quickItems: state.quickItems, expenses: state.expenses,
     suppliers: state.suppliers, purchaseOrders: state.purchaseOrders,
     supplierPayments: state.supplierPayments || [],
+    balanceSnapshots: state.balanceSnapshots || [],
     notifications: state.notifications,
     auditLogs: state.auditLogs, users,
     settings: state.settings, exportedAt: now()

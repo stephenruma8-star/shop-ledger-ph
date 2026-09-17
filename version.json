@@ -1,5 +1,5 @@
 {
-    "version":  "3.20.0",
+    "version":  "3.21.0",
     "buildDate":  "2026-09-17T00:00:00.000Z",
-    "notes":  "Monthly report generator: pick any month, get revenue, sales, payments, expenses, top items/clients and receivables in one Excel-styled report with Print and Excel export."
+    "notes":  "Balance snapshots: month-opening receivables recorded automatically, collections vs opening in monthly reports; return restock fixed; e2e suite wired into tests."
 }

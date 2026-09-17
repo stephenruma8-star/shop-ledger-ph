@@ -282,7 +282,8 @@ const IMPORT_SCHEMA = {
   users: { username: 'string' },
   notifications: {},
   auditLogs: {},
-  settings: { key: 'string' }
+  settings: { key: 'string' },
+  balanceSnapshots: { month: 'string' }
 };
 const IMPORT_STORES = Object.keys(IMPORT_SCHEMA);
 
