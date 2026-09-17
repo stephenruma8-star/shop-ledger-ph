@@ -33,8 +33,19 @@ export async function viewReports(root) {
   const totalExpenses = rEx.reduce((s, e) => s + (e.amount || 0), 0);
   const netProfit = totalRevenue - totalCOGS - totalExpenses;
   const profitMargin = totalRevenue > 0 ? ((netProfit / totalRevenue) * 100).toFixed(1) : 0;
+  const repDefaultMonth = today().slice(0, 7);
   root.innerHTML = `
     <div class="space-y-4 fade-in">
+      <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm glass-card flex flex-wrap items-end gap-3">
+        <div>
+          <h3 class="font-bold text-lg">Monthly Report</h3>
+          <p class="text-xs text-gray-500">Pick any month — sales, payments, expenses, debts and top movers in one report.</p>
+        </div>
+        <div class="ml-auto flex items-end gap-2">
+          <div><label class="text-xs text-gray-500 block">Month</label><input id="rep-month" type="month" value="${repDefaultMonth}" class="px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
+          <button onclick="generateMonthlyReport()" class="px-4 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800 font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Generate Report</button>
+        </div>
+      </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border-l-4 stat-card border-green-500">
           <p class="text-xs text-gray-500 uppercase">Total Revenue</p>
@@ -1100,6 +1111,174 @@ export function showARAging() {
 }
 
 
+// --- Monthly report: pick any month, get the whole system in one report --------
+export function monthlyReportData(monthKey) {
+  const [y, m] = monthKey.split('-').map(Number);
+  const label = new Date(y, m - 1, 1).toLocaleDateString('en-PH', { month: 'long', year: 'numeric' });
+  const txs = (state.transactions || []).filter(t => (t.date || '').startsWith(monthKey) && t.status !== 'voided' && t.status !== 'interest');
+  const sales = txs.filter(t => t.status !== 'return');
+  const returns = txs.filter(t => t.status === 'return');
+  const pays = (state.payments || []).filter(p => (p.date || '').startsWith(monthKey));
+  const exps = (state.expenses || []).filter(e => (e.date || '').startsWith(monthKey));
+  const invCost = new Map((state.inventory || []).map(i => [i.id, i.costPrice || 0]));
+  const revenue = sales.reduce((s, t) => s + (t.grandTotal || 0), 0);
+  const refunds = returns.reduce((s, t) => s + Math.abs(t.grandTotal || 0), 0);
+  const cogs = cogsOf(sales, invCost);
+  const expTotal = exps.reduce((s, e) => s + (e.amount || 0), 0);
+  const payTotal = pays.reduce((s, p) => s + (p.amount || 0), 0);
+  const profit = revenue - cogs - expTotal;
+  const creditSales = sales.filter(t => (t.paymentMethod || 'Cash') !== 'Cash').reduce((s, t) => s + (t.grandTotal || 0), 0);
+  const itemAgg = {};
+  sales.forEach(t => (t.items || []).forEach(it => {
+    const name = it.description || it.name || 'Item';
+    const mq = String(it.name || it.qty || '1').match(/^-?[\d.]+/);
+    const qty = mq ? parseFloat(mq[0]) : 1;
+    const amt = it.amount || (it.unitCost || 0) * qty;
+    if (!itemAgg[name]) itemAgg[name] = { name, qty: 0, amount: 0 };
+    itemAgg[name].qty += qty;
+    itemAgg[name].amount += amt;
+  }));
+  const topItems = Object.values(itemAgg).sort((a, b) => b.amount - a.amount).slice(0, 10);
+  const cliAgg = {};
+  sales.forEach(t => {
+    const name = t.clientName || 'Walk-in';
+    if (!cliAgg[name]) cliAgg[name] = { name, spent: 0, txns: 0 };
+    cliAgg[name].spent += t.grandTotal || 0;
+    cliAgg[name].txns += 1;
+  });
+  const topClients = Object.values(cliAgg).sort((a, b) => b.spent - a.spent).slice(0, 10);
+  // Balances are live state, so debtors are always "as of today", never month-end.
+  const debtors = (state.clients || []).filter(c => (c.balance || 0) > 0)
+    .sort((a, b) => (b.balance || 0) - (a.balance || 0))
+    .map(c => ({ name: c.name, phone: c.phone || '', balance: c.balance || 0, dueDate: c.dueDate || '' }));
+  const debtTotal = debtors.reduce((s, c) => s + c.balance, 0);
+  return { monthKey, label, sales, returns, pays, exps, revenue, refunds, cogs, expTotal, payTotal, profit, creditSales, topItems, topClients, debtors, debtTotal };
+}
+
+export function monthlyReportHtml(d) {
+  // Print-safe stat cards (plain CSS, no Tailwind dependency) so the modal and
+  // the print window render identically.
+  const stat = (label, val, color) => `
+    <div class="stat" style="border-left-color:${color}">
+      <span class="lbl">${label}</span>
+      <span class="val" style="color:${color}">${peso(val)}</span>
+    </div>`;
+  let html = `<div class="excel-sheet-head"><div class="excel-sheet-title">Monthly Report — ${escHtml(d.label)}</div>
+    <div class="excel-sheet-sub">Generated ${fmtDateTime(now())}</div></div>`;
+  html += `<div class="excel-stats">`;
+  html += stat('Revenue', d.revenue, '#059669') + stat('Refunds', d.refunds, '#c026d3') + stat('Cost of Goods', d.cogs, '#d97706');
+  html += stat('Expenses', d.expTotal, '#dc2626') + stat('Net Profit', d.profit, d.profit >= 0 ? '#2563eb' : '#dc2626') + stat('Collected', d.payTotal, '#0d9488');
+  html += `</div>`;
+
+  html += `<table class="excel-table"><caption>Sales (${d.sales.length})</caption><thead><tr><th>Invoice</th><th>Date</th><th>Client</th><th class="ctr">Items</th><th class="num">Total</th><th>Payment</th><th class="ctr">Status</th></tr></thead><tbody>`;
+  html += d.sales.length ? d.sales.map(t => `<tr><td>${escHtml(t.invoiceNo || '')}</td><td>${escHtml(t.date ? fmtDate(t.date) : '')}</td><td>${escHtml(t.clientName || 'Walk-in')}</td><td class="ctr">${(t.items || []).length}</td><td class="num">${peso(t.grandTotal)}</td><td>${escHtml(t.paymentMethod || '')}</td><td class="ctr">${escHtml(t.status || '')}</td></tr>`).join('') : `<tr><td colspan="7">No sales recorded in ${escHtml(d.label)}</td></tr>`;
+  html += `</tbody></table>`;
+
+  if (d.returns.length) {
+    html += `<table class="excel-table"><caption>Returns &amp; Refunds (${d.returns.length})</caption><thead><tr><th>Invoice</th><th>Date</th><th>Client</th><th class="num">Amount</th></tr></thead><tbody>`;
+    html += d.returns.map(t => `<tr><td>${escHtml(t.invoiceNo || '')}</td><td>${escHtml(t.date ? fmtDate(t.date) : '')}</td><td>${escHtml(t.clientName || 'Walk-in')}</td><td class="num">-${peso(Math.abs(t.grandTotal || 0))}</td></tr>`).join('');
+    html += `</tbody></table>`;
+  }
+
+  html += `<table class="excel-table"><caption>Payments Collected (${d.pays.length}) — ${peso(d.payTotal)}</caption><thead><tr><th>Date</th><th>Client</th><th class="num">Amount</th><th>Type</th></tr></thead><tbody>`;
+  html += d.pays.length ? d.pays.map(p => `<tr><td>${escHtml(p.date ? fmtDate(p.date) : '')}</td><td>${escHtml(p.clientName || '')}</td><td class="num" style="color:#059669;font-weight:600">${peso(p.amount)}</td><td>${escHtml(p.type || '')}</td></tr>`).join('') : `<tr><td colspan="4">No payments recorded in ${escHtml(d.label)}</td></tr>`;
+  html += `</tbody></table>`;
+
+  html += `<table class="excel-table"><caption>Expenses (${d.exps.length}) — ${peso(d.expTotal)}</caption><thead><tr><th>Date</th><th>Category</th><th>Description</th><th class="num">Amount</th></tr></thead><tbody>`;
+  html += d.exps.length ? d.exps.map(e => `<tr><td>${escHtml(e.date ? fmtDate(e.date) : '')}</td><td>${escHtml(e.category || '')}</td><td>${escHtml(e.description || '')}</td><td class="num">${peso(e.amount)}</td></tr>`).join('') : `<tr><td colspan="4">No expenses recorded in ${escHtml(d.label)}</td></tr>`;
+  html += `</tbody></table>`;
+
+  html += `<table class="excel-table"><caption>Top Items</caption><thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Amount</th></tr></thead><tbody>`;
+  html += d.topItems.length ? d.topItems.map(i => `<tr><td>${escHtml(i.name)}</td><td class="num">${i.qty}</td><td class="num">${peso(i.amount)}</td></tr>`).join('') : `<tr><td colspan="3">No item sales in ${escHtml(d.label)}</td></tr>`;
+  html += `</tbody></table>`;
+
+  html += `<table class="excel-table"><caption>Top Clients</caption><thead><tr><th>Client</th><th class="num">Spent</th><th class="ctr">Sales</th></tr></thead><tbody>`;
+  html += d.topClients.length ? d.topClients.map(c => `<tr><td>${escHtml(c.name)}</td><td class="num">${peso(c.spent)}</td><td class="ctr">${c.txns}</td></tr>`).join('') : `<tr><td colspan="3">No client sales in ${escHtml(d.label)}</td></tr>`;
+  html += `</tbody></table>`;
+
+  html += `<table class="excel-table"><caption>Receivables — as of today (${peso(d.debtTotal)})</caption><thead><tr><th>Client</th><th>Phone</th><th class="num">Balance</th><th class="ctr">Due Date</th></tr></thead><tbody>`;
+  html += d.debtors.length ? d.debtors.map(c => `<tr><td>${escHtml(c.name)}</td><td>${escHtml(c.phone)}</td><td class="num" style="color:#dc2626;font-weight:600">${peso(c.balance)}</td><td class="ctr">${escHtml(c.dueDate)}</td></tr>`).join('') : `<tr><td colspan="4">No outstanding balances</td></tr>`;
+  html += `</tbody></table>`;
+
+  html += `<p class="text-xs text-gray-400 mt-2">Credit sales in ${escHtml(d.label)}: ${peso(d.creditSales)}. Balances above are live figures as of today, not month-end snapshots.</p>`;
+  return html;
+}
+
+function monthlyReportMonthKey() {
+  const v = document.getElementById('rep-month')?.value || today().slice(0, 7);
+  return /^\d{4}-\d{2}$/.test(v) ? v : today().slice(0, 7);
+}
+
+async function monthlyReportLoad() {
+  await Promise.all([dbLoad('transactions'), dbLoad('payments'), dbLoad('expenses'), dbLoad('inventory'), dbLoad('clients')]);
+}
+
+export async function generateMonthlyReport() {
+  const monthKey = monthlyReportMonthKey();
+  await monthlyReportLoad();
+  const d = monthlyReportData(monthKey);
+  modal(`<div class="p-4">
+    <div class="flex justify-between items-center mb-3">
+      <h3 class="text-xl font-bold">Monthly Report — ${escHtml(d.label)}</h3>
+      <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="flex gap-2 mb-4">
+      <button onclick="printMonthlyReport()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2 2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2-2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print</button>
+      <button onclick="exportMonthlyReportXlsx()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Excel</button>
+    </div>
+    ${monthlyReportHtml(d)}
+  </div>`);
+}
+
+export async function printMonthlyReport() {
+  const monthKey = monthlyReportMonthKey();
+  await monthlyReportLoad();
+  const d = monthlyReportData(monthKey);
+  openPrintWindow(`Monthly Report — ${d.label}`, 1100, 800, monthlyReportHtml(d));
+}
+
+export async function exportMonthlyReportXlsx() {
+  const X = window.XLSX;
+  if (!X || !X.utils || typeof X.writeFile !== 'function') { toast('Excel library not loaded', 'error'); return; }
+  const monthKey = monthlyReportMonthKey();
+  await monthlyReportLoad();
+  const d = monthlyReportData(monthKey);
+  const wb = X.utils.book_new();
+  const sumPairs = [['Revenue', d.revenue], ['Refunds', -d.refunds], ['Cost of Goods', d.cogs], ['Expenses', d.expTotal], ['Net Profit', d.profit], ['Payments Collected', d.payTotal], ['Credit Sales', d.creditSales]];
+  const wsS = X.utils.aoa_to_sheet([[`${d.label} — Summary`], ...sumPairs]);
+  if (wsS && xlsxCanStyle(X)) {
+    wsS['A1'].s = { font: { name: 'Calibri', sz: 14, bold: true, color: { rgb: XL_GREEN } }, alignment: { horizontal: 'center' } };
+    wsS['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }];
+    sumPairs.forEach((_, i) => {
+      const r = i + 1;
+      const label = X.utils.encode_cell({ r, c: 0 });
+      const val = X.utils.encode_cell({ r, c: 1 });
+      if (wsS[label]) wsS[label].s = { font: { name: 'Calibri', sz: 11, bold: true }, border: xlThinBorder() };
+      if (wsS[val]) { wsS[val].s = { font: { name: 'Calibri', sz: 11 }, alignment: { horizontal: 'right' }, border: xlThinBorder() }; wsS[val].z = '#,##0.00'; }
+    });
+    wsS['!cols'] = [{ wch: 22 }, { wch: 20 }];
+  }
+  X.utils.book_append_sheet(wb, wsS, 'Summary');
+  const sheet = (title, headers, rows, numCols = [], centerCols = []) => {
+    const ws = X.utils.aoa_to_sheet([[title], headers, ...rows]);
+    styleXlsxTable(X, ws, { title, titleRow: 0, headerRow: 1, nDataRows: rows.length, nCols: headers.length, numCols, centerCols });
+    ws['!cols'] = xlsxColWidths(headers, rows, title);
+    return ws;
+  };
+  X.utils.book_append_sheet(wb, sheet(`${d.label} — Sales`, ['Invoice', 'Date', 'Client', 'Items', 'Total', 'Payment', 'Status'],
+    d.sales.map(t => [t.invoiceNo || '', t.date ? fmtDate(t.date) : '', t.clientName || 'Walk-in', (t.items || []).length, t.grandTotal || 0, t.paymentMethod || '', t.status || '']), [4], [1, 5, 6]), 'Sales');
+  X.utils.book_append_sheet(wb, sheet(`${d.label} — Payments`, ['Date', 'Client', 'Amount', 'Type'],
+    d.pays.map(p => [p.date ? fmtDate(p.date) : '', p.clientName || '', p.amount || 0, p.type || '']), [2], [0, 3]), 'Payments');
+  X.utils.book_append_sheet(wb, sheet(`${d.label} — Expenses`, ['Date', 'Category', 'Description', 'Amount'],
+    d.exps.map(e => [e.date ? fmtDate(e.date) : '', e.category || '', e.description || '', e.amount || 0]), [3], [0]), 'Expenses');
+  X.utils.book_append_sheet(wb, sheet(`${d.label} — Top Items`, ['Item', 'Qty', 'Amount'],
+    d.topItems.map(i => [i.name, i.qty, i.amount]), [1, 2], []), 'Top Items');
+  X.utils.book_append_sheet(wb, sheet(`${d.label} — Top Clients`, ['Client', 'Spent', 'Sales'],
+    d.topClients.map(c => [c.name, c.spent, c.txns]), [1, 2], []), 'Top Clients');
+  X.writeFile(wb, `Monthly_Report_${monthKey}.xlsx`);
+  toast('Monthly Excel report exported', 'success');
+}
+
 // expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
 Object.defineProperties(window, {
   viewReports: { get: () => viewReports, configurable: true },
@@ -1127,5 +1306,10 @@ Object.defineProperties(window, {
   exportBIR2551Q: { get: () => exportBIR2551Q, configurable: true },
   showInventoryValuation: { get: () => showInventoryValuation, configurable: true },
   exportFormattedXlsx: { get: () => exportFormattedXlsx, configurable: true },
-  exportLandscapePdf: { get: () => exportLandscapePdf, configurable: true }
+  exportLandscapePdf: { get: () => exportLandscapePdf, configurable: true },
+  monthlyReportData: { get: () => monthlyReportData, configurable: true },
+  monthlyReportHtml: { get: () => monthlyReportHtml, configurable: true },
+  generateMonthlyReport: { get: () => generateMonthlyReport, configurable: true },
+  printMonthlyReport: { get: () => printMonthlyReport, configurable: true },
+  exportMonthlyReportXlsx: { get: () => exportMonthlyReportXlsx, configurable: true }
 });

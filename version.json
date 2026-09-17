@@ -1,5 +1,5 @@
 {
-    "version":  "3.19.1",
+    "version":  "3.20.0",
     "buildDate":  "2026-09-17T00:00:00.000Z",
-    "notes":  "Bug-fix round from full test audit: duplicate-sale guard no longer freezes the save, Excel export degrades gracefully without styling APIs, toast/particles hardened, legacy return-reason calls work again."
+    "notes":  "Monthly report generator: pick any month, get revenue, sales, payments, expenses, top items/clients and receivables in one Excel-styled report with Print and Excel export."
 }

@@ -85,7 +85,11 @@ table.excel-table{width:100%;border-collapse:collapse;background:#fff;font-famil
 .excel-table tbody tr:nth-child(even) td{background:#E2EFDA}
 .excel-table tbody tr.excel-total td{font-weight:700;border-top:2px solid #217346;background:#fff}
 .excel-table td.num,.excel-table th.num{text-align:right;font-variant-numeric:tabular-nums}
-.excel-table td.ctr,.excel-table th.ctr{text-align:center}`;
+.excel-table td.ctr,.excel-table th.ctr{text-align:center}
+.excel-stats{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.excel-stats .stat{flex:1;min-width:120px;background:#fff;border:1px solid #BFBFBF;border-left:4px solid #217346;border-radius:6px;padding:10px 14px}
+.excel-stats .stat .lbl{font-family:Calibri,'Segoe UI',Arial,sans-serif;font-size:10px;text-transform:uppercase;color:#595959}
+.excel-stats .stat .val{font-family:Calibri,'Segoe UI',Arial,sans-serif;font-size:16pt;font-weight:700;display:block;margin-top:2px}`;
 }
 
 export function printToolbar(activeSize) {
