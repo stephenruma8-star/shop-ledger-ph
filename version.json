@@ -1,5 +1,5 @@
 {
-    "version":  "3.22.0",
+    "version":  "3.22.1",
     "buildDate":  "2026-09-17T00:00:00.000Z",
-    "notes":  "Phone pairing without QR: 6-digit codes, type-once .local address, installable app prompt, auto re-pair on expired sessions."
+    "notes":  "Fixes v3.22.0 launch crash (missing packaged module). Phone pairing without QR included."
 }

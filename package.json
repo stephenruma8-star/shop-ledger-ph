@@ -1,6 +1,6 @@
 {
     "name": "shop-ledger-ph",
-    "version": "3.22.0",
+    "version": "3.22.1",
     "description": "Shop Ledger PH - Complete POS & Inventory System for Philippine Sari-Sari Stores",
     "repository": "stephenruma8-star/shop-ledger-ph",
     "main": "out/main/index.js",
@@ -13,7 +13,7 @@
         "rebuild:electron": "node scripts/rebuild-electron-abi.mjs",
         "lint": "node scripts/lint.mjs && eslint . && npm run typecheck",
         "typecheck": "tsc --noEmit -p tsconfig.json",
-        "test": "npm run lint && npm run build && node scripts/smoke.mjs && node scripts/smoke-validation.mjs && node scripts/smoke-mobile.mjs && node scripts/smoke-mobilepage.mjs && node scripts/test-pairing.mjs && node scripts/smoke-strict-idb.mjs && node scripts/smoke-quicksale.mjs && node scripts/smoke-onboarding.mjs && node scripts/smoke-monthly-report.mjs && node scripts/sqlite-node-abi.mjs && node scripts/smoke-sqlite.mjs && node scripts/smoke-backups.mjs && node scripts/smoke-lan-api.mjs && node scripts/smoke-logger.mjs && node scripts/test-e2e.mjs",
+        "test": "npm run lint && npm run build && node scripts/smoke-packaging.mjs && node scripts/smoke.mjs && node scripts/smoke-validation.mjs && node scripts/smoke-mobile.mjs && node scripts/smoke-mobilepage.mjs && node scripts/test-pairing.mjs && node scripts/smoke-strict-idb.mjs && node scripts/smoke-quicksale.mjs && node scripts/smoke-onboarding.mjs && node scripts/smoke-monthly-report.mjs && node scripts/sqlite-node-abi.mjs && node scripts/smoke-sqlite.mjs && node scripts/smoke-backups.mjs && node scripts/smoke-lan-api.mjs && node scripts/smoke-logger.mjs && node scripts/test-e2e.mjs",
         "prepare": "husky",
         "audit": "npm audit --omit=dev",
         "audit:fix": "npm audit fix --omit=dev"
