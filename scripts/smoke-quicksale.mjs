@@ -283,6 +283,17 @@ try {
   eq(inv1c.stock, 6, 'item1 stock 7 -> 6');
   eq(inv2c.stock, 1, 'item2 stock 2 -> 1');
 
+  // --- duplicate guard: same walk-in item within 5 minutes is flagged ---
+  ok(typeof win.isDuplicateTx === 'function', 'isDuplicateTx exposed for duplicate detection');
+  const tx2sig = tx2.items.map(i => ({ description: i.description, name: i.name, unitCost: i.unitCost }));
+  ok(win.isDuplicateTx(tx2sig, null) === true, 'duplicate guard flags same walk-in item within 5 minutes');
+  ok(win.isDuplicateTx(tx2sig, cliId) === false, 'duplicate guard ignores a different client');
+  ok(win.isDuplicateTx([{ description: 'No Such Item', name: '1', unitCost: 99999 }], null) === false, 'duplicate guard ignores different items');
+  // Backdate state copies so later same-item saves below don't trip the 5-minute
+  // guard (its confirm modal has no clicker in this harness). DB rows untouched.
+  function backdateStateTx() { const old = new Date(Date.now() - 600000).toISOString(); win.state.transactions.forEach(t => { t.createdAt = old; }); }
+  backdateStateTx();
+
   // --- blank row: typed description auto-links to matching inventory item and deducts stock ---
   getEl('tm-client').options = [{ text: 'Walk-in' }];
   getEl('tm-client').selectedIndex = 0;
@@ -329,6 +340,7 @@ try {
   getEl('tm-sc').checked = false;
   getEl('tm-discount').value = '0';
   win.txCart = [{ date: new Date().toISOString().split('T')[0], description: 'Coke 500ml', name: '1', unitCost: 100, intRate: 0, invId: invId1 }];
+  backdateStateTx();
   await win.doSaveTransaction();
   const txCash = await win.dbGet('transactions', 7);
   eq(txCash.invoiceNo, 'INV-00007', 'cash sale invoice INV-00007');
@@ -357,6 +369,7 @@ try {
   win.qsUpd();
   getEl('qs-client').value = String(cliId);
   getEl('qs-payment').value = 'GCash';
+  backdateStateTx();
   await win.qsSell(false);
   win.state.transactions = await win.dbAll('transactions');
   win.state.clients = await win.dbAll('clients');

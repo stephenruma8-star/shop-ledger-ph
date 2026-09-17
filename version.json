@@ -1,5 +1,5 @@
 {
-    "version":  "3.19.0",
-    "buildDate":  "2026-09-16T00:00:00.000Z",
-    "notes":  "Excel-table design everywhere: client printouts, landscape PDFs and all Excel exports share one Calibri/green-gridband style; .xlsx now writes real cell styles via xlsx-js-style."
+    "version":  "3.19.1",
+    "buildDate":  "2026-09-17T00:00:00.000Z",
+    "notes":  "Bug-fix round from full test audit: duplicate-sale guard no longer freezes the save, Excel export degrades gracefully without styling APIs, toast/particles hardened, legacy return-reason calls work again."
 }

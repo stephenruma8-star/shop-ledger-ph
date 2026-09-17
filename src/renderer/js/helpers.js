@@ -377,9 +377,9 @@ export function toast(msg, type = 'info') {
   el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">${icons[type] || icons.info}</svg><span class="flex-1">${msg}</span><button class="toast-dismiss shrink-0 text-white/70 hover:text-white" aria-label="Dismiss" title="Dismiss"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button><div class="toast-progress" style="width:100%;transition-duration:${duration}ms"></div>`;
   el.querySelector('.toast-dismiss').onclick = () => _removeToast(el);
 
-  const insertBefore = c.querySelector('#dismiss-all-toasts');
-  if (insertBefore) c.insertBefore(el, insertBefore);
-  else c.appendChild(el);
+  const insertBefore = (typeof c.querySelector === 'function') ? c.querySelector('#dismiss-all-toasts') : null;
+  if (insertBefore && typeof c.insertBefore === 'function') c.insertBefore(el, insertBefore);
+  else if (typeof c.appendChild === 'function') c.appendChild(el);
 
   requestAnimationFrame(() => {
     const bar = el.querySelector('.toast-progress');

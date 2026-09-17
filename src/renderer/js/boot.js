@@ -439,7 +439,10 @@ export function initLoginParticles() {
     const ls = document.getElementById('login-screen');
     if (!ls) return;
     canvas.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;z-index:0;pointer-events:none;display:block';
-    if (!canvas.parentNode) ls.insertBefore(canvas, ls.firstChild);
+    if (!canvas.parentNode) {
+      if (typeof ls.insertBefore === 'function') ls.insertBefore(canvas, ls.firstChild);
+      else if (typeof ls.appendChild === 'function') ls.appendChild(canvas);
+    }
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     const W = window.innerWidth, H = window.innerHeight;

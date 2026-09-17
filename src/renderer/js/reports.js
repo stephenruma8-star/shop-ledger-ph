@@ -362,18 +362,20 @@ export async function exportXlsx() {
       ['Net Profit', netProfit], ['Outstanding Debts', totalUtang], ['Payments Collected', totalPayments]
     ]), 'Summary');
     {
-      const ws = wb.Sheets['Summary'];
-      ws['A1'].s = { font: { name: 'Calibri', sz: 14, bold: true, color: { rgb: XL_GREEN } }, alignment: { horizontal: 'center' } };
-      ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }];
-      ws['A2'].s = { font: { name: 'Calibri', sz: 10, italic: true, color: { rgb: '595959' } }, alignment: { horizontal: 'center' } };
-      ws['!merges'].push({ s: { r: 1, c: 0 }, e: { r: 1, c: 1 } });
-      for (let r = 2; r <= 8; r++) {
-        const label = X.utils.encode_cell({ r, c: 0 });
-        const val = X.utils.encode_cell({ r, c: 1 });
-        if (ws[label]) ws[label].s = { font: { name: 'Calibri', sz: 11, bold: true }, border: xlThinBorder() };
-        if (ws[val]) { ws[val].s = { font: { name: 'Calibri', sz: 11 }, alignment: { horizontal: 'right' }, border: xlThinBorder() }; ws[val].z = '#,##0.00'; }
+      const ws = wb.Sheets && wb.Sheets['Summary'];
+      if (ws && xlsxCanStyle(X)) {
+        ws['A1'].s = { font: { name: 'Calibri', sz: 14, bold: true, color: { rgb: XL_GREEN } }, alignment: { horizontal: 'center' } };
+        ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }];
+        ws['A2'].s = { font: { name: 'Calibri', sz: 10, italic: true, color: { rgb: '595959' } }, alignment: { horizontal: 'center' } };
+        ws['!merges'].push({ s: { r: 1, c: 0 }, e: { r: 1, c: 1 } });
+        for (let r = 2; r <= 8; r++) {
+          const label = X.utils.encode_cell({ r, c: 0 });
+          const val = X.utils.encode_cell({ r, c: 1 });
+          if (ws[label]) ws[label].s = { font: { name: 'Calibri', sz: 11, bold: true }, border: xlThinBorder() };
+          if (ws[val]) { ws[val].s = { font: { name: 'Calibri', sz: 11 }, alignment: { horizontal: 'right' }, border: xlThinBorder() }; ws[val].z = '#,##0.00'; }
+        }
+        ws['!cols'] = [{ wch: 22 }, { wch: 20 }];
       }
-      ws['!cols'] = [{ wch: 22 }, { wch: 20 }];
     }
 
     const sheet = (title, headers, rows, numCols = [], centerCols = []) => {
@@ -433,9 +435,16 @@ function xlThinBorder() {
 function xlFont(bold) {
   return { name: 'Calibri', sz: 11, bold: !!bold, color: { rgb: '000000' } };
 }
+// True only when the loaded XLSX engine supports the styling APIs (encode_cell,
+// encode_range). Partial shims (e.g. the smoke-test stub) get plain sheets instead
+// of a crash — styling is enhancement, never a hard requirement.
+function xlsxCanStyle(X) {
+  return !!(X && X.utils && typeof X.utils.encode_cell === 'function' && typeof X.utils.encode_range === 'function');
+}
 // opts: { title, titleRow=0, headerRow, nDataRows, nCols, numCols=[], centerCols=[],
 //         totalRow=null (data-row index to emphasize), headerBg }
 function styleXlsxTable(X, ws, opts) {
+  if (!xlsxCanStyle(X) || !ws) return;
   const { title, titleRow = 0, headerRow, nDataRows, nCols, numCols = [], centerCols = [], totalRow = null, headerBg = XL_GREEN } = opts;
   const border = xlThinBorder();
   if (title) {

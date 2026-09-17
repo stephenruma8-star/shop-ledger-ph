@@ -362,6 +362,26 @@ export async function undoSale(t) {
   }
 }
 
+// Pure duplicate detector: same client, same day, saved within the last 5 minutes,
+// identical line items. Kept side-effect free so it stays unit-testable; the modal
+// prompt lives in doSaveTransaction.
+export function isDuplicateTx(items, clientId) {
+  const recentTx = state.transactions.filter(t =>
+    t.clientId === clientId &&
+    t.date === today() &&
+    t.status !== 'voided' &&
+    t.createdAt && (Date.now() - new Date(t.createdAt).getTime()) < 300000
+  );
+  return recentTx.some(t => {
+    if ((t.items||[]).length !== items.length) return false;
+    return t.items.every((ti, i) =>
+      ti.description === items[i].description &&
+      ti.name === items[i].name &&
+      ti.unitCost === items[i].unitCost
+    );
+  });
+}
+
 export async function doSaveTransaction() {
   await linkCartToInventory();
   const subtotal = txCart.reduce((s, i) => s + lineSub(i), 0);
@@ -424,24 +444,9 @@ export async function doSaveTransaction() {
     const commissionAmountNew = round2(grandTotal * commissionRateNew / 100);
     const items = txCart.map(i => ({ date: i.date, description: i.description, name: i.name, unitCost: i.unitCost, intRate: i.intRate, amount: lineAmt(i), invId: i.invId, variantName: i.variantName }));
 
-    const recentTx = state.transactions.filter(t =>
-      t.clientId === clientId &&
-      t.date === today() &&
-      t.status !== 'voided' &&
-      t.createdAt && (Date.now() - new Date(t.createdAt).getTime()) < 300000
-    );
-    const isDuplicate = recentTx.some(t => {
-      if ((t.items||[]).length !== items.length) return false;
-      return t.items.every((ti, i) =>
-        ti.description === items[i].description &&
-        ti.name === items[i].name &&
-        ti.unitCost === items[i].unitCost
-      );
-    });
+    const isDuplicate = isDuplicateTx(items, clientId);
     if (isDuplicate) {
-      const proceed = await new Promise(resolve => {
-        confirmModal('Similar transaction found within 5 minutes. Continue?', resolve);
-      });
+      const proceed = await confirmModal('Similar transaction found within 5 minutes. Continue?', 'Proceed');
       if (!proceed) return;
     }
 
@@ -814,6 +819,7 @@ export async function confirmReturn(id) {
 }
 
 export function buildReturnTxn(orig, returnItems, opts = {}) {
+  if (typeof opts === 'string') opts = { reason: opts };
   const retTotal = round2(returnItems.reduce((s, i) => s + (getQty(i.name || i.qty || '1') * (i.unitCost || i.price || 0)), 0));
   return {
     invoiceNo: (orig.invoiceNo || '') + '-R',
@@ -1055,6 +1061,7 @@ Object.defineProperties(window, {
   autoApplyClientDiscount: { get: () => autoApplyClientDiscount, configurable: true },
   saveTransaction: { get: () => saveTransaction, configurable: true },
   doSaveTransaction: { get: () => doSaveTransaction, configurable: true },
+  isDuplicateTx: { get: () => isDuplicateTx, configurable: true },
   linkCartToInventory: { get: () => linkCartToInventory, configurable: true },
   undoSale: { get: () => undoSale, configurable: true },
   wasBalanceAdded: { get: () => wasBalanceAdded, configurable: true },

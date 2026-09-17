@@ -21,7 +21,7 @@ function makeEl(id) {
     classList: new TrackedClassList(),
     parentElement: sharedParent, parentNode: sharedParent,
     addEventListener: noop, removeEventListener: noop,
-    append: noop, appendChild: (el) => { if (id === 'toasts') toasts.push(el.textContent); },
+    append: noop, appendChild: (el) => { if (id === 'toasts') toasts.push(el.innerHTML || el.textContent); },
     remove: noop,
     querySelector: () => makeEl(), querySelectorAll: () => [],
     closest: () => makeEl(),
@@ -156,7 +156,7 @@ try {
   getEl('onb-name').value = '';
   await W.onbNext();
   if (modalRoot.innerHTML.includes('Receipt footer')) throw new Error('empty store name advanced the wizard');
-  if (toasts.filter(t => t === 'Enter your store name').length === 0) throw new Error('no warning toast for empty store name');
+  if (!toasts.some(t => (t || '').includes('Enter your store name'))) throw new Error('no warning toast for empty store name');
   if (writes.length !== writesBefore) throw new Error('settings written despite validation failure');
   console.log('PASS - empty store name blocked with warning toast, nothing written');
 
@@ -178,9 +178,10 @@ try {
   const footerWrite = writes.find(w => w.value && w.value.key === 'receiptFooter');
   if (footerWrite.value.value !== 'Thank you for your purchase!') throw new Error('receipt footer default not applied');
   if (!finalKeys.includes('onboardingDone')) throw new Error('onboardingDone not saved');
+  await new Promise(r => setTimeout(r, 250)); // allow the modal-exit animation to clear
   if (modalRoot.innerHTML !== '') throw new Error('wizard did not close on finish');
   if (writes.filter(w => w.value && w.value.key === undefined && w.store === 'auditLogs').length === 0) throw new Error('setup not audited');
-  if (toasts.filter(t => t === 'Store setup complete').length === 0) throw new Error('no success toast after setup');
+  if (!toasts.some(t => (t || '').includes('Store setup complete'))) throw new Error('no success toast after setup');
   console.log('PASS - finish saves receipt footer (default applied) + onboardingDone, audits, closes, toasts');
 
   console.log('ONBOARDING SMOKE OK: banner + wizard guards + step flow all verified');
