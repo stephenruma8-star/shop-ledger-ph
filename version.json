@@ -1,5 +1,5 @@
 {
-    "version":  "3.21.0",
+    "version":  "3.22.0",
     "buildDate":  "2026-09-17T00:00:00.000Z",
-    "notes":  "Balance snapshots: month-opening receivables recorded automatically, collections vs opening in monthly reports; return restock fixed; e2e suite wired into tests."
+    "notes":  "Phone pairing without QR: 6-digit codes, type-once .local address, installable app prompt, auto re-pair on expired sessions."
 }

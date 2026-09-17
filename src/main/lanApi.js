@@ -88,7 +88,21 @@ function createLanApiRouter(deps) {
   });
   
   router.use(rateLimit(deps.maxRatePerMin || 120));
-  
+
+  // Device pairing: exchanges a short-lived 6-digit code (shown on the desktop)
+  // for the LAN token. Intentionally unauthenticated; guarded by a tight per-IP
+  // rate limit plus code expiry and a 5-guess burn on the main-process side.
+  router.post('/api/pair', rateLimit(10), (req, res) => {
+    try {
+      if (typeof deps.redeemPairCode !== 'function') {
+        return res.status(503).json({ success: false, error: 'Pairing not available' });
+      }
+      const r = deps.redeemPairCode(req.body && req.body.code);
+      if (!r || !r.ok) return res.status(401).json({ success: false, error: (r && r.error) || 'Invalid or expired code' });
+      res.json({ success: true, token: r.token, wsPort: r.wsPort || deps.wsPort || 3458 });
+    } catch (err) { res.status(400).json({ success: false, error: 'Bad request' }); }
+  });
+
   router.use((req, res, next) => {
     if (req.path === '/api/health') return next();
     

@@ -182,7 +182,19 @@ export async function showMobileAccess() {
     modal(`
       <div class="p-6">
         <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">Mobile Access</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
-        <p class="text-sm text-gray-500 mb-3">Scan the QR with your phone camera. <strong>Network QR</strong> works on the same Wi-Fi — <strong>Anywhere QR</strong> works from any network (Tailscale).</p>
+        <div class="mb-4 p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-center">
+          <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">On your phone, open the shop address and enter this code — no QR scan needed</p>
+          <p id="pair-code" class="text-4xl font-mono font-bold tracking-[0.3em] text-blue-700 dark:text-blue-300">••••••</p>
+          <p id="pair-expiry" class="text-xs text-gray-400 mt-1">Fetching code…</p>
+          <button onclick="refreshPairCode()" class="mt-2 px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700">New code</button>
+        </div>
+        ${info.mdnsUrl ? `
+        <div class="flex gap-2 mb-1">
+          <input id="mobile-mdns-url" readonly value="${escapeHtml(info.mdnsUrl)}" onclick="this.select()" class="flex-1 px-3 py-2 border dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-sm font-mono" />
+          <button onclick="copyMobileUrl('mobile-mdns-url')" class="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 shrink-0">Copy</button>
+        </div>
+        <p class="text-xs text-center text-gray-400 mb-3">Type-once address — works on most shop Wi-Fi without typing IP numbers</p>` : ''}
+        <p class="text-sm text-gray-500 mb-3">Prefer QR? Scan with your phone camera. <strong>Network QR</strong> works on the same Wi-Fi — <strong>Anywhere QR</strong> works from any network (Tailscale).</p>
         <div class="flex justify-center mb-1"><img src="${info.qr}" alt="Network QR code" class="w-56 h-56 rounded-lg border dark:border-gray-700 bg-white p-2" /></div>
         <p class="text-xs text-center text-gray-400 mb-3">📶 Network QR — same Wi-Fi only</p>
         <div class="flex gap-2 mb-2">
@@ -203,11 +215,26 @@ export async function showMobileAccess() {
           <p>• Keep this app running — it hosts the mobile page on port 3456.</p>
           <p>• New phones: install Tailscale (free) and sign in to this account to use the Anywhere QR.</p>
           <p>• If the address is ever rejected, reopen this window and rescan to get the current code.</p>
+          <p>• Codes expire after 10 minutes and work once — hit New code for each phone.</p>
         </div>
       </div>`);
+    refreshPairCode();
   } catch (err) {
     toast('Mobile access failed: ' + err.message, 'error');
   }
+}
+
+export async function refreshPairCode() {
+  const codeEl = document.getElementById('pair-code');
+  const expEl = document.getElementById('pair-expiry');
+  if (!window.electronAPI?.createPairCode) { if (expEl) expEl.textContent = 'Desktop app only'; return; }
+  try {
+    const r = await window.electronAPI.createPairCode();
+    if (r && r.success && r.code) {
+      if (codeEl) codeEl.textContent = String(r.code).replace(/(\d{3})(\d{3})/, '$1 $2');
+      if (expEl) expEl.textContent = 'Valid for 10 minutes · single use';
+    } else if (expEl) expEl.textContent = 'Could not create code';
+  } catch (e) { if (expEl) expEl.textContent = 'Could not create code'; }
 }
 
 export async function copyMobileUrl(id) {
@@ -225,10 +252,10 @@ export async function copyMobileUrl(id) {
 
 export async function rotateLanToken() {
   if (!window.electronAPI?.rotateLanToken) return;
-  if (!await confirmModal('This will invalidate the current access code and disconnect all connected phones. Generate a fresh pair QR code?')) return;
+  if (!await confirmModal('This will invalidate the current access code and disconnect all connected phones. Generate a fresh pairing code?')) return;
   const res = await window.electronAPI.rotateLanToken();
   if (!res || !res.success) { toast('Token rotation failed', 'error'); return; }
-  toast('Access code rotated — phones must rescan the new QR', 'success');
+  toast('Access code rotated — phones must pair again with a fresh code', 'success');
   closeModal();
   showMobileAccess();
 }
@@ -525,6 +552,7 @@ Object.defineProperties(window, {
   seedIfEmpty: { get: () => seedIfEmpty, configurable: true },
   updateVersionBadge: { get: () => updateVersionBadge, configurable: true },
   showMobileAccess: { get: () => showMobileAccess, configurable: true },
+  refreshPairCode: { get: () => refreshPairCode, configurable: true },
   copyMobileUrl: { get: () => copyMobileUrl, configurable: true },
   rotateLanToken: { get: () => rotateLanToken, configurable: true },
   checkForNewBuild: { get: () => checkForNewBuild, configurable: true },

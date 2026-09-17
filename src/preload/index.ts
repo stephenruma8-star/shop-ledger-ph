@@ -33,6 +33,7 @@ const api = {
   sendSMS: (config: unknown): Promise<unknown> => ipcRenderer.invoke('send-sms', config),
   generateMobileQR: (): Promise<unknown> => ipcRenderer.invoke('generate-mobile-qr'),
   rotateLanToken: (): Promise<unknown> => ipcRenderer.invoke('rotate-lan-token'),
+  createPairCode: (): Promise<unknown> => ipcRenderer.invoke('create-pair-code'),
   importJsonDump: (dump: unknown): Promise<unknown> => ipcRenderer.invoke('import-json-dump', { dump }),
   getAppPreferences: (): Promise<unknown> => ipcRenderer.invoke('get-app-preferences'),
   setAppPreferences: (prefs: unknown): Promise<unknown> => ipcRenderer.invoke('set-app-preferences', prefs),

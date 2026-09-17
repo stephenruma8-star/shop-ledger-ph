@@ -439,6 +439,32 @@ try {
   ok(tail[0].body.description === 'Candles' && tail[1].body.items[0].description === 'Coke 500ml', 'replayed payloads intact');
   ok(gget('__queue().length') === 0 && getEl('pending-count').textContent === '0', 'queue and banner cleared after sync');
 
+  // ---- pairing without QR ----
+  gcall(`renderPairScreen()`);
+  ok(getEl('view').innerHTML.includes('pair-code') && getEl('view').innerHTML.includes('Connect this phone'), 'pair screen renders code entry');
+  getEl('pair-code').value = '12';
+  await gcall(`submitPairCode()`);
+  ok(getEl('pair-error').textContent.includes('6-digit'), 'short code rejected with guidance');
+  const realFetch = sandbox.fetch;
+  sandbox.fetch = async (url) => {
+    if (String(url).endsWith('/api/pair')) return { ok: true, json: async () => ({ success: true, token: 'paired-tok-1' }) };
+    return realFetch(url);
+  };
+  getEl('pair-code').value = '123456';
+  await gcall(`submitPairCode()`);
+  ok(storage.get('slpToken') === 'paired-tok-1', 'redeemed token persisted for future visits');
+  sandbox.fetch = async () => ({ ok: false, json: async () => ({ success: false, error: 'Wrong code' }) });
+  getEl('pair-code').value = '000000';
+  await gcall(`submitPairCode()`);
+  ok(getEl('pair-error').textContent.includes('Wrong code'), 'wrong code shows server message');
+  sandbox.fetch = realFetch;
+
+  // ---- install prompt wiring ----
+  gcall(`renderSettings()`);
+  await wait(20);
+  gcall(`updateInstallRow()`);
+  ok(getEl('install-hint').textContent.includes('Add to Home Screen'), 'install hint shown when no browser prompt');
+
   for (const t of timerIds) clearTimeout(t);
 
   if (failures === 0) {

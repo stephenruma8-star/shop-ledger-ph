@@ -86,6 +86,15 @@ function readAppPrefs() {
 }
 const _savedToken = readAppPrefs().lanToken;
 let _lanToken = _savedToken || crypto.randomBytes(24).toString('hex');
+// Short-lived pairing codes live in ./pairing.js (pure Node, unit-tested).
+const pairing = require('./pairing.js');
+pairing.configure({ getToken: () => _lanToken, wsPort: WS_PORT });
+function mdnsHostname() {
+  try {
+    const h = String(os.hostname() || '').toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/^-+|-+$/g, '');
+    return h ? h + '.local' : null;
+  } catch (e) { return null; }
+}
 if (!_savedToken) {
   try {
     const prefs = { ...readAppPrefs(), lanToken: _lanToken };
@@ -270,6 +279,22 @@ function checkForUpdates() {
   });
 }
 
+let bonjourSvc = null;
+function startMdns() {
+  try {
+    if (bonjourSvc) return;
+    const { Bonjour } = require('bonjour-service');
+    bonjourSvc = new Bonjour();
+    bonjourSvc.publish({ name: 'Shop Ledger PH', type: 'http', port: LAN_PORT, txt: { app: 'shop-ledger-ph', v: app.getVersion() } });
+    logger.info('mDNS published: Shop Ledger PH._http._tcp on port ' + LAN_PORT);
+  } catch (e) { logger.error('mDNS publish failed: ' + e.message); }
+}
+function stopMdns() {
+  try { if (bonjourSvc && typeof bonjourSvc.unpublishAll === 'function') bonjourSvc.unpublishAll(); } catch (e) {}
+  try { if (bonjourSvc && typeof bonjourSvc.destroy === 'function') bonjourSvc.destroy(); } catch (e) {}
+  bonjourSvc = null;
+}
+
 function startLANServer() {
   const expressApp = express();
   expressApp.use(cors());
@@ -312,7 +337,9 @@ function startLANServer() {
     logger,
     notify: (info) => notifyDataChanged(info),
     lanToken: _lanToken,
-    maxRatePerMin: config.MAX_RATE_PER_MIN
+    maxRatePerMin: config.MAX_RATE_PER_MIN,
+    redeemPairCode: (code) => pairing.redeemPairCode(code),
+    wsPort: WS_PORT
   }));
 
   expressApp.get('/api/health', (req, res) => res.json({ status: 'ok' }));
@@ -337,6 +364,7 @@ function startLANServer() {
     lanServer.listen(LAN_PORT, '0.0.0.0', () => {
       const url = `${protocol}://${getLocalIP()}:${LAN_PORT}`;
       logger.info('LAN server at ' + url);
+      startMdns();
     });
   } catch (e) { logger.error('LAN server error: ' + e.message); }
 }
@@ -649,6 +677,8 @@ ipcMain.handle('load-backup-file', async () => {
 ipcMain.handle('generate-mobile-qr', async () => {
   const protocol = (config.ENABLE_HTTPS && fs.existsSync(path.join(app.getPath('userData'), 'ssl', 'cert.pem')) && fs.existsSync(path.join(app.getPath('userData'), 'ssl', 'key.pem'))) ? 'https' : 'http';
   const url = `${protocol}://${getLocalIP()}:${LAN_PORT}?ws=${WS_PORT}&token=${_lanToken}`;
+  const mdns = mdnsHostname();
+  const mdnsUrl = mdns ? `${protocol}://${mdns}:${LAN_PORT}?ws=${WS_PORT}&token=${_lanToken}` : null;
   const qr = await QRCode.toDataURL(url, { width: 300 });
   const tsIp = getTailscaleIP();
   let tailscale = null;
@@ -656,12 +686,15 @@ ipcMain.handle('generate-mobile-qr', async () => {
     const tsUrl = `${protocol}://${tsIp}:${LAN_PORT}?ws=${WS_PORT}&token=${_lanToken}`;
     tailscale = { url: tsUrl, qr: await QRCode.toDataURL(tsUrl, { width: 300 }) };
   }
-  return { url, qr, token: _lanToken, wsPort: WS_PORT, tailscale };
+  return { url, qr, token: _lanToken, wsPort: WS_PORT, tailscale, mdnsUrl };
 });
+
+ipcMain.handle('create-pair-code', () => pairing.createPairCode());
 
 // Rotates the LAN access token: connected phones get disconnected and old codes stop working.
 ipcMain.handle('rotate-lan-token', async () => {
   _lanToken = crypto.randomBytes(24).toString('hex');
+  pairing.invalidate();
   try { fs.writeFileSync(APP_CONFIG_PATH, JSON.stringify({ ...readAppPrefs(), lanToken: _lanToken }, null, 2)); } catch (e) { logger.error('Failed to save rotated token: ' + e.message); }
   logger.info('LAN access token rotated');
   return { success: true, token: _lanToken };
@@ -851,9 +884,11 @@ app.on('before-quit', () => {
   // the async maintenance calls are intentionally skipped here (they run every
   // 5 minutes via scheduleMaintenance instead).
   try { closeDb(); } catch (e) { logger.error('quit close failed: ' + e.message); }
+  stopMdns();
   logger.info('app quitting');
 });
 app.on('window-all-closed', () => {
+  stopMdns();
   if (udpBroadcast) try { udpBroadcast.close(); } catch(e) {}
   if (wsServer) try { wsServer.close(); } catch(e) {}
   if (process.platform !== 'darwin') app.quit();

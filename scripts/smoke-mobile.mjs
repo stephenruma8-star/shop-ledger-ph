@@ -30,7 +30,8 @@ const fakeDB = {
 const win = new Proxy({
   __app: {},
   electronAPI: {
-    generateMobileQR: async () => ({ url: 'http://192.168.1.50:3456?ws=3458&token=abc123xyz', qr: 'data:image/png;base64,FAKEQRDATA', token: 'abc123xyz', wsPort: 3458, tailscale: { url: 'http://100.76.155.97:3456?ws=3458&token=abc123xyz', qr: 'data:image/png;base64,FAKETSQR' } }),
+    generateMobileQR: async () => ({ url: 'http://192.168.1.50:3456?ws=3458&token=abc123xyz', qr: 'data:image/png;base64,FAKEQRDATA', token: 'abc123xyz', wsPort: 3458, mdnsUrl: 'http://shop-pc.local:3456?ws=3458&token=abc123xyz', tailscale: { url: 'http://100.76.155.97:3456?ws=3458&token=abc123xyz', qr: 'data:image/png;base64,FAKETSQR' } }),
+    createPairCode: async () => ({ success: true, code: '123456', expiresIn: 600 }),
     onShortcut: noop, onUpdateAvailable: noop, onUpdateNotAvailable: noop, onUpdateError: noop,
     onUpdateDownloaded: noop, onUpdateProgress: noop, onLanUpdateSignal: noop, onConfirmExit: noop, onLanDataRefresh: noop,
     onHiddenToTray: noop,
@@ -45,6 +46,7 @@ const win = new Proxy({
   set(t, p, v) { t[p] = v; return true; },
 });
 globalThis.window = win;
+globalThis.self = win;
 Object.defineProperty(globalThis, 'document', { value: {
   getElementById: (id) => (els[id] ||= makeEl()),
   querySelector: () => makeEl(),
@@ -63,6 +65,7 @@ Object.defineProperty(globalThis, 'indexedDB', { value: {
   },
 }, configurable: true });
 Object.defineProperty(globalThis, 'navigator', { value: {}, configurable: true });
+process.on('unhandledRejection', () => {});
 globalThis.fetch = async () => ({ json: async () => ({}), ok: true, text: async () => '' });
 globalThis.MutationObserver = class { observe() {} unobserve() {} disconnect() {} takeRecords() { return []; } };
 globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
@@ -82,6 +85,7 @@ try {
   await import('file:///' + bundlePath.replace(/\\/g, '/'));
   if (typeof win.showMobileAccess !== 'function') throw new Error('showMobileAccess global not exposed');
   await win.showMobileAccess();
+  await new Promise(r => setTimeout(r, 20)); // let refreshPairCode() fill in
   const html = els['modal-root'] ? els['modal-root'].innerHTML : '';
   if (!html) throw new Error('modal() did not render (modal-root empty)');
   const checks = {
@@ -92,6 +96,9 @@ try {
     'has instructions': html.includes('same Wi-Fi'),
     'has anywhere QR': html.includes('data:image/png;base64,FAKETSQR'),
     'has tailscale URL': html.includes('http://100.76.155.97:3456?ws=3458&amp;token=abc123xyz'),
+    'has pair code panel': html.includes('id="pair-code"'),
+    'has mdns URL': html.includes('http://shop-pc.local:3456?ws=3458&amp;token=abc123xyz'),
+    'pair code filled': (els['pair-code'] ? els['pair-code'].textContent : '') === '123 456',
   };
   let ok = true;
   for (const [k, v] of Object.entries(checks)) { console.log((v ? 'PASS' : 'FAIL') + ' - ' + k); if (!v) ok = false; }

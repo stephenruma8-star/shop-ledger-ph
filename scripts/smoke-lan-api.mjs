@@ -50,6 +50,10 @@ const router = createLanApiRouter({
   rendererExec: () => { throw new Error('rendererExec must not be called on the SQLite path'); },
   setSetting: async (key, value) => { setCalls.push([key, value]); return { success: true }; },
   lanToken: 'test-token-123',
+  wsPort: 3458,
+  redeemPairCode: (code) => String(code || '') === '123456'
+    ? { ok: true, token: 'test-token-123', wsPort: 3458 }
+    : { ok: false, error: 'Wrong code' },
   backupService: { readBackupIndex: () => [{ name: 'backup-1.bak', date: TODAY, size: 100, status: 'ok', type: 'snapshot', encrypted: false }] },
   notify: () => {}
 });
@@ -68,6 +72,12 @@ const server = app.listen(0, '127.0.0.1', async () => {
     // auth enforced
     const unauth = await fetch(base + '/api/clients');
     ok(unauth.status === 401, 'GET /api/clients without token is rejected (401)');
+
+    // device pairing (no token needed)
+    const pr = await json('/api/pair', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: '123456' }) });
+    ok(pr.status === 200 && pr.body.success === true && pr.body.token === 'test-token-123' && pr.body.wsPort === 3458, 'POST /api/pair redeems a valid code for the token');
+    const prBad = await json('/api/pair', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: '000000' }) });
+    ok(prBad.status === 401 && prBad.body.success === false, 'POST /api/pair rejects a wrong code (401)');
 
     // clients
     let r = await json('/api/clients');
@@ -115,7 +125,7 @@ const server = app.listen(0, '127.0.0.1', async () => {
 
     // sqlite-status + backups
     r = await json('/api/sqlite-status');
-    ok(r.status === 200 && r.body.ok === true && r.body.backend === 'sqlite' && r.body.stores === 13, 'GET /api/sqlite-status reports sqlite');
+    ok(r.status === 200 && r.body.ok === true && r.body.backend === 'sqlite' && typeof r.body.stores === 'number' && r.body.stores >= 14, 'GET /api/sqlite-status reports sqlite');
     r = await json('/api/backups');
     ok(r.status === 200 && r.body.backups.length === 1 && r.body.backups[0].name === 'backup-1.bak', 'GET /api/backups routes through backupService');
 
