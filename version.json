@@ -1,5 +1,5 @@
 {
-    "version":  "3.24.0",
+    "version":  "3.24.1",
     "buildDate":  "2026-09-21T00:00:00.000Z",
-    "notes":  "Frontend round: command palette (Ctrl+K), modal focus trap, working Filipino shell, production CSS build, faster boot via minify and route code-splitting."
+    "notes":  "Update resilience for flaky shop networks: DNS fallbacks plus retried update checks and downloads."
 }

@@ -1,5 +1,16 @@
 ﻿const { app, BrowserWindow, ipcMain, dialog, Menu, Tray, nativeImage, shell } = require('electron');
 
+// Shop networks often run a single flaky router DNS (ENOTFOUND bursts). Keep the
+// system servers first, but add public fallbacks so one bad resolver can't wedge
+// the updater, mailer, or SMS checks. Process-local only; no system settings touched.
+try {
+  const dns = require('dns');
+  const current = dns.getServers().filter(s => s !== '127.0.0.1' && s !== '::1');
+  const merged = [...current];
+  for (const s of ['8.8.8.8', '1.1.1.1']) if (!merged.includes(s)) merged.push(s);
+  if (merged.length > current.length) dns.setServers(merged);
+} catch (e) { /* resolver left as-is */ }
+
 // Single-instance lock â€” must run before anything else
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) { process.exit(0); }
@@ -302,20 +313,31 @@ function checkForUpdates(silentNet = false) {
     return;
   }
   const https = require('https');
-  https.get('https://api.github.com/repos/stephenruma8-star/shop-ledger-ph/releases/latest', { headers: { 'User-Agent': 'shop-ledger-ph' } }, (res) => {
-    if (res.statusCode === 200) autoUpdater.checkForUpdates().catch((err) => {
-      logger.error('Auto-update check failed: ' + err.message);
-      mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-error', isUpdateNetError(err) ? NET_MSG : 'Update check failed: ' + err.message);
+  const CHECK_RETRIES = 3;
+  const CHECK_WAIT_MS = [4000, 12000, 30000];
+  // DNS blips on shop networks often clear within seconds: retry network failures
+  // a few times before admitting defeat. Non-network outcomes settle immediately.
+  function attemptCheck(n) {
+    https.get('https://api.github.com/repos/stephenruma8-star/shop-ledger-ph/releases/latest', { headers: { 'User-Agent': 'shop-ledger-ph' } }, (res) => {
+      if (res.statusCode === 200) autoUpdater.checkForUpdates().catch((err) => {
+        logger.error('Auto-update check failed: ' + err.message);
+        mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-error', isUpdateNetError(err) ? NET_MSG : 'Update check failed: ' + err.message);
+      });
+      else {
+        logger.info('GitHub returned ' + res.statusCode + ', skipping update check');
+        mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-not-available');
+      }
+    }).on('error', (err) => {
+      logger.error('Update check network error (attempt ' + n + '): ' + err.message);
+      if (isUpdateNetError(err) && n < CHECK_RETRIES) {
+        setTimeout(() => attemptCheck(n + 1), CHECK_WAIT_MS[n - 1] || 30000);
+        return;
+      }
+      if (silentNet && isUpdateNetError(err)) return;
+      mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-error', isUpdateNetError(err) ? NET_MSG : 'Could not reach GitHub: ' + err.message);
     });
-    else {
-      logger.info('GitHub returned ' + res.statusCode + ', skipping update check');
-      mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-not-available');
-    }
-  }).on('error', (err) => {
-    logger.error('Update check network error: ' + err.message);
-    if (silentNet && isUpdateNetError(err)) return;
-    mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-error', isUpdateNetError(err) ? NET_MSG : 'Could not reach GitHub: ' + err.message);
-  });
+  }
+  attemptCheck(1);
 }
 
 let bonjourSvc = null;
