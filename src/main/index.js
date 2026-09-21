@@ -141,7 +141,7 @@ function createWindow() {
   });
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
-    setTimeout(() => checkForUpdates(), 3000);
+    setTimeout(() => checkForUpdates(true), 3000);
   });
 }
 
@@ -226,7 +226,7 @@ function setupAutoUpdater() {
     if (!autoUpdater || !app.isPackaged) {
       return { success: false, error: 'Auto-update is only available in the installed app. Run the new installer instead.' };
     }
-    checkForUpdates();
+    checkForUpdates(false);
     return { success: true };
   });
   if (!autoUpdater || !app.isPackaged) return;
@@ -250,12 +250,20 @@ function setupAutoUpdater() {
     });
   });
   autoUpdater.on('error', (err) => {
-      logger.error('Auto-update error: ' + (err && err.message || err));
-    mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-error', (err && err.message) || 'Update check failed');
+    const msg = (err && err.message) || err;
+    logger.error('Auto-update error: ' + msg);
+    mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-error', isUpdateNetError(err) ? NET_MSG : (msg || 'Update check failed'));
   });
 }
 
-function checkForUpdates() {
+// Connectivity failures (DNS, timeouts, no route) get plain language instead of
+// socket internals, and never alarm the user from the automatic boot-time check.
+const NET_MSG = 'No internet connection — check your connection and try again.';
+function isUpdateNetError(err) {
+  return /ENOTFOUND|ETIMEDOUT|ENETUNREACH|EAI_AGAIN|ECONNRESET|ERR_NAME_NOT_RESOLVED|ERR_INTERNET_DISCONNECTED|ERR_NETWORK_CHANGED|ENETDOWN|EHOSTUNREACH/i.test(String((err && err.message) || err || ''));
+}
+
+function checkForUpdates(silentNet = false) {
   if (!autoUpdater) {
     mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-error', 'Auto-updater not available');
     return;
@@ -268,7 +276,7 @@ function checkForUpdates() {
   https.get('https://api.github.com/repos/stephenruma8-star/shop-ledger-ph/releases/latest', { headers: { 'User-Agent': 'shop-ledger-ph' } }, (res) => {
     if (res.statusCode === 200) autoUpdater.checkForUpdates().catch((err) => {
       logger.error('Auto-update check failed: ' + err.message);
-      mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-error', 'Update check failed: ' + err.message);
+      mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-error', isUpdateNetError(err) ? NET_MSG : 'Update check failed: ' + err.message);
     });
     else {
       logger.info('GitHub returned ' + res.statusCode + ', skipping update check');
@@ -276,7 +284,8 @@ function checkForUpdates() {
     }
   }).on('error', (err) => {
     logger.error('Update check network error: ' + err.message);
-    mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-error', 'Could not reach GitHub: ' + err.message);
+    if (silentNet && isUpdateNetError(err)) return;
+    mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-error', isUpdateNetError(err) ? NET_MSG : 'Could not reach GitHub: ' + err.message);
   });
 }
 
