@@ -1,5 +1,5 @@
 {
-    "version":  "3.22.2",
+    "version":  "3.23.0",
     "buildDate":  "2026-09-17T00:00:00.000Z",
-    "notes":  "Update checker: no connection shows a plain message instead of technical errors, and stays silent on boot without internet."
+    "notes":  "Resilient updates: interrupted downloads auto-retry with progress, verified release publishing including differential blockmap."
 }

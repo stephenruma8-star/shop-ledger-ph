@@ -206,20 +206,47 @@ function ensureFirewallRules() {
   }
 }
 
+// Resilient downloads: a user-initiated download killed by flaky connectivity is
+// retried with backoff instead of failing outright. Only download-phase errors
+// retry; update-check errors surface immediately. Attempts are reported through
+// the existing update-progress channel with a retrying flag.
+const DL_MAX_ATTEMPTS = 3;
+const DL_RETRY_MS = [5000, 15000, 30000];
+let _dlState = { active: false, attempts: 0 };
+function sendDlProgress(extra) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send('update-progress', Object.assign({
+    percent: 0, bytesPerSecond: 0, transferred: 0, total: 0
+  }, extra || {}));
+}
+function tryDownload() {
+  _dlState.attempts++;
+  try { autoUpdater.downloadUpdate(); }
+  catch (err) { onDownloadError(err); }
+}
+function onDownloadError(err) {
+  const msg = (err && err.message) || err;
+  logger.error('Download error (attempt ' + _dlState.attempts + '): ' + msg);
+  if (_dlState.active && isUpdateNetError(err) && _dlState.attempts < DL_MAX_ATTEMPTS) {
+    const wait = DL_RETRY_MS[_dlState.attempts - 1] || 30000;
+    logger.info('Download retry ' + (_dlState.attempts + 1) + '/' + DL_MAX_ATTEMPTS + ' in ' + (wait / 1000) + 's');
+    sendDlProgress({ retrying: true, attempt: _dlState.attempts + 1, maxAttempts: DL_MAX_ATTEMPTS });
+    setTimeout(() => { if (_dlState.active) tryDownload(); }, wait);
+    return;
+  }
+  _dlState.active = false;
+  mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-error', isUpdateNetError(err) ? NET_MSG : ('Download failed: ' + (msg || 'unknown error')));
+}
 function setupAutoUpdater() {
   ipcMain.handle('download-update', () => {
     if (!autoUpdater) {
       mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-error', 'Auto-updater not available');
       return { success: false, error: 'Auto-updater not available' };
     }
-    try {
-      autoUpdater.downloadUpdate();
-      return { success: true };
-    } catch (err) {
-      logger.error('downloadUpdate failed: ' + err.message);
-      mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-error', 'Download failed: ' + err.message);
-      return { success: false, error: err.message };
-    }
+    if (_dlState.active) return { success: false, error: 'Download already in progress' };
+    _dlState = { active: true, attempts: 0 };
+    tryDownload();
+    return { success: true };
   });
   ipcMain.handle('install-update', () => { if (autoUpdater) { isQuitting = true; autoUpdater.quitAndInstall(); } });
   ipcMain.handle('check-update', () => {
@@ -238,6 +265,7 @@ function setupAutoUpdater() {
     mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-not-available');
   });
   autoUpdater.on('update-downloaded', (info) => {
+    _dlState.active = false;
     mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-downloaded', info);
   });
   autoUpdater.on('download-progress', (p) => {
@@ -250,6 +278,7 @@ function setupAutoUpdater() {
     });
   });
   autoUpdater.on('error', (err) => {
+    if (_dlState.active) { onDownloadError(err); return; }
     const msg = (err && err.message) || err;
     logger.error('Auto-update error: ' + msg);
     mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-error', isUpdateNetError(err) ? NET_MSG : (msg || 'Update check failed'));

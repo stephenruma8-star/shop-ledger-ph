@@ -106,6 +106,10 @@ if (window.electronAPI) {
     const text = document.getElementById('update-progress-text');
     const meta = document.getElementById('update-progress-meta');
     if (!bar && !text && !meta) return;
+    if (info && info.retrying) {
+      if (text) text.textContent = `Connection lost — retrying download (${info.attempt} of ${info.maxAttempts})…`;
+      return;
+    }
     const pct = Math.min(100, Math.max(0, Number(info.percent) || 0));
     if (bar) bar.style.width = pct + '%';
     if (text) text.textContent = `Downloading… ${Math.round(pct)}%`;
