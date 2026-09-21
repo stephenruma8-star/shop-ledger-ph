@@ -2,7 +2,7 @@
 // Registered only in a secure context (https or localhost). Plain http:// LAN
 // access skips registration, so the app still works without it.
 const CACHE = 'shopledger-v1';
-const SHELL = ['/', '/manifest.webmanifest', '/assets/vendor/tailwind.js'];
+const SHELL = ['/', '/manifest.webmanifest', '/assets/tailwind.css'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

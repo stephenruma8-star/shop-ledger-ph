@@ -1,10 +1,11 @@
+import '../tailwind.css'
 import { applyPermissions } from './auth.js'
 import { cfCart, cfRenderCart, ensureBalanceSnapshot } from './clients.js'
 import { completeUnlock, dbAdd, dbAll, dbPut, needDbPassword, openDB } from './database.js'
-import { closeModal, confirmModal, dismissSysNotif, escapeHtml, hashPassword, initConnIndicator, modal, playSound, pushSysNotif, startClock, toast } from './helpers.js'
+import { closeModal, confirmModal, dismissSysNotif, escapeHtml, hashPassword, initConnIndicator, modal, openCommandPalette, playSound, pushSysNotif, startClock, toast } from './helpers.js'
 import { AppParticles } from './particles.js'
 import { emailBackupFlow, fileBackupFlow, redactSettings } from './reports.js'
-import { loadAll, navigate } from './router.js'
+import { loadAll, navigate, preloadViews } from './router.js'
 import { state, today } from './state.js'
 import { renderTMCart, txCart, updateTMTotals } from './transactions.js'
 import { maybeOnboard } from './onboarding.js'
@@ -400,6 +401,7 @@ export async function boot() {
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') document.documentElement.classList.add('dark');
     navigate(state.currentRoute);
+    try { preloadViews(); } catch (e) {}
     await updateVersionBadge();
     checkForNewBuild();
     initConnIndicator();
@@ -430,8 +432,7 @@ export async function boot() {
 document.addEventListener('keydown', (e) => {
   if (e.ctrlKey && e.key === 'k') {
     e.preventDefault();
-    const gs = document.getElementById('global-search');
-    if (gs) { gs.focus(); gs.select(); }
+    if (typeof openCommandPalette === 'function') openCommandPalette();
     return;
   }
   if (e.ctrlKey && e.shiftKey && e.key === 'B') {

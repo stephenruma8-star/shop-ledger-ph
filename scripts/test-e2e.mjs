@@ -124,7 +124,7 @@ globalThis.MutationObserver = class { observe() {} unobserve() {} disconnect() {
 globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
 
 for (const g of ['tailwind', 'Chart', 'XLSX', 'JsBarcode']) {
-  Object.defineProperty(globalThis, g, { get: () => win[g], configurable: true });
+  Object.defineProperty(globalThis, g, { get: () => win[g], set: () => {}, configurable: true });
 }
 
 // Test framework
@@ -414,6 +414,7 @@ try {
 
   // Test Group 14: Settings
   await testGroup('Settings', async () => {
+    await win.navigate('settings'); // loads the settings chunk (route code-splitting)
     assert(typeof win.saveSettings === 'function' || typeof win.__app?.saveSettings === 'function',
       'saveSettings function exists');
   });

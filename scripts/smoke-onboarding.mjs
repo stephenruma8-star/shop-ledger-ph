@@ -93,7 +93,7 @@ globalThis.fetch = async () => ({ json: async () => ({}), ok: true, text: async 
 globalThis.MutationObserver = class { observe() {} unobserve() {} disconnect() {} takeRecords() { return []; } };
 globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
 for (const g of ['tailwind', 'Chart', 'XLSX', 'JsBarcode']) {
-  Object.defineProperty(globalThis, g, { get: () => win[g], configurable: true });
+  Object.defineProperty(globalThis, g, { get: () => win[g], set: () => {}, configurable: true });
 }
 
 import { readdirSync } from 'node:fs';

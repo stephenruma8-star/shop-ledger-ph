@@ -1,5 +1,5 @@
 {
-    "version":  "3.23.0",
+    "version":  "3.24.0",
     "buildDate":  "2026-09-17T00:00:00.000Z",
-    "notes":  "Resilient updates: interrupted downloads auto-retry with progress, verified release publishing including differential blockmap."
+    "notes":  "Frontend round: command palette (Ctrl+K), modal focus trap, working Filipino shell, production CSS build, faster boot via minify and route code-splitting."
 }

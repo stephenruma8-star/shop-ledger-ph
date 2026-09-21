@@ -2,6 +2,7 @@ import { logAudit } from './auth.js'
 import { cfCart, cfUpdateRowAmt, cfUpdateTotals } from './clients.js'
 import { dbAdd, dbAll, dbDel, dbPut } from './database.js'
 import { renderExpTable } from './expenses.js'
+import { toggleLang } from './i18n.js'
 import { renderPayTable } from './payments.js'
 import { navigate } from './router.js'
 import { now, peso, state, today, VAT_RATE } from './state.js'
@@ -499,15 +500,45 @@ export function confetti() {
   draw();
 }
 
+let _lastFocused = null;
+const _focusableSel = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 export function modal(html) {
   const root = document.getElementById('modal-root');
   if (!root) return;
+  try { _lastFocused = document.activeElement; } catch (e) { _lastFocused = null; }
   root.innerHTML = `<div class="fixed inset-0 bg-black/50 z-[400] flex items-start justify-center pt-4 overflow-auto fade-in" onclick="if(event.target===this)closeModal()"><div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-[90vw] mx-4 mb-4 modal-enter max-h-[95vh] overflow-auto glass-strong" onclick="event.stopPropagation()">${html}</div></div>`;
+  try {
+    const first = root.querySelector(_focusableSel);
+    if (first && typeof first.focus === 'function') first.focus();
+  } catch (e) { /* headless/test DOM */ }
+}
+// Single delegated Tab trap: while any modal is open, Tab cycles inside it.
+if (typeof document !== 'undefined' && document.addEventListener) {
+  document.addEventListener('keydown', (e) => {
+    if (!e || e.key !== 'Tab') return;
+    let root = null;
+    try { root = document.getElementById('modal-root'); } catch (err) { return; }
+    if (!root || !root.firstElementChild) return;
+    let items = [];
+    try { items = Array.from(root.querySelectorAll(_focusableSel)).filter(el => el && typeof el.focus === 'function'); } catch (err) { return; }
+    if (items.length === 0) { e.preventDefault(); return; }
+    const first = items[0];
+    const last = items[items.length - 1];
+    let active = null;
+    try { active = document.activeElement; } catch (err) { active = null; }
+    const inside = active && typeof root.contains === 'function' ? root.contains(active) : active && items.includes(active);
+    if (e.shiftKey && (active === first || !inside)) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && active === last) { e.preventDefault(); first.focus(); }
+  });
 }
 
 export function closeModal() {
   if (_confirmResolve) { _confirmResolve(false); _confirmResolve = null; }
   clearItemSuggestions();
+  try {
+    if (_lastFocused && typeof _lastFocused.focus === 'function') _lastFocused.focus();
+  } catch (e) { /* headless/test DOM */ }
+  _lastFocused = null;
   const root = document.getElementById('modal-root');
   if (!root) return;
   const inner = root.querySelector('.modal-enter');
@@ -569,12 +600,68 @@ export function showShortcuts() {
           <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>Enter</span><span class="text-gray-500">Save modal form</span></div>
           <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>Ctrl+Enter</span><span class="text-gray-500">Save (from textarea)</span></div>
           <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>Ctrl+F</span><span class="text-gray-500">Focus page search</span></div>
-          <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>Ctrl+K</span><span class="text-gray-500">Global search</span></div>
+          <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>Ctrl+K</span><span class="text-gray-500">Command palette</span></div>
           <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>Ctrl+/</span><span class="text-gray-500">Show shortcuts</span></div>
           <div class="flex justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"><span>Ctrl+Shift+T</span><span class="text-gray-500">Toggle dark mode</span></div>
         </div>
       </div>
     </div>`);
+}
+
+const _palActions = [
+  { label: 'Go to Dashboard', hint: 'F1', run: () => navigate('dashboard') },
+  { label: 'Go to Clients', hint: 'F4', run: () => navigate('clients') },
+  { label: 'Go to Debts', hint: 'Ctrl+U', run: () => navigate('utang') },
+  { label: 'Go to Sales', hint: 'F2', run: () => navigate('transactions') },
+  { label: 'Go to Catalog', hint: '', run: () => navigate('catalog') },
+  { label: 'Go to Inventory', hint: 'F5', run: () => navigate('inventory') },
+  { label: 'Go to Stock Take', hint: 'F9', run: () => navigate('stocktake') },
+  { label: 'Go to Expenses', hint: 'F6', run: () => navigate('expenses') },
+  { label: 'Go to Suppliers', hint: 'F10', run: () => navigate('suppliers') },
+  { label: 'Go to Payments', hint: 'F3', run: () => navigate('payments') },
+  { label: 'Go to Purchase Orders', hint: 'F11', run: () => navigate('purchase-orders') },
+  { label: 'Go to Reports', hint: 'F7', run: () => navigate('reports') },
+  { label: 'Go to Settings', hint: 'F8', run: () => navigate('settings') },
+  { label: 'Go to Help', hint: '', run: () => navigate('help') },
+  { label: 'Search everything…', hint: 'Ctrl+F', run: () => { const gs = document.getElementById('global-search'); if (gs) { gs.focus(); gs.select(); } } },
+  { label: 'Toggle theme', hint: 'Ctrl+Shift+T', run: () => toggleTheme() },
+  { label: 'Toggle language', hint: '', run: () => toggleLang() },
+  { label: 'Toggle sidebar', hint: '', run: () => toggleSidebar() },
+  { label: 'Keyboard shortcuts', hint: 'Ctrl+/', run: () => showShortcuts() },
+];
+let _palItems = [];
+let _palSel = 0;
+export function openCommandPalette() {
+  _palSel = 0;
+  modal(`<div class="p-4">
+    <input id="palette-input" placeholder="Type a command…" autocomplete="off" oninput="paletteFilter(this.value)" onkeydown="paletteKey(event)" class="w-full px-4 py-3 border dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-base outline-none focus:ring-2 focus:ring-blue-500" />
+    <div id="palette-list" class="mt-2 max-h-80 overflow-auto"></div>
+    <p class="text-xs text-gray-400 mt-2 text-center">↑↓ to move · Enter to run · Esc to close</p>
+  </div>`);
+  renderPaletteList('');
+}
+function renderPaletteList(q) {
+  const query = (q || '').trim().toLowerCase();
+  _palItems = _palActions.filter(a => !query || a.label.toLowerCase().includes(query));
+  if (_palSel >= _palItems.length) _palSel = 0;
+  const list = document.getElementById('palette-list');
+  if (!list) return;
+  list.innerHTML = _palItems.length
+    ? _palItems.map((a, i) => `<div onclick="paletteRun(${i})" class="flex justify-between items-center px-4 py-2.5 rounded-lg cursor-pointer text-sm ${i === _palSel ? 'bg-blue-600 text-white' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}"><span class="font-medium">${escapeHtml(a.label)}</span>${a.hint ? `<span class="text-xs ${i === _palSel ? 'text-blue-100' : 'text-gray-400'}">${escapeHtml(a.hint)}</span>` : ''}</div>`).join('')
+    : '<p class="text-sm text-gray-400 text-center py-4">No matching commands</p>';
+}
+export function paletteFilter(v) { _palSel = 0; renderPaletteList(v); }
+export function paletteRun(i) {
+  const a = _palItems[i];
+  closeModal();
+  if (a) { try { a.run(); } catch (e) { toast('Command failed: ' + e.message, 'error'); } }
+}
+export function paletteKey(e) {
+  if (!e) return;
+  e.stopPropagation();
+  if (e.key === 'ArrowDown') { e.preventDefault(); _palSel = (_palSel + 1) % Math.max(_palItems.length, 1); renderPaletteList(document.getElementById('palette-input')?.value); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); _palSel = (_palSel - 1 + _palItems.length) % Math.max(_palItems.length, 1); renderPaletteList(document.getElementById('palette-input')?.value); }
+  else if (e.key === 'Enter') { e.preventDefault(); paletteRun(_palSel); }
 }
 
 export function focusPageSearch() {
@@ -1194,6 +1281,10 @@ Object.defineProperties(window, {
   toggleTheme: { get: () => toggleTheme, configurable: true },
   showShortcuts: { get: () => showShortcuts, configurable: true },
   focusPageSearch: { get: () => focusPageSearch, configurable: true },
+  openCommandPalette: { get: () => openCommandPalette, configurable: true },
+  paletteFilter: { get: () => paletteFilter, configurable: true },
+  paletteRun: { get: () => paletteRun, configurable: true },
+  paletteKey: { get: () => paletteKey, configurable: true },
   saveCurrentModal: { get: () => saveCurrentModal, configurable: true },
   validateNumber: { get: () => validateNumber, configurable: true },
   validateRequired: { get: () => validateRequired, configurable: true },

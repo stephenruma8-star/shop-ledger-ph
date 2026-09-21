@@ -1,23 +1,46 @@
-import { viewCatalog } from './catalog.js'
 import { viewClients } from './clients.js'
-import { viewDashboard } from './dashboard.js'
 import { dbAll } from './database.js'
 import { viewExpenses } from './expenses.js'
 import { applyDailyInterest, checkCloudBackupDue, checkSmsReminderDue, closeModal, escapeHtml, focusPageSearch, populateYearSelector, saveCurrentModal, showShortcuts, toast, toggleTheme, updateLowStockBadge, updateNotifications } from './helpers.js'
-import { viewHelp } from './help.js'
+import { t } from './i18n.js'
 import { viewInventory } from './inventory.js'
 import { AppParticles } from './particles.js'
 import { viewPayments } from './payments.js'
-import { viewPurchaseOrders } from './purchaseOrders.js'
 import { viewReports } from './reports.js'
-import { viewSettings } from './settings.js'
 import { state } from './state.js'
-import { viewStockTake } from './stocktake.js'
-import { viewSuppliers } from './suppliers.js'
 import { viewTransactions } from './transactions.js'
-import { viewUtang } from './utang.js'
 
 export let _navToken = 0;
+// Route code-splitting: these views load on demand so the boot bundle stays
+// small. main thread is never blocked: every loader is cached after first use,
+// and idle time preloads the rest (see preloadViews).
+const _viewMods = {};
+const _viewLoaders = {
+  dashboard: () => import('./dashboard.js'),
+  utang: () => import('./utang.js'),
+  catalog: () => import('./catalog.js'),
+  stocktake: () => import('./stocktake.js'),
+  suppliers: () => import('./suppliers.js'),
+  'purchase-orders': () => import('./purchaseOrders.js'),
+  settings: () => import('./settings.js'),
+  help: () => import('./help.js')
+};
+const _viewFnNames = {
+  dashboard: 'viewDashboard', utang: 'viewUtang', catalog: 'viewCatalog',
+  stocktake: 'viewStockTake', suppliers: 'viewSuppliers',
+  'purchase-orders': 'viewPurchaseOrders', settings: 'viewSettings', help: 'viewHelp'
+};
+function loadView(route) {
+  if (!_viewMods[route]) _viewMods[route] = _viewLoaders[route]();
+  return _viewMods[route];
+}
+export function preloadViews() {
+  const kick = () => { Object.keys(_viewLoaders).forEach(r => { loadView(r).catch(() => {}); }); };
+  try {
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(kick, { timeout: 5000 });
+    else setTimeout(kick, 2000);
+  } catch (e) { setTimeout(kick, 2000); }
+}
 // Error boundary: a crashing section must never leave a blank screen.
 // Shows a retry panel, toasts the failure, and forwards details to main-process logs.
 export function renderViewError(root, route, title, err) {
@@ -44,10 +67,10 @@ export async function navigate(route) {
   const token = ++_navToken;
   state.currentRoute = route;
   const titles = {
-    dashboard: 'Dashboard', clients: 'Clients', utang: 'Debts',
-    transactions: 'Sales', catalog: 'Catalog', inventory: 'Inventory', stocktake: 'Stock Take', expenses: 'Expenses',
-    suppliers: 'Suppliers', payments: 'Payments', 'purchase-orders': 'Purchase Orders',
-    reports: 'Reports', settings: 'Settings', help: 'Help'
+    dashboard: t('dashboard'), clients: t('clients'), utang: t('debts'),
+    transactions: t('sales'), catalog: t('catalog'), inventory: t('inventory'), stocktake: t('stocktake'), expenses: t('expenses'),
+    suppliers: t('suppliers'), payments: t('payments'), 'purchase-orders': t('purchase-orders'),
+    reports: t('reports'), settings: t('settings'), help: t('help')
   };
   const pt = document.getElementById('page-title');
   if (pt) pt.textContent = titles[route] || 'Dashboard';
@@ -71,22 +94,30 @@ export async function navigate(route) {
   populateYearSelector();
   switch (route) {
     case 'dashboard':
-      try { await viewDashboard(root); }
+      try { await (await loadView('dashboard')).viewDashboard(root); }
       catch (err) { renderViewError(root, route, titles[route] || route, err); }
       break;
     default: {
-      const viewFns = {
-        clients: viewClients, utang: viewUtang, transactions: viewTransactions,
-        catalog: viewCatalog, inventory: viewInventory, stocktake: viewStockTake,
-        expenses: viewExpenses, suppliers: viewSuppliers, payments: viewPayments,
-        'purchase-orders': viewPurchaseOrders, reports: viewReports,
-        settings: viewSettings, help: viewHelp
+      const eagerFns = {
+        clients: viewClients, transactions: viewTransactions,
+        inventory: viewInventory, expenses: viewExpenses,
+        payments: viewPayments, reports: viewReports
       };
-      const fn = viewFns[route];
+      const fn = eagerFns[route];
       if (fn) {
         root.className = 'flex-1 overflow-auto p-6';
         root.innerHTML = '';
         try { await fn(root); }
+        catch (err) { renderViewError(root, route, titles[route] || route, err); }
+      } else if (_viewFnNames[route]) {
+        root.className = 'flex-1 overflow-auto p-6';
+        if (!_viewMods[route]) root.innerHTML = '<div class="flex items-center justify-center py-20"><div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div></div>';
+        else root.innerHTML = '';
+        try {
+          const m = await loadView(route);
+          if (token !== _navToken) return;
+          await m[_viewFnNames[route]](root);
+        }
         catch (err) { renderViewError(root, route, titles[route] || route, err); }
       }
       break;
@@ -172,11 +203,17 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
   btn.addEventListener('click', () => navigate(btn.dataset.route));
 });
 
+// Re-render the current view when the language changes (page title + shell).
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('langchange', () => { try { render(); } catch (e) {} });
+}
+
 
 // expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
 Object.defineProperties(window, {
   _navToken: { get: () => _navToken, set: (v) => { _navToken = v; }, configurable: true },
   navigate: { get: () => navigate, configurable: true },
+  preloadViews: { get: () => preloadViews, configurable: true },
   loadAll: { get: () => loadAll, configurable: true },
   render: { get: () => render, configurable: true },
   renderViewError: { get: () => renderViewError, configurable: true }

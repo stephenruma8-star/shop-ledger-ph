@@ -85,7 +85,7 @@ process.on('uncaughtException', () => {});
 globalThis.MutationObserver = class { observe() {} unobserve() {} disconnect() {} takeRecords() { return []; } };
 globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
 for (const g of ['tailwind', 'Chart', 'XLSX', 'JsBarcode']) {
-  Object.defineProperty(globalThis, g, { get: () => win[g], configurable: true });
+  Object.defineProperty(globalThis, g, { get: () => win[g], set: () => {}, configurable: true });
 }
 
 const bundlePath = process.argv[2] || findBundle();

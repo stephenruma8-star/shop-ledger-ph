@@ -23,7 +23,7 @@ export default [
     },
   },
   {
-    files: ['scripts/**/*.mjs', 'scripts/**/*.js', '*.config.mjs', '*.mjs'],
+    files: ['scripts/**/*.mjs', 'scripts/**/*.js', '*.config.mjs', '*.mjs', 'tailwind.config.js', 'postcss.config.js'],
     languageOptions: { globals: { ...globals.node, ...globals.browser }, sourceType: 'module' },
     rules: {
       'no-unused-vars': 'off',

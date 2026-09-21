@@ -72,7 +72,9 @@ process.on('uncaughtException', () => {});
 globalThis.MutationObserver = class { observe() {} unobserve() {} disconnect() {} takeRecords() { return []; } };
 globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
 for (const g of ['tailwind', 'Chart', 'XLSX', 'JsBarcode']) {
-  Object.defineProperty(globalThis, g, { get: () => win[g], configurable: true });
+  // Setter swallows vendor UMD self-registration (e.g. bundled chart.js assigning
+  // global Chart): real browsers allow it, and the stub class on win[g] stays put.
+  Object.defineProperty(globalThis, g, { get: () => win[g], set: () => {}, configurable: true });
 }
 
 import { readdirSync } from 'node:fs';
@@ -145,6 +147,18 @@ try {
   if (await win.verifyPassword('pl4inpw', 'plainpw')) throw new Error('verifyPassword accepts a wrong plaintext password');
   if (await win.verifyPassword('x', 'pbkdf2$999$AAAA$AAAA')) throw new Error('verifyPassword must reject malformed pbkdf2 hashes');
   console.log('PASSWORD OK: salted PBKDF2 hashing + legacy SHA-256/plaintext migration verified');
+  await win.openCommandPalette();
+  win.paletteFilter('sale');
+  win.paletteRun(0);
+  if (win.state && win.state.currentRoute !== 'transactions') throw new Error('palette run did not navigate to Sales');
+  win.openCommandPalette();
+  win.paletteKey({ key: 'ArrowDown', preventDefault: () => {}, stopPropagation: () => {} });
+  win.paletteKey({ key: 'Enter', preventDefault: () => {}, stopPropagation: () => {} });
+  if (win.state && win.state.currentRoute !== 'clients') throw new Error('palette keyboard nav failed');
+  console.log('PALETTE OK: filter + keyboard run navigate');
+  if (typeof win.applyI18n !== 'function') throw new Error('applyI18n missing');
+  win.toggleLang(); win.toggleLang();
+  console.log('I18N OK: toggle cycle + applyI18n run clean');
   console.log('DEEP SMOKE OK: boot() + all views executed without errors');
   process.exit(0);
 } catch (e) {

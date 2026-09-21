@@ -49,6 +49,7 @@ export default defineConfig({
     publicDir: false,
     plugins: [copyRendererStatic()],
     build: {
+      minify: 'esbuild',
       rollupOptions: {
         input: { index: resolve('src/renderer/index.html') }
       }

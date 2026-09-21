@@ -120,7 +120,7 @@ process.on('uncaughtException', () => {});
 globalThis.MutationObserver = class { observe() {} unobserve() {} disconnect() {} takeRecords() { return []; } };
 globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
 for (const g of ['tailwind', 'Chart', 'XLSX', 'JsBarcode']) {
-  Object.defineProperty(globalThis, g, { get: () => win[g], configurable: true });
+  Object.defineProperty(globalThis, g, { get: () => win[g], set: () => {}, configurable: true });
 }
 
 import { readdirSync } from 'node:fs';
@@ -401,6 +401,7 @@ try {
   win.state.suppliers = await win.dbAll('suppliers');
   win.state.purchaseOrders = await win.dbAll('purchaseOrders');
   win.state.supplierPayments = await win.dbAll('supplierPayments');
+  await win.navigate('suppliers'); // loads the suppliers chunk (route code-splitting)
   await win.openSupplierPayModal(supId);
   ok(document.getElementById('modal-root').innerHTML.includes('Record Payment'), 'supplier payment modal rendered');
   getEl('sp-amount').value = '4000';
