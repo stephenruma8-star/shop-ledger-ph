@@ -1,5 +1,5 @@
 {
     "version":  "3.24.0",
-    "buildDate":  "2026-09-17T00:00:00.000Z",
+    "buildDate":  "2026-09-21T00:00:00.000Z",
     "notes":  "Frontend round: command palette (Ctrl+K), modal focus trap, working Filipino shell, production CSS build, faster boot via minify and route code-splitting."
 }
