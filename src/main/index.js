@@ -86,7 +86,8 @@ function readAppPrefs() {
 }
 const _savedToken = readAppPrefs().lanToken;
 let _lanToken = _savedToken || crypto.randomBytes(24).toString('hex');
-// Short-lived pairing codes live in ./pairing.js (pure Node, unit-tested).
+// Short-lived pairing codes (shipped as a loose module like the other main files;
+// listed in electron.vite.config.mjs copyMainStatic).
 const pairing = require('./pairing.js');
 pairing.configure({ getToken: () => _lanToken, wsPort: WS_PORT });
 function mdnsHostname() {
