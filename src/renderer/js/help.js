@@ -76,18 +76,6 @@ export function viewHelp(root) {
 
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
         <h3 class="font-bold text-lg mb-3 flex items-center gap-2">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 text-cyan-600"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-          Mobile Access
-        </h3>
-        <div class="space-y-2 text-sm text-gray-600 dark:text-gray-300">
-          <p><strong>LAN access</strong> — Other devices on your WiFi can access the app via a web browser.</p>
-          <p><strong>QR code</strong> — Click Mobile Access in the sidebar to see the QR code and connection URL.</p>
-          <p><strong>What mobile can do</strong> — Record sales, view clients, check inventory.</p>
-        </div>
-      </div>
-
-      <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
-        <h3 class="font-bold text-lg mb-3 flex items-center gap-2">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 text-gray-600"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
           Keyboard Shortcuts
         </h3>
