@@ -59,16 +59,23 @@ async function sqliteReady() {
 async function snapshotFile(filePath, password) {
   let type = 'snapshot';
   let encrypted = false;
+  let cipher = null;
   if (await sqliteReady()) {
     const s = await dbm.snapshot(filePath);
-    if (password) {
+    if (s.encrypted) {
+      // Live DB is SQLCipher-locked: the snapshot is already a vault. A user
+      // password would only double-wrap it, so the vault (same DB password) wins.
+      encrypted = true;
+      cipher = 'sqlcipher';
+    } else if (password) {
       fs.writeFileSync(filePath, JSON.stringify(encryptData(fs.readFileSync(filePath), password)));
       encrypted = true;
+      cipher = 'blob';
     }
     const chk = await dbm.integrityCheck();
     if (!chk.ok) throw new Error('Snapshot failed integrity check: ' + (chk.result || chk.error));
     await dbm.optimize();
-    return { size: s.size, type, encrypted };
+    return { size: s.size, type, encrypted, cipher };
   }
   type = 'json';
   const dump = await cfg.getRendererDump();
@@ -85,7 +92,7 @@ async function snapshotFile(filePath, password) {
 async function backupEntry(filePath, password, name, auto) {
   fs.mkdirSync(backupsDir(), { recursive: true });
   const list = readBackupIndex();
-  const entry = { name, date: new Date().toISOString(), size: 0, status: 'creating', type: 'snapshot', encrypted: false, auto: !!auto, checksum: null };
+  const entry = { name, date: new Date().toISOString(), size: 0, status: 'creating', type: 'snapshot', encrypted: false, cipher: null, auto: !!auto, checksum: null };
   const idx = list.findIndex(b => b.name === name);
   if (idx >= 0) list[idx] = entry;
   else list.push(entry);
@@ -95,6 +102,7 @@ async function backupEntry(filePath, password, name, auto) {
     entry.size = info.size;
     entry.type = info.type;
     entry.encrypted = info.encrypted;
+    entry.cipher = info.cipher || null;
     entry.checksum = calculateFileChecksum(filePath);
     entry.status = 'ok';
   } catch (e) {
@@ -216,26 +224,38 @@ async function planLocalSnapshot() {
 }
 
 // Swaps the live database for a snapshot backup (encrypted ones need the password).
+// Integrity is verified against the STORED bytes first: checksums are recorded at
+// creation time, so comparing after decryption could never match by design.
 async function restoreBackup(name, password, skipChecksum) {
   const entry = readBackupIndex().find(b => b.name === name);
   if (!entry) return { success: false, error: 'Backup not found' };
   const filePath = path.join(backupsDir(), name);
   if (!fs.existsSync(filePath)) return { success: false, error: 'Backup file missing' };
+  if (!skipChecksum && entry.checksum) {
+    const currentChecksum = calculateFileChecksum(filePath);
+    if (currentChecksum && currentChecksum !== entry.checksum) {
+      return { success: false, error: 'Checksum mismatch — backup may be corrupted. Re-try with skipChecksum to override.', checksumMismatch: true, expected: entry.checksum, actual: currentChecksum };
+    }
+  }
   let restorePath = filePath;
   try {
     if (entry.encrypted) {
       if (!password) return { success: false, error: 'This backup is encrypted - enter its password to restore' };
+      const head0 = fs.readFileSync(filePath);
+      if (head0[0] !== 0x7b) {
+        // SQLCipher vault snapshot (auto-encrypted while the DB was locked).
+        const v = await dbm.verifyVaultPassword(filePath, password);
+        if (!v.ok) return { success: false, error: 'Wrong password or corrupted backup' };
+        const r = await dbm.replaceWithEncrypted(filePath, password);
+        if (!r.ok) return { success: false, error: r.error };
+        cfg.notify({ source: 'app', kind: 'restore', backup: name });
+        return { success: true, info: r };
+      }
       let dec;
       try { dec = decryptData(JSON.parse(fs.readFileSync(filePath, 'utf8')), password); }
       catch (e) { return { success: false, error: 'Wrong password or corrupted backup' }; }
       restorePath = filePath + '.tmp';
       fs.writeFileSync(restorePath, dec);
-    }
-    if (!skipChecksum && entry.checksum) {
-      const currentChecksum = calculateFileChecksum(restorePath);
-      if (currentChecksum && currentChecksum !== entry.checksum) {
-        return { success: false, error: 'Checksum mismatch — backup may be corrupted. Re-try with skipChecksum to override.', checksumMismatch: true, expected: entry.checksum, actual: currentChecksum };
-      }
     }
     const head = fs.readFileSync(restorePath);
     if (head.slice(0, 16).toString('ascii') !== 'SQLite format 3\u0000') return { success: false, error: 'Not a valid database snapshot' };
@@ -364,6 +384,19 @@ async function dbHealth(action) {
   }
   const lastOk = [...list].reverse().find(b => b.status === 'ok');
   if (lastOk) { details.lastSnapshot = lastOk.name; details.lastSnapshotDate = lastOk.date || null; }
+  // Disk space where the DB and backups live: silent full disks are a classic
+  // shop-PC failure (updates/backups die with cryptic errors).
+  try {
+    if (cfg.userDataPath && fs.existsSync(cfg.userDataPath) && typeof fs.statfsSync === 'function') {
+      const st = fs.statfsSync(cfg.userDataPath);
+      const bsize = st.bsize || 4096;
+      details.diskFreeBytes = (st.bavail || 0) * bsize;
+      details.diskTotalBytes = (st.blocks || 0) * bsize;
+    }
+  } catch (e) {}
+  if (details.diskFreeBytes == null) { details.diskFreeBytes = null; details.diskTotalBytes = null; }
+  details.diskWarning = details.diskFreeBytes !== null && details.diskFreeBytes < 500 * 1024 * 1024;
+  details.dbSizeWarning = (details.dbSizeBytes || 0) > 500 * 1024 * 1024;
   if (action === 'status' || action === 'integrity') {
     const chk = await dbm.integrityCheck();
     details.integrityOk = chk.ok;

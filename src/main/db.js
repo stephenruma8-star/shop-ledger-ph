@@ -328,6 +328,46 @@ function checkStore(store) {
   if (!STORES.includes(store)) throw new Error('Unknown store: ' + store);
 }
 
+// OS-protected secrets (Electron safeStorage = DPAPI on Windows). Transparent layer:
+// settings values for these keys are encrypted on write, decrypted on read, so every
+// existing caller keeps working unchanged. Blobs never leave this module except into
+// the DB file itself; dumps and cloud payloads go through redactSettings downstream.
+// DPAPI keys are machine+user bound: a blob restored on another machine decrypts to
+// '' (logged) so the user simply re-enters the secret. Without Electron (plain-node
+// tests) values pass through untouched.
+const SENSITIVE_SETTINGS = ['cloudBackupPassword', 'smsApiKey', 'aiApiKey', 'smtpConfig', 'cloudApiKey'];
+const DPAPI_PREFIX = 'dpapi:v1:';
+function safeStore(override) {
+  if (override) return override;
+  try {
+    const { safeStorage } = require('electron');
+    if (safeStorage && typeof safeStorage.isEncryptionAvailable === 'function' && safeStorage.isEncryptionAvailable()) return safeStorage;
+  } catch (e) {}
+  return null;
+}
+function dpapiEncrypt(plain, store) {
+  if (typeof plain !== 'string' || plain.startsWith(DPAPI_PREFIX)) return plain;
+  const ss = safeStore(store);
+  if (!ss) return plain;
+  try { return DPAPI_PREFIX + ss.encryptString(plain).toString('base64'); }
+  catch (e) { logger.error('dpapi encrypt failed: ' + e.message); return plain; }
+}
+function dpapiDecrypt(stored, store) {
+  if (typeof stored !== 'string' || !stored.startsWith(DPAPI_PREFIX)) return stored;
+  const ss = safeStore(store);
+  if (!ss) return '';
+  try { return ss.decryptString(Buffer.from(stored.slice(DPAPI_PREFIX.length), 'base64')); }
+  catch (e) { logger.error('dpapi decrypt failed (wrong machine or corrupted blob)'); return ''; }
+}
+function protectSettingRecord(rec) {
+  if (rec && SENSITIVE_SETTINGS.includes(rec.key)) return { ...rec, value: dpapiEncrypt(rec.value) };
+  return rec;
+}
+function unprotectSettingRecord(rec) {
+  if (rec && SENSITIVE_SETTINGS.includes(rec.key)) return { ...rec, value: dpapiDecrypt(rec.value) };
+  return rec;
+}
+
 function fileSize(p) {
   try { return fs.statSync(p || dbPath).size; } catch (e) { return 0; }
 }
@@ -454,24 +494,28 @@ async function openInfoRaw() {
 async function getRaw(store, id) {
   checkStore(store);
   const row = await getAsync(`SELECT value FROM s_${store} WHERE id = ?`, [id]);
-  return row ? JSON.parse(row.value) : undefined;
+  if (!row) return undefined;
+  const rec = JSON.parse(row.value);
+  return store === 'settings' ? unprotectSettingRecord(rec) : rec;
 }
 
 async function allRaw(store) {
   checkStore(store);
-  return (await allAsync(`SELECT id, value FROM s_${store} ORDER BY id`)).map(r => JSON.parse(r.value));
+  const rows = (await allAsync(`SELECT id, value FROM s_${store} ORDER BY id`)).map(r => JSON.parse(r.value));
+  return store === 'settings' ? rows.map(unprotectSettingRecord) : rows;
 }
 
 async function addRaw(store, obj) {
   checkStore(store);
+  const rec = store === 'settings' ? protectSettingRecord(obj) : obj;
   let id;
-  if (obj && typeof obj.id === 'number') {
-    id = Number((await runAsync(`INSERT INTO s_${store} (id, value) VALUES (?, ?)`, [obj.id, JSON.stringify(obj)])).lastID);
+  if (rec && typeof rec.id === 'number') {
+    id = Number((await runAsync(`INSERT INTO s_${store} (id, value) VALUES (?, ?)`, [rec.id, JSON.stringify(rec)])).lastID);
   } else {
-    const info = await runAsync(`INSERT INTO s_${store} (value) VALUES (?)`, [JSON.stringify(obj)]);
+    const info = await runAsync(`INSERT INTO s_${store} (value) VALUES (?)`, [JSON.stringify(rec)]);
     id = Number(info.lastID);
     // Mirror IndexedDB keyPath behavior: the generated key is injected into the stored record
-    await runAsync(`UPDATE s_${store} SET value = ? WHERE id = ?`, [JSON.stringify({ ...obj, id }), id]);
+    await runAsync(`UPDATE s_${store} SET value = ? WHERE id = ?`, [JSON.stringify({ ...rec, id }), id]);
   }
   return id;
 }
@@ -479,8 +523,9 @@ async function addRaw(store, obj) {
 async function putRaw(store, obj) {
   checkStore(store);
   if (!obj || typeof obj.id !== 'number') throw new Error('put requires a record with a numeric id');
-  await runAsync(`INSERT INTO s_${store} (id, value) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET value = excluded.value`, [obj.id, JSON.stringify(obj)]);
-  return obj.id;
+  const rec = store === 'settings' ? protectSettingRecord(obj) : obj;
+  await runAsync(`INSERT INTO s_${store} (id, value) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET value = excluded.value`, [rec.id, JSON.stringify(rec)]);
+  return rec.id;
 }
 
 async function delRaw(store, id) {
@@ -654,19 +699,28 @@ async function migrateToRelational() {
   return { ok: true, counts };
 }
 
-// Consistent plaintext snapshot of the live DB (sqlcipher_export decrypts into
-// the target when the live DB is keyed, plain-copies otherwise). Snapshots stay
-// plaintext SQLite by design: restore, checksums and cloud sync all expect it.
+// Snapshot of the live DB. Keyed live DB -> the export target is keyed too, so the
+// snapshot file stays ciphertext (verified: VACUUM INTO would decrypt, export does
+// not). Plaintext live DB -> plaintext copy, exactly as before.
 async function snapshot(destPath) {
   if (!db) throw new Error('SQLite not initialized');
   try { fs.unlinkSync(destPath); } catch (e) {}
+  if (sessionKey) {
+    await execAsync(`ATTACH DATABASE ${q(destPath)} AS snap_export KEY ${q(sessionKey)}`);
+    try {
+      await execAsync(`SELECT sqlcipher_export('snap_export')`);
+    } finally {
+      try { await execAsync('DETACH DATABASE snap_export'); } catch (e) {}
+    }
+    return { ok: true, size: fs.statSync(destPath).size, encrypted: true };
+  }
   await execAsync(`ATTACH DATABASE ${q(destPath)} AS snap_export KEY ''`);
   try {
     await execAsync(`SELECT sqlcipher_export('snap_export')`);
   } finally {
     try { await execAsync('DETACH DATABASE snap_export'); } catch (e) {}
   }
-  return { ok: true, size: fs.statSync(destPath).size };
+  return { ok: true, size: fs.statSync(destPath).size, encrypted: false };
 }
 
 async function integrityCheckRaw() {
@@ -752,6 +806,45 @@ async function replaceWith(filePath) {
     dropSidecars();
     await openDbInternal(path.dirname(dbPath), null);
     if (keepKey) await ensureEncryptedLive(keepKey);
+    await runAsync('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value', ['sqliteMigrated', 'true']);
+    const chk = await integrityCheckRaw();
+    if (!chk.ok) { close(); return { ok: false, error: 'Restored file failed integrity check: ' + (chk.result || chk.error) }; }
+    return openInfoRaw();
+  } catch (e) {
+    close();
+    return { ok: false, error: e.message };
+  }
+}
+
+// Proves a password against a SQLCipher vault FILE without touching the live
+// connection. Used before restoring auto-encrypted snapshots.
+async function verifyVaultPassword(filePath, password) {
+  if (!password) return { ok: false, error: 'Password required' };
+  let handle = null;
+  try {
+    handle = await openHandleAt(filePath);
+    await applyKey(handle, String(password));
+    await probeHandle(handle);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: 'Wrong password or corrupted vault' };
+  } finally {
+    if (handle) await closeHandle(handle);
+  }
+}
+
+// Swaps the live database for a SQLCipher-vault snapshot. Caller must have
+// proven the password via verifyVaultPassword first; the session stays keyed.
+async function replaceWithEncrypted(filePath, password) {
+  if (!db) return { ok: false, error: 'SQLite not initialized' };
+  if (!password) return { ok: false, error: 'Password required' };
+  try {
+    await execAsync('PRAGMA wal_checkpoint(TRUNCATE)');
+    close();
+    try { fs.copyFileSync(dbPath, dbPath + '.prerestore'); } catch (e) {}
+    fs.copyFileSync(filePath, dbPath);
+    dropSidecars();
+    await openDbInternal(path.dirname(dbPath), String(password));
     await runAsync('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value', ['sqliteMigrated', 'true']);
     const chk = await integrityCheckRaw();
     if (!chk.ok) { close(); return { ok: false, error: 'Restored file failed integrity check: ' + (chk.result || chk.error) }; }
@@ -1135,6 +1228,8 @@ function schemaVersionQueued() { return queued(() => schemaVersionRaw()); }
 function runMigrationsQueued() { return queued(() => runMigrationsRaw()); }
 function snapshotQueued(destPath) { return queued(() => snapshot(destPath)); }
 function replaceWithQueued(filePath) { return queued(() => replaceWith(filePath)); }
+function replaceWithEncryptedQueued(filePath, password) { return queued(() => replaceWithEncrypted(filePath, password)); }
+function verifyVaultPasswordQueued(filePath, password) { return queued(() => verifyVaultPassword(filePath, password)); }
 function replaceFromDumpQueued(dump) { return queued(() => replaceFromDump(dump)); }
 function integrityQueued() { return queued(() => integrityCheckRaw()); }
 function optimizeQueued() { return queued(() => optimizeRaw()); }
@@ -1145,4 +1240,4 @@ function rAllQueued(store) { return queued(() => rAllRaw(store)); }
 function rGetQueued(store, id) { return queued(() => rGetRaw(store, id)); }
 function rAllWithItemsQueued(store) { return queued(() => rAllWithItemsRaw(store)); }
 
-module.exports = { registerDbIpc, init, migrate: migrateQueued, get, add, put, del, all, clear, stats: statsQueued, snapshot: snapshotQueued, integrityCheck: integrityQueued, optimize: optimizeQueued, checkpoint: checkpointQueued, vacuum: vacuumQueued, replaceWith: replaceWithQueued, replaceFromDump: replaceFromDumpQueued, runMigrations: runMigrationsQueued, schemaVersion: schemaVersionQueued, close, closeDb, rollbackMigration: rollbackQueued, scheduleMaintenance, encryptDb: encryptQueued, decryptDb: decryptQueued, getDbChecksum, unlockDb: unlockQueued, isDbEncrypted, changeDbPassword: changeQueued, migrateToRelational: migrateRelationalQueued, isRelationalReady: isRelationalQueued, rAll: rAllQueued, rGet: rGetQueued, rAllWithItems: rAllWithItemsQueued };
+module.exports = { registerDbIpc, init, migrate: migrateQueued, get, add, put, del, all, clear, dpapiEncrypt, dpapiDecrypt, SENSITIVE_SETTINGS, stats: statsQueued, snapshot: snapshotQueued, integrityCheck: integrityQueued, optimize: optimizeQueued, checkpoint: checkpointQueued, vacuum: vacuumQueued, replaceWith: replaceWithQueued, replaceWithEncrypted: replaceWithEncryptedQueued, verifyVaultPassword: verifyVaultPasswordQueued, replaceFromDump: replaceFromDumpQueued, runMigrations: runMigrationsQueued, schemaVersion: schemaVersionQueued, close, closeDb, rollbackMigration: rollbackQueued, scheduleMaintenance, encryptDb: encryptQueued, decryptDb: decryptQueued, getDbChecksum, unlockDb: unlockQueued, isDbEncrypted, changeDbPassword: changeQueued, migrateToRelational: migrateRelationalQueued, isRelationalReady: isRelationalQueued, rAll: rAllQueued, rGet: rGetQueued, rAllWithItems: rAllWithItemsQueued };

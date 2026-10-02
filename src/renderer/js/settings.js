@@ -175,6 +175,19 @@ export async function viewSettings(root) {
             </div>
           </div>
         </div>
+        <div class="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 mt-3">
+          <div class="flex items-center justify-between mb-2">
+            <div>
+              <p class="text-sm font-semibold">Update recovery</p>
+              <p class="text-xs text-gray-400">The current and previous app installers stay on disk. If a new version ever fails to start, run the previous Setup file from this folder to reinstall it.</p>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="openUpdateDistFolder()" class="px-3 py-1.5 bg-gray-600 text-white rounded-lg text-sm hover:bg-gray-700">Open Folder</button>
+              <button onclick="loadUpdateDistInfo()" class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700">Refresh</button>
+            </div>
+          </div>
+          <div id="update-dist-status" class="text-xs text-gray-400">Loading…</div>
+        </div>
       </div>
       <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm glass-card">
         <h3 class="font-bold text-lg mb-4 flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Logs</h3>
@@ -234,6 +247,7 @@ export async function viewSettings(root) {
   if (window.electronAPI?.runDbHealth) loadDbHealth();
   if (window.electronAPI?.dbEncryptionStatus) loadDbEncryptionStatus();
   if (window.electronAPI?.getLogsInfo) loadLogsInfo();
+  if (window.electronAPI?.getUpdateDistInfo) loadUpdateDistInfo();
 }
 
 async function loadDbHealth() {
@@ -248,7 +262,8 @@ async function loadDbHealth() {
     holder.innerHTML = [
       ['Storage', d.backend === 'sqlite' ? 'SQLite' : (d.backend || 'Unknown')],
       ['Location', d.sqlitePath ? `<span title="${d.sqlitePath}">app data…</span>` : '—'],
-      ['Size', d.dbSizeBytes != null ? formatDbBytes(d.dbSizeBytes) : '—'],
+      ['Size', d.dbSizeBytes != null ? formatDbBytes(d.dbSizeBytes) + (d.dbSizeWarning ? ' <span class="text-amber-500 font-semibold">— large, consider Compact</span>' : '') : '—'],
+      ['Disk free', d.diskFreeBytes != null ? formatDbBytes(d.diskFreeBytes) + (d.diskWarning ? ' <span class="text-red-500 font-semibold">— LOW, free space soon</span>' : '') : '—'],
       ['Table count', d.tableCount != null ? d.tableCount : '—'],
       ['Schema', d.schemaVersion != null ? 'v' + d.schemaVersion : '—'],
       ['Integrity', d.integrityOk ? '<span class="text-green-600">OK</span>' : (d.integrityResult || 'Unknown')],
@@ -289,6 +304,25 @@ function formatDbBytes(n) {
   return (v / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1) + ' ' + units[i];
 }
 
+export async function loadUpdateDistInfo() {
+  const holder = document.getElementById('update-dist-status');
+  if (!holder) return;
+  holder.textContent = 'Loading…';
+  try {
+    if (!window.electronAPI?.getUpdateDistInfo) { holder.textContent = 'Desktop app only'; return; }
+    const r = await window.electronAPI.getUpdateDistInfo();
+    const info = (r && r.success && r.info) || {};
+    if (!info.available) { holder.textContent = 'No downloaded updates staged yet — they appear here after this PC downloads an update.'; return; }
+    holder.innerHTML = 'Staged version <strong>v' + escapeHtml(info.version || '?') + '</strong> (' + ((info.files || []).length) + ' file(s)) plus the previous version as rollback. Keep this folder intact.';
+  } catch (e) { holder.textContent = 'Failed to load: ' + e.message; }
+}
+
+export async function openUpdateDistFolder() {
+  if (!window.electronAPI?.openUpdateDistFolder) { toast('Desktop app only', 'warning'); return; }
+  const r = await window.electronAPI.openUpdateDistFolder();
+  if (!r || !r.success) toast('Folder not available: ' + ((r && r.error) || 'unknown'), 'error');
+}
+
 export async function dbMaintenance(action) {
   if (!window.electronAPI?.runDbHealth) { toast('Desktop app only', 'warning'); return; }
   toast(action === 'compact' ? 'Compacting database… (may take a moment)' : 'Checking database integrity…', 'info');
@@ -298,6 +332,26 @@ export async function dbMaintenance(action) {
     else toast((r?.error || 'Maintenance failed') + (r?.details ? ' — ' + (r.details.integrityResult || r.details.error || '') : ''), 'error');
   } catch (e) { toast('Maintenance failed: ' + e.message, 'error'); }
   loadDbHealth();
+}
+
+// One-time migration: OS-protect any plaintext secrets left over from before
+// DPAPI-at-rest landed (the DB layer encrypts on every write from here on).
+// Mirrors SENSITIVE_SETTINGS in src/main/db.js — keep the two lists in sync.
+const PROTECTED_SETTING_KEYS = ['cloudBackupPassword', 'smsApiKey', 'aiApiKey', 'smtpConfig', 'cloudApiKey'];
+export async function protectStoredSecrets() {
+  try {
+    if (!window.electronAPI) return { migrated: 0 };
+    const rows = await dbAll('settings');
+    let n = 0;
+    for (const r of rows) {
+      if (PROTECTED_SETTING_KEYS.includes(r.key) && typeof r.value === 'string' && r.value && !r.value.startsWith('dpapi:v1:')) {
+        await dbPut('settings', r);
+        n++;
+      }
+    }
+    if (n > 0) state.settings = await dbAll('settings');
+    return { migrated: n };
+  } catch (e) { return { migrated: 0, error: e.message }; }
 }
 
 export async function loadDbEncryptionStatus() {
@@ -649,10 +703,13 @@ Object.defineProperties(window, {
   openUserModal: { get: () => openUserModal, configurable: true },
   saveUser: { get: () => saveUser, configurable: true },
   dbMaintenance: { get: () => dbMaintenance, configurable: true },
+  protectStoredSecrets: { get: () => protectStoredSecrets, configurable: true },
   loadDbEncryptionStatus: { get: () => loadDbEncryptionStatus, configurable: true },
   dbEncryptionFlow: { get: () => dbEncryptionFlow, configurable: true },
   doDbEncryptionSubmit: { get: () => doDbEncryptionSubmit, configurable: true },
   loadLogsInfo: { get: () => loadLogsInfo, configurable: true },
   openLogsFolder: { get: () => openLogsFolder, configurable: true },
+  loadUpdateDistInfo: { get: () => loadUpdateDistInfo, configurable: true },
+  openUpdateDistFolder: { get: () => openUpdateDistFolder, configurable: true },
   rebuildApp: { get: () => rebuildApp, configurable: true }
 });

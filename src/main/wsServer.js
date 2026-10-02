@@ -31,7 +31,7 @@ function readFrame(buf) {
 }
 
 // Minimal RFC 6455 WebSocket server. No dependencies.
-function startWsServer({ port, token, onMessage, onClose }) {
+function startWsServer({ port, token, verify, onMessage, onClose }) {
   const server = http.createServer((req, res) => { res.writeHead(426); res.end('Upgrade Required'); });
   const clients = new Set();
 
@@ -64,7 +64,12 @@ function startWsServer({ port, token, onMessage, onClose }) {
           try { msg = JSON.parse(frame.payload.toString('utf8')); } catch (e) {}
           if (!msg) continue;
           if (msg.type === 'auth') {
-            if (msg.token === token) { client.authed = true; sendFrame(socket, Buffer.from(JSON.stringify({ type: 'auth-ok' }))); }
+            // House token or a per-device phone token (via verify callback).
+            let authed = msg.token === token;
+            if (!authed && typeof verify === 'function') {
+              try { authed = !!verify(msg.token); } catch (e) { authed = false; }
+            }
+            if (authed) { client.authed = true; sendFrame(socket, Buffer.from(JSON.stringify({ type: 'auth-ok' }))); }
             else { sendFrame(socket, Buffer.from(JSON.stringify({ type: 'auth-error' }))); socket.end(); break; }
           } else if (client.authed && onMessage) {
             try { onMessage(msg, client); } catch (e) {}

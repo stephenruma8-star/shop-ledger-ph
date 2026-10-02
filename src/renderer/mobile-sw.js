@@ -1,7 +1,7 @@
 // Shop Ledger PH - mobile offline shell (PWA service worker)
 // Registered only in a secure context (https or localhost). Plain http:// LAN
 // access skips registration, so the app still works without it.
-const CACHE = 'shopledger-v1';
+const CACHE = 'shopledger-v2';
 const SHELL = ['/', '/manifest.webmanifest', '/assets/tailwind.css'];
 
 self.addEventListener('install', (e) => {

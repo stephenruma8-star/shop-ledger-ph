@@ -1,0 +1,24 @@
+{
+  "name": "shop-ledger-mobile",
+  "version": "3.34.0",
+  "private": true,
+  "description": "Shop Ledger PH — native Android companion. Capacitor shell around the LAN phone UI (synced from src/renderer/mobile.html).",
+  "scripts": {
+    "sync": "node scripts/sync-phone-ui.mjs",
+    "sync:check": "node scripts/sync-phone-ui.mjs --check",
+    "open:android": "npx cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/app": "^8.0.0",
+    "@capacitor/barcode-scanner": "^3.1.2",
+    "@capacitor/browser": "^8.0.4",
+    "@capacitor/cli": "^8.0.0",
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/haptics": "^8.0.0",
+    "@capacitor/share": "^8.0.2",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.0",
+    "capacitor-native-biometric": "^4.2.2"
+  }
+}

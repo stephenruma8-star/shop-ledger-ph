@@ -1,5 +1,5 @@
 {
-    "version":  "3.24.1",
-    "buildDate":  "2026-09-21T00:00:00.000Z",
-    "notes":  "Update resilience for flaky shop networks: DNS fallbacks plus retried update checks and downloads."
+    "version":  "3.34.0",
+    "buildDate":  "2026-10-01T00:00:00.000Z",
+    "notes":  "Phone parity round: client add/edit/history/statements/loyalty, inventory add/edit with valuation and expiry, sale void, payment and expense edit/delete, petty cash, supplier add with payment history, PO receiving, debt aging, sales by client, CSV exports, shop settings edit, debts view with SMS reminders, quick-sale presets."
 }

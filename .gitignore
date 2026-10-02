@@ -5,3 +5,11 @@ out/
 *.log
 .DS_Store
 certs/
+
+mobile-app/android/
+mobile-app/www/app/
+
+
+*.keystore
+*.jks
+

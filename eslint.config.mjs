@@ -5,7 +5,7 @@ import js from '@eslint/js'
 import globals from 'globals'
 
 export default [
-  { ignores: ['node_modules/**', 'out/**', 'build/**', 'dist/**', 'release/**', 'src/renderer/assets/**'] },
+  { ignores: ['node_modules/**', 'out/**', 'build/**', 'dist/**', 'release/**', 'src/renderer/assets/**', 'mobile-app/android/**', 'mobile-app/www/app/**'] },
   js.configs.recommended,
   {
     files: ['src/main/**/*.js', 'src/preload/**/*.js'],
@@ -23,7 +23,26 @@ export default [
     },
   },
   {
+    // Phone UI sources (assembled into mobile.html by scripts/build-mobile.mjs):
+    // single shared scope like the built file, browser globals throughout.
+    files: ['src/mobile/**/*.js'],
+    languageOptions: { globals: { ...globals.browser }, sourceType: 'script' },
+    rules: {
+      'no-unused-vars': 'off',
+      'no-undef': 'off',
+    },
+  },
+  {
     files: ['scripts/**/*.mjs', 'scripts/**/*.js', '*.config.mjs', '*.mjs', 'tailwind.config.js', 'postcss.config.js'],
+    languageOptions: { globals: { ...globals.node, ...globals.browser }, sourceType: 'module' },
+    rules: {
+      'no-unused-vars': 'off',
+      'no-undef': 'off',
+    },
+  },
+  {
+    // Native app shell: browser bootstrap page + node sync script.
+    files: ['mobile-app/www/*.js', 'mobile-app/scripts/*.mjs'],
     languageOptions: { globals: { ...globals.node, ...globals.browser }, sourceType: 'module' },
     rules: {
       'no-unused-vars': 'off',

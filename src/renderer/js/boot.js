@@ -121,6 +121,29 @@ if (window.electronAPI) {
   });
   window.electronAPI.onLanUpdateSignal((info) => {
     pushSysNotif('lan-signal', `Update signaled by ${info.from || 'another device'}${info.version ? ' (v' + escapeHtml(info.version) + ')' : ''} — check now`, 'download', '🔄');
+    if (info && info.hasDist && info.distVersion && info.host) {
+      const safeHost = String(info.host).replace(/[^0-9a-zA-Z.\-:]/g, '');
+      const safeVer = String(info.distVersion).replace(/[^0-9a-zA-Z.\-]/g, '');
+      window._lanInstallUpdate = async () => {
+        closeModal();
+        toast('Checking LAN update on ' + safeHost + '…', 'info');
+        try {
+          const r = await window.electronAPI.installLanUpdate({ host: safeHost, port: info.distPort || null, version: safeVer });
+          if (r && r.success) toast('Found v' + safeVer + ' on LAN — press Download Update in the Updates dialog', 'success');
+          else toast('LAN update failed: ' + ((r && r.error) || 'unknown error'), 'error');
+        } catch (e) { toast('LAN update failed: ' + e.message, 'error'); }
+      };
+      modal(`
+      <div class="p-6">
+        <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">Update Available on LAN</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+        <p class="text-gray-600 dark:text-gray-300 mb-4"><strong>${escapeHtml(info.from)}</strong> already downloaded <strong>v${escapeHtml(info.distVersion)}</strong> — fetch it over the shop network, no internet download needed.</p>
+        <div class="flex gap-2">
+          <button onclick="window._lanInstallUpdate()" class="flex-1 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download over LAN</button>
+          <button onclick="closeModal()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg">Later</button>
+        </div>
+      </div>`);
+      return;
+    }
     modal(`
       <div class="p-6">
         <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">LAN Update Signal</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
@@ -215,15 +238,21 @@ export async function showMobileAccess() {
           <button onclick="copyMobileUrl('mobile-url-ts')" class="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy</button>
         </div>` : ''}
         <button onclick="rotateLanToken()" class="mt-1 w-full py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Rotate Token — kick all connected phones</button>
+        <div class="mt-3 mb-1 flex items-center justify-between"><h4 class="text-sm font-bold">Paired phones</h4><button onclick="loadPairedDevices()" class="text-xs text-blue-600 hover:underline">Refresh</button></div>
+        <div id="paired-devices" class="mb-1 text-sm text-gray-500">Loading…</div>
         <div class="text-xs text-gray-400 space-y-1">
           <p>• Open the page on your phone to view clients and log payments.</p>
           <p>• Keep this app running — it hosts the mobile page on port 3456.</p>
           <p>• New phones: install Tailscale (free) and sign in to this account to use the Anywhere QR.</p>
           <p>• If the address is ever rejected, reopen this window and rescan to get the current code.</p>
           <p>• Codes expire after 10 minutes and work once — hit New code for each phone.</p>
+          <p>• Each QR pairs one phone — reopen this window for every additional phone.</p>
+          <p>• New phones pair as Cashier (sales only) — promote yours to Owner for reports and settings.</p>
+          <p>• Revoking one phone leaves the others connected; Rotate Token kicks them all.</p>
         </div>
       </div>`);
     refreshPairCode();
+    loadPairedDevices();
   } catch (err) {
     toast('Mobile access failed: ' + err.message, 'error');
   }
@@ -263,6 +292,48 @@ export async function rotateLanToken() {
   toast('Access code rotated — phones must pair again with a fresh code', 'success');
   closeModal();
   showMobileAccess();
+}
+
+export async function loadPairedDevices() {
+  const box = document.getElementById('paired-devices');
+  if (!box) return;
+  if (!window.electronAPI?.listDevices) { box.textContent = 'Desktop app only'; return; }
+  try {
+    const r = await window.electronAPI.listDevices();
+    const devs = (r && r.success && Array.isArray(r.devices)) ? r.devices : [];
+    if (!devs.length) { box.innerHTML = '<p class="text-xs">No phones paired yet — pair one with the code or QR above.</p>'; return; }
+    box.innerHTML = devs.map(d => {
+      const when = d.createdAt ? new Date(d.createdAt).toLocaleString() : '';
+      const seen = d.lastSeen ? ' · last seen ' + new Date(d.lastSeen).toLocaleString() : ' · not seen yet';
+      const role = d.role === 'owner' ? 'owner' : 'cashier';
+      const other = role === 'owner' ? 'cashier' : 'owner';
+      return `<div class="flex items-center gap-2 py-1.5 border-b dark:border-gray-700 last:border-0">
+        <div class="min-w-0 flex-1"><div class="font-semibold truncate">${escapeHtml(d.name || 'Phone')} <span class="ml-1 text-[10px] px-1.5 py-0.5 rounded-full ${role === 'owner' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}">${role}</span></div>
+        <div class="text-[11px] text-gray-400">paired ${escapeHtml(when)}${escapeHtml(seen)}</div></div>
+        <button onclick="setPairedDeviceRole('${escapeHtml(d.id || '')}','${other}')" title="Switch role" class="shrink-0 text-[11px] px-2 py-1 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-300">Make ${other}</button>
+        <button onclick="revokePairedDevice('${escapeHtml(d.id || '')}')" class="shrink-0 text-[11px] px-2 py-1 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300">Revoke</button>
+      </div>`;
+    }).join('');
+  } catch (e) { box.textContent = 'Could not load paired phones'; }
+}
+
+export async function revokePairedDevice(id) {
+  if (!id || !window.electronAPI?.revokeDevice) return;
+  if (!await confirmModal('Revoke this phone? It will be disconnected and must pair again. Other phones stay connected.')) return;
+  try {
+    const r = await window.electronAPI.revokeDevice(id);
+    if (r && r.success) { toast('Phone revoked', 'success'); loadPairedDevices(); }
+    else toast('Revoke failed', 'error');
+  } catch (e) { toast('Revoke failed: ' + e.message, 'error'); }
+}
+
+export async function setPairedDeviceRole(id, role) {
+  if (!id || !window.electronAPI?.setDeviceRole) return;
+  try {
+    const r = await window.electronAPI.setDeviceRole(id, role);
+    if (r && r.success) { toast('Phone is now ' + (role === 'owner' ? 'an Owner phone (full access)' : 'a Cashier phone (counter only)'), 'success'); loadPairedDevices(); }
+    else toast('Role update failed', 'error');
+  } catch (e) { toast('Role update failed: ' + e.message, 'error'); }
 }
 
 export async function verifyBackups() {
@@ -381,6 +452,8 @@ export async function boot() {
     }
     await seedIfEmpty();
     await loadAll();
+    // OS-protect any pre-existing plaintext secrets (one-time migration).
+    try { const settingsMod = await import('./settings.js'); await settingsMod.protectStoredSecrets().catch(() => {}); } catch (e) {}
     // Month-opening balance snapshot (no-op when already taken or no clients yet).
     ensureBalanceSnapshot().catch(() => {});
     const savedUser = sessionStorage.getItem('shopUser');
@@ -560,6 +633,9 @@ Object.defineProperties(window, {
   refreshPairCode: { get: () => refreshPairCode, configurable: true },
   copyMobileUrl: { get: () => copyMobileUrl, configurable: true },
   rotateLanToken: { get: () => rotateLanToken, configurable: true },
+  loadPairedDevices: { get: () => loadPairedDevices, configurable: true },
+  revokePairedDevice: { get: () => revokePairedDevice, configurable: true },
+  setPairedDeviceRole: { get: () => setPairedDeviceRole, configurable: true },
   checkForNewBuild: { get: () => checkForNewBuild, configurable: true },
   showUpdateProgress: { get: () => showUpdateProgress, configurable: true },
   verifyBackups: { get: () => verifyBackups, configurable: true },

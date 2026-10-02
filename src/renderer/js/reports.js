@@ -136,7 +136,7 @@ export function showMonthlyOverview() {
   });
 }
 
-export const SECRET_SETTING_KEYS = ['cloudBackupPassword', 'smsApiKey', 'aiApiKey', 'smtpConfig'];
+export const SECRET_SETTING_KEYS = ['cloudBackupPassword', 'smsApiKey', 'aiApiKey', 'smtpConfig', 'cloudApiKey'];
 
 // Masks secret setting values before they leave the machine in JSON backups,
 // email backups or LAN dumps. smtpConfig keeps its shape (just the password

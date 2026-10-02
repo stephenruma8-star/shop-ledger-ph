@@ -36,6 +36,7 @@ const sandboxInterval = (fn, ms) => { const t = setInterval(fn, ms); timerIds.ad
 
 const seen = new Set();
 const posts = [];
+const sockets = [];
 let fetchCount = 0;
 const todayStr = new Date().toISOString().split('T')[0];
 const storage = new Map();
@@ -107,31 +108,41 @@ const fakeFetch = async (url, opts) => {
   const method = (opts && opts.method) || 'GET';
   const path = String(url).replace(/^https?:\/\/[^/]+/, '');
   seen.add(method + ' ' + path);
-  if (method === 'POST') { posts.push({ path, body: JSON.parse(opts.body || '{}') }); return { ok: true, json: async () => ({ success: true, invoiceNo: 'INV-0000X' }) }; }
+  if (method === 'POST' || method === 'PUT' || method === 'DELETE') { posts.push({ path, method, body: JSON.parse(opts.body || '{}') }); return { ok: true, json: async () => ({ success: true, invoiceNo: 'INV-0000X' }) }; }
   const F = mkFixtures();
   const X = mkExtras();
   let payload = {};
   if (path.startsWith('/api/stats')) payload = statsFixture();
+  else if (path.startsWith('/api/inventory/images')) payload = {};
+  else if (path.startsWith('/api/inventory/valuation')) payload = { items: 3, units: 15, costValue: 200, retailValue: 450 };
   else if (path.startsWith('/api/inventory')) payload = F.inventory.sort((a, b) => a.name.localeCompare(b.name));
+  else if (/^\/api\/transactions\/[^/]+$/.test(path)) payload = { id: 1, invoiceNo: 'INV-00001', clientName: 'Maria Santos', paymentMethod: 'Cash', date: todayStr, grandTotal: 150, subtotal: 150, status: 'paid', items: [{ description: 'Coke 500ml', qty: 1, unitCost: 100 }] };
+  else if (/^\/api\/clients\/[^/]+\/history$/.test(path)) payload = { client: { id: 1, name: 'Maria Santos', phone: '0917', balance: 234.5, loyaltyPoints: 250 }, sales: [{ invoiceNo: 'INV-00001', date: todayStr, grandTotal: 150 }], payments: [{ date: todayStr, amount: 30 }] };
+  else if (path.startsWith('/api/version')) payload = { v: 7 };
   else if (path.startsWith('/api/transactions')) payload = F.transactions;
   else if (path.startsWith('/api/clients')) payload = F.clients;
   else if (path.startsWith('/api/expenses')) payload = X.expenses;
   else if (path.startsWith('/api/suppliers')) payload = X.suppliers;
   else if (path.startsWith('/api/purchase-orders')) payload = X.purchaseOrders;
+  else if (path.startsWith('/api/quick-items')) payload = [{ id: 1, name: 'Coke', price: 100, invId: 1 }];
   else if (path.startsWith('/api/reports')) payload = reportsFixture();
   else if (path.startsWith('/api/settings')) payload = X.settings;
+  else if (path.startsWith('/api/audit')) payload = [{ id: 1, action: 'sale', details: 'Mobile sale INV-00001', user: '', createdAt: '2026-09-24T10:00:00.000Z' }];
+  else if (path === 'version.json' || path.endsWith('/version.json')) payload = { desktopVersion: '3.30.0' };
+  else if (path.endsWith('/releases/latest')) payload = { tag_name: 'v3.31.0', assets: [{ name: 'Shop-Ledger-Mobile-3.31.0-debug.apk', browser_download_url: 'https://example.com/app.apk' }] };
   return { ok: true, json: async () => payload };
 };
 
-function FakeWebSocket(url) { this.url = url; this.onopen = noop; this.onmessage = noop; this.onclose = noop; this.onerror = noop; }
+function FakeWebSocket(url) { this.url = url; this.onopen = noop; this.onmessage = noop; this.onclose = noop; this.onerror = noop; this.sent = []; sockets.push(this); }
 FakeWebSocket.prototype.send = function (data) {
   let msg; try { msg = JSON.parse(data); } catch (e) { return; }
+  try { this.sent.push(msg); } catch (e) {}
   if (msg.type === 'auth') {
     const self = this;
     queueMicrotask(() => { if (self.onmessage) self.onmessage({ data: JSON.stringify({ type: 'auth-ok' }) }); });
   }
 };
-FakeWebSocket.prototype.close = function () {};
+FakeWebSocket.prototype.close = function () { try { this.onclose(); } catch (e) {} };
 
 const langs = { en: 'es', 'en-PH': 'es' };
 const sandbox = {
@@ -439,6 +450,32 @@ try {
   ok(tail[0].body.description === 'Candles' && tail[1].body.items[0].description === 'Coke 500ml', 'replayed payloads intact');
   ok(gget('__queue().length') === 0 && getEl('pending-count').textContent === '0', 'queue and banner cleared after sync');
 
+  // ---- WS death, poison queue, print routing ----
+  // (the sandbox never fires socket open by itself — drive it manually)
+  const liveSock = sockets[sockets.length - 1];
+  liveSock.onopen();
+  await wait(20);
+  ok(liveSock && liveSock.sent.some(m => m.type === 'auth'), 'phone authenticates the socket on open');
+  const t0 = timerIds.size;
+  liveSock.onclose();
+  await wait(20);
+  ok(timerIds.size === t0 + 1, 'dropped connection schedules a reconnect');
+  liveSock.onmessage({ data: JSON.stringify({ type: 'auth-error' }) });
+  ok(gget('wsTokenDead') === true, 'rejected token marks the socket dead');
+  const t1 = timerIds.size;
+  liveSock.onclose();
+  await wait(20);
+  ok(timerIds.size === t1, 'dead token schedules no further reconnects');
+  const savedFetchQ = sandbox.fetch;
+  gcall(`queueOp('/api/sales', { items: [] })`);
+  sandbox.fetch = async () => ({ ok: false, json: async () => ({ success: false, error: 'nope' }) });
+  await gcall(`flushQueue()`);
+  ok(gget('__queue().length') === 0, 'rejected op dropped instead of blocking the queue');
+  sandbox.fetch = async () => { throw new TypeError('down'); };
+  await gcall(`printSaleReceipt('INV-0000X')`);
+  ok(gget('__queue().length') === 0, 'failed print is not queued for later');
+  sandbox.fetch = savedFetchQ;
+
   // ---- pairing without QR ----
   gcall(`renderPairScreen()`);
   ok(getEl('view').innerHTML.includes('pair-code') && getEl('view').innerHTML.includes('Connect this phone'), 'pair screen renders code entry');
@@ -458,6 +495,290 @@ try {
   await gcall(`submitPairCode()`);
   ok(getEl('pair-error').textContent.includes('Wrong code'), 'wrong code shows server message');
   sandbox.fetch = realFetch;
+
+  // ---- counter UX: tender, search-add, retry, roles, display, alerts ----
+  getEl('sale-interest').value = '0'; getEl('sale-sc').checked = false; getEl('sale-discount').value = '0';
+  gcall(`saleTotals()`);
+  gcall(`setTender(500)`);
+  ok(getEl('tendered-amt').textContent === '₱500.00' && getEl('tender-change').textContent === '₱500.00', 'tender shows tendered + change due');
+  gcall(`setTender(0)`);
+  ok(getEl('tender-change').textContent === '—', 'cleared tender shows dashes');
+
+  gcall(`showView('sale')`);
+  gcall(`counterSearch('coke')`);
+  ok(getEl('counter-results').innerHTML.includes('Coke 500ml'), 'counter search finds Coke');
+  gcall(`counterSearch('zzz-nope')`);
+  ok(getEl('counter-results').innerHTML.includes('No match'), 'counter search reports no match');
+  gcall(`counterAdd(1)`);
+  ok(cartRef().length === 1 && cartRef()[0].name === 'Coke 500ml', 'counter add puts the item in cart');
+
+  // failed sale keeps the cart and offers one-tap retry of the same payload
+  // (HTTP errors retry; raw network drops go to the offline queue instead)
+  const postsBeforeFail = posts.length;
+  sandbox.fetch = async () => ({ ok: false, json: async () => ({ success: false, error: 'Till closed' }) });
+  await gcall(`submitSale()`);
+  ok(cartRef().length === 1 && getEl('view').innerHTML.includes('Retry last failed sale'), 'failed sale keeps cart + shows retry');
+  sandbox.fetch = realFetch;
+  await gcall(`retrySale()`);
+  ok(posts.length === postsBeforeFail + 1 && posts[postsBeforeFail].path === '/api/sales', 'retry re-posts the saved payload');
+  ok(cartRef().length === 0 && getEl('view').innerHTML.includes('INV-0000X'), 'retry success shows the receipt sheet');
+
+  // ---- double-submit guard: two rapid taps post once ----
+  gcall(`counterAdd(1)`);
+  const dblBefore = posts.length;
+  const dp1 = gcall(`submitSale()`);
+  const dp2 = gcall(`submitSale()`);
+  await dp1; await dp2;
+  ok(posts.length === dblBefore + 1 && posts[dblBefore].path === '/api/sales', 'double-tapped sale posts exactly once');
+
+  // cashier role: detected, redirected from owner views
+  storage.set('slpRole', 'cashier');
+  ok(gcall(`phoneRole()`) === 'cashier', 'cashier role detected on phone');
+  gcall(`showView('reports')`);
+  ok(curRef() === 'home', 'cashier is redirected away from reports');
+  storage.delete('slpRole');
+  gcall(`showView('home')`);
+
+  // display prefs persist + render; alerts strip names outages
+  gcall(`setPhoneTheme('day')`);
+  ok(storage.get('slpTheme') === 'day', 'day theme persisted');
+  gcall(`renderSettings()`);
+  await wait(20);
+  ok(getEl('display-row').innerHTML.includes('Day'), 'display prefs render in settings');
+  gcall(`setPhoneTheme('dark'); setPhoneText('normal');`);
+  gcall(`data.alerts = { out: [{ name: 'Milk' }], low: [], outCount: 1, lowCount: 0 }`);
+  const strip = gcall(`alertsStrip()`);
+  ok(String(strip).includes('Milk') && String(strip).includes('out of stock'), 'alerts strip names out-of-stock items');
+
+  // ---- i18n: every T() key resolves, Filipino renders ----
+  const usedKeys = [...new Set([...pageScript.matchAll(/\bT\('([^']+)'/g)].map(m => m[1]))];
+  const missingKeys = JSON.parse(gcall(`JSON.stringify(${JSON.stringify(usedKeys)}.filter(k => !(k in LANG_STRINGS.en)))`));
+  ok(missingKeys.length === 0, 'every T() key exists in the en dictionary' + (missingKeys.length ? ': ' + missingKeys.join(', ') : ''));
+  const shellKeys = [...readFileSync(join(root, 'src/mobile/shell-top.html'), 'utf8').matchAll(/data-i18n="([^"]+)"/g)].map(m => m[1]);
+  const missingShell = JSON.parse(gcall(`JSON.stringify(${JSON.stringify(shellKeys)}.filter(k => !(k in LANG_STRINGS.en)))`));
+  ok(missingShell.length === 0, 'every data-i18n key exists in the en dictionary' + (missingShell.length ? ': ' + missingShell.join(', ') : ''));
+  storage.set('slpLang', 'fil');
+  gcall(`applyStaticLang()`);
+  gcall(`showView('sale')`);
+  ok(getEl('view').innerHTML.includes('Bagong Benta') && !getEl('view').innerHTML.includes('>New Sale<'), 'sale view renders in Filipino');
+  gcall(`showView('settings')`);
+  await wait(20);
+  ok(getEl('view').innerHTML.includes('Mga Setting'), 'settings view renders in Filipino');
+  storage.delete('slpLang');
+  gcall(`applyStaticLang()`);
+
+  // ---- structural integrity: every view renders without undefined leaks ----
+  const viewTitles = { home: null, catalog: null, clients: null, sale: 'New Sale', pay: null, inventory: null, transactions: null, expenses: null, suppliers: null, 'purchase-orders': null, reports: null, settings: null, stocktake: null, audit: null, help: null, debts: null };
+  for (const vn of Object.keys(viewTitles)) {
+    gcall(`showView('${vn}')`);
+    await wait(10);
+    const html = getEl('view').innerHTML;
+    ok(!html.includes('undefined'), vn + ' view has no undefined leaks');
+    if (viewTitles[vn]) ok(html.includes(viewTitles[vn]), vn + ' view shows its title');
+  }
+  gcall(`showView('home')`);
+
+  // ---- void flow, SMS ----
+  await gcall(`openTxnDetail(1)`);
+  await gcall(`voidTxn('INV-00001')`);
+  ok(getEl('void-btn').textContent.includes('confirm'), 'void arms on first tap');
+  const voidBefore = posts.length;
+  await gcall(`voidTxn('INV-00001')`);
+  ok(posts.length === voidBefore + 1 && posts[voidBefore].path === '/api/void', 'void posts on second tap');
+  gcall(`closeQuick()`);
+
+  // ---- debts view + SMS ----
+  gcall(`showView('debts')`);
+  ok(getEl('view').innerHTML.includes('Mga Utang') || getEl('view').innerHTML.includes('Debts'), 'debts view renders');
+  const smsBefore = posts.length;
+  await gcall(`sendSmsReminders()`);
+  ok(posts.length === smsBefore + 1 && posts[smsBefore].path === '/api/sms-reminders', 'SMS reminders post to the API');
+
+  // ---- phone app updater ----
+  ok(gcall(`cmpAppVer('3.31.0', '3.30.0')`) === 1 && gcall(`cmpAppVer('3.30.0', '3.30.0')`) === 0 && gcall(`cmpAppVer('3.29.9', '3.30.0')`) === -1, 'updater compares versions');
+  ok(await gcall(`checkMobileUpdate(true)`) === 'available', 'newer release detected');
+  ok(getEl('modal-root').innerHTML.includes('Phone app update'), 'update sheet offers the download');
+  gcall(`closeQuick()`);
+  ok(await gcall(`checkMobileUpdate(false)`) === 'throttled', 'auto check throttled to once a day');
+  gcall(`renderSettings()`);
+  await wait(20);
+  ok(getEl('update-row').innerHTML.includes('3.30.0'), 'settings shows the bundled app version');
+
+  // ---- parity views: stocktake, audit, help, monthly picker, supplier pay ----
+  gcall(`showView('stocktake')`);
+  ok(getEl('view').innerHTML.includes('Stocktake'), 'stocktake view renders');
+  gcall(`stocktakeStep(1, 1)`);
+  ok(getEl('st-c-1').textContent === '11' && getEl('st-progress').textContent === '1 counted', 'stocktake stepper counts + tracks progress');
+
+  gcall(`showView('audit')`);
+  await wait(20);
+  ok(getEl('view').innerHTML.includes('Mobile sale INV-00001'), 'audit view lists activity');
+
+  gcall(`showView('help')`);
+  ok(getEl('view').innerHTML.includes('Troubleshooting'), 'help view renders the guide');
+
+  gcall(`showView('reports')`);
+  getEl('rep-month').value = '2026-01';
+  await gcall(`loadReportMonth()`);
+  ok(getEl('view').innerHTML.includes('value="2026-01"') || getEl('rep-month').value === '2026-01', 'monthly picker reloads the report for that month');
+  ok(getEl('view').innerHTML.includes('exportMonthCsv()'), 'reports view offers CSV export');
+  ok(getEl('view').innerHTML.includes('Debt aging') || getEl('view').innerHTML.includes('Pagtanda'), 'reports include debt aging');
+  ok(getEl('view').innerHTML.includes('Sales by client') || getEl('view').innerHTML.includes('Benta bawat'), 'reports include sales by client');
+
+  // ---- stocktake photo button ----
+  gcall(`showView('stocktake')`);
+  ok(getEl('view').innerHTML.includes('photoForItem('), 'stocktake rows offer photo capture');
+
+  // ---- quick-item chips + clients CSV ----
+  gcall(`showView('sale')`);
+  ok(getEl('view').innerHTML.includes('quickAddItem('), 'sale view shows quick-item chips');
+  await gcall(`quickAddItem(0)`);
+  ok(cartRef().length === 1, 'quick chip adds to cart');
+  gcall(`showView('transactions')`);
+  await gcall(`exportClientsCsv()`);
+  ok(true, 'clients CSV export runs without throwing');
+
+  // ---- clients: add form, detail, history, redeem, statement ----
+  gcall(`renderClientForm(null)`);
+  ok(getEl('modal-root').innerHTML.includes('cf-name'), 'client add form renders');
+  await gcall(`submitClientForm(null)`);
+  ok(getEl('toast-root').children.some(c => c.textContent.includes('client name')), 'empty client name rejected with guidance');
+  getEl('cf-name').value = 'Tet New';
+  const cliBefore = posts.length;
+  await gcall(`submitClientForm(null)`);
+  ok(posts.length === cliBefore + 1 && posts[cliBefore].path === '/api/clients', 'client add posts to the API');
+  await gcall(`openClientDetail(1)`);
+  ok(getEl('client-detail-body').innerHTML.includes('Maria Santos'), 'client detail shows history');
+  const redBefore = posts.length;
+  await gcall(`redeemClientPoints(1)`);
+  await gcall(`redeemClientPoints(1)`);
+  ok(posts.length === redBefore + 1 && posts[redBefore].path === '/api/clients/1/redeem', 'two-tap redeem posts once armed');
+  const stmt = gcall(`buildStatementText({ name: 'Maria', balance: 100 }, [{ date: '2026-01-01', invoiceNo: 'INV-1', grandTotal: 150, status: 'pending' }], [{ date: '2026-01-02', amount: 50 }])`);
+  ok(String(stmt).includes('BALANCE') && String(stmt).includes('INV-1'), 'statement text builds from history');
+
+  // ---- inventory: valuation card, add form, submit ----
+  gcall(`showView('inventory')`);
+  await wait(20);
+  ok(getEl('inv-valuation').innerHTML.includes('450'), 'valuation card shows retail total');
+  gcall(`renderItemForm(null)`);
+  ok(getEl('modal-root').innerHTML.includes('if-name'), 'item form renders');
+  await gcall(`submitItemForm(null)`);
+  ok(getEl('toast-root').children.some(c => c.textContent.includes('item name')), 'empty item name rejected with guidance');
+  getEl('if-name').value = 'Test Item';
+  const invBefore = posts.length;
+  await gcall(`submitItemForm(null)`);
+  ok(posts.length === invBefore + 1 && posts[invBefore].path === '/api/inventory', 'item add posts to the API');
+
+  gcall(`showView('suppliers')`);
+  await gcall(`renderSupplierPay(1)`);
+  ok(getEl('modal-root').innerHTML.includes('ABC Trading'), 'supplier pay sheet opens for the supplier');
+  getEl('sp-amount').value = '100';
+  await gcall(`submitSupplierPay()`);
+  ok(posts.length && posts[posts.length - 1].path === '/api/supplier-payments', 'supplier payment posts to the API');
+
+  // cashier is also kept out of the audit view
+  storage.set('slpRole', 'cashier');
+  gcall(`showView('audit')`);
+  ok(curRef() === 'home', 'cashier is redirected away from audit');
+  gcall(`showView('suppliers')`);
+  ok(curRef() === 'home', 'cashier is redirected away from suppliers');
+  storage.delete('slpRole');
+  gcall(`showView('home')`);
+
+  // ---- settings edit (owner) ----
+  gcall(`showView('settings')`);
+  await wait(20);
+  gcall(`renderShopEdit()`);
+  ok(getEl('modal-root').innerHTML.includes('se-name'), 'shop edit form renders');
+  ok(getEl('modal-root').innerHTML.includes('se-name'), 'shop edit form renders');
+  getEl('se-name').value = '';
+  await gcall(`submitShopEdit()`);
+  const shopBefore = posts.length;
+  getEl('se-name').value = 'New Shop Name';
+  await gcall(`submitShopEdit()`);
+  ok(posts.length === shopBefore + 4 && posts[shopBefore].path === '/api/settings', 'shop edit saves each field');
+
+  // ---- payment edit/delete, expense edit/delete, petty, supplier add, PO receive ----
+  await gcall(`openClientDetail(1)`);
+  gcall(`renderPaymentEdit(101, 30)`);
+  ok(getEl('modal-root').innerHTML.includes('pe-amount'), 'payment edit sheet renders');
+  getEl('pe-amount').value = '35';
+  const payEditBefore = posts.length;
+  await gcall(`submitPaymentEdit(101)`);
+  ok(posts.length === payEditBefore + 1 && posts[payEditBefore].path === '/api/payments/101', 'payment edit posts');
+  const payDelBefore = posts.length;
+  await gcall(`deletePayment(101)`);
+  await gcall(`deletePayment(101)`);
+  ok(posts.length === payDelBefore + 1 && posts[payDelBefore].path === '/api/payments/101', 'payment delete posts on second tap');
+
+  // ---- expense edit/delete + petty ----
+  gcall(`showView('expenses')`);
+  await gcall(`renderExpenseEdit(1)`);
+  ok(getEl('modal-root').innerHTML.includes('ee-amount'), 'expense edit sheet renders');
+  getEl('ee-amount').value = '25';
+  const expBefore = posts.length;
+  await gcall(`submitExpenseEdit(1)`);
+  ok(posts.length === expBefore + 1 && posts[expBefore].path === '/api/expenses/1', 'expense edit posts');
+  gcall(`closeQuick()`);
+
+  // ---- supplier add ----
+  gcall(`showView('suppliers')`);
+  gcall(`renderSupplierForm()`);
+  ok(getEl('modal-root').innerHTML.includes('sp-name'), 'supplier add form renders');
+  getEl('sp-name').value = '';
+  await gcall(`submitSupplierForm()`);
+  getEl('sp-name').value = 'New Supplier';
+  const supBefore = posts.length;
+  await gcall(`submitSupplierForm()`);
+  ok(posts.length === supBefore + 1 && posts[supBefore].path === '/api/suppliers', 'supplier add posts');
+  gcall(`closeQuick()`);
+
+  // ---- PO receive (two-tap) ----
+  gcall(`showView('purchase-orders')`);
+  const poBefore = posts.length;
+  await gcall(`receivePO(1)`);
+  await gcall(`receivePO(1)`);
+  ok(posts.length === poBefore + 1 && posts[poBefore].path === '/api/purchase-orders/1/receive', 'PO receive posts on second tap');
+
+  // ---- refresh diet, diagnostics, biometrics, report sharing ----
+  const fcBefore = fetchCount;
+  await gcall(`loadAll()`);
+  ok(fetchCount === fcBefore + 1, 'unchanged data skips reload (version probe only)');
+  gcall(`diagPush('test-kind', 'test message')`);
+  ok(storage.get('slpDiag').includes('test message'), 'diagnostics buffer on device');
+  const upResult = await gcall(`uploadDiagnostics(false)`);
+  const dgPost = posts.filter(p => p.path === '/api/mobile-diag').pop();
+  ok(upResult >= 1 && storage.get('slpDiag') === '[]', 'diagnostics upload drains the buffer');
+  ok(dgPost && dgPost.body.entries.some(e => e.message === 'test message'), 'buffered entry posted to the API (alongside the earlier dropped-queue note)');
+  ok((await gcall(`bioAvailable()`)) === false, 'biometrics absent without native runtime');
+  gcall(`renderSettings()`);
+  await wait(20);
+  ok(getEl('view').innerHTML.includes('Diagnostics') && getEl('bio-row').innerHTML === '', 'settings shows diagnostics, no bio option headless');
+  await gcall(`shareMonthReport()`);
+  ok(true, 'report sharing runs without throwing (clipboard fallback)');
+  // (the sandbox has no HTML parser, so sheet content lands on the
+  // txn-detail-body stub instead of inside modal-root — assert there)
+  await gcall(`openTxnDetail(1)`);
+  ok(getEl('txn-detail-body').innerHTML.includes('INV-00001'), 'receipt detail shows the invoice');
+  const postsBeforeReturn = posts.length;
+  await gcall(`returnTxn('INV-00001')`);
+  ok(getEl('return-btn').textContent.includes('confirm'), 'first tap arms the return');
+  await gcall(`returnTxn('INV-00001')`);
+  ok(posts.length === postsBeforeReturn + 1 && posts[postsBeforeReturn].path === '/api/returns', 'second tap posts the return');
+  storage.set('slpRole', 'cashier');
+  await gcall(`openTxnDetail(1)`);
+  ok(!getEl('txn-detail-body').innerHTML.includes('return-btn'), 'cashier sees no return button');
+  storage.delete('slpRole');
+  gcall(`closeQuick()`);
+
+  // ---- partial returns: line picking ----
+  await gcall(`openTxnDetail(1)`);
+  gcall(`toggleReturnLine(0)`);
+  ok(getEl('return-btn').textContent.includes('(1)'), 'tapping a line selects it for partial return');
+  gcall(`toggleReturnLine(0)`);
+  ok(getEl('return-btn').textContent.includes('Return this sale'), 'tapping again deselects back to full return');
+  await gcall(`downscalePhoto('data:image/png;base64,AAA', 2)`);
+  ok(posts.length && posts[posts.length - 1].path === '/api/inventory/2/photo', 'product photo uploads to the item endpoint');
 
   // ---- install prompt wiring ----
   gcall(`renderSettings()`);

@@ -81,6 +81,7 @@ const { createLanApiRouter } = require('./lanApi.js');
 const { registerDbIpc, closeDb, init: sqliteInit, add: dbAddRow, put: dbPutRow, all: dbAllRows } = require('./db.js');
 const { encryptData, decryptData } = require('./crypto.js');
 const backupService = require('./backupService.js');
+const updateDist = require('./updateDist.js');
 const { getConfig } = require('./config.js');
 
 let autoUpdater = null;
@@ -101,6 +102,11 @@ let _lanToken = _savedToken || crypto.randomBytes(24).toString('hex');
 // listed in electron.vite.config.mjs copyMainStatic).
 const pairing = require('./pairing.js');
 pairing.configure({ getToken: () => _lanToken, wsPort: WS_PORT });
+pairing.restoreDevices(readAppPrefs().devices);
+function saveDevices() {
+  try { fs.writeFileSync(APP_CONFIG_PATH, JSON.stringify({ ...readAppPrefs(), devices: pairing.exportDevices() }, null, 2)); }
+  catch (e) { logger.error('Failed to persist paired phones: ' + e.message); }
+}
 function mdnsHostname() {
   try {
     const h = String(os.hostname() || '').toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/^-+|-+$/g, '');
@@ -260,6 +266,27 @@ function setupAutoUpdater() {
     return { success: true };
   });
   ipcMain.handle('install-update', () => { if (autoUpdater) { isQuitting = true; autoUpdater.quitAndInstall(); } });
+  ipcMain.handle('install-lan-update', async (event, { host, port, version }) => {
+    try {
+      if (!autoUpdater || !app.isPackaged) return { success: false, error: 'Auto-update is only available in the installed app.' };
+      if (!host) return { success: false, error: 'No host given' };
+      const axios = require('axios');
+      const base = `http://${host}:${port || LAN_PORT}/update-dist`;
+      const { data } = await axios.get(base + '/lan-latest.yml', { timeout: 15000, responseType: 'text' });
+      const m = String(data || '').match(/^version:\s*(.+)$/m);
+      const remote = m ? m[1].trim().replace(/^'|'$/g, '') : null;
+      if (!remote) return { success: false, error: 'Bad update metadata from host' };
+      if (version && remote !== String(version)) return { success: false, error: 'Host version changed, try again' };
+      if (updateDist.cmpVersions(remote, app.getVersion()) <= 0) return { success: false, error: 'Already up to date' };
+      autoUpdater.setFeedURL({ provider: 'generic', url: base });
+      _feedIsLan = true;
+      checkForUpdates(false);
+      return { success: true, version: remote };
+    } catch (err) {
+      setGithubFeed();
+      return { success: false, error: err.message };
+    }
+  });
   ipcMain.handle('check-update', () => {
     if (!autoUpdater || !app.isPackaged) {
       return { success: false, error: 'Auto-update is only available in the installed app. Run the new installer instead.' };
@@ -273,10 +300,13 @@ function setupAutoUpdater() {
     mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-available', info);
   });
   autoUpdater.on('update-not-available', () => {
+    if (_feedIsLan) setGithubFeed();
     mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-not-available');
   });
   autoUpdater.on('update-downloaded', (info) => {
     _dlState.active = false;
+    if (_feedIsLan) setGithubFeed();
+    publishStagedUpdate(info);
     mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-downloaded', info);
   });
   autoUpdater.on('download-progress', (p) => {
@@ -290,10 +320,69 @@ function setupAutoUpdater() {
   });
   autoUpdater.on('error', (err) => {
     if (_dlState.active) { onDownloadError(err); return; }
+    if (_feedIsLan) setGithubFeed();
     const msg = (err && err.message) || err;
     logger.error('Auto-update error: ' + msg);
     mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-error', isUpdateNetError(err) ? NET_MSG : (msg || 'Update check failed'));
   });
+}
+
+// LAN update distribution: publish this PC's freshly downloaded update so peer
+// PCs pull it over the shop network instead of GitHub. Staged paths come from
+// electron-updater internals (guarded: absent API just means nothing to share).
+function publishStagedUpdate(info) {
+  try {
+    const h = autoUpdater && autoUpdater.downloadedUpdateHelper;
+    const staged = [];
+    for (const p of [h && h.file, h && h.packageFile]) {
+      if (typeof p === 'string' && p && !staged.includes(p)) {
+        try { if (fs.existsSync(p)) staged.push(p); } catch (e) {}
+      }
+    }
+    if (!staged.length) { logger.info('update-dist: no staged files to publish'); return; }
+    for (const p of [...staged]) {
+      try { if (fs.existsSync(p + '.blockmap')) staged.push(p + '.blockmap'); } catch (e) {}
+    }
+    const crypto = require('crypto');
+    const version = (info && info.version) || app.getVersion();
+    const known = {};
+    for (const f of (info && Array.isArray(info.files)) ? info.files : []) {
+      if (f && (f.url || f.path)) known[f.url || f.path] = f;
+    }
+    const files = staged.map(p => {
+      const name = path.basename(p);
+      const k = known[name] || {};
+      let sha512 = k.sha512 || '';
+      let size = k.size || 0;
+      if (!sha512) {
+        try { sha512 = crypto.createHash('sha512').update(fs.readFileSync(p)).digest('base64'); } catch (e) {}
+      }
+      if (!size) {
+        try { size = fs.statSync(p).size; } catch (e) {}
+      }
+      return { url: name, sha512, size };
+    });
+    const first = files[0] || {};
+    const r = updateDist.publishDist(app.getPath('userData'), version,
+      staged.map(p => ({ src: p, name: path.basename(p) })),
+      {
+        version,
+        files,
+        path: (info && info.path) || first.url || '',
+        sha512: (info && info.sha512) || first.sha512 || '',
+        releaseDate: (info && info.releaseDate) || new Date().toISOString()
+      }, logger);
+    logger.info('update-dist publish: ' + (r.ok ? r.files.join(',') : r.error));
+  } catch (e) { logger.error('update-dist publish failed: ' + e.message); }
+}
+
+// Peer-side LAN install: point the updater at a host PC's dist dir, check, and
+// let the normal download/install flow take over. Feed always restored after.
+let _feedIsLan = false;
+function setGithubFeed() {
+  try { autoUpdater.setFeedURL({ provider: 'github', owner: 'stephenruma8-star', repo: 'shop-ledger-ph' }); }
+  catch (e) { logger.error('feed restore failed: ' + e.message); }
+  _feedIsLan = false;
 }
 
 // Connectivity failures (DNS, timeouts, no route) get plain language instead of
@@ -363,20 +452,34 @@ function startLANServer() {
   expressApp.use((req, res, next) => {
     if (req.path === '/api/health' || req.path === '/' || req.path === '/manifest.webmanifest' || req.path === '/mobile-sw.js' || req.path.startsWith('/assets/')) return next();
     const token = req.headers['x-auth-token'] || req.query.token;
-    if (token === _lanToken) return next();
+    // Master house token (PC-to-PC sync, legacy links) or a per-device phone token.
+    if (pairing.verifyToken(token).ok) return next();
     res.status(401).json({ error: 'Unauthorized' });
   });
 
+  // Static phone shell with validator caching: phones revalidate with
+  // If-None-Match and get 304s instead of re-downloading on every visit.
+  function serveStatic(res, req, filePath, contentType) {
+    try {
+      const st = fs.statSync(filePath);
+      const etag = '"' + st.size.toString(36) + '-' + Math.floor(st.mtimeMs / 1000).toString(36) + '"';
+      res.set('ETag', etag);
+      res.set('Cache-Control', 'public, max-age=60');
+      if (req.headers['if-none-match'] === etag) return res.status(304).end();
+      res.type(contentType).send(fs.readFileSync(filePath));
+    } catch (e) { res.status(404).end(); }
+  }
+
   expressApp.get('/', (req, res) => {
-    res.type('html').send(fs.readFileSync(path.join(__dirname, '../renderer/mobile.html'), 'utf8'));
+    serveStatic(res, req, path.join(__dirname, '../renderer/mobile.html'), 'html');
   });
 
   expressApp.get('/manifest.webmanifest', (req, res) => {
-    res.type('application/manifest+json').send(fs.readFileSync(path.join(__dirname, '../renderer/manifest.webmanifest'), 'utf8'));
+    serveStatic(res, req, path.join(__dirname, '../renderer/manifest.webmanifest'), 'application/manifest+json');
   });
 
   expressApp.get('/mobile-sw.js', (req, res) => {
-    res.type('application/javascript').send(fs.readFileSync(path.join(__dirname, '../renderer/mobile-sw.js'), 'utf8'));
+    serveStatic(res, req, path.join(__dirname, '../renderer/mobile-sw.js'), 'application/javascript');
   });
 
   expressApp.get('/assets/:file', (req, res) => {
@@ -384,7 +487,8 @@ function startLANServer() {
     if (!/^[a-zA-Z0-9._-]+$/.test(name)) return res.status(400).end();
     const p = path.join(__dirname, '../renderer/assets', name);
     if (!fs.existsSync(p)) return res.status(404).end();
-    res.type(name.endsWith('.png') ? 'image/png' : 'application/octet-stream').send(fs.readFileSync(p));
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.type(name.endsWith('.png') ? 'image/png' : name.endsWith('.css') ? 'text/css' : 'application/octet-stream').send(fs.readFileSync(p));
   });
 
   expressApp.use(createLanApiRouter({
@@ -397,9 +501,18 @@ function startLANServer() {
     backupService,
     logger,
     notify: (info) => notifyDataChanged(info),
+    getUpdateDistFile: (name) => updateDist.resolveDistFile(app.getPath('userData'), name),
     lanToken: _lanToken,
     maxRatePerMin: config.MAX_RATE_PER_MIN,
-    redeemPairCode: (code) => pairing.redeemPairCode(code),
+    redeemPairCode: (code, name) => pairing.redeemPairCode(code, name),
+    redeemClaim: (claim, name) => pairing.redeemClaim(claim, name),
+    verifyToken: (t) => pairing.verifyToken(t),
+    printThermal: ({ host, port, lines }) => sendThermalLines(host, port, lines),
+    sendRemindersNow: async () => {
+      const out = await mainWindow.webContents.executeJavaScript('(async()=>{try{return JSON.stringify(await sendOverdueReminders());}catch(e){return JSON.stringify({sent:0,failed:0,total:0,error:e.message});}})()');
+      try { return JSON.parse(out); } catch (e) { return { sent: 0, failed: 0, total: 0 }; }
+    },
+    onDevicesChanged: () => saveDevices(),
     wsPort: WS_PORT
   }));
 
@@ -438,8 +551,9 @@ function startUDPBroadcast() {
       try {
         const pkt = JSON.parse(msg.toString());
         if (pkt.type === 'update-signal' && mainWindow && !mainWindow.isDestroyed()) {
+          if (isSelfAddress(rinfo.address)) return;
           const sender = pkt.hostName || rinfo.address;
-          mainWindow.webContents.send('lan-update-signal', { from: sender, version: pkt.version || '?' });
+          mainWindow.webContents.send('lan-update-signal', { from: sender, version: pkt.version || '?', host: rinfo.address, hasDist: !!pkt.hasDist, distVersion: pkt.distVersion || null, distPort: pkt.distPort || null });
         }
       } catch (e) {}
     });
@@ -449,13 +563,35 @@ function startUDPBroadcast() {
   } catch (e) { logger.error('UDP broadcast error: ' + e.message); }
 }
 
+function isSelfAddress(addr) {
+  try {
+    if (!addr) return false;
+    if (addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1') return true;
+    const fams = os.networkInterfaces();
+    for (const name of Object.keys(fams)) {
+      for (const iface of fams[name]) {
+        if (iface.address === addr || addr === '::ffff:' + iface.address) return true;
+      }
+    }
+  } catch (e) {}
+  return false;
+}
+
 function broadcastUpdateSignal() {
   if (!udpBroadcast) return;
   try {
+    let dist = null;
+    try {
+      const di = updateDist.distInfo(app.getPath('userData'));
+      if (di.available) dist = { version: di.version, port: LAN_PORT };
+    } catch (e) {}
     const msg = JSON.stringify({
       type: 'update-signal',
       version: app.getVersion(),
-      hostName: os.hostname()
+      hostName: os.hostname(),
+      hasDist: !!dist,
+      distVersion: dist ? dist.version : null,
+      distPort: dist ? dist.port : null
     });
     udpBroadcast.send(msg, 0, msg.length, UDP_PORT, '255.255.255.255');
   } catch (e) { logger.error('broadcast error: ' + e.message); }
@@ -737,26 +873,56 @@ ipcMain.handle('load-backup-file', async () => {
 
 ipcMain.handle('generate-mobile-qr', async () => {
   const protocol = (config.ENABLE_HTTPS && fs.existsSync(path.join(app.getPath('userData'), 'ssl', 'cert.pem')) && fs.existsSync(path.join(app.getPath('userData'), 'ssl', 'key.pem'))) ? 'https' : 'http';
-  const url = `${protocol}://${getLocalIP()}:${LAN_PORT}?ws=${WS_PORT}&token=${_lanToken}`;
+  // Single-use claim: the phone exchanges it for its own device token, so the
+  // shared house token never travels in QR links anymore.
+  const { claim } = pairing.createClaim();
+  const url = `${protocol}://${getLocalIP()}:${LAN_PORT}?ws=${WS_PORT}&claim=${claim}`;
   const mdns = mdnsHostname();
-  const mdnsUrl = mdns ? `${protocol}://${mdns}:${LAN_PORT}?ws=${WS_PORT}&token=${_lanToken}` : null;
+  const mdnsUrl = mdns ? `${protocol}://${mdns}:${LAN_PORT}?ws=${WS_PORT}&claim=${claim}` : null;
   const qr = await QRCode.toDataURL(url, { width: 300 });
   const tsIp = getTailscaleIP();
   let tailscale = null;
   if (tsIp) {
-    const tsUrl = `${protocol}://${tsIp}:${LAN_PORT}?ws=${WS_PORT}&token=${_lanToken}`;
+    const tsUrl = `${protocol}://${tsIp}:${LAN_PORT}?ws=${WS_PORT}&claim=${claim}`;
     tailscale = { url: tsUrl, qr: await QRCode.toDataURL(tsUrl, { width: 300 }) };
   }
-  return { url, qr, token: _lanToken, wsPort: WS_PORT, tailscale, mdnsUrl };
+  return { url, qr, wsPort: WS_PORT, tailscale, mdnsUrl };
 });
 
 ipcMain.handle('create-pair-code', () => pairing.createPairCode());
+ipcMain.handle('list-devices', () => { try { return { success: true, devices: pairing.listDevices() }; } catch (e) { return { success: false, error: e.message }; } });
+ipcMain.handle('revoke-device', (event, { id }) => {
+  try {
+    const ok = pairing.revokeDeviceToken(id);
+    if (ok) saveDevices();
+    return { success: ok };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+ipcMain.handle('set-device-role', (event, { id, role }) => {
+  try {
+    const ok = pairing.setDeviceRole(id, role);
+    if (ok) saveDevices();
+    return { success: ok };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+// Update rollback: which staged versions are retained on disk (current +
+// previous) so a broken update can be reinstalled manually.
+ipcMain.handle('get-update-dist-info', () => {
+  try { return { success: true, info: updateDist.distInfo(app.getPath('userData')) }; }
+  catch (e) { return { success: false, error: e.message }; }
+});
+ipcMain.handle('open-update-dist-folder', async () => {
+  try { await shell.openPath(updateDist.distRoot(app.getPath('userData'))); return { success: true }; }
+  catch (e) { return { success: false, error: e.message }; }
+});
 
-// Rotates the LAN access token: connected phones get disconnected and old codes stop working.
+// Rotates the LAN access token and clears every paired phone: connected phones
+// get disconnected and old codes/claims stop working.
 ipcMain.handle('rotate-lan-token', async () => {
   _lanToken = crypto.randomBytes(24).toString('hex');
   pairing.invalidate();
-  try { fs.writeFileSync(APP_CONFIG_PATH, JSON.stringify({ ...readAppPrefs(), lanToken: _lanToken }, null, 2)); } catch (e) { logger.error('Failed to save rotated token: ' + e.message); }
+  pairing.clearDeviceTokens();
+  try { fs.writeFileSync(APP_CONFIG_PATH, JSON.stringify({ ...readAppPrefs(), lanToken: _lanToken, devices: [] }, null, 2)); } catch (e) { logger.error('Failed to save rotated token: ' + e.message); }
   logger.info('LAN access token rotated');
   return { success: true, token: _lanToken };
 });
@@ -889,7 +1055,7 @@ function buildEscPos(lines) {
   return Buffer.concat(parts);
 }
 
-ipcMain.handle('print-thermal', async (event, { host, port, lines }) => {
+function sendThermalLines(host, port, lines) {
   return new Promise((resolve) => {
     const sock = net.createConnection({ host, port: parseInt(port, 10) || 9100 }, () => {
       sock.write(buildEscPos(lines || []), () => {
@@ -900,7 +1066,8 @@ ipcMain.handle('print-thermal', async (event, { host, port, lines }) => {
     sock.on('error', (err) => resolve({ success: false, error: err.message }));
     sock.setTimeout(10000, () => { sock.destroy(); resolve({ success: false, error: 'Timed out connecting to printer' }); });
   });
-});
+}
+ipcMain.handle('print-thermal', async (event, { host, port, lines }) => sendThermalLines(host, port, lines));
 
 function buildMenu() {
   return Menu.buildFromTemplate([
@@ -931,6 +1098,7 @@ app.whenReady().then(() => {
     wsServer = startWsServer({
       port: WS_PORT,
       token: _lanToken,
+      verify: (t) => pairing.verifyToken(t).ok,
       onMessage: (msg) => {
         if (msg.type === 'update') notifyDataChanged({ source: 'mobile', kind: 'data' });
       }

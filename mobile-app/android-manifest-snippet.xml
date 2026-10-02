@@ -1,0 +1,9 @@
+<!-- Applied to android/app/src/main/AndroidManifest.xml AFTER `npx cap add android`.
+     Shop Wi-Fi is plain http (cleartext) and scanning needs the camera. -->
+<uses-permission android:name="android.permission.CAMERA" />
+<uses-permission android:name="android.permission.FLASHLIGHT" />
+<application android:usesCleartextTraffic="true" ...>
+  <!-- ML Kit model download for the barcode scanner -->
+  <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="barcode_ui" />
+  ...
+</application>
