@@ -1,5 +1,5 @@
 {
-    "version":  "3.34.0",
-    "buildDate":  "2026-10-01T00:00:00.000Z",
-    "notes":  "Phone parity round: client add/edit/history/statements/loyalty, inventory add/edit with valuation and expiry, sale void, payment and expense edit/delete, petty cash, supplier add with payment history, PO receiving, debt aging, sales by client, CSV exports, shop settings edit, debts view with SMS reminders, quick-sale presets."
+    "version":  "3.35.0",
+    "buildDate":  "2026-10-02T00:00:00.000Z",
+    "notes":  "Removes the Mobile Access pairing screen from the desktop app. Desktop is now standalone; phone pairing is no longer offered."
 }
