@@ -16,7 +16,7 @@ function renderSale() {
       <input id="counter-search" type="text" placeholder="${esc(T('sale.search_ph'))}" oninput="counterSearch(this.value)" autocomplete="off" class="inp pl-10" />
       <div id="counter-results" class="grid gap-1.5 mt-1.5"></div>
     </div>
-    ${(data.quickItems || []).length ? `<div class="flex gap-1.5 mb-3 fade-in overflow-x-auto" style="scrollbar-width:none">${data.quickItems.slice(0, 12).map((q, qi) => `<button onclick="quickAddItem(${qi})" class="shrink-0 px-3 py-2 rounded-xl text-xs font-semibold" style="background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);color:#93c5fd">${esc(q.name)} · ${peso(q.price)}</button>`).join('')}</div>` : ''}
+    ${(data.quickItems || []).length ? `<div class="flex gap-1.5 mb-3 fade-in overflow-x-auto" style="scrollbar-width:none">${data.quickItems.slice(0, 12).map((q, qi) => `<button onclick="quickAddItem(${qi})" class="shrink-0 px-3 py-2 rounded-xl text-xs font-semibold" style="background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);color:#93c5fd">${esc(q.name)} · ${peso(q.price)}</button>`).join('')}${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button onclick="managePresets()" class="shrink-0 px-3 py-2 rounded-xl text-xs font-semibold" style="background:rgba(255,255,255,.06);border:1px dashed rgba(255,255,255,.2);color:#94a3b8">⚙️ Presets</button>` : ''}</div>` : ''}
     ${lastFailedSale ? `<button onclick="retrySale()" class="w-full mb-3 py-2.5 rounded-xl font-semibold text-sm fade-in" style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.5);color:#fbbf24">${T('sale.retry')}</button>` : ''}
     <div class="glass-card rounded-2xl p-2 mb-3 fade-in">
       ${cart.length ? cart.map((i, idx) => `
@@ -297,6 +297,69 @@ function quickAddItem(qi) {
   feelAdd();
   toast(T('sale.added', { name: q.name }), 'ok');
   if (currentView === 'sale') renderSale();
+}
+// Standalone-only: manage quick-sale presets (desktop manages them in its
+// own Backups screen; the LAN API is read-only). Gated at the call site.
+function managePresets() {
+  const list = (data.quickItems || []).map(q => `
+    <div class="row py-2.5 px-1">
+      <div class="flex-1 min-w-0"><div class="text-sm font-medium truncate text-gray-200">${esc(q.name)}</div>
+      <div class="text-[11px] text-gray-500 num">${peso(q.price)}</div></div>
+      <button onclick="deletePreset(${q.id})" class="text-red-400 text-xs px-2.5 py-1.5 rounded-lg shrink-0" style="background:rgba(239,68,68,.1)">Delete</button>
+    </div>`).join('') || `<p class="text-sm text-gray-500 text-center py-4">No presets yet.</p>`;
+  const invOpts = (data.inventory || [])
+    .filter(i => (i.stock || 0) > 0)
+    .slice(0, 200)
+    .map(i => `<option value="${i.id}">${esc(i.name)} · ${peso(i.price)}</option>`).join('');
+  document.getElementById('modal-root').innerHTML = `
+    <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
+      <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:92dvh;overflow-y:auto" onclick="event.stopPropagation()">
+        <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
+        <h3 class="font-bold text-gray-100 text-sm mb-3">⚡ Quick-sale presets</h3>
+        ${list}
+        <div class="border-t border-white/10 mt-3 pt-3 space-y-2">
+          <input id="preset-name" class="inp" maxlength="80" placeholder="Preset name" />
+          <div class="flex gap-2">
+            <input id="preset-price" class="inp" type="number" min="0" step="0.01" placeholder="Price" />
+            <button onclick="addPreset()" class="btn btn-primary shrink-0">Add</button>
+          </div>
+          ${invOpts ? `<select id="preset-inv" class="inp"><option value="">— or pick a catalog item —</option>${invOpts}</select>
+          <button onclick="addPresetFromCatalog()" class="btn btn-ghost w-full">Add catalog item as preset</button>` : ''}
+        </div>
+        <button onclick="closeQuick()" class="btn btn-ghost w-full mt-3">Done</button>
+      </div>
+    </div>`;
+}
+async function addPreset() {
+  const name = ((document.getElementById('preset-name') || {}).value || '').trim();
+  const price = parseFloat((document.getElementById('preset-price') || {}).value) || 0;
+  if (!name) { toast('Preset name required', 'err'); return; }
+  try {
+    await apiPost('/api/quick-items', { name, price });
+    data.quickItems = await apiGet('/api/quick-items');
+    managePresets();
+    if (currentView === 'sale') renderSale();
+  } catch (e) { toast(e.message, 'err'); }
+}
+async function addPresetFromCatalog() {
+  const sel = document.getElementById('preset-inv');
+  const id = sel && sel.value ? Number(sel.value) : null;
+  const item = id != null && (data.inventory || []).find(i => i.id === id);
+  if (!item) return;
+  try {
+    await apiPost('/api/quick-items', { name: item.name, price: item.price || 0, invId: item.id });
+    data.quickItems = await apiGet('/api/quick-items');
+    managePresets();
+    if (currentView === 'sale') renderSale();
+  } catch (e) { toast(e.message, 'err'); }
+}
+async function deletePreset(id) {
+  try {
+    await apiPost('/api/quick-items/' + encodeURIComponent(id), {}, 'DELETE');
+    data.quickItems = await apiGet('/api/quick-items');
+    managePresets();
+    if (currentView === 'sale') renderSale();
+  } catch (e) { toast(e.message, 'err'); }
 }
 // ---------- barcode scan-to-cart ----------
 // Uses the phone camera + built-in BarcodeDetector (Chrome/Edge). Plain-http

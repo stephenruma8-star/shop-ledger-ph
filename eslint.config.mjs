@@ -23,9 +23,10 @@ export default [
     },
   },
   {
-    // Phone UI sources (assembled into mobile.html by scripts/build-mobile.mjs):
-    // single shared scope like the built file, browser globals throughout.
-    files: ['src/mobile/**/*.js'],
+    // Phone UI sources (assembled by scripts/build-mobile.mjs and
+    // scripts/build-standalone.mjs): single shared scope like the built
+    // file, browser globals throughout.
+    files: ['src/mobile/**/*.js', 'src/mobile-standalone/**/*.js'],
     languageOptions: { globals: { ...globals.browser }, sourceType: 'script' },
     rules: {
       'no-unused-vars': 'off',

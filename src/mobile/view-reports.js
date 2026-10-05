@@ -133,6 +133,11 @@ function exportMonthCsv() {
   const inp = document.getElementById('rep-month');
   const m = ((inp && inp.value) || '').trim() || monthKey(new Date());
   if (!/^\d{4}-\d{2}$/.test(m)) return;
+  // Standalone: build the CSV on-device and share it (no server download).
+  if (typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) {
+    exportMonthCsvLocal(m);
+    return;
+  }
   const tok = getToken();
   if (!tok) { renderPairScreen(); return; }
   // The CSV downloads through the system browser (auth travels in the URL,
@@ -144,6 +149,13 @@ function exportMonthCsv() {
     if (B && typeof B.open === 'function') { B.open({ url }).catch(() => {}); return; }
   } catch (e) {}
   try { window.open(url, '_blank'); } catch (e) { toast(T('upd.open_fail'), 'err'); }
+}
+async function exportMonthCsvLocal(m) {
+  try {
+    const r = await apiGet('/api/reports/export.csv?month=' + m);
+    if (!r || !r.csv) throw new Error('empty report');
+    await shareText('ShopLedger-' + m + '.csv', r.csv);
+  } catch (e) { toast(T('rep.load_fail', { m, msg: e.message }), 'err'); }
 }
 async function shareMonthReport() {
   const r = data.reports;

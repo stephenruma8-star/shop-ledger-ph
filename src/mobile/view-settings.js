@@ -79,6 +79,11 @@ function renderShopEdit() {
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('set.shop_receipt_footer')}</label>
             <input id="se-footer" type="text" maxlength="200" value="${esc(s.receiptFooter || '')}" class="inp" />
           </div>
+          ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `
+          <div>
+            <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">Printer IP (Wi-Fi receipt printer)</label>
+            <input id="se-thermal" type="text" maxlength="40" placeholder="192.168.1.50" value="${esc(s.thermalHost || '')}" class="inp" />
+          </div>` : ''}
           <button onclick="submitShopEdit()" class="btn btn-primary btn-lg">${T('set.save_shop')}</button>
         </div>
       </div>
@@ -91,6 +96,10 @@ async function submitShopEdit() {
     shopContact: ((document.getElementById('se-contact') || {}).value || '').trim(),
     receiptFooter: ((document.getElementById('se-footer') || {}).value || '').trim()
   };
+  if (typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) {
+    const th = document.getElementById('se-thermal');
+    if (th) vals.thermalHost = (th.value || '').trim().slice(0, 40);
+  }
   if (!vals.shopName) { toast(T('set.need_name'), 'err'); return; }
   if (!takeSubmitLock('shopedit')) return;
   try {

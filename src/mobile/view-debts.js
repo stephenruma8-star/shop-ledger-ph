@@ -43,7 +43,28 @@ async function sendSmsReminders() {
   try {
     const r = await apiPost('/api/sms-reminders', {});
     feelOk();
-    toast(T('debts.sent', { n: (r && r.sent) || 0 }), 'ok');
+    // Standalone: no SMS gateway on the phone — open one pre-filled text
+    // per debtor (smsto: needs no permission, one tap each).
+    if (r && Array.isArray(r.texts) && r.texts.length) {
+      const list = r.texts.map((t, i) =>
+        `<a href="smsto:${esc(t.phone)}?body=${encodeURIComponent(t.text)}" class="row py-2.5" style="text-decoration:none">
+          <span class="flex-1 min-w-0"><span class="block font-semibold text-sm text-gray-200 truncate">${esc(t.name)}</span>
+          <span class="block text-[11px] text-gray-500 truncate">${esc(t.phone)}</span></span>
+          <span class="btn btn-ghost btn-sm shrink-0">📩 Text</span>
+        </a>`).join('');
+      document.getElementById('modal-root').innerHTML = `
+        <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
+          <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:92dvh;overflow-y:auto" onclick="event.stopPropagation()">
+            <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
+            <h3 class="font-bold text-gray-100 text-sm mb-1">Reminders (${r.texts.length})</h3>
+            <p class="text-[11px] text-gray-500 mb-2">Tap Text to open each message ready to send.</p>
+            ${list}
+            <button onclick="closeQuick()" class="btn btn-ghost w-full mt-3">Close</button>
+          </div>
+        </div>`;
+    } else {
+      toast(T('debts.sent', { n: (r && r.sent) || 0 }), 'ok');
+    }
   } catch (e) { feelErr(); toast(T('debts.failed', { msg: e.message }), 'err'); }
   finally { releaseSubmitLock('sms'); }
 }
