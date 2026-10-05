@@ -1,5 +1,7 @@
-// Syncs the built phone UI into the native app shell (mobile-app/www/app/).
-// The APK bundles this snapshot, so re-run after any phone UI change:
+// Syncs the legacy LAN phone UI snapshot (src/renderer/mobile.html) under
+// mobile-app/www/lan/ for reference. The shipped APK bundle lives at
+// mobile-app/www/app/ and is owned by scripts/build-standalone.mjs —
+// this script must not touch it.
 //   node mobile-app/scripts/sync-phone-ui.mjs [--check]
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
@@ -7,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CHECK = process.argv.includes('--check');
-const app = (...p) => resolve(root, 'mobile-app', 'www', 'app', ...p);
+const app = (...p) => resolve(root, 'mobile-app', 'www', 'lan', ...p);
 
 const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
 const files = [

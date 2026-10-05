@@ -2520,7 +2520,7 @@ function renderSale() {
       <input id="counter-search" type="text" placeholder="${esc(T('sale.search_ph'))}" oninput="counterSearch(this.value)" autocomplete="off" class="inp pl-10" />
       <div id="counter-results" class="grid gap-1.5 mt-1.5"></div>
     </div>
-    ${(data.quickItems || []).length ? `<div class="flex gap-1.5 mb-3 fade-in overflow-x-auto" style="scrollbar-width:none">${data.quickItems.slice(0, 12).map((q, qi) => `<button onclick="quickAddItem(${qi})" class="shrink-0 px-3 py-2 rounded-xl text-xs font-semibold" style="background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);color:#93c5fd">${esc(q.name)} · ${peso(q.price)}</button>`).join('')}</div>` : ''}
+    ${(data.quickItems || []).length ? `<div class="flex gap-1.5 mb-3 fade-in overflow-x-auto" style="scrollbar-width:none">${data.quickItems.slice(0, 12).map((q, qi) => `<button onclick="quickAddItem(${qi})" class="shrink-0 px-3 py-2 rounded-xl text-xs font-semibold" style="background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);color:#93c5fd">${esc(q.name)} · ${peso(q.price)}</button>`).join('')}${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button onclick="managePresets()" class="shrink-0 px-3 py-2 rounded-xl text-xs font-semibold" style="background:rgba(255,255,255,.06);border:1px dashed rgba(255,255,255,.2);color:#94a3b8">⚙️ Presets</button>` : ''}</div>` : ''}
     ${lastFailedSale ? `<button onclick="retrySale()" class="w-full mb-3 py-2.5 rounded-xl font-semibold text-sm fade-in" style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.5);color:#fbbf24">${T('sale.retry')}</button>` : ''}
     <div class="glass-card rounded-2xl p-2 mb-3 fade-in">
       ${cart.length ? cart.map((i, idx) => `
@@ -2801,6 +2801,69 @@ function quickAddItem(qi) {
   feelAdd();
   toast(T('sale.added', { name: q.name }), 'ok');
   if (currentView === 'sale') renderSale();
+}
+// Standalone-only: manage quick-sale presets (desktop manages them in its
+// own Backups screen; the LAN API is read-only). Gated at the call site.
+function managePresets() {
+  const list = (data.quickItems || []).map(q => `
+    <div class="row py-2.5 px-1">
+      <div class="flex-1 min-w-0"><div class="text-sm font-medium truncate text-gray-200">${esc(q.name)}</div>
+      <div class="text-[11px] text-gray-500 num">${peso(q.price)}</div></div>
+      <button onclick="deletePreset(${q.id})" class="text-red-400 text-xs px-2.5 py-1.5 rounded-lg shrink-0" style="background:rgba(239,68,68,.1)">Delete</button>
+    </div>`).join('') || `<p class="text-sm text-gray-500 text-center py-4">No presets yet.</p>`;
+  const invOpts = (data.inventory || [])
+    .filter(i => (i.stock || 0) > 0)
+    .slice(0, 200)
+    .map(i => `<option value="${i.id}">${esc(i.name)} · ${peso(i.price)}</option>`).join('');
+  document.getElementById('modal-root').innerHTML = `
+    <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
+      <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:92dvh;overflow-y:auto" onclick="event.stopPropagation()">
+        <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
+        <h3 class="font-bold text-gray-100 text-sm mb-3">⚡ Quick-sale presets</h3>
+        ${list}
+        <div class="border-t border-white/10 mt-3 pt-3 space-y-2">
+          <input id="preset-name" class="inp" maxlength="80" placeholder="Preset name" />
+          <div class="flex gap-2">
+            <input id="preset-price" class="inp" type="number" min="0" step="0.01" placeholder="Price" />
+            <button onclick="addPreset()" class="btn btn-primary shrink-0">Add</button>
+          </div>
+          ${invOpts ? `<select id="preset-inv" class="inp"><option value="">— or pick a catalog item —</option>${invOpts}</select>
+          <button onclick="addPresetFromCatalog()" class="btn btn-ghost w-full">Add catalog item as preset</button>` : ''}
+        </div>
+        <button onclick="closeQuick()" class="btn btn-ghost w-full mt-3">Done</button>
+      </div>
+    </div>`;
+}
+async function addPreset() {
+  const name = ((document.getElementById('preset-name') || {}).value || '').trim();
+  const price = parseFloat((document.getElementById('preset-price') || {}).value) || 0;
+  if (!name) { toast('Preset name required', 'err'); return; }
+  try {
+    await apiPost('/api/quick-items', { name, price });
+    data.quickItems = await apiGet('/api/quick-items');
+    managePresets();
+    if (currentView === 'sale') renderSale();
+  } catch (e) { toast(e.message, 'err'); }
+}
+async function addPresetFromCatalog() {
+  const sel = document.getElementById('preset-inv');
+  const id = sel && sel.value ? Number(sel.value) : null;
+  const item = id != null && (data.inventory || []).find(i => i.id === id);
+  if (!item) return;
+  try {
+    await apiPost('/api/quick-items', { name: item.name, price: item.price || 0, invId: item.id });
+    data.quickItems = await apiGet('/api/quick-items');
+    managePresets();
+    if (currentView === 'sale') renderSale();
+  } catch (e) { toast(e.message, 'err'); }
+}
+async function deletePreset(id) {
+  try {
+    await apiPost('/api/quick-items/' + encodeURIComponent(id), {}, 'DELETE');
+    data.quickItems = await apiGet('/api/quick-items');
+    managePresets();
+    if (currentView === 'sale') renderSale();
+  } catch (e) { toast(e.message, 'err'); }
 }
 // ---------- barcode scan-to-cart ----------
 // Uses the phone camera + built-in BarcodeDetector (Chrome/Edge). Plain-http
@@ -3915,6 +3978,11 @@ function exportMonthCsv() {
   const inp = document.getElementById('rep-month');
   const m = ((inp && inp.value) || '').trim() || monthKey(new Date());
   if (!/^\d{4}-\d{2}$/.test(m)) return;
+  // Standalone: build the CSV on-device and share it (no server download).
+  if (typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) {
+    exportMonthCsvLocal(m);
+    return;
+  }
   const tok = getToken();
   if (!tok) { renderPairScreen(); return; }
   // The CSV downloads through the system browser (auth travels in the URL,
@@ -3926,6 +3994,13 @@ function exportMonthCsv() {
     if (B && typeof B.open === 'function') { B.open({ url }).catch(() => {}); return; }
   } catch (e) {}
   try { window.open(url, '_blank'); } catch (e) { toast(T('upd.open_fail'), 'err'); }
+}
+async function exportMonthCsvLocal(m) {
+  try {
+    const r = await apiGet('/api/reports/export.csv?month=' + m);
+    if (!r || !r.csv) throw new Error('empty report');
+    await shareText('ShopLedger-' + m + '.csv', r.csv);
+  } catch (e) { toast(T('rep.load_fail', { m, msg: e.message }), 'err'); }
 }
 async function shareMonthReport() {
   const r = data.reports;
@@ -4020,6 +4095,11 @@ function renderShopEdit() {
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('set.shop_receipt_footer')}</label>
             <input id="se-footer" type="text" maxlength="200" value="${esc(s.receiptFooter || '')}" class="inp" />
           </div>
+          ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `
+          <div>
+            <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">Printer IP (Wi-Fi receipt printer)</label>
+            <input id="se-thermal" type="text" maxlength="40" placeholder="192.168.1.50" value="${esc(s.thermalHost || '')}" class="inp" />
+          </div>` : ''}
           <button onclick="submitShopEdit()" class="btn btn-primary btn-lg">${T('set.save_shop')}</button>
         </div>
       </div>
@@ -4032,6 +4112,10 @@ async function submitShopEdit() {
     shopContact: ((document.getElementById('se-contact') || {}).value || '').trim(),
     receiptFooter: ((document.getElementById('se-footer') || {}).value || '').trim()
   };
+  if (typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) {
+    const th = document.getElementById('se-thermal');
+    if (th) vals.thermalHost = (th.value || '').trim().slice(0, 40);
+  }
   if (!vals.shopName) { toast(T('set.need_name'), 'err'); return; }
   if (!takeSubmitLock('shopedit')) return;
   try {
@@ -4278,7 +4362,28 @@ async function sendSmsReminders() {
   try {
     const r = await apiPost('/api/sms-reminders', {});
     feelOk();
-    toast(T('debts.sent', { n: (r && r.sent) || 0 }), 'ok');
+    // Standalone: no SMS gateway on the phone — open one pre-filled text
+    // per debtor (smsto: needs no permission, one tap each).
+    if (r && Array.isArray(r.texts) && r.texts.length) {
+      const list = r.texts.map((t, i) =>
+        `<a href="smsto:${esc(t.phone)}?body=${encodeURIComponent(t.text)}" class="row py-2.5" style="text-decoration:none">
+          <span class="flex-1 min-w-0"><span class="block font-semibold text-sm text-gray-200 truncate">${esc(t.name)}</span>
+          <span class="block text-[11px] text-gray-500 truncate">${esc(t.phone)}</span></span>
+          <span class="btn btn-ghost btn-sm shrink-0">📩 Text</span>
+        </a>`).join('');
+      document.getElementById('modal-root').innerHTML = `
+        <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
+          <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:92dvh;overflow-y:auto" onclick="event.stopPropagation()">
+            <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
+            <h3 class="font-bold text-gray-100 text-sm mb-1">Reminders (${r.texts.length})</h3>
+            <p class="text-[11px] text-gray-500 mb-2">Tap Text to open each message ready to send.</p>
+            ${list}
+            <button onclick="closeQuick()" class="btn btn-ghost w-full mt-3">Close</button>
+          </div>
+        </div>`;
+    } else {
+      toast(T('debts.sent', { n: (r && r.sent) || 0 }), 'ok');
+    }
   } catch (e) { feelErr(); toast(T('debts.failed', { msg: e.message }), 'err'); }
   finally { releaseSubmitLock('sms'); }
 }

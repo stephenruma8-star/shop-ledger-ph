@@ -8,6 +8,7 @@ certs/
 
 mobile-app/android/
 mobile-app/www/app/
+mobile-app/www/lan/
 
 
 *.keystore
