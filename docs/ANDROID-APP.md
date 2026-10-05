@@ -1,37 +1,38 @@
-# Shop Ledger PH — Android app
+# Shop Ledger PH — Android app (standalone)
 
-Native Android companion built with Capacitor v8 around the LAN phone UI.
-The APK bundles a snapshot of the phone UI; the **shop computer is still
-required** — it remains the server (database, API, printer). The app adds:
-native camera barcode scanning (works on plain-http shop Wi-Fi, where the
-browser blocks the camera), haptics, proper back-button behavior, and a
-connect screen with saved shops. No Play Store needed for shop use: the APK
-sideloads directly. A ready debug APK ships with every desktop release
-(starting v3.30.0) as `Shop-Ledger-Mobile-X.Y.Z-debug.apk` — grab it for
-testing; follow below to build your own signed release.
+Native Android POS built with Capacitor v8. Since v4.0.0 the phone is a
+**fully independent shop ledger**: its own on-device SQLite database, all
+sales/clients/inventory/suppliers/expenses/reports logic running locally.
+No desktop, no pairing, no Wi-Fi needed — except for the thermal printer.
+
+The app adds over the browser: native camera barcode scanning, haptics,
+proper back-button behavior, biometric/PIN lock, and direct Wi-Fi receipt
+printing through the first-party `ShopPrinter` plugin (raw TCP ESC/POS,
+same bytes the desktop sends). No Play Store needed: the signed APK
+sideloads directly. Releases ship as `Shop-Ledger-Mobile-X.Y.Z-standalone.apk`
+under the `mobile-vX.Y.Z` prerelease tags (pre-release so desktop
+updaters ignore them).
 
 ## One-time setup (on a machine with Android Studio)
 
-Prerequisites: **Android Studio** (includes SDK + a suitable JDK — use the
-Studio-bundled JDK), Node LTS, and (for the scanner) a device with Google
-Play services. This repo machine has none of these, so all of this runs on
-yours.
+Prerequisites: **Android Studio** (SDK + JDK), Node LTS, and a device with
+Google Play services for the scanner.
 
 ```powershell
 cd mobile-app
 npm install
-node scripts/sync-phone-ui.mjs
-npx cap add android
+node scripts/build-standalone.mjs
+npx cap sync android
 ```
 
 Then apply `mobile-app/android-manifest-snippet.xml` to
-`android/app/src/main/AndroidManifest.xml` (camera permission + cleartext
-http for shop Wi-Fi + ML Kit model), and in
-`android/variables.gradle` set `minSdkVersion = 26` (barcode scanner
-requirement; Android 8+, covers virtually every device today).
+`android/app/src/main/AndroidManifest.xml` (camera permission + cleartext),
+and wire the local printer plugin (see
+`mobile-app/plugins/shop-printer/README.md`: settings.gradle include,
+`implementation project(':shop-printer')`, `registerPlugin` in
+MainActivity — `npx cap sync` preserves all three).
 
-Icons (one command, needs a source image — `src/renderer/assets/pwa-512.png`
-works):
+Icons (one command, `src/renderer/assets/pwa-512.png` works as source):
 
 ```powershell
 npx @capacitor/assets generate --iconBackgroundColor '#0f172a' --splashBackgroundColor '#0f172a'
@@ -39,58 +40,51 @@ npx cap sync
 npx cap open android
 ```
 
+Keystore: `mobile-app/shop-ledger-release.keystore` (gitignored — back it
+up; lose it and installed apps can never update). Passwords live in
+`mobile-app/android/gradle.properties` (also ignored).
+
 ## Run / build
 
 - **Try it:** in Android Studio, pick a device/emulator and press Run. For
-  barcode scanning use a physical device (emulators lack Play-services
-  vision unless the image ships it).
-- **Debug APK** (sideload for testing): `Build → Build App Bundle(s) / APK(s)
-  → Build APK(s)`, or `./gradlew assembleDebug` in `mobile-app/android`.
-  Copy the APK to the phone, allow “install unknown apps”, install.
-- **Release APK:** `Build → Generate Signed Bundle / APK`, create a
-  keystore once, keep it backed up — lose it and you can never update the
-  installed app. Share the signed APK (Drive, USB, QR to the file).
+  barcode scanning use a physical device.
+- **Signed APK:** `./gradlew assembleRelease -x lintVitalAnalyzeRelease -x lintVitalReportRelease -x lintVitalRelease`
+  in `mobile-app/android` (lint exclusions are for machine JDKs with
+  missing AWT libs; debug lint passes). Copy the APK to the phone, allow
+  "install unknown apps", install.
 
 ## Updating the app on phones
 
-1. Pull the repo (new `mobile-app/package.json` version tracks desktop).
-2. `node scripts/build-mobile.mjs` (if phone UI sources changed) then
-   `node mobile-app/scripts/sync-phone-ui.mjs` — refreshes the bundled UI.
-3. `node mobile-app/scripts/stamp-android-version.mjs` — stamps
-   versionCode/versionName from `mobile-app/package.json` (the in-app
-   updater and Android use these to tell releases apart).
-4. `npx cap sync` — copies web assets + plugins into the native project.
-5. Rebuild the APK in Android Studio, reinstall on phones (data and pairing
-   survive; the stored shop address stays).
+1. Edit `src/mobile/` (shared views) or `src/mobile-standalone/`, then
+   `node scripts/build-standalone.mjs` — refreshes the bundled UI.
+2. Bump `mobile-app/package.json`, then
+   `node mobile-app/scripts/stamp-android-version.mjs` (versionCode
+   `major*1000000 + minor*1000 + patch`).
+3. `npx cap sync` — copies web assets + plugins into the native project.
+4. Rebuild, reinstall (on-device data survives: same app id, same DB file).
 
-Phones also self-notify: the phone UI checks the GitHub releases about
-once a day (plus a manual Settings → App updates check) and offers newer
-mobile APKs through the system browser, which installs them like any
-sideloaded file.
+Root `npm test` covers the standalone layer: `build-standalone --check`,
+`test-standalone` (59 store tests), `check-standalone-refs` (bundle link
+check). The old companion flow (pairing, connect screen, LAN API) is gone:
+desktop v3.35+ has no Mobile Access screen, and `mobile-app/www/index.html`
+redirects straight into the app.
 
-## How it connects
+## First run on a phone
 
-First launch shows a connect screen: type the shop address
-(`http://192.168.1.5:3456`, shown on the desktop under Mobile Access) or
-scan the desktop QR with the native scanner. The app health-checks the
-address, saves it, and opens the phone UI with the QR claim (or the pair
-screen for typed codes). Saved shops persist; the token flow, roles, PIN,
-and offline queue are unchanged from the browser version.
+Fresh ledger — nothing carries over from anywhere. Set a PIN in Settings,
+enter the receipt printer's Wi-Fi IP in Settings → shop edit, add catalog
+items, and run a test sale + payment + return before shop use.
 
 ## Troubleshooting
 
-- **Blank / can't reach shop:** same Wi-Fi? Desktop app running? Address
-  must include the port (`:3456`). Cleartext is enabled via the manifest
-  snippet — without it Android blocks plain-http.
+- **Blank screen:** reinstall the APK (downgrades blocked by versionCode).
 - **Scanner won't start:** needs Play services + camera permission; grant it
   in App info if denied. Emulators usually can't do this — use hardware.
-- **Build fails on minSdk:** the barcode plugin needs 26+; check
-  `android/variables.gradle` wasn't overwritten by `cap sync` (it isn't —
-  variables survive syncs).
-- **Stale UI in the APK:** you forgot `sync-phone-ui.mjs` + `cap sync`.
-  Root `npm test` includes `sync:check` to catch this.
-- **Desktop API rejects the app:** the app sends the same tokens/headers as
-  the browser page; check pairing and the LAN token as usual.
+- **Print fails:** printer IP set? Same Wi-Fi? No printer → receipt shares
+  as text instead (by design).
+- **Stale UI in the APK:** you forgot `build-standalone.mjs` + `cap sync`.
+- **SQLite plugin missing at boot:** `npx cap sync` wasn't run after
+  `npm install` — the app shows a database error instead of data.
 
 ## Later: iPhone, Play Store
 
