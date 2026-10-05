@@ -180,5 +180,34 @@ await throwsJson(502, () => A('POST', '/api/print-thermal', { transactionId: 'IN
 sandbox.__api.setPrinterFn(async () => ({ success: true }));
 ok((await A('POST', '/api/print-thermal', { transactionId: 'INV-00001' })).success, 'print with stub');
 
+// deletes with safety rules
+await throws(400, () => A('POST', '/api/inventory/' + it1.id, {}, 'DELETE'), 'delete item with sales history blocked');
+const tmp = await A('POST', '/api/inventory', { name: 'Temp Item', sellPrice: 5, stock: 3 });
+await A('POST', '/api/quick-items', { name: 'Temp preset', price: 5, invId: tmp.id });
+ok((await A('POST', '/api/inventory/' + tmp.id, {}, 'DELETE')).success, 'delete unused item');
+ok((await A('GET', '/api/quick-items')).length === 0, 'delete cascades to presets');
+await throws(404, () => A('POST', '/api/inventory/9999', {}, 'DELETE'), 'delete item 404');
+await throws(400, () => A('POST', '/api/clients/' + c1.id, {}, 'DELETE'), 'delete client with balance blocked');
+const tmpC = await A('POST', '/api/clients', { name: 'Temp Client' });
+ok((await A('POST', '/api/clients/' + tmpC.id, {}, 'DELETE')).success, 'delete clean client');
+const histC = await A('POST', '/api/clients', { name: 'Hist Client' });
+await A('POST', '/api/payments', { clientId: histC.id, amount: 50 });
+ok((await A('GET', '/api/clients/' + histC.id + '/history')).client.balance === 0, 'payment on zero balance keeps zero');
+await throws(400, () => A('POST', '/api/clients/' + histC.id, {}, 'DELETE'), 'delete client with payment history blocked');
+const poId2 = (await A('POST', '/api/purchase-orders', { supplierId: sup.id, items: [{ name: 'X', price: 1, qty: 1 }] }));
+ok((await A('POST', '/api/purchase-orders/' + (await A('GET', '/api/purchase-orders')).find(p => p.poNo === poId2.poNo).id, {}, 'DELETE')).success, 'cancel pending PO');
+await throws(400, () => A('POST', '/api/purchase-orders/' + poId, {}, 'DELETE'), 'delete received PO blocked');
+
+// backup export/import round-trip
+const exp = await A('GET', '/api/backup/export');
+ok(exp.success && exp.backup.app === 'shop-ledger-standalone' && exp.backup.tables.clients.length >= 3, 'backup export');
+const expJson = JSON.stringify(exp.backup);
+await A('POST', '/api/clients', { name: 'After Backup' });
+const imp = await A('POST', '/api/backup/import', { backup: JSON.parse(expJson) });
+ok(imp.success && imp.counts.clients === exp.backup.tables.clients.length, 'backup import restores counts');
+ok(!(await A('GET', '/api/clients')).some(c => c.name === 'After Backup'), 'import wipes newer rows');
+await throws(400, () => A('POST', '/api/backup/import', { backup: { app: 'nope' } }), 'import rejects foreign backup');
+await throws(400, () => A('POST', '/api/backup/import', { backup: { app: 'shop-ledger-standalone', tables: { clients: 'oops' } } }), 'import rejects corrupt tables');
+
 console.log(`\nSTANDALONE STORE: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

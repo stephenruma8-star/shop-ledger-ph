@@ -19,6 +19,8 @@ const STANDALONE_MODULES = [
   ['sa', 'store.js'],
   ['sa', 'driver-capacitor.js'],
   ['sa', 'escpos.js'],
+  ['sa', 'backup-crypto.js'],
+  ['sa', 'backup-ui.js'],
   ['sa', 'standalone-core.js'],
   ['mob', 'pin.js'],
   ['mob', 'display.js'],

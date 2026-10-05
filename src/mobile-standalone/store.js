@@ -148,8 +148,20 @@ async function _apiClients(method, parts, body) {
     _bump();
     return { success: true, points: pointsToRedeem, discount: discountAmount, remaining: pts - pointsToRedeem };
   }
-  if (parts.length === 1 && method === 'PUT') {
-    const b = body || {};
+  if (parts.length === 1 && method === 'DELETE') {
+    const c = await db.get('SELECT * FROM clients WHERE id = ?', [parts[0]]);
+    if (!c) throw _apiErr(404, 'Client not found');
+    if ((c.balance || 0) !== 0) throw _apiErr(400, 'Cannot delete: client still has a balance of ₱' + (Number(c.balance) || 0).toFixed(2));
+    const txns = await db.all('SELECT id FROM transactions WHERE clientId = ? LIMIT 1', [c.id]);
+    if (txns.length) throw _apiErr(400, 'Cannot delete: client has recorded sales');
+    const pays = await db.all('SELECT id FROM payments WHERE clientId = ? LIMIT 1', [c.id]);
+    if (pays.length) throw _apiErr(400, 'Cannot delete: client has recorded payments');
+    await db.run('DELETE FROM clients WHERE id = ?', [c.id]);
+    await _audit('client-delete', 'Deleted client ' + (c.name || '') + ' (phone)');
+    _bump();
+    return { success: true };
+  }
+  if (parts.length === 1 && method === 'PUT') {    const b = body || {};
     const name = String(b.name || '').trim();
     if (!name) throw _apiErr(400, 'Client name required');
     if (name.length > 80) throw _apiErr(400, 'Name too long (max 80)');
@@ -265,6 +277,22 @@ async function _apiInventory(method, parts, body, query) {
     _bump();
     return { success: true };
   }
+  if (method === 'DELETE' && parts.length === 1) {
+    const it = await db.get('SELECT * FROM inventory WHERE id = ?', [parts[0]]);
+    if (!it) throw _apiErr(404, 'Item not found');
+    // Safety: history keeps the name, so an item named in any sale line stays.
+    const txns = await db.all('SELECT items FROM transactions', []);
+    const nm = String(it.name || '').trim().toLowerCase();
+    const used = txns.some(t => _parseJson(t.items, []).some(li =>
+      (li.invId !== undefined && li.invId !== null && li.invId !== '' && String(li.invId) === String(it.id)) ||
+      (nm && String(li.description || li.name || '').trim().toLowerCase() === nm)));
+    if (used) throw _apiErr(400, 'Cannot delete: this item appears in recorded sales');
+    await db.run('DELETE FROM inventory WHERE id = ?', [it.id]);
+    await db.run('DELETE FROM quick_items WHERE invId = ?', [it.id]);
+    await _audit('inventory', 'Deleted item: ' + (it.name || '') + ' (stock was ' + (it.stock || 0) + ') (phone)');
+    _bump();
+    return { success: true };
+  }
   if (method === 'POST' && parts.length === 1 && parts[0] === 'adjust') {
     const qty = parseInt(body && body.stock, 10);
     const id = body && body.id;
@@ -279,8 +307,7 @@ async function _apiInventory(method, parts, body, query) {
     _bump();
     return { success: true, name: it.name, before, stock: qty };
   }
-  if (method === 'POST' && parts.length === 2 && parts[1] === 'photo') {
-    const img = body && body.image;
+  if (method === 'POST' && parts.length === 2 && parts[1] === 'photo') {    const img = body && body.image;
     if (typeof img !== 'string' || !img.startsWith('data:image/') || img.length > 700000) {
       throw _apiErr(400, 'Photo must be an image data URL under ~700KB');
     }
@@ -780,8 +807,18 @@ async function _apiPOs(method, parts, body) {
     _bump();
     return { success: true, poNo };
   }
-  if (method === 'POST' && parts.length === 2 && parts[1] === 'receive') {
+  if (method === 'DELETE' && parts.length === 1) {
     const po = await db.get('SELECT * FROM purchase_orders WHERE id = ?', [parts[0]]);
+    if (!po) throw _apiErr(404, 'Purchase order not found');
+    // Received POs already added stock and booked a purchase expense — they
+    // stay as permanent history. Cancel pending ones freely.
+    if (po.status === 'Received') throw _apiErr(400, 'Cannot delete a received order (it is purchase history)');
+    await db.run('DELETE FROM purchase_orders WHERE id = ?', [po.id]);
+    await _audit('po', 'Cancelled PO ' + (po.poNo || '') + ' (phone)');
+    _bump();
+    return { success: true };
+  }
+  if (method === 'POST' && parts.length === 2 && parts[1] === 'receive') {    const po = await db.get('SELECT * FROM purchase_orders WHERE id = ?', [parts[0]]);
     if (!po) { const e = _apiErr(404, 'Purchase order not found'); e.json = { success: false, error: 'Purchase order not found' }; throw e; }
     if (po.status === 'Received') { const e = _apiErr(400, 'Already received'); e.json = { success: false, error: 'Already received' }; throw e; }
     await db.run('UPDATE purchase_orders SET status = ?, receivedAt = ? WHERE id = ?', ['Received', new Date().toISOString(), po.id]);
@@ -1000,7 +1037,63 @@ async function _apiSms() {
   return { success: true, sent: 0, failed: 0, total: debtors.length, texts };
 }
 
-// ---------- router ----------
+// ---------- backup export / import ----------
+const BACKUP_TABLES = ['clients', 'inventory', 'transactions', 'payments', 'expenses', 'suppliers', 'purchase_orders', 'supplier_payments', 'quick_items', 'settings', 'audit_logs'];
+async function _apiBackupExport() {
+  const db = _db();
+  const tables = {};
+  for (const t of BACKUP_TABLES) tables[t] = await db.all('SELECT * FROM ' + t, []);
+  return { success: true, backup: { app: 'shop-ledger-standalone', version: 1, exportedAt: new Date().toISOString(), tables } };
+}
+async function _apiBackupImport(body) {
+  const db = _db();
+  const b = (body && body.backup) || body || {};
+  if (!b || b.app !== 'shop-ledger-standalone' || typeof b.tables !== 'object' || !b.tables) {
+    throw _apiErr(400, 'Not a Shop Ledger phone backup');
+  }
+  // Validate everything BEFORE wiping: every known table must be an array
+  // of plain row objects when present.
+  const incoming = {};
+  for (const t of BACKUP_TABLES) {
+    const rows = b.tables[t];
+    if (rows === undefined) { incoming[t] = null; continue; }
+    if (!Array.isArray(rows)) throw _apiErr(400, 'Backup is corrupted (table ' + t + ')');
+    for (const r of rows) {
+      if (!r || typeof r !== 'object' || Array.isArray(r)) throw _apiErr(400, 'Backup is corrupted (table ' + t + ')');
+    }
+    incoming[t] = rows;
+  }
+  const colsOf = (rows) => {
+    const cols = [];
+    for (const r of rows) for (const k of Object.keys(r)) if (!cols.includes(k)) cols.push(k);
+    return cols.filter(c => /^[A-Za-z_][A-Za-z0-9_]*$/.test(c));
+  };
+  await db.exec('BEGIN');
+  try {
+    for (const t of BACKUP_TABLES) {
+      if (incoming[t] === null) continue;
+      await db.exec('DELETE FROM ' + t);
+      const cols = colsOf(incoming[t]);
+      if (!cols.length) continue;
+      const ph = cols.map(() => '?').join(',');
+      for (const r of incoming[t]) {
+        await db.run('INSERT INTO ' + t + ' (' + cols.join(',') + ') VALUES (' + ph + ')',
+          cols.map(c => (r[c] === undefined ? null : (typeof r[c] === 'object' && r[c] !== null ? JSON.stringify(r[c]) : r[c]))));
+      }
+    }
+    await db.exec('COMMIT');
+  } catch (e) {
+    try { await db.exec('ROLLBACK'); } catch (_) {}
+    throw _apiErr(400, 'Restore failed, nothing was changed: ' + (e && e.message));
+  }
+  // Re-seed any settings the backup predates, then log the restore.
+  await initStore(_db());
+  await _audit('backup-restore', 'Phone ledger restored from backup (' + (b.exportedAt || 'unknown date') + ') (phone)');
+  _bump();
+  const counts = {};
+  for (const t of BACKUP_TABLES) counts[t] = (incoming[t] || []).length;
+  return { success: true, counts };
+}
 async function localApi(method, rawPath, body) {
   const m = String(method || 'GET').toUpperCase();
   const qi = String(rawPath || '').indexOf('?');
@@ -1036,6 +1129,8 @@ async function localApi(method, rawPath, body) {
   if (head === 'settings') return _apiSettings(m, body);
   if (head === 'audit' && m === 'GET') return _apiAudit(query);
   if (head === 'sms-reminders' && m === 'POST') return _apiSms();
+  if (head === 'backup' && parts[1] === 'export' && m === 'GET') return _apiBackupExport();
+  if (head === 'backup' && parts[1] === 'import' && m === 'POST') return _apiBackupImport(body);
   if (head === 'alerts' && m === 'GET') {
     const rows = await _db().all('SELECT id, name, stock, lowStock, minStock, sellPrice FROM inventory', []);
     const items = rows.map(i => ({

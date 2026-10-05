@@ -18,7 +18,10 @@ async function renderPOs() {
           <div class="text-[11px] text-gray-500 mt-0.5">${po.items.length} ${po.items.length === 1 ? T('cat.item') : T('cat.items')}</div>
           <div class="flex items-center justify-between mt-1.5">
             <div class="text-sm font-bold text-teal-400 num">${peso(po.total)}</div>
+            <div class="flex gap-1.5">
+            ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) && po.status !== 'Received' ? `<button onclick="deletePO(${JSON.stringify(po.id)})" id="po-del-${po.id}" class="btn btn-sm" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);color:#f87171;font-size:.75rem">🗑</button>` : ''}
             ${phoneRole() !== 'cashier' && po.status !== 'Received' ? `<button onclick="receivePO(${JSON.stringify(po.id)})" class="btn btn-ghost btn-sm">${T('po.receive')}</button>` : ''}
+            </div>
           </div>
         </div>`).join('') || `<div class="text-center text-gray-500 py-16 fade-in">${T('po.empty')}</div>`}
     </div>`;
@@ -40,6 +43,26 @@ async function receivePO(id) {
     await refreshAll();
   } catch (e) { feelErr(); toast(T('po.receive_failed', { msg: e.message }), 'err'); }
   finally { releaseSubmitLock('porecv'); }
+}
+// Standalone-only: cancel a pending purchase order (received ones stay).
+let poDeleteArmed = null;
+async function deletePO(id) {
+  if (poDeleteArmed !== id) {
+    poDeleteArmed = id;
+    const btn = document.getElementById('po-del-' + id);
+    if (btn) btn.textContent = 'Sure?';
+    setTimeout(() => { if (poDeleteArmed === id) { poDeleteArmed = null; if (typeof renderPOs === 'function') renderPOs(); } }, 5000);
+    return;
+  }
+  poDeleteArmed = null;
+  if (!takeSubmitLock('podel')) return;
+  try {
+    await apiPost('/api/purchase-orders/' + encodeURIComponent(id), {}, 'DELETE');
+    feelOk();
+    toast('Order cancelled', 'ok');
+    await refreshAll();
+  } catch (e) { feelErr(); toast(e.message, 'err'); }
+  finally { releaseSubmitLock('podel'); }
 }
 function addPO() {
   poItems = [];

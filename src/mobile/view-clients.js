@@ -91,6 +91,7 @@ async function openClientDetail(id) {
       <button onclick="shareClientStatement()" class="btn btn-ghost btn-sm">📤 ${T('cli.statement')}</button>
       <button id="redeem-btn" onclick="redeemClientPoints(${JSON.stringify(c.id)})" class="btn btn-sm" style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.5);color:#fbbf24">${T('cli.redeem')}</button>
     </div>
+    ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button id="client-del-btn" onclick="deleteClient(${JSON.stringify(c.id)})" class="btn btn-sm w-full mb-3" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);color:#f87171">🗑 Delete client</button>` : ''}
     <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">${T('cli.history_sales')}</h4>
     <div class="space-y-1.5 mb-3">
       ${(h.sales || []).slice(0, 20).map(t => `
@@ -201,6 +202,27 @@ async function redeemClientPoints(id) {
     await refreshAll();
   } catch (e) { feelErr(); toast(T('cli.failed', { msg: e.message }), 'err'); }
   finally { releaseSubmitLock('redeem'); }
+}
+// Standalone-only: delete a client with no balance and no history.
+let clientDeleteArmed = null;
+async function deleteClient(id) {
+  if (clientDeleteArmed !== id) {
+    clientDeleteArmed = id;
+    const btn = document.getElementById('client-del-btn');
+    if (btn) btn.textContent = 'Tap again to delete this client';
+    setTimeout(() => { if (clientDeleteArmed === id) { clientDeleteArmed = null; const b = document.getElementById('client-del-btn'); if (b) b.textContent = '🗑 Delete client'; } }, 5000);
+    return;
+  }
+  clientDeleteArmed = null;
+  if (!takeSubmitLock('clientdel')) return;
+  try {
+    await apiPost('/api/clients/' + encodeURIComponent(id), {}, 'DELETE');
+    closeQuick();
+    feelOk();
+    toast('Client deleted', 'ok');
+    await refreshAll();
+  } catch (e) { feelErr(); toast(e.message, 'err'); }
+  finally { releaseSubmitLock('clientdel'); }
 }
 async function shareClientStatement() {
   if (!detailClientId) return;

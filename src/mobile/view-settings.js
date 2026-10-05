@@ -47,6 +47,10 @@ async function renderSettings() {
       <h3 class="card-title mb-1">${T('diag.title')}</h3>
       <div id="diag-row"></div>
     </section>
+    ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<section class="glass-card rounded-2xl p-4 mb-3 fade-in">
+      <h3 class="card-title mb-1">💾 Backup</h3>
+      <div id="backup-row"></div>
+    </section>` : ''}
     <p class="text-center text-[11px] text-gray-500 fade-in">${T('set.store_note')}</p>`;
   updateInstallRow();
   updatePinRow();
@@ -54,6 +58,7 @@ async function renderSettings() {
   updateUpdateRow();
   updateBioRow();
   updateDiagRow();
+  if (typeof updateBackupRow === 'function') updateBackupRow();
 }
 function renderShopEdit() {
   const s = data.settings || {};

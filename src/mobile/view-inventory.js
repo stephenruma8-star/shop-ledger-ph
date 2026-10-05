@@ -130,6 +130,7 @@ function renderItemForm(id) {
             </div>
           </div>
           <button onclick="submitItemForm(${id ? JSON.stringify(id) : 'null'})" class="btn btn-primary btn-lg">${T('inv.save')}</button>
+          ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE && id) ? `<button id="item-del-btn" onclick="deleteItemForm(${JSON.stringify(id)})" class="btn btn-sm w-full" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);color:#f87171">🗑 Delete item</button>` : ''}
         </div>
       </div>
     </div>`;
@@ -159,6 +160,27 @@ async function submitItemForm(id) {
     await refreshAll();
   } catch (e) { toast(T('inv.failed', { msg: e.message }), 'err'); }
   finally { releaseSubmitLock('item'); }
+}
+// Standalone-only: delete an item with no sales history.
+let itemDeleteArmed = null;
+async function deleteItemForm(id) {
+  if (itemDeleteArmed !== id) {
+    itemDeleteArmed = id;
+    const btn = document.getElementById('item-del-btn');
+    if (btn) btn.textContent = 'Tap again to delete this item';
+    setTimeout(() => { if (itemDeleteArmed === id) { itemDeleteArmed = null; const b = document.getElementById('item-del-btn'); if (b) b.textContent = '🗑 Delete item'; } }, 5000);
+    return;
+  }
+  itemDeleteArmed = null;
+  if (!takeSubmitLock('itemdel')) return;
+  try {
+    await apiPost('/api/inventory/' + encodeURIComponent(id), {}, 'DELETE');
+    closeQuick();
+    feelOk();
+    toast('Item deleted', 'ok');
+    await refreshAll();
+  } catch (e) { feelErr(); toast(e.message, 'err'); }
+  finally { releaseSubmitLock('itemdel'); }
 }
 // ---------- product photos ----------
 // Phone camera → downscaled JPEG → catalog thumbnail. Works on plain http
