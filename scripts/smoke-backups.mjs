@@ -60,10 +60,12 @@ ok(decBin.length === raw.length && decBin.equals(raw), 'binary round trip is byt
 const encObj = JSON.parse(JSON.stringify(encBin));
 ok(decryptData(encObj, 'pw123').equals(raw), 'encrypted payload survives JSON serialization');
 
-// 5 wrong password fails
-let wrongPass = false;
-try { decryptData(encBin, 'nope'); } catch (e) { wrongPass = true; }
-ok(wrongPass, 'wrong password rejects');
+// 5 wrong password never yields the plaintext (AES-CBC carries no auth tag:
+// bad padding throws ~255/256 of the time, garbage otherwise — either way
+// the original bytes must not come back; callers gate on format after this)
+let wrongLeak = false;
+try { wrongLeak = decryptData(encBin, 'nope').equals(raw); } catch (e) { wrongLeak = false; }
+ok(!wrongLeak, 'wrong password never yields plaintext');
 
 // 6 encrypted snapshot file flow (what create-local-backup does)
 const encFile = join(dir, 'backup-encrypted.bak');
