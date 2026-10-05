@@ -1557,7 +1557,7 @@ const LANG_STRINGS = {
     'upd.title': 'Phone app update',
     'upd.body': 'Version {tag} is ready. Download it, then tap the file to install — your pairing and settings stay.',
     'upd.download': 'Download update', 'upd.later': 'Later',
-    'txn.print': '🖨️ Print', 'txn.share': '📤 Share',
+    'txn.print': '🖨️ Print', 'txn.share': '📤 Share', 'txn.preview': '👁 Preview', 'txn.back_detail': '← Back to receipt',
     'txn.credit': 'Credit', 'txn.paid': 'Paid', 'txn.returned_chip': 'Returned',
     'txn.total': 'Total', 'txn.return': '↩ Return this sale',
     'txn.return_confirm': 'Tap again to confirm return',
@@ -1912,7 +1912,7 @@ const LANG_STRINGS = {
     'upd.title': 'Update ng phone app',
     'upd.body': 'Handa na ang bersyong {tag}. I-download ito, tapos pindutin ang file para i-install — mananatili ang pairing at settings.',
     'upd.download': 'I-download ang update', 'upd.later': 'Mamaya',
-    'txn.print': '🖨️ I-print', 'txn.share': '📤 I-share',
+    'txn.print': '🖨️ I-print', 'txn.share': '📤 I-share', 'txn.preview': '👁 Silipin', 'txn.back_detail': '← Bumalik sa resibo',
     'txn.credit': 'Utang', 'txn.paid': 'Bayad', 'txn.returned_chip': 'Naibalik',
     'txn.total': 'Kabuuan', 'txn.return': '↩ Ibalik ang bentang ito',
     'txn.return_confirm': 'Pindutin muli para kumpirmahin ang pagbalik',
@@ -3314,7 +3314,8 @@ async function openTxnDetail(id) {
     ${(() => { const vr = parseFloat((data.settings || {}).vatRate) || 0; return vr > 0 ? `<div class="flex justify-between text-[11px] text-gray-500 mb-3"><span>VAT (${vr}%) incl.</span><span class="num">${peso((t.grandTotal || 0) * vr / (100 + vr))}</span></div>` : ''; })()}
     <div class="grid grid-cols-2 gap-2">
       <button onclick="printSaleReceipt('${esc(t.invoiceNo || '')}')" class="btn btn-ghost btn-sm">${T('txn.print')}</button>
-      <button onclick="shareReceiptTxn(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-ghost btn-sm">${T('txn.share')}</button>
+      <button onclick="previewReceiptTxn(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-ghost btn-sm">👁 ${T('txn.preview')}</button>
+      <button onclick="shareReceiptTxn(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-ghost btn-sm col-span-2">${T('txn.share')}</button>
       ${canReturn ? `<button id="return-btn" onclick="returnTxn(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-sm col-span-2" style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);color:#f87171">${T('txn.return')}</button>` : ''}
       ${owner && t.status !== 'voided' && t.status !== 'return' ? `<button id="void-btn" onclick="voidTxn(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-sm col-span-2" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);color:#94a3b8">${T('txn.void')}</button>` : ''}
     </div>`;
@@ -3359,6 +3360,60 @@ async function returnTxn(id) {
     toast(r && r.invoiceNo ? T('txn.returned_as', { inv: r.invoiceNo }) : T('txn.returned'), 'ok');
     await refreshAll();
   } catch (e) { feelErr(); toast(T('txn.failed', { msg: e.message }), 'err'); }
+}
+// ---------- receipt preview ----------
+// 32-column thermal layout in monospace — what the printer gets, before it
+// gets it. Print + Share act on the same sale from here.
+async function previewReceiptTxn(id) {
+  let t = (typeof detailTxn !== 'undefined' && detailTxn && (String(detailTxn.id) === String(id) || detailTxn.invoiceNo === String(id))) ? detailTxn : null;
+  if (!t) {
+    try { t = await apiGet('/api/transactions/' + encodeURIComponent(id)); }
+    catch (e) { toast(T('txn.load_fail', { msg: e.message }), 'err'); return; }
+  }
+  const s = (typeof data !== 'undefined' && data.settings) || {};
+  const W = 32;
+  const clip = (x) => String(x == null ? '' : x).slice(0, W);
+  const center = (x) => { x = clip(x); const p = Math.max(0, Math.floor((W - x.length) / 2)); return ' '.repeat(p) + x; };
+  const row2 = (l, r) => { l = String(l); r = String(r); return (l + ' '.repeat(Math.max(1, W - l.length - r.length)) + r); };
+  const pesoPlain = (n) => 'P' + (Number(n) || 0).toFixed(2);
+  const L = [];
+  L.push(center(s.shopName || 'Shop Ledger PH'));
+  if (s.shopAddress) L.push(center(s.shopAddress));
+  if (s.shopContact) L.push(center('Contact: ' + s.shopContact));
+  L.push('-'.repeat(W));
+  L.push(center('OFFICIAL RECEIPT'));
+  L.push(clip('Invoice: ' + (t.invoiceNo || 'N/A')));
+  L.push(clip('Date: ' + (t.createdAt || t.date || '')));
+  if (t.clientName && t.clientName !== 'Walk-in') L.push(clip('Client: ' + t.clientName));
+  L.push('-'.repeat(W));
+  (t.items || []).forEach(it => {
+    const q = parseFloat(it.qty) || 1;
+    const p = it.unitCost || it.price || 0;
+    L.push(String(it.description || it.name || 'Item').slice(0, W));
+    L.push(row2('  ' + q + ' x ' + pesoPlain(p), pesoPlain(q * p)));
+  });
+  L.push('-'.repeat(W));
+  L.push(row2('Subtotal:', pesoPlain(t.subtotal)));
+  if (t.totalInterest > 0) L.push(row2('Interest:', pesoPlain(t.totalInterest)));
+  if (t.discount > 0) L.push(row2('Discount:', '-' + pesoPlain(t.discount)));
+  L.push(row2('TOTAL:', pesoPlain(t.grandTotal)));
+  L.push('-'.repeat(W));
+  L.push('Payment: ' + (t.paymentMethod || 'Cash'));
+  L.push('');
+  L.push(center(s.receiptFooter || 'Thank you for your patronage!'));
+  document.getElementById('modal-root').innerHTML = `
+    <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
+      <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:92dvh;overflow-y:auto" onclick="event.stopPropagation()">
+        <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
+        <h3 class="font-bold text-gray-100 text-sm mb-3">${esc(t.invoiceNo || 'Receipt')}</h3>
+        <pre class="text-gray-200 rounded-xl p-3 mb-3" style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.5;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.08);overflow-x:auto;white-space:pre">${esc(L.join('\n'))}</pre>
+        <div class="grid grid-cols-2 gap-2">
+          <button onclick="printSaleReceipt(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-primary btn-sm">${T('txn.print')}</button>
+          <button onclick="shareReceiptTxn(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-ghost btn-sm">${T('txn.share')}</button>
+        </div>
+        <button onclick="openTxnDetail(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-ghost w-full mt-2">${T('txn.back_detail')}</button>
+      </div>
+    </div>`;
 }
 
 // ===== src/mobile/view-expenses.js =====
