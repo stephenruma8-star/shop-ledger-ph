@@ -129,7 +129,6 @@ async function _apiClients(method, parts, body) {
     if (!c) throw _apiErr(404, 'Client not found');
     const txns = await db.all('SELECT * FROM transactions WHERE clientId = ? ORDER BY date DESC, createdAt DESC LIMIT 100', [c.id]);
     const pays = await db.all('SELECT * FROM payments WHERE clientId = ? ORDER BY date DESC, createdAt DESC LIMIT 100', [c.id]);
-    // match desktop string-sort on date||createdAt (null-safe equivalent)
     const byDate = (a, b) => String(b.date || b.createdAt || '').localeCompare(String(a.date || a.createdAt || ''));
     return {
       client: { id: c.id, name: c.name, phone: c.phone, address: c.address, balance: c.balance || 0, loyaltyPoints: c.loyaltyPoints || 0, isSC: !!c.isSC, isPWD: !!c.isPWD },
@@ -202,7 +201,9 @@ function _mapInv(i) {
 async function _apiInventory(method, parts, body, query) {
   const db = _db();
   if (method === 'GET' && parts.length === 0) {
-    const rows = await db.all('SELECT * FROM inventory', []);
+    // NOTE: image blobs stay out of the list query — photos ride the
+    // on-demand /images endpoint so every refresh doesn't haul megabytes.
+    const rows = await db.all('SELECT id, name, sku, barcode, category, sellPrice, costPrice, stock, minStock, lowStock, unit, expiryDate, variants, createdAt, updatedAt FROM inventory', []);
     return rows.map(_mapInv).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }
   if (method === 'GET' && parts.length === 1 && parts[0] === 'valuation') {
@@ -433,13 +434,12 @@ async function _apiSales(method, parts, body, query) {
   if (method === 'POST' && parts.length === 0) return _applySale(body || {});
   if (method === 'GET' && parts.length === 0) {
     const limit = Math.min(parseInt(query.limit) || 200, 500);
-    const rows = await db.all('SELECT * FROM transactions', []);
-    return rows
-      .sort((a, b) => String(b.date || b.createdAt || '').localeCompare(String(a.date || a.createdAt || '')))
-      .slice(0, limit).map(_mapTxnList);
+    // SQL-level cap: years of sales must never all land in memory at once.
+    const rows = await db.all('SELECT * FROM transactions ORDER BY date DESC, createdAt DESC LIMIT ?', [limit]);
+    return rows.map(_mapTxnList);
   }
   if (method === 'GET' && parts.length === 1) {
-    const rows = await db.all('SELECT * FROM transactions', []);
+    const rows = await db.all('SELECT * FROM transactions WHERE invoiceNo = ? OR id = ?', [String(parts[0]), String(parts[0])]);
     const t = rows.find(x => String(x.id) === String(parts[0]) || x.invoiceNo === String(parts[0]));
     if (!t) throw _apiErr(404, 'Transaction not found');
     const full = _rowTxn(Object.assign({}, t));
@@ -456,7 +456,7 @@ async function _apiVoid(body) {
   const db = _db();
   const ref = body && (body.invoiceNo ?? body.id);
   if (ref === undefined || ref === null || String(ref).trim() === '') throw _apiErr(400, 'invoiceNo required');
-  const rows = await db.all('SELECT * FROM transactions', []);
+  const rows = await db.all('SELECT * FROM transactions WHERE invoiceNo = ? OR id = ?', [String(ref), String(ref)]);
   const t = rows.find(x => x.invoiceNo === String(ref) || String(x.id) === String(ref));
   if (!t || t.status === 'voided') throw _apiErr(404, 'Sale not found or already voided');
   const items = _parseJson(t.items, []);
@@ -491,12 +491,13 @@ async function _apiReturns(body) {
       }
     }
   }
-  const allTx = await db.all('SELECT * FROM transactions', []);
-  const orig = allTx.find(t => t.invoiceNo === String(ref) || String(t.id) === String(ref)) || null;
+  const found = await db.all('SELECT * FROM transactions WHERE invoiceNo = ? OR id = ?', [String(ref), String(ref)]);
+  const orig = found.find(t => t.invoiceNo === String(ref) || String(t.id) === String(ref)) || null;
   if (!orig) throw _apiErr(404, 'Original sale not found');
   const origItems = _parseJson(orig.items, []);
   if (!origItems.length) throw _apiErr(400, 'Original sale has no item lines');
-  const prior = allTx.filter(t => t.status === 'return' && (orig.id !== null && t.refId === orig.id || t.refInvoiceNo === (orig.invoiceNo || '')));
+  const priorAll = await db.all('SELECT * FROM transactions WHERE status = ?', ['return']);
+  const prior = priorAll.filter(t => (orig.id !== null && t.refId === orig.id || t.refInvoiceNo === (orig.invoiceNo || '')));
   const keyOf = (i) => (i.invId !== undefined && i.invId !== null && i.invId !== '' ? 'id:' + i.invId : 'nm:' + String(i.description || i.name || '').trim().toLowerCase());
   const remaining = {};
   for (const i of origItems) {
@@ -632,9 +633,8 @@ async function _apiPayments(method, parts, body) {
 async function _apiExpenses(method, parts, body) {
   const db = _db();
   if (method === 'GET' && parts.length === 0) {
-    const rows = await db.all('SELECT * FROM expenses', []);
+    const rows = await db.all('SELECT * FROM expenses ORDER BY date DESC, createdAt DESC LIMIT 500', []);
     return rows
-      .sort((a, b) => String(b.date || b.createdAt || '').localeCompare(String(a.date || a.createdAt || '')))
       .map(e => ({ id: e.id, date: e.date, category: e.category, description: e.description, amount: e.amount, payee: e.payee, createdAt: e.createdAt }));
   }
   if (method === 'POST' && parts.length === 0) {
@@ -803,7 +803,8 @@ async function _apiPOs(method, parts, body) {
 // ---------- reports / stats / settings / audit ----------
 async function _apiStats() {
   const db = _db();
-  const txns = await db.all('SELECT * FROM transactions', []);
+  // Slim columns: aggregates never need the items blobs.
+  const txns = await db.all('SELECT id, invoiceNo, clientId, clientName, date, createdAt, grandTotal, paymentMethod, status FROM transactions', []);
   const exps = await db.all('SELECT * FROM expenses', []);
   const pays = await db.all('SELECT * FROM payments', []);
   const clients = await db.all('SELECT id, balance FROM clients', []);
@@ -932,10 +933,8 @@ async function _apiSettings(method, body) {
 }
 async function _apiAudit(query) {
   const limit = Math.min(parseInt(query.limit) || 100, 200);
-  const rows = await _db().all('SELECT * FROM audit_logs', []);
+  const rows = await _db().all('SELECT * FROM audit_logs ORDER BY createdAt DESC LIMIT ?', [limit]);
   return rows
-    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
-    .slice(0, limit)
     .map(l => ({ id: l.id, action: l.action || '', details: l.details || '', user: l.user || '', createdAt: l.createdAt || '' }));
 }
 async function _apiPrint(body) {
@@ -945,7 +944,7 @@ async function _apiPrint(body) {
     const e = _apiErr(400, 'transactionId required'); e.json = { success: false, error: 'transactionId required' }; throw e;
   }
   const db = _db();
-  const rows = await db.all('SELECT * FROM transactions', []);
+  const rows = await db.all('SELECT * FROM transactions WHERE invoiceNo = ? OR id = ?', [String(id), String(id)]);
   const t = rows.find(x => String(x.id) === String(id) || x.invoiceNo === String(id));
   if (!t) { const e = _apiErr(404, 'Transaction not found'); e.json = { success: false, error: 'Transaction not found' }; throw e; }
   const s = await _settingsMap();
