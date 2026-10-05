@@ -12,6 +12,10 @@ async function renderReports() {
       <input id="rep-month" type="month" value="${esc(repMonth)}" max="${esc(monthKey(new Date()))}" onchange="loadReportMonth()" class="inp flex-1" style="height:2.4rem" />
       ${phoneRole() === 'cashier' ? '' : `<button onclick="exportMonthCsv()" class="btn btn-ghost btn-sm shrink-0">📥 ${T('rep.export')}</button>`}
     </div>
+    <div class="grid grid-cols-2 gap-2 mb-3 fade-in">
+      <button onclick="shareTodayReport()" class="btn btn-ghost btn-sm">📤 Today's summary</button>
+      <button onclick="shareMonthReport()" class="btn btn-ghost btn-sm">📤 Month summary</button>
+    </div>
     <div class="grid grid-cols-2 gap-2.5 mb-3 fade-in">
       <div class="stat-card rounded-2xl p-3.5">
         <div class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-1">${T('home.today_sales')}</div>
@@ -166,5 +170,18 @@ async function shareMonthReport() {
   L.push('Sales: ' + peso(r.month.sales) + ' | Expenses: ' + peso(r.month.expenses) + ' | Profit: ' + peso(r.month.profit) + ' | Collected: ' + peso(r.month.collected));
   (r.topItems || []).slice(0, 5).forEach((t, i) => L.push(`${i + 1}. ${t.name} — ${t.qty} sold (${peso(t.amount)})`));
   await shareText('Monthly report ' + (r.monthStr || ''), L.join('\n'));
+}
+async function shareTodayReport() {
+  const r = data.reports;
+  if (!r || !r.today) return;
+  const s = data.settings || {};
+  const t = r.today;
+  const d = new Date();
+  const today = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  const L = [];
+  L.push((s.shopName || 'Shop Ledger PH') + ' — closing ' + today);
+  L.push('Sales: ' + peso(t.sales) + ' | Expenses: ' + peso(t.expenses) + ' | Profit: ' + peso(t.profit));
+  L.push('Collected: ' + peso(t.collected) + (t.refunds ? ' | Refunds: ' + peso(t.refunds) : ''));
+  await shareText('Daily closing ' + today, L.join('\n'));
 }
 

@@ -209,5 +209,44 @@ ok(!(await A('GET', '/api/clients')).some(c => c.name === 'After Backup'), 'impo
 await throws(400, () => A('POST', '/api/backup/import', { backup: { app: 'nope' } }), 'import rejects foreign backup');
 await throws(400, () => A('POST', '/api/backup/import', { backup: { app: 'shop-ledger-standalone', tables: { clients: 'oops' } } }), 'import rejects corrupt tables');
 
+// payment reference numbers
+await A('POST', '/api/payments', { clientId: histC.id, amount: 25, referenceNo: 'GCash 123456' });
+const hpays = (await A('GET', '/api/clients/' + histC.id + '/history')).payments;
+ok(hpays.some(p => p.referenceNo === 'GCash 123456'), 'payment ref saved + returned');
+const pref = hpays.find(p => p.referenceNo === 'GCash 123456');
+await A('POST', '/api/payments/' + pref.id, { amount: 25, referenceNo: 'GCash 999' }, 'PUT');
+ok((await A('GET', '/api/clients/' + histC.id + '/history')).payments.some(p => p.referenceNo === 'GCash 999'), 'payment ref editable');
+
+// PO edit (pending only)
+const poEdit = await A('POST', '/api/purchase-orders', { supplierId: sup.id, items: [{ name: 'Sugar', price: 10, qty: 5 }] });
+const poEditId = (await A('GET', '/api/purchase-orders')).find(p => p.poNo === poEdit.poNo).id;
+const poUpd = await A('POST', '/api/purchase-orders/' + poEditId, { items: [{ name: 'Sugar', price: 12, qty: 5 }] }, 'PUT');
+ok(poUpd.poNo === poEdit.poNo, 'PO edit keeps number');
+ok((await A('GET', '/api/purchase-orders')).find(p => p.poNo === poEdit.poNo).total === 60, 'PO edit recomputes total');
+await throws(400, () => A('POST', '/api/purchase-orders/' + poId, {}, 'PUT'), 'edit received PO blocked');
+
+// expiring alerts
+await A('POST', '/api/inventory/' + it2.id, { name: 'Oil', sellPrice: 30, stock: 52, expiryDate: '2026-10-20' }, 'PUT');
+const alerts2 = await A('GET', '/api/alerts');
+ok(Array.isArray(alerts2.expiring) && alerts2.expiring.some(e => e.id === it2.id) && alerts2.expiringCount >= 1, 'expiring list');
+
+// migration: a 4.0/4.1 ledger whose payments table lacks referenceNo
+{
+  const { makeNodeDriver: mk } = await import('../src/mobile-standalone/driver-node.mjs');
+  const old = mk();
+  await old.exec('CREATE TABLE payments (id INTEGER PRIMARY KEY AUTOINCREMENT, clientId INTEGER, amount REAL DEFAULT 0, date TEXT, type TEXT, notes TEXT, createdAt TEXT)');
+  await old.exec('CREATE TABLE settings (id INTEGER PRIMARY KEY AUTOINCREMENT, key TEXT UNIQUE NOT NULL, value TEXT)');
+  const vm2 = (await import('node:vm')).default;
+  const sb2 = { console };
+  vm2.createContext(sb2);
+  const fs2 = (await import('node:fs')).default;
+  vm2.runInContext(fs2.readFileSync('src/mobile-standalone/store.js', 'utf8') + '\nthis.__m = { localApi, initStore };', sb2);
+  await sb2.__m.initStore(old);
+  const cols = await old.all('PRAGMA table_info(payments)', []);
+  ok(cols.some(c => c.name === 'referenceNo'), 'migration adds referenceNo');
+  const r2 = await sb2.__m.localApi('POST', '/api/payments', { amount: 10, referenceNo: 'X1' });
+  ok(r2.success, 'payments work after migration');
+}
+
 console.log(`\nSTANDALONE STORE: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

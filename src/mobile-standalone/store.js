@@ -49,7 +49,7 @@ const STORE_SCHEMA = [
   `CREATE TABLE IF NOT EXISTS clients (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, phone TEXT, address TEXT, balance REAL DEFAULT 0, dueDate TEXT, createdAt TEXT, ledgerYear TEXT, isSC INTEGER DEFAULT 0, isPWD INTEGER DEFAULT 0, loyaltyPoints INTEGER DEFAULT 0, totalSpent REAL DEFAULT 0, redeemedDiscount REAL DEFAULT 0)`,
   `CREATE TABLE IF NOT EXISTS inventory (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, description TEXT, sku TEXT, barcode TEXT, category TEXT, sellPrice REAL DEFAULT 0, costPrice REAL DEFAULT 0, stock INTEGER DEFAULT 0, minStock INTEGER DEFAULT 5, lowStock INTEGER DEFAULT 5, unit TEXT DEFAULT 'pcs', image TEXT, expiryDate TEXT, variants TEXT DEFAULT '[]', createdAt TEXT, updatedAt TEXT)`,
   `CREATE TABLE IF NOT EXISTS transactions (id INTEGER PRIMARY KEY AUTOINCREMENT, invoiceNo TEXT, clientId INTEGER, clientName TEXT, date TEXT, createdAt TEXT, items TEXT DEFAULT '[]', subtotal REAL DEFAULT 0, totalInterest REAL DEFAULT 0, discount REAL DEFAULT 0, scDiscount REAL DEFAULT 0, grandTotal REAL DEFAULT 0, commissionRate REAL DEFAULT 0, commissionAmount REAL DEFAULT 0, paymentMethod TEXT DEFAULT 'Cash', status TEXT DEFAULT 'pending', balanceAdded INTEGER DEFAULT 0, vatExclusive REAL DEFAULT 0, vatAmount REAL DEFAULT 0, vatRate REAL DEFAULT 0.12, editedAt TEXT, returnReason TEXT, refundMethod TEXT, returnNotes TEXT, refId INTEGER, refInvoiceNo TEXT, partial INTEGER DEFAULT 0, voidReason TEXT, voidNotes TEXT, voidedAt TEXT)`,
-  `CREATE TABLE IF NOT EXISTS payments (id INTEGER PRIMARY KEY AUTOINCREMENT, clientId INTEGER, clientName TEXT, amount REAL DEFAULT 0, date TEXT, type TEXT, notes TEXT, createdAt TEXT, updatedAt TEXT)`,
+  `CREATE TABLE IF NOT EXISTS payments (id INTEGER PRIMARY KEY AUTOINCREMENT, clientId INTEGER, clientName TEXT, amount REAL DEFAULT 0, date TEXT, type TEXT, notes TEXT, referenceNo TEXT DEFAULT '', createdAt TEXT, updatedAt TEXT)`,
   `CREATE TABLE IF NOT EXISTS expenses (id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT, category TEXT, description TEXT, amount REAL DEFAULT 0, payee TEXT, type TEXT, refType TEXT, refId INTEGER, createdAt TEXT)`,
   `CREATE TABLE IF NOT EXISTS suppliers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, contact TEXT, email TEXT, category TEXT, address TEXT, createdAt TEXT)`,
   `CREATE TABLE IF NOT EXISTS purchase_orders (id INTEGER PRIMARY KEY AUTOINCREMENT, poNo TEXT, supplierId INTEGER, supplierName TEXT, date TEXT, items TEXT DEFAULT '[]', total REAL DEFAULT 0, status TEXT DEFAULT 'Pending', createdAt TEXT, receivedAt TEXT)`,
@@ -72,6 +72,13 @@ async function initStore(driver) {
     const row = await db.get('SELECT id FROM settings WHERE key = ?', [k]);
     if (!row) await db.run('INSERT INTO settings (key, value) VALUES (?, ?)', [k, v]);
   }
+  // Lightweight migrations for ledgers created by older app versions.
+  try {
+    const cols = await db.all('PRAGMA table_info(payments)', []);
+    if (!cols.some(c => c.name === 'referenceNo')) {
+      await db.exec('ALTER TABLE payments ADD COLUMN referenceNo TEXT DEFAULT \'\'');
+    }
+  } catch (e) {}
   return true;
 }
 async function _settingsMap() {
@@ -133,7 +140,7 @@ async function _apiClients(method, parts, body) {
     return {
       client: { id: c.id, name: c.name, phone: c.phone, address: c.address, balance: c.balance || 0, loyaltyPoints: c.loyaltyPoints || 0, isSC: !!c.isSC, isPWD: !!c.isPWD },
       sales: txns.sort(byDate).slice(0, 100).map(t => ({ id: t.id, invoiceNo: t.invoiceNo, date: t.date, grandTotal: t.grandTotal, paymentMethod: t.paymentMethod, status: t.status })),
-      payments: pays.sort(byDate).slice(0, 100).map(p => ({ id: p.id, date: p.date, amount: p.amount, type: p.type }))
+      payments: pays.sort(byDate).slice(0, 100).map(p => ({ id: p.id, date: p.date, amount: p.amount, type: p.type, referenceNo: p.referenceNo || '' }))
     };
   }
   if (parts.length === 2 && parts[1] === 'redeem' && method === 'POST') {
@@ -609,30 +616,31 @@ async function _apiReturns(body) {
 async function _apiPayments(method, parts, body) {
   const db = _db();
   if (method === 'POST' && parts.length === 0) {
-    const { clientId, amount, type, date } = body || {};
+    const { clientId, amount, type, date, referenceNo } = body || {};
     if (!_validateAmount(amount)) throw _apiErr(400, 'Valid amount required');
     if (clientId && typeof clientId !== 'number' && typeof clientId !== 'string') throw _apiErr(400, 'Invalid client ID');
     const amtNum = _r2(amount);
     if (amtNum <= 0) throw _apiErr(400, 'Amount must be greater than 0');
     const safeDate = _sanitize(date) || new Date().toISOString().split('T')[0];
+    const ref = String(referenceNo || '').trim().slice(0, 40);
     const c = clientId ? await db.get('SELECT * FROM clients WHERE id = ?', [clientId]) : null;
     const balBefore = c ? (c.balance || 0) : 0;
     const pt = (type === 'Full' || type === 'Partial') ? type : (amtNum >= balBefore ? 'Full' : 'Partial');
-    await db.run('INSERT INTO payments (clientId, amount, type, date, notes, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
-      [clientId || null, amtNum, pt, safeDate, '', new Date().toISOString()]);
+    await db.run('INSERT INTO payments (clientId, amount, type, date, notes, referenceNo, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [clientId || null, amtNum, pt, safeDate, '', ref, new Date().toISOString()]);
     if (c) await db.run('UPDATE clients SET balance = ? WHERE id = ?', [Math.max(0, balBefore - amtNum), c.id]);
     await _audit('payment', 'Mobile payment ' + (c ? c.name : 'client') + ' - ₱' + amtNum.toFixed(2) + ' (phone)');
     _bump();
     return { success: true };
   }
   if (method === 'PUT' && parts.length === 1) {
-    const amt = parseFloat(body && body.amount);
-    if (!_validateAmount(amt) || amt <= 0) throw _apiErr(400, 'Valid amount required');
     const p = await db.get('SELECT * FROM payments WHERE id = ?', [parts[0]]);
     if (!p) throw _apiErr(404, 'Payment not found');
-    const amtNum = _r2(amt);
+    const amtNum = _r2(body && body.amount);
+    if (!_validateAmount(amtNum) || amtNum <= 0) throw _apiErr(400, 'Valid amount required');
+    const ref = body && body.referenceNo !== undefined ? String(body.referenceNo || '').trim().slice(0, 40) : (p.referenceNo || '');
     const diff = amtNum - (p.amount || 0);
-    await db.run('UPDATE payments SET amount = ? WHERE id = ?', [amtNum, p.id]);
+    await db.run('UPDATE payments SET amount = ?, referenceNo = ? WHERE id = ?', [amtNum, ref, p.id]);
     if (p.clientId) {
       const c = await db.get('SELECT * FROM clients WHERE id = ?', [p.clientId]);
       if (c) await db.run('UPDATE clients SET balance = ? WHERE id = ?', [Math.max(0, (c.balance || 0) - diff), c.id]);
@@ -817,6 +825,27 @@ async function _apiPOs(method, parts, body) {
     await _audit('po', 'Cancelled PO ' + (po.poNo || '') + ' (phone)');
     _bump();
     return { success: true };
+  }
+  if (method === 'PUT' && parts.length === 1) {
+    const b = body || {};
+    const po = await db.get('SELECT * FROM purchase_orders WHERE id = ?', [parts[0]]);
+    if (!po) throw _apiErr(404, 'Purchase order not found');
+    if (po.status === 'Received') throw _apiErr(400, 'Received orders cannot be edited');
+    const items = b.items !== undefined ? b.items : _parseJson(po.items, []);
+    if (!Array.isArray(items) || !items.length) throw _apiErr(400, 'No items');
+    const cleanItems = items.map(i => ({ invId: i.invId || null, name: String(i.name || 'Item'), price: parseFloat(i.price) || 0, qty: parseInt(i.qty) || 1, variantName: i.variantName || null }));
+    const total = cleanItems.reduce((s, i) => s + (i.price * i.qty), 0);
+    let supplierId = po.supplierId, supplierName = po.supplierName;
+    if (b.supplierId !== undefined) {
+      const s = await db.get('SELECT * FROM suppliers WHERE id = ?', [b.supplierId]);
+      supplierId = s ? s.id : null;
+      supplierName = s ? s.name : 'Unknown';
+    }
+    await db.run('UPDATE purchase_orders SET supplierId = ?, supplierName = ?, date = ?, items = ?, total = ? WHERE id = ?',
+      [supplierId, supplierName, b.date || po.date, JSON.stringify(cleanItems), total, po.id]);
+    await _audit('po', 'Edited PO ' + (po.poNo || '') + ' (phone)');
+    _bump();
+    return { success: true, poNo: po.poNo };
   }
   if (method === 'POST' && parts.length === 2 && parts[1] === 'receive') {    const po = await db.get('SELECT * FROM purchase_orders WHERE id = ?', [parts[0]]);
     if (!po) { const e = _apiErr(404, 'Purchase order not found'); e.json = { success: false, error: 'Purchase order not found' }; throw e; }
@@ -1132,7 +1161,7 @@ async function localApi(method, rawPath, body) {
   if (head === 'backup' && parts[1] === 'export' && m === 'GET') return _apiBackupExport();
   if (head === 'backup' && parts[1] === 'import' && m === 'POST') return _apiBackupImport(body);
   if (head === 'alerts' && m === 'GET') {
-    const rows = await _db().all('SELECT id, name, stock, lowStock, minStock, sellPrice FROM inventory', []);
+    const rows = await _db().all('SELECT id, name, stock, lowStock, minStock, sellPrice, expiryDate FROM inventory', []);
     const items = rows.map(i => ({
       id: i.id, name: i.name, stock: i.stock || 0,
       lowStock: i.lowStock ?? i.minStock ?? 5,
@@ -1140,7 +1169,14 @@ async function localApi(method, rawPath, body) {
     }));
     const out = items.filter(i => i.stock <= 0).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     const low = items.filter(i => i.stock > 0 && i.stock <= i.lowStock).sort((a, b) => a.stock - b.stock).slice(0, 100);
-    return { out, low, outCount: out.length, lowCount: low.length };
+    // Expiring within 30 days (or already past): oldest date first.
+    const soon = Date.now() + 30 * 86400000;
+    const expiring = rows
+      .filter(i => i.expiryDate && !isNaN(new Date(i.expiryDate + 'T00:00:00').getTime()) && new Date(i.expiryDate + 'T00:00:00').getTime() < soon)
+      .map(i => ({ id: i.id, name: i.name, expiryDate: i.expiryDate, stock: i.stock || 0 }))
+      .sort((a, b) => String(a.expiryDate).localeCompare(String(b.expiryDate)))
+      .slice(0, 100);
+    return { out, low, outCount: out.length, lowCount: low.length, expiring, expiringCount: expiring.length };
   }
   if (head === 'mobile-diag') return m === 'GET' ? [] : { success: true, stored: 0 };
   throw _apiErr(404, 'Not found');

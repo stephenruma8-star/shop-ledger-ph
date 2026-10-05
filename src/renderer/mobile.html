@@ -2018,10 +2018,11 @@ function applyStaticLang() {
 // ---------- HOME ----------
 function alertsStrip() {
   const a = data.alerts || { out: [], low: [], outCount: 0, lowCount: 0 };
-  if (!a.outCount && !a.lowCount) return '';
+  const expCount = (a.expiringCount || (a.expiring || []).length) || 0;
+  if (!a.outCount && !a.lowCount && !expCount) return '';
   const names = (a.out || []).slice(0, 3).map(i => esc(i.name)).join(', ') + (a.outCount > 3 ? ` +${a.outCount - 3} more` : '');
   return `<button onclick="showView('inventory')" class="w-full text-left glass-card rounded-2xl p-3 mb-2.5 fade-in" style="border:1px solid rgba(239,68,68,.4)">
-    <div class="text-sm font-bold text-red-400">⚠ ${a.outCount} ${T('alerts.out')}${a.lowCount ? ` · ${a.lowCount} ${T('alerts.low')}` : ''}</div>
+    <div class="text-sm font-bold text-red-400">⚠ ${a.outCount} ${T('alerts.out')}${a.lowCount ? ` · ${a.lowCount} ${T('alerts.low')}` : ''}${expCount ? ` · ⏳ ${expCount} expiring` : ''}</div>
     ${names ? `<div class="text-[11px] text-gray-400 truncate">${names}</div>` : ''}</button>`;
 }
 async function renderCashierHome() {
@@ -2236,10 +2237,10 @@ async function openClientDetail(id) {
     <div class="space-y-1.5">
       ${(h.payments || []).slice(0, 20).map(p => `
         <div class="flex justify-between items-center text-sm gap-2">
-          <span class="text-gray-200">${fmtDate(p.date)} <span class="text-gray-500">· ${esc(p.type || '')}</span></span>
+          <span class="text-gray-200">${fmtDate(p.date)} <span class="text-gray-500">· ${esc(p.type || '')}${p.referenceNo ? ' · #' + esc(p.referenceNo) : ''}</span></span>
           <span class="flex items-center gap-1.5">
             <span class="text-green-400 num shrink-0">-${peso(p.amount)}</span>
-            ${phoneRole() === 'cashier' ? '' : `<button onclick="renderPaymentEdit(${JSON.stringify(p.id)}, ${p.amount || 0})" class="text-[11px] text-blue-400 px-1.5">✏️</button><button onclick="deletePayment(${JSON.stringify(p.id)})" class="text-[11px] text-red-400 px-1.5">✕</button>`}
+            ${phoneRole() === 'cashier' ? '' : `<button onclick="renderPaymentEdit(${JSON.stringify(p.id)}, ${p.amount || 0}, ${JSON.stringify(p.referenceNo || '')})" class="text-[11px] text-blue-400 px-1.5">✏️</button><button onclick="deletePayment(${JSON.stringify(p.id)})" class="text-[11px] text-red-400 px-1.5">✕</button>`}
           </span>
         </div>`).join('') || `<p class="text-[11px] text-gray-500">${T('cli.no_history')}</p>`}
     </div>`;
@@ -2363,13 +2364,14 @@ async function shareClientStatement() {
   catch (e) { toast(T('cli.load_fail', { msg: e.message }), 'err'); return; }
   await shareText((h.client.name || '') + ' — statement', buildStatementText(h.client, h.sales || [], h.payments || []));
 }
-function renderPaymentEdit(id, amount) {
+function renderPaymentEdit(id, amount, referenceNo) {
   document.getElementById('modal-root').innerHTML = `
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
       <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" onclick="event.stopPropagation()">
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
         <h3 class="font-bold text-gray-100 text-sm mb-3">${T('pay.edit_title')}</h3>
         <input id="pe-amount" type="number" min="0" step="0.01" value="${amount || ''}" class="inp mb-3" />
+        <input id="pe-ref" type="text" maxlength="40" value="${esc(referenceNo || '')}" placeholder="Reference # (optional)" autocomplete="off" class="inp mb-3" />
         <button onclick="submitPaymentEdit(${JSON.stringify(id)})" class="btn btn-primary btn-lg">${T('pay.save_edit')}</button>
       </div>
     </div>`;
@@ -2377,9 +2379,10 @@ function renderPaymentEdit(id, amount) {
 async function submitPaymentEdit(id) {
   const amount = parseFloat((document.getElementById('pe-amount') || {}).value);
   if (!amount || amount <= 0) { toast(T('exp.need_amount'), 'err'); return; }
+  const referenceNo = ((document.getElementById('pe-ref') || {}).value || '').trim().slice(0, 40);
   if (!takeSubmitLock('payedit')) return;
   try {
-    await apiPost('/api/payments/' + encodeURIComponent(id), { amount }, 'PUT');
+    await apiPost('/api/payments/' + encodeURIComponent(id), { amount, referenceNo }, 'PUT');
     closeQuick();
     toast(T('pay.updated'), 'ok');
     await refreshAll();
@@ -3000,6 +3003,10 @@ async function renderPay(preselectedId) {
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('pay.method')}</label>
           <select id="pay-type" class="inp"><option>Cash</option><option>GCash</option><option>Maya</option><option>Bank Transfer</option></select>
         </div>
+        <div>
+          <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">Reference # (GCash/Maya/Bank, optional)</label>
+          <input id="pay-ref" type="text" maxlength="40" placeholder="e.g. 1234 567 890" autocomplete="off" class="inp" />
+        </div>
         <button onclick="submitPay()" class="btn btn-success btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>${T('pay.record')}</button>
       </div>
     </div>`;
@@ -3014,10 +3021,11 @@ async function submitPay() {
   const clientId = parseInt(document.getElementById('pay-client').value);
   const amount = parseFloat(document.getElementById('pay-amount').value);
   const type = document.getElementById('pay-type').value;
+  const referenceNo = ((document.getElementById('pay-ref') || {}).value || '').trim().slice(0, 40);
   if (!clientId || !amount) return toast(T('pay.fill'), 'err');
   if (!takeSubmitLock('pay')) return;
   try {
-    const r = await apiPost('/api/payments', { clientId, amount, type, date: new Date().toISOString().split('T')[0] });
+    const r = await apiPost('/api/payments', { clientId, amount, type, referenceNo, date: new Date().toISOString().split('T')[0] });
     if (r.queued) toast(T('pay.queued'), 'ok');
     else toast(T('pay.ok'), 'ok');
     showView('home'); await refreshAll();
@@ -3834,7 +3842,7 @@ async function renderPOs() {
   v.innerHTML = `
     <div class="flex items-center justify-between gap-2 mb-3 fade-in">
       <h2 class="card-title text-base"><span class="icon-tile bg-teal-500/15 text-teal-400"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></span>${T('view.purchase-orders.title')}</h2>
-      <button onclick="addPO()" class="btn btn-primary btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('po.new')}</button>
+      <button onclick="newPO()" class="btn btn-primary btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('po.new')}</button>
     </div>
     <div class="grid gap-2.5 fade-in">
       ${data.purchaseOrders.map(po => `
@@ -3848,7 +3856,7 @@ async function renderPOs() {
           <div class="flex items-center justify-between mt-1.5">
             <div class="text-sm font-bold text-teal-400 num">${peso(po.total)}</div>
             <div class="flex gap-1.5">
-            ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) && po.status !== 'Received' ? `<button onclick="deletePO(${JSON.stringify(po.id)})" id="po-del-${po.id}" class="btn btn-sm" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);color:#f87171;font-size:.75rem">🗑</button>` : ''}
+            ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) && po.status !== 'Received' ? `<button onclick="editPO(${JSON.stringify(po.id)})" class="btn btn-ghost btn-sm" style="font-size:.75rem">✏️</button><button onclick="deletePO(${JSON.stringify(po.id)})" id="po-del-${po.id}" class="btn btn-sm" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);color:#f87171;font-size:.75rem">🗑</button>` : ''}
             ${phoneRole() !== 'cashier' && po.status !== 'Received' ? `<button onclick="receivePO(${JSON.stringify(po.id)})" class="btn btn-ghost btn-sm">${T('po.receive')}</button>` : ''}
             </div>
           </div>
@@ -3894,7 +3902,7 @@ async function deletePO(id) {
   finally { releaseSubmitLock('podel'); }
 }
 function addPO() {
-  poItems = [];
+  if (editingPoId == null) poItems = [];
   document.getElementById('modal-root').innerHTML = `
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
       <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up" style="background:rgba(15,23,42,.97);border:1px solid rgba(255,255,255,.09);border-bottom:none;box-shadow:0 -12px 40px rgba(0,0,0,.5);max-height:92dvh;overflow-y:auto" onclick="event.stopPropagation()">
@@ -3922,7 +3930,7 @@ function addPO() {
           <button onclick="poAddItem()" class="btn btn-ghost btn-sm w-full"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('po.add_to_po')}</button>
           <div id="po-cart" class="glass rounded-2xl p-2 text-sm space-y-1"><p class="text-gray-500 text-xs px-1">${T('po.no_items')}</p></div>
           <div class="flex justify-between font-bold text-gray-100">${T('po.total')} <span class="text-teal-400 num" id="po-total-mobile">${peso(0)}</span></div>
-          <button onclick="submitPO()" class="btn btn-success btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>${T('po.create')}</button>
+          <button onclick="submitPO()" id="po-submit-btn" class="btn btn-success btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>${T('po.create')}</button>
         </div>
       </div>
     </div>`;
@@ -3962,14 +3970,45 @@ async function submitPO() {
   if (!supplierId) return toast(T('po.need_supplier'), 'err');
   if (!takeSubmitLock('po')) return;
   try {
-    const r = await apiPost('/api/purchase-orders', { supplierId, items: poItems.map(i => ({ invId: i.invId, name: i.name, price: i.price, qty: i.qty })), date: new Date().toISOString().split('T')[0] });
-    closeQuick();
-    poItems = [];
-    if (r.queued) toast(T('po.queued'), 'ok');
-    else toast(T('po.created', { po: r.poNo || '' }), 'ok');
+    if (editingPoId) {
+      await apiPost('/api/purchase-orders/' + encodeURIComponent(editingPoId), { supplierId, items: poItems.map(i => ({ invId: i.invId, name: i.name, price: i.price, qty: i.qty })) }, 'PUT');
+      closeQuick();
+      poItems = []; editingPoId = null;
+      toast('Order updated', 'ok');
+    } else {
+      const r = await apiPost('/api/purchase-orders', { supplierId, items: poItems.map(i => ({ invId: i.invId, name: i.name, price: i.price, qty: i.qty })), date: new Date().toISOString().split('T')[0] });
+      closeQuick();
+      poItems = [];
+      if (r.queued) toast(T('po.queued'), 'ok');
+      else toast(T('po.created', { po: r.poNo || '' }), 'ok');
+    }
     await refreshAll();
   } catch (e) { toast(T('po.failed', { msg: e.message }), 'err'); }
   finally { releaseSubmitLock('po'); }
+}
+// Standalone-only: fix a pending order's lines (desktop LAN API is read-only
+// for orders, so the button is gated at the call site).
+let editingPoId = null;
+function newPO() {
+  editingPoId = null;
+  poItems = [];
+  addPO();
+}
+function editPO(id) {
+  const po = (data.purchaseOrders || []).find(p => String(p.id) === String(id));
+  if (!po || po.status === 'Received') return;
+  editingPoId = po.id;
+  poItems = (po.items || []).map(i => ({ invId: i.invId || null, name: i.name || 'Item', price: i.price || 0, qty: i.qty || 1 }));
+  addPO();
+  poRenderCart();
+  setTimeout(() => {
+    try {
+      const sel = document.getElementById('po-supplier');
+      if (sel && po.supplierId) sel.value = String(po.supplierId);
+      const btn = document.getElementById('po-submit-btn');
+      if (btn && btn.lastChild) btn.lastChild.textContent = 'Save changes';
+    } catch (e) {}
+  }, 30);
 }
 
 // ===== src/mobile/view-reports.js =====
@@ -3986,6 +4025,10 @@ async function renderReports() {
       <span class="text-xs text-gray-400 shrink-0">${T('rep.month')}</span>
       <input id="rep-month" type="month" value="${esc(repMonth)}" max="${esc(monthKey(new Date()))}" onchange="loadReportMonth()" class="inp flex-1" style="height:2.4rem" />
       ${phoneRole() === 'cashier' ? '' : `<button onclick="exportMonthCsv()" class="btn btn-ghost btn-sm shrink-0">📥 ${T('rep.export')}</button>`}
+    </div>
+    <div class="grid grid-cols-2 gap-2 mb-3 fade-in">
+      <button onclick="shareTodayReport()" class="btn btn-ghost btn-sm">📤 Today's summary</button>
+      <button onclick="shareMonthReport()" class="btn btn-ghost btn-sm">📤 Month summary</button>
     </div>
     <div class="grid grid-cols-2 gap-2.5 mb-3 fade-in">
       <div class="stat-card rounded-2xl p-3.5">
@@ -4141,6 +4184,19 @@ async function shareMonthReport() {
   L.push('Sales: ' + peso(r.month.sales) + ' | Expenses: ' + peso(r.month.expenses) + ' | Profit: ' + peso(r.month.profit) + ' | Collected: ' + peso(r.month.collected));
   (r.topItems || []).slice(0, 5).forEach((t, i) => L.push(`${i + 1}. ${t.name} — ${t.qty} sold (${peso(t.amount)})`));
   await shareText('Monthly report ' + (r.monthStr || ''), L.join('\n'));
+}
+async function shareTodayReport() {
+  const r = data.reports;
+  if (!r || !r.today) return;
+  const s = data.settings || {};
+  const t = r.today;
+  const d = new Date();
+  const today = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  const L = [];
+  L.push((s.shopName || 'Shop Ledger PH') + ' — closing ' + today);
+  L.push('Sales: ' + peso(t.sales) + ' | Expenses: ' + peso(t.expenses) + ' | Profit: ' + peso(t.profit));
+  L.push('Collected: ' + peso(t.collected) + (t.refunds ? ' | Refunds: ' + peso(t.refunds) : ''));
+  await shareText('Daily closing ' + today, L.join('\n'));
 }
 
 // ===== src/mobile/view-settings.js =====

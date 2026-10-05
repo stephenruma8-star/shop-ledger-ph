@@ -104,10 +104,10 @@ async function openClientDetail(id) {
     <div class="space-y-1.5">
       ${(h.payments || []).slice(0, 20).map(p => `
         <div class="flex justify-between items-center text-sm gap-2">
-          <span class="text-gray-200">${fmtDate(p.date)} <span class="text-gray-500">· ${esc(p.type || '')}</span></span>
+          <span class="text-gray-200">${fmtDate(p.date)} <span class="text-gray-500">· ${esc(p.type || '')}${p.referenceNo ? ' · #' + esc(p.referenceNo) : ''}</span></span>
           <span class="flex items-center gap-1.5">
             <span class="text-green-400 num shrink-0">-${peso(p.amount)}</span>
-            ${phoneRole() === 'cashier' ? '' : `<button onclick="renderPaymentEdit(${JSON.stringify(p.id)}, ${p.amount || 0})" class="text-[11px] text-blue-400 px-1.5">✏️</button><button onclick="deletePayment(${JSON.stringify(p.id)})" class="text-[11px] text-red-400 px-1.5">✕</button>`}
+            ${phoneRole() === 'cashier' ? '' : `<button onclick="renderPaymentEdit(${JSON.stringify(p.id)}, ${p.amount || 0}, ${JSON.stringify(p.referenceNo || '')})" class="text-[11px] text-blue-400 px-1.5">✏️</button><button onclick="deletePayment(${JSON.stringify(p.id)})" class="text-[11px] text-red-400 px-1.5">✕</button>`}
           </span>
         </div>`).join('') || `<p class="text-[11px] text-gray-500">${T('cli.no_history')}</p>`}
     </div>`;
@@ -231,13 +231,14 @@ async function shareClientStatement() {
   catch (e) { toast(T('cli.load_fail', { msg: e.message }), 'err'); return; }
   await shareText((h.client.name || '') + ' — statement', buildStatementText(h.client, h.sales || [], h.payments || []));
 }
-function renderPaymentEdit(id, amount) {
+function renderPaymentEdit(id, amount, referenceNo) {
   document.getElementById('modal-root').innerHTML = `
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
       <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" onclick="event.stopPropagation()">
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
         <h3 class="font-bold text-gray-100 text-sm mb-3">${T('pay.edit_title')}</h3>
         <input id="pe-amount" type="number" min="0" step="0.01" value="${amount || ''}" class="inp mb-3" />
+        <input id="pe-ref" type="text" maxlength="40" value="${esc(referenceNo || '')}" placeholder="Reference # (optional)" autocomplete="off" class="inp mb-3" />
         <button onclick="submitPaymentEdit(${JSON.stringify(id)})" class="btn btn-primary btn-lg">${T('pay.save_edit')}</button>
       </div>
     </div>`;
@@ -245,9 +246,10 @@ function renderPaymentEdit(id, amount) {
 async function submitPaymentEdit(id) {
   const amount = parseFloat((document.getElementById('pe-amount') || {}).value);
   if (!amount || amount <= 0) { toast(T('exp.need_amount'), 'err'); return; }
+  const referenceNo = ((document.getElementById('pe-ref') || {}).value || '').trim().slice(0, 40);
   if (!takeSubmitLock('payedit')) return;
   try {
-    await apiPost('/api/payments/' + encodeURIComponent(id), { amount }, 'PUT');
+    await apiPost('/api/payments/' + encodeURIComponent(id), { amount, referenceNo }, 'PUT');
     closeQuick();
     toast(T('pay.updated'), 'ok');
     await refreshAll();

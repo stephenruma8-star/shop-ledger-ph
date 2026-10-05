@@ -1,10 +1,11 @@
 // ---------- HOME ----------
 function alertsStrip() {
   const a = data.alerts || { out: [], low: [], outCount: 0, lowCount: 0 };
-  if (!a.outCount && !a.lowCount) return '';
+  const expCount = (a.expiringCount || (a.expiring || []).length) || 0;
+  if (!a.outCount && !a.lowCount && !expCount) return '';
   const names = (a.out || []).slice(0, 3).map(i => esc(i.name)).join(', ') + (a.outCount > 3 ? ` +${a.outCount - 3} more` : '');
   return `<button onclick="showView('inventory')" class="w-full text-left glass-card rounded-2xl p-3 mb-2.5 fade-in" style="border:1px solid rgba(239,68,68,.4)">
-    <div class="text-sm font-bold text-red-400">⚠ ${a.outCount} ${T('alerts.out')}${a.lowCount ? ` · ${a.lowCount} ${T('alerts.low')}` : ''}</div>
+    <div class="text-sm font-bold text-red-400">⚠ ${a.outCount} ${T('alerts.out')}${a.lowCount ? ` · ${a.lowCount} ${T('alerts.low')}` : ''}${expCount ? ` · ⏳ ${expCount} expiring` : ''}</div>
     ${names ? `<div class="text-[11px] text-gray-400 truncate">${names}</div>` : ''}</button>`;
 }
 async function renderCashierHome() {

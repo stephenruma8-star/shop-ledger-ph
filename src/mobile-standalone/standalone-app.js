@@ -15,6 +15,8 @@ async function startStandalone() {
   applyRoleGating();
   applyBrand();
   wirePrinter();
+  checkStockNotify();
+  maybeAutoUpdateCheck();
   const ls = document.getElementById('loading-screen');
   if (ls) ls.classList.add('hidden');
   showView('home');

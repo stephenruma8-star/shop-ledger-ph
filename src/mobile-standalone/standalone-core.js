@@ -345,6 +345,30 @@ function updateCartUI() {
   }
   if (currentView === 'sale' && navModalOpen) updateNavMeta('sale');
 }
+// Low-stock push: once per day at boot when something needs restocking.
+// Silent everywhere the plugin is absent (browser, old builds).
+async function checkStockNotify() {
+  try {
+    const N = nativePlugin('LocalNotifications');
+    if (!N || typeof N.schedule !== 'function') return;
+    const a = data.alerts || {};
+    const out = a.outCount || 0, low = a.lowCount || 0;
+    if (!out && !low) return;
+    const today = new Date().toISOString().split('T')[0];
+    let stamped = '';
+    try { stamped = localStorage.getItem('slpStockNote') || ''; } catch (e) {}
+    if (stamped === today) return;
+    try {
+      if (typeof N.requestPermissions === 'function') await N.requestPermissions().catch(() => {});
+      await N.schedule({ notifications: [{
+        id: 7, title: 'Shop Ledger: restock needed',
+        body: out ? (out + ' item(s) out of stock' + (low ? ', ' + low + ' running low' : '')) : (low + ' item(s) running low'),
+        schedule: { at: new Date(Date.now() + 1000) }, smallIcon: 'ic_launcher'
+      }] });
+      try { localStorage.setItem('slpStockNote', today); } catch (e) {}
+    } catch (e) {}
+  } catch (e) {}
+}
 // Settings substitutes (no desktop to check for updates, no PWA install).
 async function bundledAppVersion() { return 'standalone-' + STANDALONE_VERSION; }
 function updateInstallRow() {
@@ -359,5 +383,57 @@ function installApp() { return false; }
 function updateUpdateRow() {
   const box = document.getElementById('update-row');
   if (!box) return;
-  box.innerHTML = `<p class="text-[11px] text-gray-500">Standalone v${STANDALONE_VERSION} — updates arrive as a new APK.</p>`;
+  box.innerHTML = `<p class="text-[11px] text-gray-500 mb-2">Standalone v${STANDALONE_VERSION} — updates arrive as a new APK.</p>
+    <div id="upd-check"></div>
+    <button onclick="checkStandaloneUpdate(true)" class="w-full py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500">Check for updates</button>`;
+}
+function _cmpVersions(a, b) {
+  const pa = String(a || '').split('.').map(x => parseInt(x) || 0);
+  const pb = String(b || '').split('.').map(x => parseInt(x) || 0);
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) - (pb[i] || 0);
+  }
+  return 0;
+}
+async function checkStandaloneUpdate(manual) {
+  const slot = document.getElementById('upd-check');
+  const say = (html) => { if (slot) slot.innerHTML = html; };
+  if (manual) say('<p class="text-[11px] text-gray-500 mb-2">Checking…</p>');
+  try {
+    const r = await (await fetch('https://api.github.com/repos/stephenruma8-star/shop-ledger-ph/releases?per_page=20', { headers: { Accept: 'application/vnd.github+json' } })).json();
+    const mobile = (Array.isArray(r) ? r : [])
+      .filter(x => x && /^mobile-v\d+\.\d+\.\d+$/.test(x.tag_name || ''))
+      .map(x => ({ tag: x.tag_name.slice('mobile-v'.length), url: (x.assets || []).map(a => a.browser_download_url).find(u => /standalone\.apk$/i.test(u || '')) || x.html_url, name: x.name || x.tag_name }));
+    mobile.sort((x, y) => _cmpVersions(y.tag, x.tag));
+    const best = mobile[0];
+    try { localStorage.setItem('slpUpdCheck', new Date().toISOString()); } catch (e) {}
+    if (!best || _cmpVersions(best.tag, STANDALONE_VERSION) <= 0) {
+      if (manual) say('<p class="text-[11px] text-green-400 mb-2">Up to date (v' + STANDALONE_VERSION + ').</p>');
+      else if (slot) slot.innerHTML = '';
+      return false;
+    }
+    say(`<div class="rounded-xl p-3 mb-2" style="background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.35)">
+      <p class="text-xs font-bold text-blue-300 mb-1">New version ${esc(best.tag)} available</p>
+      <button onclick="openStandaloneUpdate(${JSON.stringify(best.url)})" class="w-full py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold">Download ${esc(best.tag)}</button>
+    </div>`);
+    if (!manual) toast('App update available: v' + best.tag, 'info');
+    return true;
+  } catch (e) {
+    if (manual) say('<p class="text-[11px] text-red-400 mb-2">Check failed — needs internet.</p>');
+    return false;
+  }
+}
+function openStandaloneUpdate(url) {
+  try {
+    const B = nativePlugin('Browser');
+    if (B && typeof B.open === 'function') { B.open({ url }).catch(() => {}); return; }
+  } catch (e) {}
+  try { window.open(url, '_blank'); } catch (e) {}
+}
+async function maybeAutoUpdateCheck() {
+  try {
+    const last = localStorage.getItem('slpUpdCheck') || '';
+    if (last && (Date.now() - new Date(last).getTime()) < 24 * 3600000) return;
+    await checkStandaloneUpdate(false);
+  } catch (e) {}
 }

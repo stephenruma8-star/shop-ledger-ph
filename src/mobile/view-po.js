@@ -5,7 +5,7 @@ async function renderPOs() {
   v.innerHTML = `
     <div class="flex items-center justify-between gap-2 mb-3 fade-in">
       <h2 class="card-title text-base"><span class="icon-tile bg-teal-500/15 text-teal-400"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></span>${T('view.purchase-orders.title')}</h2>
-      <button onclick="addPO()" class="btn btn-primary btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('po.new')}</button>
+      <button onclick="newPO()" class="btn btn-primary btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('po.new')}</button>
     </div>
     <div class="grid gap-2.5 fade-in">
       ${data.purchaseOrders.map(po => `
@@ -19,7 +19,7 @@ async function renderPOs() {
           <div class="flex items-center justify-between mt-1.5">
             <div class="text-sm font-bold text-teal-400 num">${peso(po.total)}</div>
             <div class="flex gap-1.5">
-            ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) && po.status !== 'Received' ? `<button onclick="deletePO(${JSON.stringify(po.id)})" id="po-del-${po.id}" class="btn btn-sm" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);color:#f87171;font-size:.75rem">🗑</button>` : ''}
+            ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) && po.status !== 'Received' ? `<button onclick="editPO(${JSON.stringify(po.id)})" class="btn btn-ghost btn-sm" style="font-size:.75rem">✏️</button><button onclick="deletePO(${JSON.stringify(po.id)})" id="po-del-${po.id}" class="btn btn-sm" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);color:#f87171;font-size:.75rem">🗑</button>` : ''}
             ${phoneRole() !== 'cashier' && po.status !== 'Received' ? `<button onclick="receivePO(${JSON.stringify(po.id)})" class="btn btn-ghost btn-sm">${T('po.receive')}</button>` : ''}
             </div>
           </div>
@@ -65,7 +65,7 @@ async function deletePO(id) {
   finally { releaseSubmitLock('podel'); }
 }
 function addPO() {
-  poItems = [];
+  if (editingPoId == null) poItems = [];
   document.getElementById('modal-root').innerHTML = `
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
       <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up" style="background:rgba(15,23,42,.97);border:1px solid rgba(255,255,255,.09);border-bottom:none;box-shadow:0 -12px 40px rgba(0,0,0,.5);max-height:92dvh;overflow-y:auto" onclick="event.stopPropagation()">
@@ -93,7 +93,7 @@ function addPO() {
           <button onclick="poAddItem()" class="btn btn-ghost btn-sm w-full"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('po.add_to_po')}</button>
           <div id="po-cart" class="glass rounded-2xl p-2 text-sm space-y-1"><p class="text-gray-500 text-xs px-1">${T('po.no_items')}</p></div>
           <div class="flex justify-between font-bold text-gray-100">${T('po.total')} <span class="text-teal-400 num" id="po-total-mobile">${peso(0)}</span></div>
-          <button onclick="submitPO()" class="btn btn-success btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>${T('po.create')}</button>
+          <button onclick="submitPO()" id="po-submit-btn" class="btn btn-success btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>${T('po.create')}</button>
         </div>
       </div>
     </div>`;
@@ -133,13 +133,44 @@ async function submitPO() {
   if (!supplierId) return toast(T('po.need_supplier'), 'err');
   if (!takeSubmitLock('po')) return;
   try {
-    const r = await apiPost('/api/purchase-orders', { supplierId, items: poItems.map(i => ({ invId: i.invId, name: i.name, price: i.price, qty: i.qty })), date: new Date().toISOString().split('T')[0] });
-    closeQuick();
-    poItems = [];
-    if (r.queued) toast(T('po.queued'), 'ok');
-    else toast(T('po.created', { po: r.poNo || '' }), 'ok');
+    if (editingPoId) {
+      await apiPost('/api/purchase-orders/' + encodeURIComponent(editingPoId), { supplierId, items: poItems.map(i => ({ invId: i.invId, name: i.name, price: i.price, qty: i.qty })) }, 'PUT');
+      closeQuick();
+      poItems = []; editingPoId = null;
+      toast('Order updated', 'ok');
+    } else {
+      const r = await apiPost('/api/purchase-orders', { supplierId, items: poItems.map(i => ({ invId: i.invId, name: i.name, price: i.price, qty: i.qty })), date: new Date().toISOString().split('T')[0] });
+      closeQuick();
+      poItems = [];
+      if (r.queued) toast(T('po.queued'), 'ok');
+      else toast(T('po.created', { po: r.poNo || '' }), 'ok');
+    }
     await refreshAll();
   } catch (e) { toast(T('po.failed', { msg: e.message }), 'err'); }
   finally { releaseSubmitLock('po'); }
+}
+// Standalone-only: fix a pending order's lines (desktop LAN API is read-only
+// for orders, so the button is gated at the call site).
+let editingPoId = null;
+function newPO() {
+  editingPoId = null;
+  poItems = [];
+  addPO();
+}
+function editPO(id) {
+  const po = (data.purchaseOrders || []).find(p => String(p.id) === String(id));
+  if (!po || po.status === 'Received') return;
+  editingPoId = po.id;
+  poItems = (po.items || []).map(i => ({ invId: i.invId || null, name: i.name || 'Item', price: i.price || 0, qty: i.qty || 1 }));
+  addPO();
+  poRenderCart();
+  setTimeout(() => {
+    try {
+      const sel = document.getElementById('po-supplier');
+      if (sel && po.supplierId) sel.value = String(po.supplierId);
+      const btn = document.getElementById('po-submit-btn');
+      if (btn && btn.lastChild) btn.lastChild.textContent = 'Save changes';
+    } catch (e) {}
+  }, 30);
 }
 
