@@ -2690,7 +2690,7 @@ function renderSale() {
   saleTotals();
 }
 function clientOptions() {
-  return '<option value="">' + T('sale.walkin') + '</option>' + data.clients.map(c => '<option value="' + c.id + '"' + (c.id === preselectedId ? ' selected' : '') + '>' + esc(c.name) + ' — ' + peso(c.balance) + '</option>').join('');
+  return '<option value="">' + T('sale.walkin') + '</option>' + data.clients.map(c => '<option value="' + c.id + '">' + esc(c.name) + ' — ' + peso(c.balance) + '</option>').join('');
 }
 // Preset the interest picker from the client's most recent rated sale
 // (mirrors the desktop rate memory; the cashier can still change it).
