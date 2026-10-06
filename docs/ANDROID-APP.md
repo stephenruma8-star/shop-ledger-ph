@@ -11,7 +11,9 @@ printing through the first-party `ShopPrinter` plugin (raw TCP ESC/POS,
 same bytes the desktop sends). No Play Store needed: the signed APK
 sideloads directly. Releases ship as `Shop-Ledger-Mobile-X.Y.Z-standalone.apk`
 under the `mobile-vX.Y.Z` prerelease tags (pre-release so desktop
-updaters ignore them).
+updaters ignore them). The latest APK is always also committed at
+`releases/Shop-Ledger-Mobile-standalone.apk` — see
+`scripts/publish-mobile.mjs`, which keeps both copies in sync.
 
 ## One-time setup (on a machine with Android Studio)
 
