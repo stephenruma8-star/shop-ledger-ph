@@ -24,6 +24,29 @@ async function renderCashierHome() {
       <button onclick="showView('inventory')" class="stat-card rounded-2xl p-5 text-center card-hover"><div class="text-2xl mb-1">📦</div><div class="text-sm font-bold text-gray-100">${T('home.stock')}</div></button>
     </div>`;
 }
+// Standalone-only setup checklist on a fresh ledger. Each step links where
+// it gets done; the card disappears once everything is.
+function onboardingCard() {
+  if (typeof IS_STANDALONE === 'undefined' || !IS_STANDALONE) return '';
+  const hasItems = (data.inventory || []).length > 0;
+  const hasPrinter = !!((data.settings || {}).thermalHost);
+  const hasSale = (data.transactions || []).length > 0;
+  let backedUp = false;
+  try { backedUp = !!localStorage.getItem('slpLastBackup'); } catch (e) {}
+  if (hasItems && hasPrinter && hasSale && backedUp) return '';
+  const step = (done, label, view) => `
+    <button onclick="showView('${view}')" class="w-full text-left flex items-center gap-2.5 py-2 row">
+      <span class="w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${done ? 'bg-green-600 text-white' : 'bg-white/10 text-gray-400 border border-white/15'}">${done ? '✓' : '·'}</span>
+      <span class="text-sm ${done ? 'text-gray-500 line-through' : 'text-gray-200 font-medium'}">${label}</span>
+    </button>`;
+  return `<div class="glass-card rounded-2xl p-3.5 mb-2.5 fade-in" style="border:1px solid rgba(59,130,246,.35)">
+    <div class="text-sm font-bold text-gray-100 mb-1">🚀 Set up your shop</div>
+    ${step(hasItems, 'Add your catalog items', 'inventory')}
+    ${step(hasPrinter, 'Set the receipt printer IP', 'settings')}
+    ${step(hasSale, 'Make your first sale', 'sale')}
+    ${step(backedUp, 'Export your first backup', 'settings')}
+  </div>`;
+}
 async function renderHome() {
   const v = document.getElementById('view');
   v.innerHTML = skeleton(T('common.loading'));
@@ -37,6 +60,7 @@ async function renderHome() {
   const recent = (s.recent || []).slice(0, 4);
   v.innerHTML = `
     ${alertsStrip()}
+    ${onboardingCard()}
     <div class="grid grid-cols-2 gap-2.5 fade-in">
       <div class="stat-card rounded-2xl p-3.5">
         <div class="flex items-center justify-between mb-2 gap-1">

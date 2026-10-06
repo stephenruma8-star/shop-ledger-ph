@@ -84,7 +84,25 @@ function renderShopEdit() {
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('set.shop_receipt_footer')}</label>
             <input id="se-footer" type="text" maxlength="200" value="${esc(s.receiptFooter || '')}" class="inp" />
           </div>
+          <div>
+            <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">Receipt header (printed above shop name)</label>
+            <input id="se-headertext" type="text" maxlength="200" value="${esc(s.receiptHeaderText || '')}" class="inp" />
+          </div>
           ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `
+          <div class="grid grid-cols-2 gap-2.5">
+            <div>
+              <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">VAT % (0 = off)</label>
+              <input id="se-vat" type="number" min="0" max="100" step="0.01" value="${esc(s.vatRate ?? 0)}" class="inp" />
+            </div>
+            <div>
+              <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">Printer port</label>
+              <input id="se-thermalport" type="number" min="1" max="65535" value="${esc(s.thermalPort || '9100')}" class="inp" />
+            </div>
+          </div>
+          <div>
+            <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">Loyalty points per ₱1</label>
+            <input id="se-ppp" type="number" min="0" step="0.01" value="${esc(s.pointsPerPeso ?? 1)}" class="inp" />
+          </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">Printer IP (Wi-Fi receipt printer)</label>
             <input id="se-thermal" type="text" maxlength="40" placeholder="192.168.1.50" value="${esc(s.thermalHost || '')}" class="inp" />
@@ -99,11 +117,18 @@ async function submitShopEdit() {
     shopName: ((document.getElementById('se-name') || {}).value || '').trim(),
     shopAddress: ((document.getElementById('se-address') || {}).value || '').trim(),
     shopContact: ((document.getElementById('se-contact') || {}).value || '').trim(),
-    receiptFooter: ((document.getElementById('se-footer') || {}).value || '').trim()
+    receiptFooter: ((document.getElementById('se-footer') || {}).value || '').trim(),
+    receiptHeaderText: ((document.getElementById('se-headertext') || {}).value || '').trim().slice(0, 500)
   };
   if (typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) {
     const th = document.getElementById('se-thermal');
     if (th) vals.thermalHost = (th.value || '').trim().slice(0, 40);
+    const tp = document.getElementById('se-thermalport');
+    if (tp) vals.thermalPort = String(Math.min(65535, Math.max(1, parseInt(tp.value) || 9100)));
+    const vr = document.getElementById('se-vat');
+    if (vr) vals.vatRate = String(Math.min(100, Math.max(0, parseFloat(vr.value) || 0)));
+    const pp = document.getElementById('se-ppp');
+    if (pp) vals.pointsPerPeso = String(Math.max(0, parseFloat(pp.value) || 0));
   }
   if (!vals.shopName) { toast(T('set.need_name'), 'err'); return; }
   if (!takeSubmitLock('shopedit')) return;

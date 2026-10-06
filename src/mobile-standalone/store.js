@@ -93,6 +93,12 @@ async function _audit(action, details) {
       'INSERT INTO audit_logs (action, details, user, createdAt, date) VALUES (?, ?, ?, ?, ?)',
       [String(action || ''), String(details || ''), 'phone', new Date().toISOString(), _todayStr()]
     );
+    // Retention: keep the newest 1000 entries so the log can't bloat the
+    // phone over the years (mirrors the desktop's auditRetentionDays).
+    const n = await _db().get('SELECT COUNT(*) AS c FROM audit_logs', []);
+    if (n && n.c > 1000) {
+      await _db().run('DELETE FROM audit_logs WHERE id NOT IN (SELECT id FROM audit_logs ORDER BY id DESC LIMIT 1000)', []);
+    }
   } catch (e) {}
 }
 function _rowClient(r) {
@@ -481,7 +487,9 @@ async function _apiSales(method, parts, body, query) {
       id: full.id, invoiceNo: full.invoiceNo, clientId: full.clientId || null, clientName: full.clientName,
       paymentMethod: full.paymentMethod, date: full.date, createdAt: full.createdAt,
       grandTotal: full.grandTotal, subtotal: full.subtotal, totalInterest: full.totalInterest,
-      discount: full.discount, scDiscount: full.scDiscount, status: full.status, items: full.items
+      discount: full.discount, scDiscount: full.scDiscount, status: full.status, items: full.items,
+      voidReason: full.voidReason || '', returnReason: full.returnReason || '',
+      refId: full.refId || null, refInvoiceNo: full.refInvoiceNo || null
     };
   }
   throw _apiErr(404, 'Not found');
@@ -490,6 +498,7 @@ async function _apiVoid(body) {
   const db = _db();
   const ref = body && (body.invoiceNo ?? body.id);
   if (ref === undefined || ref === null || String(ref).trim() === '') throw _apiErr(400, 'invoiceNo required');
+  const reason = String((body && (body.reason || body.voidReason)) || '').slice(0, 200);
   const rows = await db.all('SELECT * FROM transactions WHERE invoiceNo = ? OR id = ?', [String(ref), String(ref)]);
   const t = rows.find(x => x.invoiceNo === String(ref) || String(x.id) === String(ref));
   if (!t || t.status === 'voided') throw _apiErr(404, 'Sale not found or already voided');
@@ -504,7 +513,7 @@ async function _apiVoid(body) {
     const c = await db.get('SELECT * FROM clients WHERE id = ?', [t.clientId]);
     if (c) await db.run('UPDATE clients SET balance = ? WHERE id = ?', [Math.max(0, (c.balance || 0) - (t.grandTotal || 0)), c.id]);
   }
-  await db.run('UPDATE transactions SET status = ?, voidedAt = ? WHERE id = ?', ['voided', new Date().toISOString(), t.id]);
+  await db.run('UPDATE transactions SET status = ?, voidedAt = ?, voidReason = ? WHERE id = ?', ['voided', new Date().toISOString(), reason, t.id]);
   await _audit('sale-void', 'Mobile void ' + String(ref) + ' (phone)');
   _bump();
   return { success: true };
@@ -573,6 +582,7 @@ async function _apiReturns(body) {
   }
   return _withNumbering(async () => {
     const invoiceNo = await _nextInvoiceNo(db);
+    const reason = String((body && (body.reason || body.returnReason)) || '').slice(0, 200);
     const unitOf = (line) => (typeof line._u === 'number') ? line._u : unitFromOrig(line);
     const origSub = origItems.reduce((s, i) => s + ((parseInt(i.qty) || 1) * unitOf(i)), 0);
     let retSub = 0;
@@ -593,8 +603,8 @@ async function _apiReturns(body) {
     });
     const now = new Date().toISOString();
     await db.run(
-      'INSERT INTO transactions (invoiceNo, clientId, clientName, date, createdAt, items, subtotal, totalInterest, discount, scDiscount, grandTotal, paymentMethod, status, refId, refInvoiceNo, partial) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?, ?)',
-      [invoiceNo, orig.clientId || null, orig.clientName || 'Walk-in', _todayStr(), now, JSON.stringify(items), -retSub, grandTotal, orig.paymentMethod || 'Cash', 'return', orig.id || null, orig.invoiceNo || null, partial ? 1 : 0]
+      'INSERT INTO transactions (invoiceNo, clientId, clientName, date, createdAt, items, subtotal, totalInterest, discount, scDiscount, grandTotal, paymentMethod, status, refId, refInvoiceNo, partial, returnReason) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?)',
+      [invoiceNo, orig.clientId || null, orig.clientName || 'Walk-in', _todayStr(), now, JSON.stringify(items), -retSub, grandTotal, orig.paymentMethod || 'Cash', 'return', orig.id || null, orig.invoiceNo || null, partial ? 1 : 0, reason]
     );
     for (const item of items) {
       if (item.invId) {
@@ -947,8 +957,30 @@ async function _apiReports(query) {
     week
   };
 }
-async function _apiCsv(query) {
+async function _apiCsvPayments() {
   const db = _db();
+  const pays = await db.all('SELECT * FROM payments ORDER BY date, createdAt', []);
+  const clients = await db.all('SELECT id, name FROM clients', []);
+  const names = {};
+  clients.forEach(c => { names[c.id] = c.name; });
+  const L = [];
+  L.push(['Date', 'Client', 'Amount', 'Type', 'Reference', 'Notes'].map(_csvCell).join(','));
+  pays.forEach(p => {
+    L.push([p.date || '', names[p.clientId] || p.clientName || '', p.amount || 0, p.type || '', p.referenceNo || '', p.notes || ''].map(_csvCell).join(','));
+  });
+  return { success: true, csv: '﻿' + L.join('\n') };
+}
+async function _apiCsvInventory() {
+  const db = _db();
+  const rows = await db.all('SELECT * FROM inventory ORDER BY name', []);
+  const L = [];
+  L.push(['Name', 'SKU', 'Barcode', 'Category', 'Sell Price', 'Cost Price', 'Stock', 'Min Stock', 'Unit', 'Expiry'].map(_csvCell).join(','));
+  rows.forEach(i => {
+    L.push([i.name || '', i.sku || '', i.barcode || '', i.category || '', i.sellPrice || 0, i.costPrice || 0, i.stock || 0, i.lowStock ?? i.minStock ?? 5, i.unit || 'pcs', i.expiryDate || ''].map(_csvCell).join(','));
+  });
+  return { success: true, csv: '﻿' + L.join('\n') };
+}
+async function _apiCsv(query) {  const db = _db();
   const tStr = _todayStr();
   const m = /^\d{4}-\d{2}$/.test(query.month || '') ? query.month : tStr.slice(0, 7);
   const txns = await db.all('SELECT * FROM transactions', []);
@@ -975,14 +1007,15 @@ async function _apiCsv(query) {
     });
   return { success: true, csv: '﻿' + L.join('\n') };
 }
-const EDITABLE_SETTINGS = ['shopName', 'shopAddress', 'shopContact', 'receiptFooter', 'receiptHeaderText', 'thermalHost', 'thermalPort'];
+const EDITABLE_SETTINGS = ['shopName', 'shopAddress', 'shopContact', 'receiptFooter', 'receiptHeaderText', 'thermalHost', 'thermalPort', 'vatRate', 'pointsPerPeso'];
 async function _apiSettings(method, body) {
   const db = _db();
   if (method === 'GET') {
     const s = await _settingsMap();
     return {
       shopName: s.shopName || 'My Sari-Sari Store', shopContact: s.shopContact || '', shopAddress: s.shopAddress || '',
-      currency: s.currency || '₱', receiptFooter: s.receiptFooter || '',
+      currency: s.currency || '₱', receiptFooter: s.receiptFooter || '', receiptHeaderText: s.receiptHeaderText || '',
+      thermalHost: s.thermalHost || '', thermalPort: s.thermalPort || '9100', pointsPerPeso: parseFloat(s.pointsPerPeso) || 1,
       pettyCashBalance: parseFloat(s.pettyCashBalance) || 0, vatRate: parseFloat(s.vatRate) || 0
     };
   }
@@ -1139,12 +1172,15 @@ async function localApi(method, rawPath, body) {
   const head = parts[0] || '';
   if (head === 'version' && m === 'GET') return { v: _dataVersion };
   if (head === 'clients') return _apiClients(m, parts.slice(1), body);
+  if (head === 'inventory' && m === 'GET' && parts[1] === 'export.csv') return _apiCsvInventory();
   if (head === 'inventory') return _apiInventory(m, parts.slice(1), body, query);
   if (head === 'quick-items') return _apiQuick(m, parts.slice(1), body);
   if (head === 'sales') return _apiSales(m, parts.slice(1), body, query);
   if (head === 'transactions') return _apiSales(m, parts.slice(1), body, query);
   if (head === 'void' && m === 'POST') return _apiVoid(body);
   if (head === 'returns' && m === 'POST') return _apiReturns(body);
+  if (head === 'payments' && m === 'GET' && parts[1] === 'export.csv') return _apiCsvPayments();
+  if (head === 'inventory' && m === 'GET' && parts[1] === 'export.csv') return _apiCsvInventory();
   if (head === 'payments') return _apiPayments(m, parts.slice(1), body);
   if (head === 'print-thermal' && m === 'POST') return _apiPrint(body);
   if (head === 'expenses') return _apiExpenses(m, parts.slice(1), body);

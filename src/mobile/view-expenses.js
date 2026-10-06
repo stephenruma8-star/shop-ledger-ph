@@ -30,6 +30,7 @@ async function renderExpenses() {
 }
 function expenseListHTML(items) {
   const owner = phoneRole() !== 'cashier';
+  if (!(items || []).length) return `<div class="text-center text-gray-500 py-10 fade-in"><svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><p class="text-sm">No expenses found.</p></div>`;
   return items.map(e => `
     <div class="glass-card rounded-2xl p-3 row card-hover">
       <span class="icon-tile bg-red-500/15 text-red-400 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>

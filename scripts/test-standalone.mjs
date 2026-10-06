@@ -230,6 +230,27 @@ await A('POST', '/api/inventory/' + it2.id, { name: 'Oil', sellPrice: 30, stock:
 const alerts2 = await A('GET', '/api/alerts');
 ok(Array.isArray(alerts2.expiring) && alerts2.expiring.some(e => e.id === it2.id) && alerts2.expiringCount >= 1, 'expiring list');
 
+// void/return reasons stored + returned
+const rvSale = await A('POST', '/api/sales', { items: [{ description: 'Oil', qty: 1, unitCost: 30, invId: it2.id }], paymentMethod: 'Cash' });
+await A('POST', '/api/void', { invoiceNo: rvSale.invoiceNo, reason: 'double entry' });
+ok((await A('GET', '/api/transactions/' + rvSale.invoiceNo)).voidReason === 'double entry', 'void reason stored');
+const ret2 = await A('POST', '/api/returns', { invoiceNo: 'INV-00001', reason: 'changed mind' });
+ok((await A('GET', '/api/transactions/' + ret2.invoiceNo)).returnReason === 'changed mind', 'return reason stored');
+
+// CSV exports
+const payCsv = await A('GET', '/api/payments/export.csv');
+ok(payCsv.success && payCsv.csv.includes('Reference') && payCsv.csv.includes('GCash 999'), 'payments CSV');
+const invCsv = await A('GET', '/api/inventory/export.csv');
+ok(invCsv.success && invCsv.csv.includes('Cost Price') && invCsv.csv.includes('Rice'), 'inventory CSV');
+
+// settings fields round-trip
+await A('POST', '/api/settings', { key: 'receiptHeaderText', value: 'Brgy 123' }, 'PUT');
+await A('POST', '/api/settings', { key: 'vatRate', value: '12' }, 'PUT');
+await A('POST', '/api/settings', { key: 'thermalPort', value: '9101' }, 'PUT');
+await A('POST', '/api/settings', { key: 'pointsPerPeso', value: '2' }, 'PUT');
+const sAfter = await A('GET', '/api/settings');
+ok(sAfter.receiptHeaderText === 'Brgy 123' && sAfter.vatRate === 12 && sAfter.thermalPort === '9101' && sAfter.pointsPerPeso === 2, 'settings fields');
+
 // migration: a 4.0/4.1 ledger whose payments table lacks referenceNo
 {
   const { makeNodeDriver: mk } = await import('../src/mobile-standalone/driver-node.mjs');

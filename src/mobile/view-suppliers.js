@@ -18,6 +18,7 @@ async function renderSuppliers() {
     <div class="grid gap-2.5 fade-in" id="sup-grid">${supplierListHTML(data.suppliers)}</div>`;
 }
 function supplierListHTML(items) {
+  if (!(items || []).length) return `<div class="text-center text-gray-500 py-10 fade-in"><svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-2"><rect x="1" y="3" width="15" height="13" rx="1"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg><p class="text-sm">No suppliers found.</p></div>`;
   return items.map(s => `
     <div class="glass-card rounded-2xl p-3 card-hover">
       <div class="flex items-center gap-3">

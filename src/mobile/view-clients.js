@@ -27,6 +27,7 @@ async function renderClients() {
     <div class="grid sm:grid-cols-2 gap-2.5 fade-in" id="client-grid">${clientListHTML(data.clients)}</div>`;
 }
 function clientListHTML(clients) {
+  if (!(clients || []).length) return `<div class="text-center text-gray-500 py-10 fade-in sm:col-span-2"><svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><p class="text-sm">No clients found.</p></div>`;
   return clients.map(c => `
     <div class="glass-card rounded-2xl p-3 row card-hover" onclick='openClientDetail(${JSON.stringify(c.id)})' style="cursor:pointer">
       <span class="w-10 h-10 rounded-full bg-blue-600/20 text-blue-300 border border-blue-500/30 font-bold text-sm flex items-center justify-center shrink-0">${esc(((c.name || '?').trim().charAt(0) || '?').toUpperCase())}</span>
