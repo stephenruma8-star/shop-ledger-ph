@@ -11,6 +11,9 @@ async function startStandalone() {
     if (ls) ls.classList.add('hidden');
     return;
   }
+  // Daily interest accrues like the desktop, before the first paint so the
+  // numbers are already fresh. Silent, once per day max.
+  try { await apiPost('/api/interest/apply', {}); } catch (e) {}
   await loadAll();
   applyRoleGating();
   applyBrand();

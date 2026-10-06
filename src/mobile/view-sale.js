@@ -41,7 +41,7 @@ function renderSale() {
       <div class="grid grid-cols-2 gap-2.5">
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sale.client')}</label>
-          <select id="sale-client" class="inp">${clientOptions()}</select>
+          <select id="sale-client" onchange="applyClientRate()" class="inp">${clientOptions()}</select>
         </div>
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sale.payment')}</label>
@@ -84,7 +84,28 @@ function renderSale() {
   saleTotals();
 }
 function clientOptions() {
-  return '<option value="">' + T('sale.walkin') + '</option>' + data.clients.map(c => '<option value="' + c.id + '">' + esc(c.name) + ' — ' + peso(c.balance) + '</option>').join('');
+  return '<option value="">' + T('sale.walkin') + '</option>' + data.clients.map(c => '<option value="' + c.id + '"' + (c.id === preselectedId ? ' selected' : '') + '>' + esc(c.name) + ' — ' + peso(c.balance) + '</option>').join('');
+}
+// Preset the interest picker from the client's most recent rated sale
+// (mirrors the desktop rate memory; the cashier can still change it).
+function applyClientRate() {
+  try {
+    const sel = document.getElementById('sale-client');
+    const id = sel && sel.value ? sel.value : null;
+    const c = id && (data.clients || []).find(x => String(x.id) === String(id));
+    const rate = (c && parseFloat(c.lastRate)) || 0;
+    const box = document.getElementById('sale-interest');
+    if (!box) return;
+    let opt = [...box.options].find(o => parseFloat(o.value) === rate);
+    if (!opt && rate > 0) {
+      opt = document.createElement('option');
+      opt.value = String(rate);
+      opt.textContent = rate + '%';
+      box.appendChild(opt);
+    }
+    box.value = String(rate);
+    if (typeof saleTotals === 'function') saleTotals();
+  } catch (e) {}
 }
 function saleTotals() {
   const sub = cart.reduce((s, i) => s + i.qty * i.price, 0);

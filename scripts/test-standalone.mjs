@@ -230,6 +230,45 @@ await A('POST', '/api/inventory/' + it2.id, { name: 'Oil', sellPrice: 30, stock:
 const alerts2 = await A('GET', '/api/alerts');
 ok(Array.isArray(alerts2.expiring) && alerts2.expiring.some(e => e.id === it2.id) && alerts2.expiringCount >= 1, 'expiring list');
 
+// bulk import (balances allowed, bad rows skipped)
+const imp1 = await A('POST', '/api/clients/import', { clients: [
+  { name: 'Imp One', phone: '0911', address: 'A', balance: 250.5 },
+  { name: '', phone: 'x' },
+  { name: 'Imp Two', balance: 'not-a-number' }
+] });
+ok(imp1.added === 2 && imp1.skipped === 1, 'bulk import counts');
+ok((await A('GET', '/api/clients')).some(c => c.name === 'Imp One' && c.balance === 250.5), 'imported balance kept');
+await throws(400, () => A('POST', '/api/clients/import', { clients: [] }), 'import rejects empty');
+await throws(400, () => A('POST', '/api/clients/import', {}), 'import rejects missing');
+
+// per-client rate attached to list
+ok((await A('GET', '/api/clients')).find(c => c.id === c1.id).lastRate === 10, 'lastRate from rated sale');
+
+// daily interest: first run stamps, rated debtor accrues over backdated days
+const intFirst = await A('POST', '/api/interest/apply', {});
+ok(intFirst.applied === 0 && intFirst.stamped === true, 'first interest run stamps date');
+ok((await A('POST', '/api/interest/apply', {})).applied === 0, 'same-day rerun applies nothing');
+const intC = await A('POST', '/api/clients', { name: 'Interest Client' });
+await A('POST', '/api/sales', {
+  clientId: intC.id,
+  items: [{ description: 'Oil', qty: 2, unitCost: 30, intRate: 10, invId: it2.id }],
+  paymentMethod: 'GCash'
+}); // balance 66 (60 + 6 interest), rate 10
+{
+  const exp0 = await A('GET', '/api/backup/export');
+  const bk = JSON.parse(JSON.stringify(exp0.backup));
+  const past = new Date(Date.now() - 4 * 86400000);
+  const pastStr = past.getFullYear() + '-' + String(past.getMonth() + 1).padStart(2, '0') + '-' + String(past.getDate()).padStart(2, '0');
+  const row = bk.tables.settings.find(r => r.key === 'lastInterestDate');
+  if (row) row.value = pastStr;
+  else bk.tables.settings.push({ key: 'lastInterestDate', value: pastStr });
+  await A('POST', '/api/backup/import', { backup: bk });
+}
+const intRun = await A('POST', '/api/interest/apply', {});
+const intAfter = (await A('GET', '/api/clients/' + intC.id + '/history')).client;
+ok(intRun.applied >= 1 && intRun.days === 4, 'interest accrues over ' + intRun.days + ' days, ' + intRun.applied + ' client(s)');
+ok(Math.abs(intAfter.balance - (66 + Math.round(66 * 0.10 * 4 * 100) / 100)) < 1e-9, 'interest math matches desktop formula');
+
 // void/return reasons stored + returned
 const rvSale = await A('POST', '/api/sales', { items: [{ description: 'Oil', qty: 1, unitCost: 30, invId: it2.id }], paymentMethod: 'Cash' });
 await A('POST', '/api/void', { invoiceNo: rvSale.invoiceNo, reason: 'double entry' });

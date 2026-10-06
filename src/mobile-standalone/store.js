@@ -121,7 +121,20 @@ async function _apiClients(method, parts, body) {
   const db = _db();
   if (method === 'GET' && parts.length === 0) {
     const rows = await db.all('SELECT * FROM clients ORDER BY name', []);
-    return rows.map(_rowClient);
+    // lastRate: the rate on the client's most recent rated sale (mirrors
+    // the desktop's getInterestRate) — drives the sale-screen preset.
+    const txns = await db.all('SELECT clientId, date, createdAt, items FROM transactions', []);
+    const byClient = {};
+    txns.forEach(t => {
+      if (t.clientId == null) return;
+      const items = _parseJson(t.items, []);
+      const rated = items.find(i => (parseFloat(i.intRate) || 0) > 0);
+      if (!rated) return;
+      const when = String(t.date || t.createdAt || '');
+      const cur = byClient[t.clientId];
+      if (!cur || when > cur.when) byClient[t.clientId] = { when, rate: parseFloat(rated.intRate) };
+    });
+    return rows.map(c => Object.assign(_rowClient(c), { lastRate: (byClient[c.id] && byClient[c.id].rate) || 0 }));
   }
   if (method === 'POST' && parts.length === 0) {
     const b = body || {};
@@ -161,8 +174,7 @@ async function _apiClients(method, parts, body) {
     _bump();
     return { success: true, points: pointsToRedeem, discount: discountAmount, remaining: pts - pointsToRedeem };
   }
-  if (parts.length === 1 && method === 'DELETE') {
-    const c = await db.get('SELECT * FROM clients WHERE id = ?', [parts[0]]);
+  if (parts.length === 1 && method === 'DELETE') {    const c = await db.get('SELECT * FROM clients WHERE id = ?', [parts[0]]);
     if (!c) throw _apiErr(404, 'Client not found');
     if ((c.balance || 0) !== 0) throw _apiErr(400, 'Cannot delete: client still has a balance of ₱' + (Number(c.balance) || 0).toFixed(2));
     const txns = await db.all('SELECT id FROM transactions WHERE clientId = ? LIMIT 1', [c.id]);
@@ -188,6 +200,77 @@ async function _apiClients(method, parts, body) {
     return { success: true };
   }
   throw _apiErr(404, 'Not found');
+}
+
+// ---------- bulk client import (CSV migration; balances allowed here) ----------
+async function _apiClientsImport(body) {
+  const db = _db();
+  const list = (body && body.clients) || [];
+  if (!Array.isArray(list) || !list.length) throw _apiErr(400, 'No clients to import');
+  if (list.length > 2000) throw _apiErr(400, 'Too many rows (max 2000)');
+  let added = 0, skipped = 0;
+  const now = new Date().toISOString();
+  for (const r of list) {
+    const name = String((r && r.name) || '').trim().slice(0, 80);
+    if (!name) { skipped++; continue; }
+    const bal = parseFloat(r && r.balance);
+    await db.run(
+      'INSERT INTO clients (name, phone, address, balance, dueDate, isSC, isPWD, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [name, String((r && r.phone) || '').trim().slice(0, 20), String((r && r.address) || '').trim().slice(0, 200),
+       isNaN(bal) ? 0 : Math.max(0, bal),
+       String((r && r.dueDate) || '').slice(0, 10), r && r.isSC ? 1 : 0, r && r.isPWD ? 1 : 0, now]
+    );
+    added++;
+  }
+  await _audit('client-import', 'Imported ' + added + ' clients from CSV (' + skipped + ' skipped) (phone)');
+  _bump();
+  return { success: true, added, skipped };
+}
+
+// ---------- daily interest (mirrors the desktop's applyDailyInterest) ----------
+async function _clientRate(clientId) {
+  const txns = await _db().all('SELECT date, createdAt, items FROM transactions WHERE clientId = ? ORDER BY date DESC, createdAt DESC', [clientId]);
+  for (const t of txns) {
+    const item = _parseJson(t.items, []).find(i => (parseFloat(i.intRate) || 0) > 0);
+    if (item) return parseFloat(item.intRate);
+  }
+  return 0;
+}
+async function _apiInterestApply() {
+  const db = _db();
+  const today = _todayStr();
+  const s = await _settingsMap();
+  if ((s.lastInterestDate || '') === today) return { success: true, applied: 0, days: 0 };
+  if (!s.lastInterestDate) {
+    await db.run("INSERT INTO settings (key, value) VALUES ('lastInterestDate', ?)", [today]);
+    return { success: true, applied: 0, days: 0, stamped: true };
+  }
+  const days = Math.floor((new Date(today + 'T00:00:00').getTime() - new Date(s.lastInterestDate + 'T00:00:00').getTime()) / 86400000);
+  if (!(days > 0)) {
+    await db.run("UPDATE settings SET value = ? WHERE key = 'lastInterestDate'", [today]);
+    return { success: true, applied: 0, days: 0 };
+  }
+  const clients = await db.all('SELECT * FROM clients WHERE balance > 0', []);
+  let applied = 0;
+  await db.exec('BEGIN');
+  try {
+    for (const c of clients) {
+      const rate = await _clientRate(c.id);
+      if (!(rate > 0)) continue;
+      const interest = Math.round((c.balance || 0) * (rate / 100) * days * 100) / 100;
+      if (!(interest > 0)) continue;
+      await db.run('UPDATE clients SET balance = ? WHERE id = ?', [_r2((c.balance || 0) + interest), c.id]);
+      applied++;
+    }
+    await db.run("UPDATE settings SET value = ? WHERE key = 'lastInterestDate'", [today]);
+    await db.exec('COMMIT');
+  } catch (e) {
+    try { await db.exec('ROLLBACK'); } catch (_) {}
+    throw _apiErr(500, 'Interest run failed, nothing was changed');
+  }
+  if (applied > 0) await _audit('interest', 'Daily interest applied to ' + applied + ' client(s) over ' + days + ' day(s) (phone)');
+  _bump();
+  return { success: true, applied, days };
 }
 
 // ---------- inventory ----------
@@ -1171,6 +1254,7 @@ async function localApi(method, rawPath, body) {
   const parts = String(path || '').replace(/^\/api\//, '').split('/').filter(Boolean);
   const head = parts[0] || '';
   if (head === 'version' && m === 'GET') return { v: _dataVersion };
+  if (head === 'clients' && m === 'POST' && parts[1] === 'import') return _apiClientsImport(body);
   if (head === 'clients') return _apiClients(m, parts.slice(1), body);
   if (head === 'inventory' && m === 'GET' && parts[1] === 'export.csv') return _apiCsvInventory();
   if (head === 'inventory') return _apiInventory(m, parts.slice(1), body, query);
@@ -1194,6 +1278,7 @@ async function localApi(method, rawPath, body) {
   if (head === 'settings') return _apiSettings(m, body);
   if (head === 'audit' && m === 'GET') return _apiAudit(query);
   if (head === 'sms-reminders' && m === 'POST') return _apiSms();
+  if (head === 'interest' && m === 'POST' && parts[1] === 'apply') return _apiInterestApply();
   if (head === 'backup' && parts[1] === 'export' && m === 'GET') return _apiBackupExport();
   if (head === 'backup' && parts[1] === 'import' && m === 'POST') return _apiBackupImport(body);
   if (head === 'alerts' && m === 'GET') {

@@ -18,6 +18,7 @@ async function renderClients() {
       </div>
       <button onclick="renderClientForm(null)" class="btn btn-primary btn-sm shrink-0 self-start"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('cli.add')}</button>
       <button onclick="showView('debts')" class="btn btn-ghost btn-sm shrink-0 self-start"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>${T('view.debts.title')}</button>
+      ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button onclick="importClientsCsv()" class="btn btn-ghost btn-sm shrink-0 self-start"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Import</button>` : ''}
       ${phoneRole() === 'cashier' ? '' : `<button onclick="exportClientsCsv()" class="btn btn-ghost btn-sm shrink-0 self-start">📥 CSV</button>`}
     </div>
     <div class="relative mb-3 fade-in">
@@ -55,8 +56,51 @@ async function exportClientsCsv() {
   for (const c of (data.clients || [])) {
     rows.push([c.name || '', c.phone || '', c.address || '', c.balance || 0, c.loyaltyPoints || 0]);
   }
-  await shareText('Clients export', '\ufeff' + rows.map(r => r.map(csvCell).join(',')).join('\n'));
+  await shareText('Clients export', '﻿' + rows.map(r => r.map(csvCell).join(',')).join('\n'));
   return true;
+}
+// Standalone-only CSV import (same columns as the export + desktop:
+// Name, Phone, Address, Balance). Balances allowed — this is migration.
+function parseCsvLine(line) {
+  const out = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < (line || '').length; i++) {
+    const ch = line[i];
+    if (inQ) {
+      if (ch === '"') {
+        if (line[i + 1] === '"') { cur += '"'; i++; }
+        else inQ = false;
+      } else cur += ch;
+    } else if (ch === '"') inQ = true;
+    else if (ch === ',') { out.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  out.push(cur);
+  return out.map(s => s.trim());
+}
+async function importClientsCsv() {
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = '.csv,text/csv';
+  inp.onchange = async () => {
+    const file = inp.files && inp.files[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
+      if (lines.length < 2) { toast('Empty file', 'err'); return; }
+      const hasHeader = /^"?name"?\s*,/i.test(lines[0]);
+      const rows = (hasHeader ? lines.slice(1) : lines).map(l => {
+        const p = parseCsvLine(l);
+        return { name: p[0] || '', phone: p[1] || '', address: p[2] || '', balance: parseFloat(p[3]) || 0 };
+      });
+      const r = await apiPost('/api/clients/import', { clients: rows });
+      feelSale();
+      toast('Imported ' + (r.added || 0) + ((r.skipped || 0) ? ' (' + r.skipped + ' skipped)' : ''), 'ok');
+      await refreshAll();
+    } catch (e) { feelErr(); toast('Import failed: ' + e.message, 'err'); }
+  };
+  inp.click();
 }
 let detailClientId = null;
 async function openClientDetail(id) {
