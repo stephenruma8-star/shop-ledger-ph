@@ -20,9 +20,9 @@ if (!process.env.GH_TOKEN) {
   process.exit(1);
 }
 const apkName = `Shop-Ledger-Mobile-${version}-standalone.apk`;
-const src = resolve(root, 'build', apkName);
+const src = resolve(root, 'build', 'mobile', apkName);
 if (!existsSync(src)) {
-  console.error('missing build artifact: build/' + apkName + ' — build the release APK first');
+  console.error('missing build artifact: build/mobile/' + apkName + ' — stage the signed APK there first');
   process.exit(1);
 }
 const dest = resolve(root, 'releases', 'Shop-Ledger-Mobile-standalone.apk');

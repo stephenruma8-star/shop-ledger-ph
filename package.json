@@ -71,7 +71,7 @@
             "**/node_modules/@journeyapps/sqlcipher/lib/binding/**"
         ],
         "directories": {
-            "output": "build"
+            "output": "build/desktop"
         },
         "icon": "src/renderer/assets/icon.png",
         "win": {

@@ -6,13 +6,14 @@
 // Usage:
 //   node scripts/release.mjs [--dry-run] [--notes "text"] [--skip-existing]
 // Reads version from package.json and notes from version.json. Artifacts come
-// from build/ : Setup exe, portable exe, latest.yml and the Setup blockmap
-// (differential updates). Requires `gh` authenticated.
+// from build/desktop/ : Setup exe, portable exe, latest.yml and the Setup
+// blockmap (differential updates). Requires `gh` authenticated.
 import { execFileSync } from 'node:child_process';
 import { existsSync, statSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname ?? process.cwd(), '..');
+const dist = (...p) => resolve(root, 'build', 'desktop', ...p);
 const args = process.argv.slice(2);
 const DRY = args.includes('--dry-run');
 const SKIP_EXISTING = !args.includes('--no-skip-existing');
@@ -57,13 +58,13 @@ const files = [
 ];
 
 console.log(`release ${tag} (dry-run: ${DRY ? 'yes' : 'no'})`);
-const missing = files.filter(f => !existsSync(resolve(root, 'build', f)));
+const missing = files.filter(f => !existsSync(dist(f)));
 if (missing.length) {
   console.error('missing build artifacts: ' + missing.join(', ') + ' — run npm run build:win first');
   process.exit(1);
 }
 for (const f of files) {
-  const size = statSync(resolve(root, 'build', f)).size;
+  const size = statSync(dist(f)).size;
   console.log(`  artifact: ${f} (${(size / 1048576).toFixed(1)} MB)`);
   if (size === 0) { console.error('empty artifact: ' + f); process.exit(1); }
 }
@@ -92,18 +93,18 @@ const listAssets = () => {
 
 // 3 upload with retries, skip byte-identical assets already present
 for (const f of files) {
-  const localSize = statSync(resolve(root, 'build', f)).size;
+  const localSize = statSync(dist(f)).size;
   const remote = listAssets()[f];
   if (SKIP_EXISTING && remote === localSize) { console.log(`  skip ${f} (already uploaded, same size)`); continue; }
   console.log(`  upload ${f} ...`);
-  const u = await retry(() => sh('gh', ['release', 'upload', tag, resolve(root, 'build', f), '--clobber']), 'upload ' + f, 5);
+  const u = await retry(() => sh('gh', ['release', 'upload', tag, dist(f), '--clobber']), 'upload ' + f, 5);
   if (!u.ok) { console.error('upload failed: ' + f + ' — ' + u.error); process.exit(1); }
   console.log(`  uploaded ${f}`);
 }
 
 // 4 verify every expected asset present with matching size
 const final = listAssets();
-const bad = files.filter(f => final[f] !== statSync(resolve(root, 'build', f)).size);
+const bad = files.filter(f => final[f] !== statSync(dist(f)).size);
 if (bad.length) {
   console.error('VERIFICATION FAILED, missing or size-mismatched: ' + bad.join(', '));
   process.exit(1);
