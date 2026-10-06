@@ -696,7 +696,7 @@ try {
   const shopBefore = posts.length;
   getEl('se-name').value = 'New Shop Name';
   await gcall(`submitShopEdit()`);
-  ok(posts.length === shopBefore + 4 && posts[shopBefore].path === '/api/settings', 'shop edit saves each field');
+  ok(posts.length === shopBefore + 5 && posts[shopBefore].path === '/api/settings', 'shop edit saves each field');
 
   // ---- payment edit/delete, expense edit/delete, petty, supplier add, PO receive ----
   await gcall(`openClientDetail(1)`);
