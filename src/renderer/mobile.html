@@ -802,7 +802,7 @@ function updatePinRow() {
       <div class="text-[11px] text-gray-500 mb-2">${esc(T('set.pin_locked_head', { dev: dev ? ' (' + dev + ')' : '' }))}</div>
       <div class="flex gap-2">
         <button onclick="lockPhoneNow()" class="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500">${T('set.pin_locknow')}</button>
-        <button onclick="disconnectPhone()" class="flex-1 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-200 text-sm font-semibold">${T('set.pin_disconnect')}</button>
+        ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? '' : `<button onclick="disconnectPhone()" class="flex-1 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-200 text-sm font-semibold">${T('set.pin_disconnect')}</button>`}
       </div>
       <div class="flex gap-2 mt-2">
         <input id="pin-current" inputmode="numeric" maxlength="8" placeholder="${esc(T('set.pin_current_ph'))}" class="flex-1 min-w-0 text-center text-sm px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-100 outline-none focus:border-blue-500" />
@@ -817,7 +817,7 @@ function updatePinRow() {
       </div>
       <button onclick="setupPhonePin()" class="w-full mt-2 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500">${T('set.pin_set')}</button>
       <p id="pin-msg" class="hidden text-[11px] mt-2"></p>
-      <button onclick="disconnectPhone()" class="w-full mt-2 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-300 text-xs">${T('set.pin_disconnect_phone')}</button>`;
+      ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? '' : `<button onclick="disconnectPhone()" class="w-full mt-2 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-300 text-xs">${T('set.pin_disconnect_phone')}</button>`}`;
 }
 async function setPhoneBio(on) {
   if (on) {
@@ -1341,7 +1341,7 @@ const LANG_STRINGS = {
     'set.install_btn': 'Install Shop Ledger',
     'set.install_prompt': 'Installs Shop Ledger as a fullscreen app on this phone.',
     'set.pin_title': 'Phone lock',
-    'set.pin_desc': "Forgot it? Revoke this phone on the desktop, clear this site's browser data, and pair again.",
+    'set.pin_desc': 'Locks this phone behind a short PIN. A forgotten PIN cannot be reset — reinstalling wipes the ledger, so keep a backup from Settings → Backup.',
     'set.pin_new_ph': 'New PIN (4-8 digits)', 'set.pin_confirm_ph': 'Repeat PIN',
     'set.pin_set': 'Set PIN', 'set.pin_current_ph': 'Current PIN',
     'set.pin_remove': 'Remove PIN', 'set.pin_locknow': 'Lock now',
@@ -1700,7 +1700,7 @@ const LANG_STRINGS = {
     'set.install_btn': 'I-install ang Shop Ledger',
     'set.install_prompt': 'Ini-install ang Shop Ledger bilang fullscreen app sa phone na ito.',
     'set.pin_title': 'Lock ng Phone',
-    'set.pin_desc': 'Nakalimutan? I-revoke ang phone na ito sa desktop, burahin ang browser data ng site na ito, at mag-pair muli.',
+    'set.pin_desc': 'Ila-lock ang phone gamit ang PIN. Ang nakalimutang PIN ay hindi na maibabalik — buburahin ng reinstall ang ledger, kaya mag-backup mula sa Settings → Backup.',
     'set.pin_new_ph': 'Bagong PIN (4-8 digits)', 'set.pin_confirm_ph': 'Ulitin ang PIN',
     'set.pin_set': 'Mag-set ng PIN', 'set.pin_current_ph': 'Kasalukuyang PIN',
     'set.pin_remove': 'Tanggalin ang PIN', 'set.pin_locknow': 'I-lock ngayon',

@@ -196,7 +196,7 @@ function updatePinRow() {
       <div class="text-[11px] text-gray-500 mb-2">${esc(T('set.pin_locked_head', { dev: dev ? ' (' + dev + ')' : '' }))}</div>
       <div class="flex gap-2">
         <button onclick="lockPhoneNow()" class="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500">${T('set.pin_locknow')}</button>
-        <button onclick="disconnectPhone()" class="flex-1 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-200 text-sm font-semibold">${T('set.pin_disconnect')}</button>
+        ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? '' : `<button onclick="disconnectPhone()" class="flex-1 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-200 text-sm font-semibold">${T('set.pin_disconnect')}</button>`}
       </div>
       <div class="flex gap-2 mt-2">
         <input id="pin-current" inputmode="numeric" maxlength="8" placeholder="${esc(T('set.pin_current_ph'))}" class="flex-1 min-w-0 text-center text-sm px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-100 outline-none focus:border-blue-500" />
@@ -211,7 +211,7 @@ function updatePinRow() {
       </div>
       <button onclick="setupPhonePin()" class="w-full mt-2 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500">${T('set.pin_set')}</button>
       <p id="pin-msg" class="hidden text-[11px] mt-2"></p>
-      <button onclick="disconnectPhone()" class="w-full mt-2 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-300 text-xs">${T('set.pin_disconnect_phone')}</button>`;
+      ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? '' : `<button onclick="disconnectPhone()" class="w-full mt-2 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-300 text-xs">${T('set.pin_disconnect_phone')}</button>`}`;
 }
 async function setPhoneBio(on) {
   if (on) {
