@@ -17,8 +17,8 @@ async function renderDebts() {
   const owner = phoneRole() !== 'cashier';
   v.innerHTML = `
     <div class="flex items-center justify-between gap-2 mb-3 fade-in">
-      <h2 class="card-title text-base">${T('view.debts.title')}</h2>
-      ${owner ? `<button onclick="sendSmsReminders()" class="btn btn-ghost btn-sm shrink-0">📱 ${T('debts.sms')}</button>` : ''}
+      <h2 class="card-title text-base"><span class="icon-tile bg-orange-500/15 text-orange-400"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>${T('view.debts.title')}</h2>
+      ${owner ? `<button onclick="sendSmsReminders()" class="btn btn-ghost btn-sm shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>${T('debts.sms')}</button>` : ''}
     </div>
     <div class="stat-card rounded-2xl p-3.5 text-center mb-3 fade-in">
       <div class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-1">${T('debts.total')}</div>
@@ -34,7 +34,7 @@ async function renderDebts() {
           <div class="text-[11px] ${c.overdueDays > 0 ? 'text-red-400 font-semibold' : 'text-gray-500'}">${c.overdueDays > 0 ? T('debts.overdue', { n: c.overdueDays }) : (c.dueDate ? T('debts.due', { d: c.dueDate }) : '')}</div>
         </div>
         <div class="font-bold text-sm text-orange-400 num shrink-0">${peso(c.balance)}</div>
-      </div>`).join('') || `<p class="text-sm text-gray-500 text-center py-6">${T('debts.empty')}</p>`}
+      </div>`).join('') || `<div class="text-center text-gray-500 py-10"><svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#15803d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-2"><polyline points="20 6 9 17 4 12"/></svg><p class="text-sm">${T('debts.empty')}</p></div>`}
     </div>`;
 }
 async function sendSmsReminders() {
@@ -56,10 +56,10 @@ async function sendSmsReminders() {
         <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
           <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:92dvh;overflow-y:auto" onclick="event.stopPropagation()">
             <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
-            <h3 class="font-bold text-gray-100 text-sm mb-1">Reminders (${r.texts.length})</h3>
+            <h3 class="font-bold text-gray-100 text-sm mb-1 flex items-center gap-2"><span class="icon-tile bg-orange-500/15 text-orange-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>Reminders (${r.texts.length})</h3>
             <p class="text-[11px] text-gray-500 mb-2">Tap Text to open each message ready to send.</p>
             ${list}
-            <button onclick="closeQuick()" class="btn btn-ghost w-full mt-3">Close</button>
+            <button onclick="closeQuick()" class="btn btn-ghost w-full mt-3"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Close</button>
           </div>
         </div>`;
     } else {

@@ -2092,7 +2092,7 @@ async function renderHome() {
       <section class="glass-card rounded-2xl p-3">
         <div class="flex items-center justify-between mb-1.5 gap-1">
           <h3 class="card-title"><span class="icon-tile bg-amber-500/15 text-amber-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></span>${T('home.low_stock')}</h3>
-          <button onclick="showView('inventory')" class="text-xs font-semibold text-blue-400 hover:text-blue-300">${T('home.view_all')}</button>
+          <button onclick="showView('inventory')" class="text-xs font-semibold text-blue-400 hover:text-blue-300 inline-flex items-center gap-1">${T('home.view_all')}<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
         </div>
         ${lowStockTop.length ? lowStockTop.map(i => `
           <div class="row py-2">
@@ -2101,13 +2101,13 @@ async function renderHome() {
               <div class="text-sm font-medium truncate text-gray-200">${esc(i.name)}</div>
               <div class="text-[11px] ${(i.stock || 0) <= 0 ? 'text-red-400 font-semibold' : 'text-amber-400'}">${(i.stock || 0) <= 0 ? T('home.out') : T('home.left', { n: i.stock || 0 })}</div>
             </div>
-            <button onclick="openQuick(${i.id})" class="btn btn-primary btn-sm">${T('home.sell')}</button>
+            <button onclick="openQuick(${i.id})" class="btn btn-primary btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>${T('home.sell')}</button>
           </div>`).join('') : `<p class="text-sm text-gray-500 text-center py-6">${T('home.all_stocked')}</p>`}
       </section>
       <section class="glass-card rounded-2xl p-3">
         <div class="flex items-center justify-between mb-1.5 gap-1">
           <h3 class="card-title"><span class="icon-tile bg-blue-500/15 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>${T('home.recent')}</h3>
-          <button onclick="showView('transactions')" class="text-xs font-semibold text-blue-400 hover:text-blue-300">${T('home.view_all')}</button>
+          <button onclick="showView('transactions')" class="text-xs font-semibold text-blue-400 hover:text-blue-300 inline-flex items-center gap-1">${T('home.view_all')}<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
         </div>
         ${recent.length ? recent.map(t => `
           <div class="row py-2">
@@ -2149,8 +2149,8 @@ async function renderClients() {
         <div class="text-xl font-bold text-orange-400 num">${peso(total)}</div>
       </div>
       </div>
-      <button onclick="renderClientForm(null)" class="btn btn-primary btn-sm shrink-0 self-start">+ ${T('cli.add')}</button>
-      <button onclick="showView('debts')" class="btn btn-ghost btn-sm shrink-0 self-start">${T('view.debts.title')}</button>
+      <button onclick="renderClientForm(null)" class="btn btn-primary btn-sm shrink-0 self-start"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('cli.add')}</button>
+      <button onclick="showView('debts')" class="btn btn-ghost btn-sm shrink-0 self-start"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>${T('view.debts.title')}</button>
       ${phoneRole() === 'cashier' ? '' : `<button onclick="exportClientsCsv()" class="btn btn-ghost btn-sm shrink-0 self-start">📥 CSV</button>`}
     </div>
     <div class="relative mb-3 fade-in">
@@ -2170,7 +2170,7 @@ function clientListHTML(clients) {
       <div class="text-right shrink-0">
         <div class="font-bold text-sm num ${(c.balance || 0) <= 0 ? 'text-green-400' : 'text-orange-400'}">${peso(c.balance)}</div>
       </div>
-      <button onclick="event.stopPropagation();showView('pay', ${JSON.stringify(c.id)})" class="btn btn-success btn-sm">${T('cli.pay')}</button>
+      <button onclick="event.stopPropagation();showView('pay', ${JSON.stringify(c.id)})" class="btn btn-success btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>${T('cli.pay')}</button>
     </div>`).join('');
 }
 function filterClients(q) {
@@ -2220,9 +2220,9 @@ async function openClientDetail(id) {
       </div>
     </div>
     <div class="grid grid-cols-3 gap-2 mb-3">
-      <button onclick="renderClientForm(${JSON.stringify(c.id)})" class="btn btn-ghost btn-sm">${T('cli.edit')}</button>
+      <button onclick="renderClientForm(${JSON.stringify(c.id)})" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>${T('cli.edit')}</button>
       <button onclick="shareClientStatement()" class="btn btn-ghost btn-sm">📤 ${T('cli.statement')}</button>
-      <button id="redeem-btn" onclick="redeemClientPoints(${JSON.stringify(c.id)})" class="btn btn-sm" style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.5);color:#fbbf24">${T('cli.redeem')}</button>
+      <button id="redeem-btn" onclick="redeemClientPoints(${JSON.stringify(c.id)})" class="btn btn-sm" style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.5);color:#fbbf24"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>${T('cli.redeem')}</button>
     </div>
     ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button id="client-del-btn" onclick="deleteClient(${JSON.stringify(c.id)})" class="btn btn-sm w-full mb-3" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);color:#f87171">🗑 Delete client</button>` : ''}
     <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">${T('cli.history_sales')}</h4>
@@ -2251,7 +2251,7 @@ function renderClientForm(id) {
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
       <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:92dvh;overflow-y:auto" onclick="event.stopPropagation()">
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
-        <h3 class="font-bold text-gray-100 text-sm mb-3">${id ? T('cli.edit_title') : T('cli.add_title')}</h3>
+        <h3 class="font-bold text-gray-100 text-sm mb-3 flex items-center gap-2"><span class="icon-tile bg-blue-500/15 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>${id ? T('cli.edit_title') : T('cli.add_title')}</h3>
         <div class="space-y-3">
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('cli.name')}</label>
@@ -2281,7 +2281,7 @@ function renderClientForm(id) {
               <span class="text-sm text-gray-300">PWD</span>
             </label>
           </div>
-          <button onclick="submitClientForm(${id ? JSON.stringify(id) : 'null'})" class="btn btn-primary btn-lg">${T('cli.save')}</button>
+          <button onclick="submitClientForm(${id ? JSON.stringify(id) : 'null'})" class="btn btn-primary btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('cli.save')}</button>
         </div>
       </div>
     </div>`;
@@ -2369,10 +2369,10 @@ function renderPaymentEdit(id, amount, referenceNo) {
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
       <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" onclick="event.stopPropagation()">
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
-        <h3 class="font-bold text-gray-100 text-sm mb-3">${T('pay.edit_title')}</h3>
+        <h3 class="font-bold text-gray-100 text-sm mb-3 flex items-center gap-2"><span class="icon-tile bg-green-500/15 text-green-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>${T('pay.edit_title')}</h3>
         <input id="pe-amount" type="number" min="0" step="0.01" value="${amount || ''}" class="inp mb-3" />
         <input id="pe-ref" type="text" maxlength="40" value="${esc(referenceNo || '')}" placeholder="Reference # (optional)" autocomplete="off" class="inp mb-3" />
-        <button onclick="submitPaymentEdit(${JSON.stringify(id)})" class="btn btn-primary btn-lg">${T('pay.save_edit')}</button>
+        <button onclick="submitPaymentEdit(${JSON.stringify(id)})" class="btn btn-primary btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('pay.save_edit')}</button>
       </div>
     </div>`;
 }
@@ -2443,7 +2443,7 @@ function renderCatalog(q) {
           </div>
         </button>`;
       }).join('')}
-    </div>` : `<div class="text-center text-gray-500 py-16 fade-in">${query ? T('cat.no_match') : T('cat.empty')}</div>`}`;
+    </div>` : `<div class="text-center text-gray-500 py-16 fade-in"><svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-2"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>${query ? T('cat.no_match') : T('cat.empty')}</div>`}`;
 }
 function searchCatalog(q) { renderCatalog(q); }
 function itemById(id) { return data.inventory.find(i => i.id === id); }
@@ -2554,7 +2554,7 @@ function renderSale() {
       <div id="counter-results" class="grid gap-1.5 mt-1.5"></div>
     </div>
     ${(data.quickItems || []).length ? `<div class="flex gap-1.5 mb-3 fade-in overflow-x-auto" style="scrollbar-width:none">${data.quickItems.slice(0, 12).map((q, qi) => `<button onclick="quickAddItem(${qi})" class="shrink-0 px-3 py-2 rounded-xl text-xs font-semibold" style="background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);color:#93c5fd">${esc(q.name)} · ${peso(q.price)}</button>`).join('')}${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button onclick="managePresets()" class="shrink-0 px-3 py-2 rounded-xl text-xs font-semibold" style="background:rgba(255,255,255,.06);border:1px dashed rgba(255,255,255,.2);color:#94a3b8">⚙️ Presets</button>` : ''}</div>` : ''}
-    ${lastFailedSale ? `<button onclick="retrySale()" class="w-full mb-3 py-2.5 rounded-xl font-semibold text-sm fade-in" style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.5);color:#fbbf24">${T('sale.retry')}</button>` : ''}
+    ${lastFailedSale ? `<button onclick="retrySale()" class="btn w-full mb-3 py-2.5 rounded-xl font-semibold text-sm fade-in" style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.5);color:#fbbf24"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>${T('sale.retry')}</button>` : ''}
     <div class="glass-card rounded-2xl p-2 mb-3 fade-in">
       ${cart.length ? cart.map((i, idx) => `
         <div class="row py-2.5 px-1.5" id="mc-row-${idx}">
@@ -2768,9 +2768,9 @@ function saleSuccessSheet(invoiceNo) {
       <div class="text-4xl mb-2">✅</div>
       <div class="text-lg font-bold text-gray-100 mb-1">${T('sale.success_title')}</div>
       <div class="text-sm text-gray-400 mb-4">${esc(invoiceNo || '')}</div>
-      <button onclick="printSaleReceipt('${esc(invoiceNo || '')}')" class="btn btn-primary btn-lg mb-2">${T('sale.print')}</button>
-      <button onclick="shareReceiptTxn('${esc(invoiceNo || '')}')" class="btn btn-ghost btn-lg mb-2">${T('sale.share')}</button>
-      <button onclick="showView('sale')" class="btn btn-ghost btn-lg">${T('sale.new')}</button>
+      <button onclick="printSaleReceipt('${esc(invoiceNo || '')}')" class="btn btn-primary btn-lg mb-2"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>${T('sale.print')}</button>
+      <button onclick="shareReceiptTxn('${esc(invoiceNo || '')}')" class="btn btn-ghost btn-lg mb-2"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>${T('sale.share')}</button>
+      <button onclick="showView('sale')" class="btn btn-ghost btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('sale.new')}</button>
     </div>`;
   try { window.scrollTo(0, 0); } catch (e) {}
 }
@@ -2842,7 +2842,7 @@ function managePresets() {
     <div class="row py-2.5 px-1">
       <div class="flex-1 min-w-0"><div class="text-sm font-medium truncate text-gray-200">${esc(q.name)}</div>
       <div class="text-[11px] text-gray-500 num">${peso(q.price)}</div></div>
-      <button onclick="deletePreset(${q.id})" class="text-red-400 text-xs px-2.5 py-1.5 rounded-lg shrink-0" style="background:rgba(239,68,68,.1)">Delete</button>
+      <button onclick="deletePreset(${q.id})" class="text-red-400 text-xs px-2.5 py-1.5 rounded-lg shrink-0 inline-flex items-center gap-1" style="background:rgba(239,68,68,.1)"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete</button>
     </div>`).join('') || `<p class="text-sm text-gray-500 text-center py-4">No presets yet.</p>`;
   const invOpts = (data.inventory || [])
     .filter(i => (i.stock || 0) > 0)
@@ -2858,12 +2858,12 @@ function managePresets() {
           <input id="preset-name" class="inp" maxlength="80" placeholder="Preset name" />
           <div class="flex gap-2">
             <input id="preset-price" class="inp" type="number" min="0" step="0.01" placeholder="Price" />
-            <button onclick="addPreset()" class="btn btn-primary shrink-0">Add</button>
+            <button onclick="addPreset()" class="btn btn-primary shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add</button>
           </div>
           ${invOpts ? `<select id="preset-inv" class="inp"><option value="">— or pick a catalog item —</option>${invOpts}</select>
-          <button onclick="addPresetFromCatalog()" class="btn btn-ghost w-full">Add catalog item as preset</button>` : ''}
+          <button onclick="addPresetFromCatalog()" class="btn btn-ghost w-full"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add catalog item as preset</button>` : ''}
         </div>
-        <button onclick="closeQuick()" class="btn btn-ghost w-full mt-3">Done</button>
+        <button onclick="closeQuick()" class="btn btn-ghost w-full mt-3"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Done</button>
       </div>
     </div>`;
 }
@@ -2929,7 +2929,7 @@ async function startBarcodeScan() {
     ov.innerHTML = `<video id="scan-video" playsinline muted style="flex:1;width:100%;object-fit:cover;"></video>
       <div style="padding:1rem;display:flex;gap:.5rem;background:#0f172a;align-items:center;">
         <div style="flex:1;color:#94a3b8;font-size:12px;">${T('scan.point')}</div>
-        <button onclick="stopBarcodeScan()" class="btn btn-ghost">${T('scan.cancel')}</button>
+        <button onclick="stopBarcodeScan()" class="btn btn-ghost"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>${T('scan.cancel')}</button>
       </div>`;
     document.body.appendChild(ov);
   } else ov.style.display = 'flex';
@@ -3007,7 +3007,7 @@ async function renderPay(preselectedId) {
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">Reference # (GCash/Maya/Bank, optional)</label>
           <input id="pay-ref" type="text" maxlength="40" placeholder="e.g. 1234 567 890" autocomplete="off" class="inp" />
         </div>
-        <button onclick="submitPay()" class="btn btn-success btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>${T('pay.record')}</button>
+        <button onclick="submitPay()" class="btn btn-success btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('pay.record')}</button>
       </div>
     </div>`;
 }
@@ -3042,11 +3042,11 @@ async function renderInventory() {
   v.innerHTML = `
     <div class="flex items-center justify-between gap-2 mb-3 fade-in">
       <h2 class="card-title text-base"><span class="icon-tile bg-blue-500/15 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></span>${T('view.inventory.title')} <span class="text-sm text-gray-500 font-normal">(${T('inv.count', { n: data.inventory.length })})</span></h2>
-      <button onclick="renderItemForm(null)" class="btn btn-primary btn-sm shrink-0">+ ${T('inv.add')}</button>
+      <button onclick="renderItemForm(null)" class="btn btn-primary btn-sm shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('inv.add')}</button>
     </div>
     <div class="mb-3 fade-in"><span class="chip ${low > 0 ? 'chip-amber' : 'chip-green'}">${low > 0 ? T('inv.low_n', { n: low }) : T('inv.all_ok')}</span></div>
     <div id="inv-valuation" class="mb-3"></div>
-      <button onclick="showView('stocktake')" class="btn btn-ghost w-full mb-3">${T('st.start')}</button>
+      <button onclick="showView('stocktake')" class="btn btn-ghost w-full mb-3"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>${T('st.start')}</button>
     <div class="relative mb-3 fade-in">
       <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <input id="inv-search" type="text" placeholder="${esc(T('cat.search_ph'))}" oninput="filterInventory(this.value)" class="inp pl-10" />
@@ -3068,7 +3068,7 @@ function invListHTML(items) {
         <div class="text-[11px] text-gray-500">${peso(i.price)} ${T('sale.each')}${expSoon ? ' · <span class="text-amber-400 font-semibold">⏳ ' + esc(i.expiryDate) + '</span>' : ''}</div>
         <div class="text-xs font-bold mt-0.5 ${stock <= 0 ? 'text-red-400' : stock <= (i.lowStock || 5) ? 'text-amber-400' : 'text-green-400'}">${stock <= 0 ? T('inv.oos') : T('inv.left', { n: stock })}</div>
       </div>
-      <button onclick="openQuick(${i.id})" class="btn btn-sm ${stock <= 0 ? 'btn-ghost text-gray-500 cursor-not-allowed' : 'btn-primary'}">${T('home.sell')}</button>
+      <button onclick="openQuick(${i.id})" class="btn btn-sm ${stock <= 0 ? 'btn-ghost text-gray-500 cursor-not-allowed' : 'btn-primary'}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>${T('home.sell')}</button>
       <button onclick="photoForItem(${JSON.stringify(i.id)})" title="${esc(T('photo.take'))}" class="btn btn-ghost btn-sm px-2">📷</button>
       <button onclick="renderItemForm(${JSON.stringify(i.id)})" title="${esc(T('inv.edit'))}" class="btn btn-ghost btn-sm px-2">✏️</button>
     </div>`;
@@ -3111,7 +3111,7 @@ function renderItemForm(id) {
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
       <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:92dvh;overflow-y:auto" onclick="event.stopPropagation()">
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
-        <h3 class="font-bold text-gray-100 text-sm mb-3">${id ? T('inv.edit') : T('inv.add')}</h3>
+        <h3 class="font-bold text-gray-100 text-sm mb-3 flex items-center gap-2"><span class="icon-tile bg-blue-500/15 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></span>${id ? T('inv.edit') : T('inv.add')}</h3>
         <div class="space-y-3">
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('inv.name')}</label>
@@ -3165,7 +3165,7 @@ function renderItemForm(id) {
               </div>`).join('')}
             </div>
           </div>
-          <button onclick="submitItemForm(${id ? JSON.stringify(id) : 'null'})" class="btn btn-primary btn-lg">${T('inv.save')}</button>
+          <button onclick="submitItemForm(${id ? JSON.stringify(id) : 'null'})" class="btn btn-primary btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('inv.save')}</button>
           ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE && id) ? `<button id="item-del-btn" onclick="deleteItemForm(${JSON.stringify(id)})" class="btn btn-sm w-full" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);color:#f87171">🗑 Delete item</button>` : ''}
         </div>
       </div>
@@ -3357,7 +3357,7 @@ async function openTxnDetail(id) {
   const owner = phoneRole() !== 'cashier';
   const canReturn = owner && t.status !== 'return';
   box.innerHTML = `
-    <h3 class="font-bold text-gray-100 text-sm mb-1">${esc(t.invoiceNo || 'Receipt')}</h3>
+    <h3 class="font-bold text-gray-100 text-sm mb-1 flex items-center gap-2"><span class="icon-tile bg-blue-500/15 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>${esc(t.invoiceNo || 'Receipt')}</h3>
     <p class="text-[11px] text-gray-500 mb-3">${esc(t.clientName || 'Walk-in')} · ${esc(t.date || '')} · ${esc(t.paymentMethod || 'Cash')}</p>
     ${canReturn && (t.items || []).length ? `<p class="text-[11px] text-gray-500 mb-2">${T('ret.pick_hint')}</p>` : ''}
     <div class="space-y-1.5 mb-3">
@@ -3373,11 +3373,11 @@ async function openTxnDetail(id) {
     </div>
     ${(() => { const vr = parseFloat((data.settings || {}).vatRate) || 0; return vr > 0 ? `<div class="flex justify-between text-[11px] text-gray-500 mb-3"><span>VAT (${vr}%) incl.</span><span class="num">${peso((t.grandTotal || 0) * vr / (100 + vr))}</span></div>` : ''; })()}
     <div class="grid grid-cols-2 gap-2">
-      <button onclick="printSaleReceipt('${esc(t.invoiceNo || '')}')" class="btn btn-ghost btn-sm">${T('txn.print')}</button>
-      <button onclick="previewReceiptTxn(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-ghost btn-sm">👁 ${T('txn.preview')}</button>
-      <button onclick="shareReceiptTxn(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-ghost btn-sm col-span-2">${T('txn.share')}</button>
-      ${canReturn ? `<button id="return-btn" onclick="returnTxn(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-sm col-span-2" style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);color:#f87171">${T('txn.return')}</button>` : ''}
-      ${owner && t.status !== 'voided' && t.status !== 'return' ? `<button id="void-btn" onclick="voidTxn(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-sm col-span-2" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);color:#94a3b8">${T('txn.void')}</button>` : ''}
+      <button onclick="printSaleReceipt('${esc(t.invoiceNo || '')}')" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>${T('txn.print')}</button>
+      <button onclick="previewReceiptTxn(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>${T('txn.preview')}</button>
+      <button onclick="shareReceiptTxn(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-ghost btn-sm col-span-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>${T('txn.share')}</button>
+      ${canReturn ? `<button id="return-btn" onclick="returnTxn(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-sm col-span-2" style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);color:#f87171"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>${T('txn.return')}</button>` : ''}
+      ${owner && t.status !== 'voided' && t.status !== 'return' ? `<button id="void-btn" onclick="voidTxn(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-sm col-span-2" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);color:#94a3b8"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="12" cy="12" r="10"/><line x1="4.9" y1="4.9" x2="19.1" y2="19.1"/></svg>${T('txn.void')}</button>` : ''}
     </div>`;
 }
 async function toggleReturnLine(idx) {
@@ -3465,13 +3465,13 @@ async function previewReceiptTxn(id) {
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
       <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:92dvh;overflow-y:auto" onclick="event.stopPropagation()">
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
-        <h3 class="font-bold text-gray-100 text-sm mb-3">${esc(t.invoiceNo || 'Receipt')}</h3>
+        <h3 class="font-bold text-gray-100 text-sm mb-3 flex items-center gap-2"><span class="icon-tile bg-blue-500/15 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>${esc(t.invoiceNo || 'Receipt')}</h3>
         <pre class="text-gray-200 rounded-xl p-3 mb-3" style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.5;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.08);overflow-x:auto;white-space:pre">${esc(L.join('\n'))}</pre>
         <div class="grid grid-cols-2 gap-2">
-          <button onclick="printSaleReceipt(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-primary btn-sm">${T('txn.print')}</button>
-          <button onclick="shareReceiptTxn(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-ghost btn-sm">${T('txn.share')}</button>
+          <button onclick="printSaleReceipt(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-primary btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>${T('txn.print')}</button>
+          <button onclick="shareReceiptTxn(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>${T('txn.share')}</button>
         </div>
-        <button onclick="openTxnDetail(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-ghost w-full mt-2">${T('txn.back_detail')}</button>
+        <button onclick="openTxnDetail(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-ghost w-full mt-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>${T('txn.back_detail')}</button>
       </div>
     </div>`;
 }
@@ -3596,7 +3596,7 @@ function renderExpenseEdit(id) {
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
       <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" onclick="event.stopPropagation()">
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
-        <h3 class="font-bold text-gray-100 text-sm mb-3">${T('exp.edit_title')}</h3>
+        <h3 class="font-bold text-gray-100 text-sm mb-3 flex items-center gap-2"><span class="icon-tile bg-red-500/15 text-red-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>${T('exp.edit_title')}</h3>
         <div class="space-y-3">
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('exp.desc')}</label>
@@ -3606,7 +3606,7 @@ function renderExpenseEdit(id) {
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('exp.amount')}</label>
             <input id="ee-amount" type="number" min="0" step="0.01" value="${e.amount || ''}" class="inp" />
           </div>
-          <button onclick="submitExpenseEdit(${JSON.stringify(id)})" class="btn btn-primary btn-lg">${T('exp.save')}</button>
+          <button onclick="submitExpenseEdit(${JSON.stringify(id)})" class="btn btn-primary btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('exp.save')}</button>
         </div>
       </div>
     </div>`;
@@ -3657,8 +3657,8 @@ async function loadPettyRow() {
         <div class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">${T('petty.title')}</div>
         <div class="text-lg font-bold text-amber-400 num">${peso(bal)}</div>
       </div>
-      <button onclick="pettySheet('add')" class="btn btn-ghost btn-sm">+ ${T('petty.add').split(' ')[0]}</button>
-      <button onclick="pettySheet('withdraw')" class="btn btn-ghost btn-sm">−</button>
+      <button onclick="pettySheet('add')" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('petty.add').split(' ')[0]}</button>
+      <button onclick="pettySheet('withdraw')" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
     </div>`;
 }
 function pettySheet(dir) {
@@ -3668,7 +3668,7 @@ function pettySheet(dir) {
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
         <h3 class="font-bold text-gray-100 text-sm mb-3">${T('petty.title')}</h3>
         <input id="petty-amount" type="number" min="0" step="0.01" placeholder="${esc(T('petty.amount_ph'))}" class="inp mb-3" />
-        <button onclick="submitPettyMove('${dir}')" class="btn btn-primary btn-lg">${T('petty.go')}</button>
+        <button onclick="submitPettyMove('${dir}')" class="btn btn-primary btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('petty.go')}</button>
       </div>
     </div>`;
 }
@@ -3697,7 +3697,7 @@ async function renderSuppliers() {
       <h2 class="card-title text-base"><span class="icon-tile bg-indigo-500/15 text-indigo-400"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>${T('view.suppliers.title')}</h2>
       <div class="flex gap-1.5 items-center">
         <span class="chip ${totalOwed > 0 ? 'chip-amber' : 'chip-green'}">${peso(totalOwed)} ${T('po.owed_suffix')}</span>
-        ${phoneRole() === 'cashier' ? '' : `<button onclick="renderSupplierForm()" class="btn btn-primary btn-sm shrink-0">+ ${T('sup.add')}</button>`}
+        ${phoneRole() === 'cashier' ? '' : `<button onclick="renderSupplierForm()" class="btn btn-primary btn-sm shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('sup.add')}</button>`}
       </div>
     </div>
     <div class="relative mb-3 fade-in">
@@ -3736,7 +3736,7 @@ function renderSupplierForm() {
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
       <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:92dvh;overflow-y:auto" onclick="event.stopPropagation()">
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
-        <h3 class="font-bold text-gray-100 text-sm mb-3">${T('sup.add')}</h3>
+        <h3 class="font-bold text-gray-100 text-sm mb-3 flex items-center gap-2"><span class="icon-tile bg-indigo-500/15 text-indigo-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>${T('sup.add')}</h3>
         <div class="space-y-3">
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sup.name')}</label>
@@ -3756,7 +3756,7 @@ function renderSupplierForm() {
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sup.address')}</label>
             <input id="sp-address" type="text" maxlength="200" class="inp" />
           </div>
-          <button onclick="submitSupplierForm()" class="btn btn-primary btn-lg">${T('sup.save')}</button>
+          <button onclick="submitSupplierForm()" class="btn btn-primary btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('sup.save')}</button>
         </div>
       </div>
     </div>`;
@@ -3787,7 +3787,7 @@ async function renderSupplierPay(id) {
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
       <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:92dvh;overflow-y:auto" onclick="event.stopPropagation()">
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
-        <h3 class="font-bold text-gray-100 text-sm mb-1">${esc(T('sup.pay_title', { name: (s && s.name) || '' }))}</h3>
+        <h3 class="font-bold text-gray-100 text-sm mb-1 flex items-center gap-2"><span class="icon-tile bg-indigo-500/15 text-indigo-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>${esc(T('sup.pay_title', { name: (s && s.name) || '' }))}</h3>
         <p class="text-[11px] text-gray-500 mb-3">${T('sup.owed', { amt: peso((hist && hist.owed) ?? (s && s.owed) ?? 0) })}</p>
         <div class="space-y-3">
           <div class="grid grid-cols-2 gap-2.5">
@@ -3800,7 +3800,7 @@ async function renderSupplierPay(id) {
               <select id="sp-method" class="inp"><option>Cash</option><option>GCash</option><option>Maya</option><option>Bank Transfer</option></select>
             </div>
           </div>
-          <button onclick="submitSupplierPay()" class="btn btn-primary btn-lg">${T('sup.record')}</button>
+          <button onclick="submitSupplierPay()" class="btn btn-primary btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('sup.record')}</button>
           ${(hist && hist.payments && hist.payments.length) ? `
           <div>
             <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">${T('sup.history')}</h4>
@@ -3857,10 +3857,10 @@ async function renderPOs() {
             <div class="text-sm font-bold text-teal-400 num">${peso(po.total)}</div>
             <div class="flex gap-1.5">
             ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) && po.status !== 'Received' ? `<button onclick="editPO(${JSON.stringify(po.id)})" class="btn btn-ghost btn-sm" style="font-size:.75rem">✏️</button><button onclick="deletePO(${JSON.stringify(po.id)})" id="po-del-${po.id}" class="btn btn-sm" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);color:#f87171;font-size:.75rem">🗑</button>` : ''}
-            ${phoneRole() !== 'cashier' && po.status !== 'Received' ? `<button onclick="receivePO(${JSON.stringify(po.id)})" class="btn btn-ghost btn-sm">${T('po.receive')}</button>` : ''}
+            ${phoneRole() !== 'cashier' && po.status !== 'Received' ? `<button onclick="receivePO(${JSON.stringify(po.id)})" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('po.receive')}</button>` : ''}
             </div>
           </div>
-        </div>`).join('') || `<div class="text-center text-gray-500 py-16 fade-in">${T('po.empty')}</div>`}
+        </div>`).join('') || `<div class="text-center text-gray-500 py-16 fade-in"><svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-2"><rect x="1" y="3" width="15" height="13" rx="1"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>${T('po.empty')}</div>`}
     </div>`;
 }
 let poReceiveArmed = null;
@@ -3930,7 +3930,7 @@ function addPO() {
           <button onclick="poAddItem()" class="btn btn-ghost btn-sm w-full"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('po.add_to_po')}</button>
           <div id="po-cart" class="glass rounded-2xl p-2 text-sm space-y-1"><p class="text-gray-500 text-xs px-1">${T('po.no_items')}</p></div>
           <div class="flex justify-between font-bold text-gray-100">${T('po.total')} <span class="text-teal-400 num" id="po-total-mobile">${peso(0)}</span></div>
-          <button onclick="submitPO()" id="po-submit-btn" class="btn btn-success btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>${T('po.create')}</button>
+          <button onclick="submitPO()" id="po-submit-btn" class="btn btn-success btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('po.create')}</button>
         </div>
       </div>
     </div>`;
@@ -4027,8 +4027,8 @@ async function renderReports() {
       ${phoneRole() === 'cashier' ? '' : `<button onclick="exportMonthCsv()" class="btn btn-ghost btn-sm shrink-0">📥 ${T('rep.export')}</button>`}
     </div>
     <div class="grid grid-cols-2 gap-2 mb-3 fade-in">
-      <button onclick="shareTodayReport()" class="btn btn-ghost btn-sm">📤 Today's summary</button>
-      <button onclick="shareMonthReport()" class="btn btn-ghost btn-sm">📤 Month summary</button>
+      <button onclick="shareTodayReport()" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>Today's summary</button>
+      <button onclick="shareMonthReport()" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>Month summary</button>
     </div>
     <div class="grid grid-cols-2 gap-2.5 mb-3 fade-in">
       <div class="stat-card rounded-2xl p-3.5">
@@ -4076,7 +4076,7 @@ async function renderReports() {
             <div class="text-[11px] text-gray-500">${T('rep.sold', { qty: t.qty })}</div>
           </div>
           <div class="text-sm font-bold text-green-400 num">${peso(t.amount)}</div>
-        </div>`).join('') : `<p class="text-sm text-gray-500 text-center py-6">${T('home.no_sales')}</p>`}
+        </div>`).join('') : `<div class="text-center text-gray-500 py-10"><svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg><p class="text-sm">${T('home.no_sales')}</p></div>`}
     </section>
     ${arAgingHTML()}
     ${salesByClientHTML()}`;
@@ -4219,38 +4219,38 @@ async function renderSettings() {
         <div class="row py-1.5"><span class="text-gray-500 w-20 shrink-0">${T('set.shop_contact')}</span><span class="text-gray-200 truncate">${esc(s.shopContact || '—')}</span></div>
         <div class="row py-1.5"><span class="text-gray-500 w-20 shrink-0">${T('set.shop_currency')}</span><span class="text-gray-200">${esc(s.currency || '₱')} ${T('set.currency_ph')}</span></div>
       </div>
-      ${phoneRole() === 'cashier' ? '' : `<button onclick="renderShopEdit()" class="btn btn-ghost btn-sm w-full mt-3">${T('set.edit_shop')}</button>`}
+      ${phoneRole() === 'cashier' ? '' : `<button onclick="renderShopEdit()" class="btn btn-ghost btn-sm w-full mt-3"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>${T('set.edit_shop')}</button>`}
     </section>
     <section class="glass-card rounded-2xl p-4 mb-3 fade-in">
-      <h3 class="card-title mb-1">${T('set.install_title')}</h3>
+      <h3 class="card-title mb-1 flex items-center gap-2"><span class="icon-tile bg-blue-500/15 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span>${T('set.install_title')}</h3>
       <p id="install-hint" class="text-[11px] text-gray-500 mb-2">${T('set.install_hint')}</p>
-      <button id="install-app-btn" onclick="installApp()" class="hidden w-full py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500">${T('set.install_btn')}</button>
+      <button id="install-app-btn" onclick="installApp()" class="hidden w-full py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500 items-center justify-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>${T('set.install_btn')}</button>
     </section>
     <section class="glass-card rounded-2xl p-4 mb-3 fade-in">
-      <h3 class="card-title mb-1">${T('set.pin_title')}</h3>
+      <h3 class="card-title mb-1 flex items-center gap-2"><span class="icon-tile bg-amber-500/15 text-amber-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>${T('set.pin_title')}</h3>
       <p class="text-[11px] text-gray-500 mb-2">${T('set.pin_desc')}</p>
       <div id="pin-row"></div>
       <div id="bio-row"></div>
     </section>
     <section class="glass-card rounded-2xl p-4 mb-3 fade-in">
-      <h3 class="card-title mb-1">${T('set.display_title')}</h3>
+      <h3 class="card-title mb-1 flex items-center gap-2"><span class="icon-tile bg-indigo-500/15 text-indigo-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.2" y1="4.2" x2="5.6" y2="5.6"/><line x1="18.4" y1="18.4" x2="19.8" y2="19.8"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.2" y1="19.8" x2="5.6" y2="18.4"/><line x1="18.4" y1="5.6" x2="19.8" y2="4.2"/></svg></span>${T('set.display_title')}</h3>
       <p class="text-[11px] text-gray-500 mb-2">${T('set.display_desc')}</p>
       <div id="display-row"></div>
     </section>
     <div class="grid grid-cols-2 gap-2 mb-3 fade-in">
-      ${phoneRole() === 'cashier' ? '' : `<button onclick="showView('audit')" class="btn btn-ghost">${T('set.audit_btn')}</button>`}
-      <button onclick="showView('help')" class="btn btn-ghost">${T('set.help_btn')}</button>
+      ${phoneRole() === 'cashier' ? '' : `<button onclick="showView('audit')" class="btn btn-ghost"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>${T('set.audit_btn')}</button>`}
+      <button onclick="showView('help')" class="btn btn-ghost"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>${T('set.help_btn')}</button>
     </div>
     <section class="glass-card rounded-2xl p-4 mb-3 fade-in">
-      <h3 class="card-title mb-1">${T('set.updates_title')}</h3>
+      <h3 class="card-title mb-1 flex items-center gap-2"><span class="icon-tile bg-green-500/15 text-green-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></span>${T('set.updates_title')}</h3>
       <div id="update-row"></div>
     </section>
     <section class="glass-card rounded-2xl p-4 mb-3 fade-in">
-      <h3 class="card-title mb-1">${T('diag.title')}</h3>
+      <h3 class="card-title mb-1 flex items-center gap-2"><span class="icon-tile bg-purple-500/15 text-purple-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>${T('diag.title')}</h3>
       <div id="diag-row"></div>
     </section>
     ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<section class="glass-card rounded-2xl p-4 mb-3 fade-in">
-      <h3 class="card-title mb-1">💾 Backup</h3>
+      <h3 class="card-title mb-1 flex items-center gap-2"><span class="icon-tile bg-cyan-500/15 text-cyan-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></span>Backup</h3>
       <div id="backup-row"></div>
     </section>` : ''}
     <p class="text-center text-[11px] text-gray-500 fade-in">${T('set.store_note')}</p>`;
@@ -4291,7 +4291,7 @@ function renderShopEdit() {
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">Printer IP (Wi-Fi receipt printer)</label>
             <input id="se-thermal" type="text" maxlength="40" placeholder="192.168.1.50" value="${esc(s.thermalHost || '')}" class="inp" />
           </div>` : ''}
-          <button onclick="submitShopEdit()" class="btn btn-primary btn-lg">${T('set.save_shop')}</button>
+          <button onclick="submitShopEdit()" class="btn btn-primary btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('set.save_shop')}</button>
         </div>
       </div>
     </div>`;
@@ -4339,7 +4339,7 @@ async function renderStocktake() {
       <input id="st-search" type="text" placeholder="${esc(T('st.search_ph'))}" oninput="filterStocktake(this.value)" autocomplete="off" class="inp pl-10" />
     </div>
     <div class="grid gap-2.5 fade-in" id="st-grid">${stocktakeListHTML(data.inventory)}</div>
-    <button onclick="submitStocktake()" class="btn btn-primary btn-lg mt-3">${T('st.save')}</button>
+    <button onclick="submitStocktake()" class="btn btn-primary btn-lg mt-3"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('st.save')}</button>
     <p class="text-[11px] text-gray-500 text-center mt-2">${T('st.note')}</p>`;
 }
 function stocktakeCounted(item) {
@@ -4472,7 +4472,7 @@ function auditTime(ts) {
   } catch (e) { return String(ts || ''); }
 }
 function auditListHTML(items) {
-  if (!items.length) return `<p class="text-sm text-gray-500 text-center py-6">${T('aud.empty')}</p>`;
+  if (!items.length) return `<div class="text-center text-gray-500 py-10"><svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><p class="text-sm">${T('aud.empty')}</p></div>`;
   return items.map(l => `
     <div class="glass-card rounded-xl px-3 py-2.5">
       <div class="flex items-center gap-2">
@@ -4527,8 +4527,8 @@ async function renderDebts() {
   const owner = phoneRole() !== 'cashier';
   v.innerHTML = `
     <div class="flex items-center justify-between gap-2 mb-3 fade-in">
-      <h2 class="card-title text-base">${T('view.debts.title')}</h2>
-      ${owner ? `<button onclick="sendSmsReminders()" class="btn btn-ghost btn-sm shrink-0">📱 ${T('debts.sms')}</button>` : ''}
+      <h2 class="card-title text-base"><span class="icon-tile bg-orange-500/15 text-orange-400"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>${T('view.debts.title')}</h2>
+      ${owner ? `<button onclick="sendSmsReminders()" class="btn btn-ghost btn-sm shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>${T('debts.sms')}</button>` : ''}
     </div>
     <div class="stat-card rounded-2xl p-3.5 text-center mb-3 fade-in">
       <div class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-1">${T('debts.total')}</div>
@@ -4544,7 +4544,7 @@ async function renderDebts() {
           <div class="text-[11px] ${c.overdueDays > 0 ? 'text-red-400 font-semibold' : 'text-gray-500'}">${c.overdueDays > 0 ? T('debts.overdue', { n: c.overdueDays }) : (c.dueDate ? T('debts.due', { d: c.dueDate }) : '')}</div>
         </div>
         <div class="font-bold text-sm text-orange-400 num shrink-0">${peso(c.balance)}</div>
-      </div>`).join('') || `<p class="text-sm text-gray-500 text-center py-6">${T('debts.empty')}</p>`}
+      </div>`).join('') || `<div class="text-center text-gray-500 py-10"><svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#15803d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-2"><polyline points="20 6 9 17 4 12"/></svg><p class="text-sm">${T('debts.empty')}</p></div>`}
     </div>`;
 }
 async function sendSmsReminders() {
@@ -4566,10 +4566,10 @@ async function sendSmsReminders() {
         <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
           <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:92dvh;overflow-y:auto" onclick="event.stopPropagation()">
             <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
-            <h3 class="font-bold text-gray-100 text-sm mb-1">Reminders (${r.texts.length})</h3>
+            <h3 class="font-bold text-gray-100 text-sm mb-1 flex items-center gap-2"><span class="icon-tile bg-orange-500/15 text-orange-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>Reminders (${r.texts.length})</h3>
             <p class="text-[11px] text-gray-500 mb-2">Tap Text to open each message ready to send.</p>
             ${list}
-            <button onclick="closeQuick()" class="btn btn-ghost w-full mt-3">Close</button>
+            <button onclick="closeQuick()" class="btn btn-ghost w-full mt-3"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Close</button>
           </div>
         </div>`;
     } else {

@@ -17,38 +17,38 @@ async function renderSettings() {
         <div class="row py-1.5"><span class="text-gray-500 w-20 shrink-0">${T('set.shop_contact')}</span><span class="text-gray-200 truncate">${esc(s.shopContact || '—')}</span></div>
         <div class="row py-1.5"><span class="text-gray-500 w-20 shrink-0">${T('set.shop_currency')}</span><span class="text-gray-200">${esc(s.currency || '₱')} ${T('set.currency_ph')}</span></div>
       </div>
-      ${phoneRole() === 'cashier' ? '' : `<button onclick="renderShopEdit()" class="btn btn-ghost btn-sm w-full mt-3">${T('set.edit_shop')}</button>`}
+      ${phoneRole() === 'cashier' ? '' : `<button onclick="renderShopEdit()" class="btn btn-ghost btn-sm w-full mt-3"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>${T('set.edit_shop')}</button>`}
     </section>
     <section class="glass-card rounded-2xl p-4 mb-3 fade-in">
-      <h3 class="card-title mb-1">${T('set.install_title')}</h3>
+      <h3 class="card-title mb-1 flex items-center gap-2"><span class="icon-tile bg-blue-500/15 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span>${T('set.install_title')}</h3>
       <p id="install-hint" class="text-[11px] text-gray-500 mb-2">${T('set.install_hint')}</p>
-      <button id="install-app-btn" onclick="installApp()" class="hidden w-full py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500">${T('set.install_btn')}</button>
+      <button id="install-app-btn" onclick="installApp()" class="hidden w-full py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500 items-center justify-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>${T('set.install_btn')}</button>
     </section>
     <section class="glass-card rounded-2xl p-4 mb-3 fade-in">
-      <h3 class="card-title mb-1">${T('set.pin_title')}</h3>
+      <h3 class="card-title mb-1 flex items-center gap-2"><span class="icon-tile bg-amber-500/15 text-amber-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>${T('set.pin_title')}</h3>
       <p class="text-[11px] text-gray-500 mb-2">${T('set.pin_desc')}</p>
       <div id="pin-row"></div>
       <div id="bio-row"></div>
     </section>
     <section class="glass-card rounded-2xl p-4 mb-3 fade-in">
-      <h3 class="card-title mb-1">${T('set.display_title')}</h3>
+      <h3 class="card-title mb-1 flex items-center gap-2"><span class="icon-tile bg-indigo-500/15 text-indigo-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.2" y1="4.2" x2="5.6" y2="5.6"/><line x1="18.4" y1="18.4" x2="19.8" y2="19.8"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.2" y1="19.8" x2="5.6" y2="18.4"/><line x1="18.4" y1="5.6" x2="19.8" y2="4.2"/></svg></span>${T('set.display_title')}</h3>
       <p class="text-[11px] text-gray-500 mb-2">${T('set.display_desc')}</p>
       <div id="display-row"></div>
     </section>
     <div class="grid grid-cols-2 gap-2 mb-3 fade-in">
-      ${phoneRole() === 'cashier' ? '' : `<button onclick="showView('audit')" class="btn btn-ghost">${T('set.audit_btn')}</button>`}
-      <button onclick="showView('help')" class="btn btn-ghost">${T('set.help_btn')}</button>
+      ${phoneRole() === 'cashier' ? '' : `<button onclick="showView('audit')" class="btn btn-ghost"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>${T('set.audit_btn')}</button>`}
+      <button onclick="showView('help')" class="btn btn-ghost"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>${T('set.help_btn')}</button>
     </div>
     <section class="glass-card rounded-2xl p-4 mb-3 fade-in">
-      <h3 class="card-title mb-1">${T('set.updates_title')}</h3>
+      <h3 class="card-title mb-1 flex items-center gap-2"><span class="icon-tile bg-green-500/15 text-green-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></span>${T('set.updates_title')}</h3>
       <div id="update-row"></div>
     </section>
     <section class="glass-card rounded-2xl p-4 mb-3 fade-in">
-      <h3 class="card-title mb-1">${T('diag.title')}</h3>
+      <h3 class="card-title mb-1 flex items-center gap-2"><span class="icon-tile bg-purple-500/15 text-purple-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>${T('diag.title')}</h3>
       <div id="diag-row"></div>
     </section>
     ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<section class="glass-card rounded-2xl p-4 mb-3 fade-in">
-      <h3 class="card-title mb-1">💾 Backup</h3>
+      <h3 class="card-title mb-1 flex items-center gap-2"><span class="icon-tile bg-cyan-500/15 text-cyan-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></span>Backup</h3>
       <div id="backup-row"></div>
     </section>` : ''}
     <p class="text-center text-[11px] text-gray-500 fade-in">${T('set.store_note')}</p>`;
@@ -89,7 +89,7 @@ function renderShopEdit() {
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">Printer IP (Wi-Fi receipt printer)</label>
             <input id="se-thermal" type="text" maxlength="40" placeholder="192.168.1.50" value="${esc(s.thermalHost || '')}" class="inp" />
           </div>` : ''}
-          <button onclick="submitShopEdit()" class="btn btn-primary btn-lg">${T('set.save_shop')}</button>
+          <button onclick="submitShopEdit()" class="btn btn-primary btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('set.save_shop')}</button>
         </div>
       </div>
     </div>`;

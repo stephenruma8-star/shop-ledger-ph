@@ -13,8 +13,8 @@ async function renderReports() {
       ${phoneRole() === 'cashier' ? '' : `<button onclick="exportMonthCsv()" class="btn btn-ghost btn-sm shrink-0">📥 ${T('rep.export')}</button>`}
     </div>
     <div class="grid grid-cols-2 gap-2 mb-3 fade-in">
-      <button onclick="shareTodayReport()" class="btn btn-ghost btn-sm">📤 Today's summary</button>
-      <button onclick="shareMonthReport()" class="btn btn-ghost btn-sm">📤 Month summary</button>
+      <button onclick="shareTodayReport()" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>Today's summary</button>
+      <button onclick="shareMonthReport()" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>Month summary</button>
     </div>
     <div class="grid grid-cols-2 gap-2.5 mb-3 fade-in">
       <div class="stat-card rounded-2xl p-3.5">
@@ -62,7 +62,7 @@ async function renderReports() {
             <div class="text-[11px] text-gray-500">${T('rep.sold', { qty: t.qty })}</div>
           </div>
           <div class="text-sm font-bold text-green-400 num">${peso(t.amount)}</div>
-        </div>`).join('') : `<p class="text-sm text-gray-500 text-center py-6">${T('home.no_sales')}</p>`}
+        </div>`).join('') : `<div class="text-center text-gray-500 py-10"><svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg><p class="text-sm">${T('home.no_sales')}</p></div>`}
     </section>
     ${arAgingHTML()}
     ${salesByClientHTML()}`;

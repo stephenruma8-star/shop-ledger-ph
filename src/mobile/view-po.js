@@ -20,10 +20,10 @@ async function renderPOs() {
             <div class="text-sm font-bold text-teal-400 num">${peso(po.total)}</div>
             <div class="flex gap-1.5">
             ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) && po.status !== 'Received' ? `<button onclick="editPO(${JSON.stringify(po.id)})" class="btn btn-ghost btn-sm" style="font-size:.75rem">✏️</button><button onclick="deletePO(${JSON.stringify(po.id)})" id="po-del-${po.id}" class="btn btn-sm" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);color:#f87171;font-size:.75rem">🗑</button>` : ''}
-            ${phoneRole() !== 'cashier' && po.status !== 'Received' ? `<button onclick="receivePO(${JSON.stringify(po.id)})" class="btn btn-ghost btn-sm">${T('po.receive')}</button>` : ''}
+            ${phoneRole() !== 'cashier' && po.status !== 'Received' ? `<button onclick="receivePO(${JSON.stringify(po.id)})" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('po.receive')}</button>` : ''}
             </div>
           </div>
-        </div>`).join('') || `<div class="text-center text-gray-500 py-16 fade-in">${T('po.empty')}</div>`}
+        </div>`).join('') || `<div class="text-center text-gray-500 py-16 fade-in"><svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-2"><rect x="1" y="3" width="15" height="13" rx="1"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>${T('po.empty')}</div>`}
     </div>`;
 }
 let poReceiveArmed = null;
@@ -93,7 +93,7 @@ function addPO() {
           <button onclick="poAddItem()" class="btn btn-ghost btn-sm w-full"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('po.add_to_po')}</button>
           <div id="po-cart" class="glass rounded-2xl p-2 text-sm space-y-1"><p class="text-gray-500 text-xs px-1">${T('po.no_items')}</p></div>
           <div class="flex justify-between font-bold text-gray-100">${T('po.total')} <span class="text-teal-400 num" id="po-total-mobile">${peso(0)}</span></div>
-          <button onclick="submitPO()" id="po-submit-btn" class="btn btn-success btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>${T('po.create')}</button>
+          <button onclick="submitPO()" id="po-submit-btn" class="btn btn-success btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('po.create')}</button>
         </div>
       </div>
     </div>`;

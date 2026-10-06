@@ -117,7 +117,7 @@ function renderExpenseEdit(id) {
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
       <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" onclick="event.stopPropagation()">
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
-        <h3 class="font-bold text-gray-100 text-sm mb-3">${T('exp.edit_title')}</h3>
+        <h3 class="font-bold text-gray-100 text-sm mb-3 flex items-center gap-2"><span class="icon-tile bg-red-500/15 text-red-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>${T('exp.edit_title')}</h3>
         <div class="space-y-3">
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('exp.desc')}</label>
@@ -127,7 +127,7 @@ function renderExpenseEdit(id) {
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('exp.amount')}</label>
             <input id="ee-amount" type="number" min="0" step="0.01" value="${e.amount || ''}" class="inp" />
           </div>
-          <button onclick="submitExpenseEdit(${JSON.stringify(id)})" class="btn btn-primary btn-lg">${T('exp.save')}</button>
+          <button onclick="submitExpenseEdit(${JSON.stringify(id)})" class="btn btn-primary btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('exp.save')}</button>
         </div>
       </div>
     </div>`;
@@ -178,8 +178,8 @@ async function loadPettyRow() {
         <div class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">${T('petty.title')}</div>
         <div class="text-lg font-bold text-amber-400 num">${peso(bal)}</div>
       </div>
-      <button onclick="pettySheet('add')" class="btn btn-ghost btn-sm">+ ${T('petty.add').split(' ')[0]}</button>
-      <button onclick="pettySheet('withdraw')" class="btn btn-ghost btn-sm">−</button>
+      <button onclick="pettySheet('add')" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('petty.add').split(' ')[0]}</button>
+      <button onclick="pettySheet('withdraw')" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
     </div>`;
 }
 function pettySheet(dir) {
@@ -189,7 +189,7 @@ function pettySheet(dir) {
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
         <h3 class="font-bold text-gray-100 text-sm mb-3">${T('petty.title')}</h3>
         <input id="petty-amount" type="number" min="0" step="0.01" placeholder="${esc(T('petty.amount_ph'))}" class="inp mb-3" />
-        <button onclick="submitPettyMove('${dir}')" class="btn btn-primary btn-lg">${T('petty.go')}</button>
+        <button onclick="submitPettyMove('${dir}')" class="btn btn-primary btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('petty.go')}</button>
       </div>
     </div>`;
 }

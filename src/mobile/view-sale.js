@@ -17,7 +17,7 @@ function renderSale() {
       <div id="counter-results" class="grid gap-1.5 mt-1.5"></div>
     </div>
     ${(data.quickItems || []).length ? `<div class="flex gap-1.5 mb-3 fade-in overflow-x-auto" style="scrollbar-width:none">${data.quickItems.slice(0, 12).map((q, qi) => `<button onclick="quickAddItem(${qi})" class="shrink-0 px-3 py-2 rounded-xl text-xs font-semibold" style="background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);color:#93c5fd">${esc(q.name)} · ${peso(q.price)}</button>`).join('')}${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button onclick="managePresets()" class="shrink-0 px-3 py-2 rounded-xl text-xs font-semibold" style="background:rgba(255,255,255,.06);border:1px dashed rgba(255,255,255,.2);color:#94a3b8">⚙️ Presets</button>` : ''}</div>` : ''}
-    ${lastFailedSale ? `<button onclick="retrySale()" class="w-full mb-3 py-2.5 rounded-xl font-semibold text-sm fade-in" style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.5);color:#fbbf24">${T('sale.retry')}</button>` : ''}
+    ${lastFailedSale ? `<button onclick="retrySale()" class="btn w-full mb-3 py-2.5 rounded-xl font-semibold text-sm fade-in" style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.5);color:#fbbf24"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>${T('sale.retry')}</button>` : ''}
     <div class="glass-card rounded-2xl p-2 mb-3 fade-in">
       ${cart.length ? cart.map((i, idx) => `
         <div class="row py-2.5 px-1.5" id="mc-row-${idx}">
@@ -231,9 +231,9 @@ function saleSuccessSheet(invoiceNo) {
       <div class="text-4xl mb-2">✅</div>
       <div class="text-lg font-bold text-gray-100 mb-1">${T('sale.success_title')}</div>
       <div class="text-sm text-gray-400 mb-4">${esc(invoiceNo || '')}</div>
-      <button onclick="printSaleReceipt('${esc(invoiceNo || '')}')" class="btn btn-primary btn-lg mb-2">${T('sale.print')}</button>
-      <button onclick="shareReceiptTxn('${esc(invoiceNo || '')}')" class="btn btn-ghost btn-lg mb-2">${T('sale.share')}</button>
-      <button onclick="showView('sale')" class="btn btn-ghost btn-lg">${T('sale.new')}</button>
+      <button onclick="printSaleReceipt('${esc(invoiceNo || '')}')" class="btn btn-primary btn-lg mb-2"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>${T('sale.print')}</button>
+      <button onclick="shareReceiptTxn('${esc(invoiceNo || '')}')" class="btn btn-ghost btn-lg mb-2"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>${T('sale.share')}</button>
+      <button onclick="showView('sale')" class="btn btn-ghost btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('sale.new')}</button>
     </div>`;
   try { window.scrollTo(0, 0); } catch (e) {}
 }
@@ -305,7 +305,7 @@ function managePresets() {
     <div class="row py-2.5 px-1">
       <div class="flex-1 min-w-0"><div class="text-sm font-medium truncate text-gray-200">${esc(q.name)}</div>
       <div class="text-[11px] text-gray-500 num">${peso(q.price)}</div></div>
-      <button onclick="deletePreset(${q.id})" class="text-red-400 text-xs px-2.5 py-1.5 rounded-lg shrink-0" style="background:rgba(239,68,68,.1)">Delete</button>
+      <button onclick="deletePreset(${q.id})" class="text-red-400 text-xs px-2.5 py-1.5 rounded-lg shrink-0 inline-flex items-center gap-1" style="background:rgba(239,68,68,.1)"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete</button>
     </div>`).join('') || `<p class="text-sm text-gray-500 text-center py-4">No presets yet.</p>`;
   const invOpts = (data.inventory || [])
     .filter(i => (i.stock || 0) > 0)
@@ -321,12 +321,12 @@ function managePresets() {
           <input id="preset-name" class="inp" maxlength="80" placeholder="Preset name" />
           <div class="flex gap-2">
             <input id="preset-price" class="inp" type="number" min="0" step="0.01" placeholder="Price" />
-            <button onclick="addPreset()" class="btn btn-primary shrink-0">Add</button>
+            <button onclick="addPreset()" class="btn btn-primary shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add</button>
           </div>
           ${invOpts ? `<select id="preset-inv" class="inp"><option value="">— or pick a catalog item —</option>${invOpts}</select>
-          <button onclick="addPresetFromCatalog()" class="btn btn-ghost w-full">Add catalog item as preset</button>` : ''}
+          <button onclick="addPresetFromCatalog()" class="btn btn-ghost w-full"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add catalog item as preset</button>` : ''}
         </div>
-        <button onclick="closeQuick()" class="btn btn-ghost w-full mt-3">Done</button>
+        <button onclick="closeQuick()" class="btn btn-ghost w-full mt-3"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Done</button>
       </div>
     </div>`;
 }
@@ -392,7 +392,7 @@ async function startBarcodeScan() {
     ov.innerHTML = `<video id="scan-video" playsinline muted style="flex:1;width:100%;object-fit:cover;"></video>
       <div style="padding:1rem;display:flex;gap:.5rem;background:#0f172a;align-items:center;">
         <div style="flex:1;color:#94a3b8;font-size:12px;">${T('scan.point')}</div>
-        <button onclick="stopBarcodeScan()" class="btn btn-ghost">${T('scan.cancel')}</button>
+        <button onclick="stopBarcodeScan()" class="btn btn-ghost"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>${T('scan.cancel')}</button>
       </div>`;
     document.body.appendChild(ov);
   } else ov.style.display = 'flex';

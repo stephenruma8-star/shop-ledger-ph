@@ -75,7 +75,7 @@ async function renderHome() {
       <section class="glass-card rounded-2xl p-3">
         <div class="flex items-center justify-between mb-1.5 gap-1">
           <h3 class="card-title"><span class="icon-tile bg-amber-500/15 text-amber-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></span>${T('home.low_stock')}</h3>
-          <button onclick="showView('inventory')" class="text-xs font-semibold text-blue-400 hover:text-blue-300">${T('home.view_all')}</button>
+          <button onclick="showView('inventory')" class="text-xs font-semibold text-blue-400 hover:text-blue-300 inline-flex items-center gap-1">${T('home.view_all')}<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
         </div>
         ${lowStockTop.length ? lowStockTop.map(i => `
           <div class="row py-2">
@@ -84,13 +84,13 @@ async function renderHome() {
               <div class="text-sm font-medium truncate text-gray-200">${esc(i.name)}</div>
               <div class="text-[11px] ${(i.stock || 0) <= 0 ? 'text-red-400 font-semibold' : 'text-amber-400'}">${(i.stock || 0) <= 0 ? T('home.out') : T('home.left', { n: i.stock || 0 })}</div>
             </div>
-            <button onclick="openQuick(${i.id})" class="btn btn-primary btn-sm">${T('home.sell')}</button>
+            <button onclick="openQuick(${i.id})" class="btn btn-primary btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>${T('home.sell')}</button>
           </div>`).join('') : `<p class="text-sm text-gray-500 text-center py-6">${T('home.all_stocked')}</p>`}
       </section>
       <section class="glass-card rounded-2xl p-3">
         <div class="flex items-center justify-between mb-1.5 gap-1">
           <h3 class="card-title"><span class="icon-tile bg-blue-500/15 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>${T('home.recent')}</h3>
-          <button onclick="showView('transactions')" class="text-xs font-semibold text-blue-400 hover:text-blue-300">${T('home.view_all')}</button>
+          <button onclick="showView('transactions')" class="text-xs font-semibold text-blue-400 hover:text-blue-300 inline-flex items-center gap-1">${T('home.view_all')}<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
         </div>
         ${recent.length ? recent.map(t => `
           <div class="row py-2">
