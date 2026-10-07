@@ -95,6 +95,20 @@ async function renderHome() {
         <div class="text-[11px] text-gray-500 mt-1">${T('home.to_restock')}</div>
       </button>
     </div>
+    <div class="grid grid-cols-2 gap-2.5 mt-2.5 fade-in">
+      <section class="glass-card rounded-2xl p-3">
+        <div class="flex items-center gap-1.5 mb-1.5">
+          <h3 class="card-title"><span class="icon-tile bg-sky-500/15 text-sky-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></span>Weather</h3>
+        </div>
+        <div id="weather-display"><p class="text-gray-400 text-xs py-2">Loading…</p></div>
+      </section>
+      <section class="glass-card rounded-2xl p-3">
+        <div class="flex items-center gap-1.5 mb-1.5">
+          <h3 class="card-title"><span class="icon-tile bg-cyan-500/15 text-cyan-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>Holiday</h3>
+        </div>
+        <div id="next-holiday"><p class="text-[11px] text-gray-500">Loading…</p></div>
+      </section>
+    </div>
     <div class="grid gap-2.5 mt-2.5 md:grid-cols-2 fade-in">
       <section class="glass-card rounded-2xl p-3">
         <div class="flex items-center justify-between mb-1.5 gap-1">
@@ -135,5 +149,7 @@ async function renderHome() {
         <button onclick="showView('reports')" class="btn btn-ghost btn-lg justify-start"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>${T('nav.reports')}</button>
       </div>
     </section>`;
+  loadPhoneWeather();
+  loadPhoneHolidays();
 }
 

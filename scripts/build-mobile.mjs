@@ -16,7 +16,7 @@ const CHECK = process.argv.includes('--check');
 
 const MODULES = [
   'core.js', 'pair.js', 'pwa.js', 'pin.js', 'display.js', 'ptr.js',
-  'offline.js', 'nav.js', 'lang.js', 'view-home.js', 'view-clients.js',
+  'offline.js', 'nav.js', 'lang.js', 'weather.js', 'view-home.js', 'view-clients.js',
   'view-catalog.js', 'view-quick.js', 'view-sale.js', 'view-pay.js',
   'view-inventory.js', 'view-transactions.js', 'view-expenses.js',
   'view-suppliers.js',   'view-po.js', 'view-reports.js', 'view-settings.js', 'view-stocktake.js',

@@ -35,6 +35,11 @@ async function renderSettings() {
       <p class="text-[11px] text-gray-500 mb-2">${T('set.display_desc')}</p>
       <div id="display-row"></div>
     </section>
+    <section class="glass-card rounded-2xl p-4 mb-3 fade-in">
+      <h3 class="card-title mb-1 flex items-center gap-2"><span class="icon-tile bg-sky-500/15 text-sky-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></span>Weather location</h3>
+      <p class="text-[11px] text-gray-500 mb-2">City for the home-screen weather.</p>
+      <div id="weather-row"></div>
+    </section>
     <div class="grid grid-cols-2 gap-2 mb-3 fade-in">
       ${phoneRole() === 'cashier' ? '' : `<button onclick="showView('audit')" class="btn btn-ghost"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>${T('set.audit_btn')}</button>`}
       <button onclick="showView('help')" class="btn btn-ghost"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>${T('set.help_btn')}</button>
@@ -59,6 +64,7 @@ async function renderSettings() {
   updateBioRow();
   updateDiagRow();
   if (typeof updateBackupRow === 'function') updateBackupRow();
+  updateWeatherRow();
 }
 function renderShopEdit() {
   const s = data.settings || {};
