@@ -465,7 +465,9 @@ async function _applySale(body) {
   for (const item of items) {
     if (!item.description || typeof item.description !== 'string') throw _apiErr(400, 'Each item must have a description');
     if (!_validateAmount(item.unitCost)) throw _apiErr(400, 'Invalid item price');
-    if (item.qty && (isNaN(parseInt(item.qty)) || parseInt(item.qty) < 1)) throw _apiErr(400, 'Invalid item quantity');
+    // Explicit qty validation: 0/negative/NaN are rejected instead of being
+    // silently coerced to 1 (a mistyped quantity must fail loudly).
+    if (item.qty !== undefined && item.qty !== null && (isNaN(parseInt(item.qty)) || parseInt(item.qty) < 1)) throw _apiErr(400, 'Invalid item quantity');
   }
   if (discount && !_validateAmount(discount)) throw _apiErr(400, 'Invalid discount');
   if (paymentMethod && !PAY_METHODS.includes(paymentMethod)) throw _apiErr(400, 'Invalid payment method');
@@ -584,12 +586,27 @@ async function _apiVoid(body) {
   const reason = String((body && (body.reason || body.voidReason)) || '').slice(0, 200);
   const rows = await db.all('SELECT * FROM transactions WHERE invoiceNo = ? OR id = ?', [String(ref), String(ref)]);
   const t = rows.find(x => x.invoiceNo === String(ref) || String(x.id) === String(ref));
-  if (!t || t.status === 'voided') throw _apiErr(404, 'Sale not found or already voided');
+  // Only live sales can be voided: voiding returns would un-restock negative
+  // lines (corrupting stock), and voided rows are already final.
+  if (!t) throw _apiErr(404, 'Sale not found');
+  if (t.status === 'voided') throw _apiErr(404, 'Sale not found or already voided');
+  // Pending/paid sales void forward; returns void BACKWARD (un-restock the
+  // negative lines, un-refund the balance via the same signed formula).
+  if (t.status !== 'pending' && t.status !== 'paid' && t.status !== 'return') throw _apiErr(400, 'Only active sales and returns can be voided');
   const items = _parseJson(t.items, []);
   for (const it of items) {
     if (it.invId) {
       const inv = await db.get('SELECT * FROM inventory WHERE id = ?', [it.invId]);
-      if (inv) await db.run('UPDATE inventory SET stock = ? WHERE id = ?', [(inv.stock || 0) + (parseInt(it.qty) || 1), inv.id]);
+      if (inv) {
+        const q = parseInt(it.qty) || 1;
+        let variants = _parseJson(inv.variants, []);
+        if (it.variantName && Array.isArray(variants)) {
+          variants = variants.map(v => v.name === it.variantName
+            ? Object.assign({}, v, { stock: (v.stock || 0) + q }) : v);
+        }
+        await db.run('UPDATE inventory SET stock = ?, variants = ? WHERE id = ?',
+          [(inv.stock || 0) + q, JSON.stringify(variants), inv.id]);
+      }
     }
   }
   if (t.balanceAdded && t.clientId) {
@@ -620,6 +637,10 @@ async function _apiReturns(body) {
   const found = await db.all('SELECT * FROM transactions WHERE invoiceNo = ? OR id = ?', [String(ref), String(ref)]);
   const orig = found.find(t => t.invoiceNo === String(ref) || String(t.id) === String(ref)) || null;
   if (!orig) throw _apiErr(404, 'Original sale not found');
+  // Returns only make sense against a live sale: voided sales are cancelled
+  // (nothing to refund), and returns-of-returns would corrupt the books.
+  if (orig.status === 'voided') throw _apiErr(400, 'Cannot return a voided sale');
+  if (orig.status === 'return') throw _apiErr(400, 'Cannot return a return; void it instead if wrong');
   const origItems = _parseJson(orig.items, []);
   if (!origItems.length) throw _apiErr(400, 'Original sale has no item lines');
   const priorAll = await db.all('SELECT * FROM transactions WHERE status = ?', ['return']);
@@ -685,9 +706,10 @@ async function _apiReturns(body) {
       return (remaining[k] ? remaining[k].left : 0) > 0;
     });
     const now = new Date().toISOString();
+    const touchedBalance = !!(orig.clientId && (orig.paymentMethod || 'Cash') !== 'Cash');
     await db.run(
-      'INSERT INTO transactions (invoiceNo, clientId, clientName, date, createdAt, items, subtotal, totalInterest, discount, scDiscount, grandTotal, paymentMethod, status, refId, refInvoiceNo, partial, returnReason) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?)',
-      [invoiceNo, orig.clientId || null, orig.clientName || 'Walk-in', _todayStr(), now, JSON.stringify(items), -retSub, grandTotal, orig.paymentMethod || 'Cash', 'return', orig.id || null, orig.invoiceNo || null, partial ? 1 : 0, reason]
+      'INSERT INTO transactions (invoiceNo, clientId, clientName, date, createdAt, items, subtotal, totalInterest, discount, scDiscount, grandTotal, paymentMethod, status, refId, refInvoiceNo, partial, returnReason, balanceAdded) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [invoiceNo, orig.clientId || null, orig.clientName || 'Walk-in', _todayStr(), now, JSON.stringify(items), -retSub, grandTotal, orig.paymentMethod || 'Cash', 'return', orig.id || null, orig.invoiceNo || null, partial ? 1 : 0, reason, touchedBalance ? 1 : 0]
     );
     for (const item of items) {
       if (item.invId) {
@@ -853,8 +875,19 @@ async function _apiSuppliers(method, parts, body) {
     _bump();
     return { success: true, id: r.lastID };
   }
-  if (method === 'GET' && parts.length === 2 && parts[1] === 'payments') {
+  if (method === 'DELETE' && parts.length === 1) {
     const s = await db.get('SELECT * FROM suppliers WHERE id = ?', [parts[0]]);
+    if (!s) throw _apiErr(404, 'Supplier not found');
+    const pos = await db.all('SELECT id FROM purchase_orders WHERE supplierId = ? LIMIT 1', [s.id]);
+    if (pos.length) throw _apiErr(400, 'Cannot delete: supplier has purchase orders');
+    const pays = await db.all('SELECT id FROM supplier_payments WHERE supplierId = ? LIMIT 1', [s.id]);
+    if (pays.length) throw _apiErr(400, 'Cannot delete: supplier has recorded payments');
+    await db.run('DELETE FROM suppliers WHERE id = ?', [s.id]);
+    await _audit('supplier', 'Deleted supplier: ' + (s.name || '') + ' (phone)');
+    _bump();
+    return { success: true };
+  }
+  if (method === 'GET' && parts.length === 2 && parts[1] === 'payments') {    const s = await db.get('SELECT * FROM suppliers WHERE id = ?', [parts[0]]);
     if (!s) throw _apiErr(404, 'Supplier not found');
     const pays = await db.all('SELECT * FROM supplier_payments WHERE supplierId = ?', [s.id]);
     const byDate = (a, b) => String(b.date || b.createdAt || '').localeCompare(String(a.date || a.createdAt || ''));

@@ -308,5 +308,40 @@ ok(sAfter.receiptHeaderText === 'Brgy 123' && sAfter.vatRate === 12 && sAfter.th
   ok(r2.success, 'payments work after migration');
 }
 
+// void/return state machine: voided sales can't be returned, live returns void backward
+const stC = await A('POST', '/api/clients', { name: 'State Client' });
+const stSale = await A('POST', '/api/sales', {
+  clientId: stC.id,
+  items: [{ description: 'Oil', qty: 2, unitCost: 30, invId: it2.id }],
+  paymentMethod: 'GCash'
+}); // balance 66 (60 + 6)
+await A('POST', '/api/void', { invoiceNo: stSale.invoiceNo });
+ok((await A('GET', '/api/clients/' + stC.id + '/history')).client.balance === 0, 'void reverses credit balance');
+await throws(400, () => A('POST', '/api/returns', { invoiceNo: stSale.invoiceNo }), 'return of voided sale rejected');
+const stSale2 = await A('POST', '/api/sales', {
+  clientId: stC.id,
+  items: [{ description: 'Oil', qty: 2, unitCost: 30, invId: it2.id }],
+  paymentMethod: 'GCash'
+});
+const stRet = await A('POST', '/api/returns', { invoiceNo: stSale2.invoiceNo, items: [{ invId: it2.id, description: 'Oil', qty: 1 }] });
+const oilBefore = (await A('GET', '/api/inventory')).find(i => i.name === 'Oil').stock;
+const balBefore = (await A('GET', '/api/clients/' + stC.id + '/history')).client.balance;
+await A('POST', '/api/void', { invoiceNo: stRet.invoiceNo });
+const oilAfter = (await A('GET', '/api/inventory')).find(i => i.name === 'Oil').stock;
+const balAfter = (await A('GET', '/api/clients/' + stC.id + '/history')).client.balance;
+ok(oilAfter === oilBefore - 1, 'void-of-return un-restocks the line');
+ok(Math.abs(balAfter - (balBefore + Math.abs((await A('GET', '/api/transactions/' + stRet.invoiceNo)).grandTotal))) < 1e-9, 'void-of-return un-refunds the balance');
+ok((await A('GET', '/api/transactions/' + stRet.invoiceNo)).status === 'voided', 'return marked voided');
+await throws(404, () => A('POST', '/api/void', { invoiceNo: stRet.invoiceNo }), 'double void rejected');
+
+// supplier delete rules
+const supTmp = await A('POST', '/api/suppliers', { name: 'Temp Supplier' });
+ok((await A('POST', '/api/suppliers/' + supTmp.id, {}, 'DELETE')).success, 'delete clean supplier');
+await throws(400, () => A('POST', '/api/suppliers/' + sup.id, {}, 'DELETE'), 'delete supplier with orders blocked');
+
+// strict qty validation
+await throws(400, () => A('POST', '/api/sales', { items: [{ description: 'X', qty: 0, unitCost: 5 }] }), 'zero qty rejected');
+await throws(400, () => A('POST', '/api/sales', { items: [{ description: 'X', qty: -2, unitCost: 5 }] }), 'negative qty rejected');
+
 console.log(`\nSTANDALONE STORE: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -32,9 +32,10 @@ function supplierListHTML(items) {
         <div class="text-[10px] text-gray-500">${T('po.owed_suffix')}</div>
         </div>
       </div>
-      <div class="flex gap-1.5 mt-2">
+      <div class="flex gap-1.5 mt-2 items-center">
         <span class="chip chip-blue">${T('sup.bought', { amt: peso(s.purchased) })}</span>
         <span class="chip chip-green">${T('sup.paid', { amt: peso(s.paid) })}</span>
+        ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button onclick="deleteSupplier(${JSON.stringify(s.id)})" id="sup-del-${s.id}" class="ml-auto text-[11px] text-red-400 px-2 py-1 rounded-lg shrink-0" style="background:rgba(239,68,68,.1)">🗑</button>` : ''}
       </div>
     </div>`).join('');
 }
@@ -42,6 +43,26 @@ function filterSuppliers(q) {
   q = (q || '').toLowerCase();
   const g = document.getElementById('sup-grid');
   if (g) g.innerHTML = supplierListHTML(data.suppliers.filter(s => ((s.name || '') + ' ' + (s.contact || '') + ' ' + (s.email || '')).toLowerCase().includes(q)));
+}
+// Standalone-only: delete a supplier with no orders or payments.
+let supplierDeleteArmed = null;
+async function deleteSupplier(id) {
+  if (supplierDeleteArmed !== id) {
+    supplierDeleteArmed = id;
+    const btn = document.getElementById('sup-del-' + id);
+    if (btn) btn.textContent = 'Sure?';
+    setTimeout(() => { if (supplierDeleteArmed === id) { supplierDeleteArmed = null; if (typeof renderSuppliers === 'function') renderSuppliers(); } }, 5000);
+    return;
+  }
+  supplierDeleteArmed = null;
+  if (!takeSubmitLock('supdel')) return;
+  try {
+    await apiPost('/api/suppliers/' + encodeURIComponent(id), {}, 'DELETE');
+    feelOk();
+    toast('Supplier deleted', 'ok');
+    await refreshAll();
+  } catch (e) { feelErr(); toast(e.message, 'err'); }
+  finally { releaseSubmitLock('supdel'); }
 }
 function renderSupplierForm() {
   document.getElementById('modal-root').innerHTML = `
