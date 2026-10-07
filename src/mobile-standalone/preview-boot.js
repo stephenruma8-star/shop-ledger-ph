@@ -61,6 +61,10 @@ async function seedDemoShop() {
   applyBrand();
   const ls = document.getElementById('loading-screen');
   if (ls) ls.classList.add('hidden');
+  if (/[?&]audit=1/.test(window.location.search) && typeof runStandaloneAudit === 'function') {
+    await runStandaloneAudit();
+    return;
+  }
   const m = (window.location.hash || '').match(/^#\/([a-z-]+)/);
   showView((m && m[1]) || 'home');
   document.title = 'preview:' + ((m && m[1]) || 'home');

@@ -99,6 +99,8 @@ async function saveFirstRunPin() {
   await startStandalone();
 }
 (async () => {
+  // Preview harness (browser screenshots): the preview boot runs instead.
+  if (typeof window !== 'undefined' && window.__SLP_PREVIEW__) return;
   try {
     if ('serviceWorker' in navigator) {
       const regs = await navigator.serviceWorker.getRegistrations().catch(() => []);

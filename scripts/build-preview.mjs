@@ -42,6 +42,8 @@ const MODULES = [
   ['mob', 'view-audit.js'],
   ['mob', 'view-help.js'],
   ['mob', 'view-debts.js'],
+  ['sa', 'preview-audit.js'],
+  ['sa', 'standalone-app.js'],
   ['sa', 'preview-boot.js'],
 ];
 
