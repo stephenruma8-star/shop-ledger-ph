@@ -20,7 +20,9 @@ function makeSandbox(fetchImpl) {
     },
     fetch: fetchImpl || (() => Promise.reject(new Error('offline'))),
     document: { getElementById: (id) => (els[id] || (els[id] = { innerHTML: '' })) },
-    navigator: {}
+    navigator: {},
+    nativePlugin: () => null,
+    toast: () => {}
   };
   vm.createContext(sandbox);
   vm.runInContext('function esc(s){return String(s==null?"":s);}', sandbox);
@@ -93,6 +95,34 @@ function ok(cond, name) {
   await s.loadPhoneWeather();
   ok(els['weather-display'].innerHTML.includes('31°C') && els['weather-display'].innerHTML.includes('Quezon City'), 'live fetch renders + names city');
   ok(JSON.parse(store.weatherCache).temp === '31', 'live fetch cached');
+}
+{
+  // auto mode: manual city by default, GPS coords when enabled
+  const { sandbox: s, store } = makeSandbox(() => Promise.reject(new Error('offline')));
+  ok((await s.resolveWeatherLoc()).loc === 'Manila', 'manual mode defaults to Manila');
+  let fixes = 0;
+  s.navigator.geolocation = {
+    getCurrentPosition: (okFn) => { fixes++; okFn({ coords: { latitude: 14.6, longitude: 120.98 } }); }
+  };
+  store.slpWeatherAuto = '1';
+  const got = await s.resolveWeatherLoc();
+  ok(got.auto === true && got.loc === '14.6,120.98', 'auto mode resolves GPS coords');
+  await s.resolveWeatherLoc();
+  ok(fixes === 1, 'GPS fix cached per session');
+  // denied GPS falls back to city
+  s.navigator.geolocation = { getCurrentPosition: (okFn, errFn) => errFn(new Error('denied')) };
+  const got2 = await s.resolveWeatherLoc();
+  ok(got2.auto === true && got2.loc === '14.6,120.98', 'denied GPS keeps session fix');
+}
+{
+  // setWeatherAuto(false) needs no GPS; bad coords never reach fetch
+  const seen = [];
+  const { sandbox: s, store } = makeSandbox((url) => { seen.push(String(url)); return Promise.reject(new Error('offline')); });
+  store.slpWeatherAuto = '1';
+  await s.setWeatherAuto(false);
+  ok(store.slpWeatherAuto === '0', 'auto toggle off persists');
+  await s.loadPhoneWeather();
+  ok(seen.some(u => u.includes('wttr.in/Manila')), 'manual city used in fetch URL');
 }
 
 console.log(`\nWEATHER SMOKE: ${pass} passed, ${fail} failed`);

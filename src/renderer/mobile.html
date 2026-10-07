@@ -2056,6 +2056,43 @@ function weatherLocGet() {
 function weatherLocSet(v) {
   try { localStorage.setItem('slpWeatherLoc', String(v || '').trim().slice(0, 60) || 'Manila'); } catch (e) {}
 }
+function weatherAutoGet() {
+  try { return localStorage.getItem('slpWeatherAuto') === '1'; } catch (e) { return false; }
+}
+function weatherAutoSet(on) {
+  try { localStorage.setItem('slpWeatherAuto', on ? '1' : '0'); } catch (e) {}
+}
+// Session-cached coordinates: one GPS fix per launch, not per render.
+let _geoFix = null;
+// Resolve the wttr.in location: GPS coords when auto mode is on, else the
+// saved city. Never throws — always falls back to the saved city.
+async function resolveWeatherLoc() {
+  const fallback = weatherLocGet();
+  if (!weatherAutoGet()) return { loc: fallback, auto: false };
+  if (_geoFix) return { loc: _geoFix, auto: true };
+  try {
+    const G = (typeof nativePlugin === 'function') ? nativePlugin('Geolocation') : null;
+    if (G && typeof G.getCurrentPosition === 'function') {
+      try { if (typeof G.requestPermissions === 'function') await G.requestPermissions().catch(() => {}); } catch (e) {}
+      const pos = await G.getCurrentPosition({ enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 });
+      const lat = pos && pos.coords && pos.coords.latitude;
+      const lon = pos && pos.coords && pos.coords.longitude;
+      if (isFinite(lat) && isFinite(lon)) {
+        _geoFix = lat + ',' + lon;
+        return { loc: _geoFix, auto: true };
+      }
+    } else if (navigator.geolocation) {
+      const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { timeout: 10000, enableHighAccuracy: false, maximumAge: 300000 }));
+      const lat = pos && pos.coords && pos.coords.latitude;
+      const lon = pos && pos.coords && pos.coords.longitude;
+      if (isFinite(lat) && isFinite(lon)) {
+        _geoFix = lat + ',' + lon;
+        return { loc: _geoFix, auto: true };
+      }
+    }
+  } catch (e) {}
+  return { loc: fallback, auto: false };
+}
 function weatherCacheGet() {
   try { return JSON.parse(localStorage.getItem('weatherCache') || 'null'); } catch (e) { return null; }
 }
@@ -2079,7 +2116,8 @@ async function loadPhoneWeather() {
     el.innerHTML = '<p class="text-gray-400 text-xs py-2">Loading weather…</p>';
   }
   try {
-    const loc = weatherLocGet();
+    const got = await resolveWeatherLoc();
+    const loc = got.loc;
     const res = await fetch('https://wttr.in/' + encodeURIComponent(loc) + '?format=j1');
     if (!res.ok) throw new Error('weather fetch failed');
     const data = await res.json();
@@ -2184,17 +2222,54 @@ async function showPhoneHolidays() {
 function updateWeatherRow() {
   const box = document.getElementById('weather-row');
   if (!box) return;
+  const auto = weatherAutoGet();
   box.innerHTML = `
+    <div class="flex items-center justify-between gap-3 py-1 mb-2">
+      <span class="text-sm text-gray-300">Auto-detect my location</span>
+      <button onclick="setWeatherAuto(${auto ? 'false' : 'true'})" class="px-3 py-1.5 rounded-xl text-xs font-semibold ${auto ? 'bg-green-600 text-white' : 'bg-white/5 border border-white/10 text-gray-200'}">${auto ? 'On' : 'Off'}</button>
+    </div>
     <div class="flex gap-2">
       <input id="wx-loc" type="text" maxlength="60" value="${esc(weatherLocGet())}" placeholder="City (e.g. Manila)" autocomplete="off" class="inp flex-1" />
       <button onclick="saveWeatherLoc()" class="btn btn-ghost btn-sm shrink-0">Set</button>
-    </div>`;
+    </div>
+    <p class="text-[11px] text-gray-500 mt-1.5">Auto uses GPS (needs location permission); otherwise the city above is used.</p>`;
+}
+async function setWeatherAuto(on) {
+  if (on) {
+    // Prove GPS works before committing to it: one fix, else stay manual.
+    try {
+      const G = (typeof nativePlugin === 'function') ? nativePlugin('Geolocation') : null;
+      if (G && typeof G.requestPermissions === 'function') await G.requestPermissions().catch(() => {});
+      _geoFix = null;
+      weatherAutoSet(true);
+      const got = await resolveWeatherLoc();
+      if (!got.auto) {
+        weatherAutoSet(false);
+        toast('Could not get location — using city instead', 'err');
+      } else {
+        toast('Auto location on', 'ok');
+      }
+    } catch (e) {
+      weatherAutoSet(false);
+      toast('Could not get location — using city instead', 'err');
+    }
+  } else {
+    weatherAutoSet(false);
+    _geoFix = null;
+    toast('Auto location off', 'ok');
+  }
+  try { localStorage.removeItem('weatherCache'); } catch (e) {}
+  updateWeatherRow();
+  loadPhoneWeather();
 }
 function saveWeatherLoc() {
   const v = ((document.getElementById('wx-loc') || {}).value || '').trim();
   weatherLocSet(v || 'Manila');
+  weatherAutoSet(false);
+  _geoFix = null;
   try { localStorage.removeItem('weatherCache'); } catch (e) {}
   toast('Weather location saved', 'ok');
+  updateWeatherRow();
   loadPhoneWeather();
 }
 
