@@ -48,10 +48,11 @@ async function runStandaloneAudit() {
   await A('client-detail', async () => { await openClientDetail(1); });
   await A('txn-detail', async () => { const t = (data.transactions || [])[0]; await openTxnDetail(t.invoiceNo || t.id); });
   await A('receipt-preview', async () => { const t = (data.transactions || [])[0]; await previewReceiptTxn(t.invoiceNo || t.id); });
-  await A('item-form', async () => { const it = (data.inventory || [])[0]; renderItemForm(it.id); });
-  await A('client-form', async () => { renderClientForm(null); });
+  await A('item-form', async () => { const it = (data.inventory || [])[0]; renderItemForm(it.id); });  await A('client-form', async () => { renderClientForm(null); });
   await A('po-sheet', async () => { addPO(); });
   await A('presets-manager', async () => { showView('sale'); managePresets(); });
+  await A('debt-form-setup', async () => { showView('debts'); openDebtFormSetup(); });
+  await A('debt-form-preview', async () => { previewDebtForm('portrait'); });
   await A('stocktake-submit-dry', async () => { showView('stocktake'); });
   await A('pay-submit', async () => {
     showView('pay');

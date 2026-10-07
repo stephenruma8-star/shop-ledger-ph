@@ -26,6 +26,7 @@ const MODULES = [
   ['mob', 'nav.js'],
   ['mob', 'lang.js'],
   ['mob', 'weather.js'],
+  ['mob', 'debt-form.js'],
   ['mob', 'view-home.js'],
   ['mob', 'view-clients.js'],
   ['mob', 'view-catalog.js'],
