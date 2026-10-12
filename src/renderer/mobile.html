@@ -3955,6 +3955,7 @@ async function previewReceiptTxn(id) {
   const row2 = (l, r) => { l = String(l); r = String(r); return (l + ' '.repeat(Math.max(1, W - l.length - r.length)) + r); };
   const pesoPlain = (n) => 'P' + (Number(n) || 0).toFixed(2);
   const L = [];
+  if (s.receiptHeaderText) L.push(s.receiptHeaderText);
   L.push(center(s.shopName || 'Shop Ledger PH'));
   if (s.shopAddress) L.push(center(s.shopAddress));
   if (s.shopContact) L.push(center('Contact: ' + s.shopContact));

@@ -1165,6 +1165,7 @@ async function _apiPrint(body) {
   const s = await _settingsMap();
   const peso = (n) => '₱' + (Number(n) || 0).toFixed(2);
   const lines = [];
+  if (s.receiptHeaderText) lines.push({ t: 'center', text: s.receiptHeaderText });
   lines.push({ t: 'center', bold: true, size: 'double', text: s.shopName || 'Shop Ledger PH' });
   if (s.shopAddress) lines.push({ t: 'center', text: s.shopAddress });
   if (s.shopContact) lines.push({ t: 'center', text: 'Contact: ' + s.shopContact });

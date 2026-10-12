@@ -177,8 +177,13 @@ ok(sms.success && sms.total >= 1 && sms.texts.length >= 1 && sms.texts[0].text.i
 
 // print: no printer -> 502 shape; stub printer -> success
 await throwsJson(502, () => A('POST', '/api/print-thermal', { transactionId: 'INV-00001' }), 'print without printer');
-sandbox.__api.setPrinterFn(async () => ({ success: true }));
+let printedLines = null;
+sandbox.__api.setPrinterFn(async (lines) => { printedLines = lines; return { success: true }; });
 ok((await A('POST', '/api/print-thermal', { transactionId: 'INV-00001' })).success, 'print with stub');
+ok(printedLines.some(l => l && l.text === 'OFFICIAL RECEIPT'), 'receipt body built');
+await A('POST', '/api/settings', { key: 'receiptHeaderText', value: 'Brgy Hall St' }, 'PUT');
+await A('POST', '/api/print-thermal', { transactionId: 'INV-00001' });
+ok(printedLines[0].text === 'Brgy Hall St', 'receipt header prints first when set');
 
 // deletes with safety rules
 await throws(400, () => A('POST', '/api/inventory/' + it1.id, {}, 'DELETE'), 'delete item with sales history blocked');
