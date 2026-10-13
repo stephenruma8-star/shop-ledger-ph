@@ -196,6 +196,35 @@ body.big-text .btn-sm{font-size:.85rem}
 </div>
 
 <script>
+/*SLP-WATCHDOG: survives even if the main bundle fails to parse. If no view
+renders within 10s, replace the screen with the captured error so a dead
+app always explains itself (screenshot it and send it to support).*/
+window.__slpBootOk = false;
+window.__slpBootErrors = [];
+try {
+  window.addEventListener('error', function (e) {
+    try { window.__slpBootErrors.push(String((e && e.message) || 'script error')); } catch (_) {}
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    try { var r = e && e.reason; window.__slpBootErrors.push('rejection: ' + String((r && (r.message || r)) || r)); } catch (_) {}
+  });
+} catch (_) {}
+setTimeout(function () {
+  try {
+    if (window.__slpBootOk) return;
+    var msg = window.__slpBootErrors.length ? window.__slpBootErrors.slice(0, 4).join('\n') : 'App did not start, and no error was captured.';
+    var detail = 'Shop Ledger could not start.\n\n' + msg + '\n\nPlease screenshot this screen and send it to support.';
+    var box = document.createElement('div');
+    box.setAttribute('style', 'position:fixed;inset:0;z-index:999;background:#0f172a;color:#f1f5f9;display:flex;align-items:center;justify-content:center;padding:1.5rem;font-family:sans-serif;');
+    var pre = document.createElement('pre');
+    pre.setAttribute('style', 'max-width:26rem;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.4);border-radius:.75rem;padding:1rem;font-size:12px;white-space:pre-wrap;word-break:break-word;');
+    pre.textContent = detail;
+    box.appendChild(pre);
+    document.body.appendChild(box);
+  } catch (_) {}
+}, 10000);
+</script>
+<script>
 
 // ===== src/mobile/core.js =====
 function isNativeApp() {
@@ -1223,6 +1252,8 @@ function navTap(view) {
 }
 function showView(view, arg) {
   currentView = view;
+  // Any rendered view proves the app is alive: silence the boot watchdog.
+  try { if (typeof window !== 'undefined') window.__slpBootOk = true; } catch (e) {}
   // Cashier phones never render owner-only views (the server also 403s them).
   if (phoneRole() === 'cashier' && (view === 'reports' || view === 'expenses' || view === 'audit' || view === 'suppliers' || view === 'purchase-orders')) {
     toast(T('nav.owner_only'), 'err');

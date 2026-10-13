@@ -62,6 +62,8 @@ function navTap(view) {
 }
 function showView(view, arg) {
   currentView = view;
+  // Any rendered view proves the app is alive: silence the boot watchdog.
+  try { if (typeof window !== 'undefined') window.__slpBootOk = true; } catch (e) {}
   // Cashier phones never render owner-only views (the server also 403s them).
   if (phoneRole() === 'cashier' && (view === 'reports' || view === 'expenses' || view === 'audit' || view === 'suppliers' || view === 'purchase-orders')) {
     toast(T('nav.owner_only'), 'err');

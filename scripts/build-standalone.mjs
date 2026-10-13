@@ -50,7 +50,9 @@ const STANDALONE_MODULES = [
 
 const top = readFileSync(mob('shell-top.html'), 'utf8');
 const bottom = readFileSync(mob('shell-bottom.html'), 'utf8');
-if ((top.match(/<script>/g) || []).length !== 1) throw new Error('shell-top must end with exactly one <script>');
+if ((top.match(/<script>/g) || []).length !== 2) throw new Error('shell-top must hold the watchdog script plus exactly one open app <script>');
+if (!top.includes('SLP-WATCHDOG')) throw new Error('shell-top watchdog block missing');
+if (!top.trimEnd().endsWith('<script>')) throw new Error('shell-top must end with the open app <script>');
 if (bottom.includes('<script')) throw new Error('shell-bottom must not contain scripts');
 
 let js = '';

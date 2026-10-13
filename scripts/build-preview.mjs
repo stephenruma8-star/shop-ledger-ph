@@ -51,6 +51,8 @@ const MODULES = [
 
 const top = readFileSync(mob('shell-top.html'), 'utf8');
 const bottom = readFileSync(mob('shell-bottom.html'), 'utf8');
+if ((top.match(/<script>/g) || []).length !== 2) throw new Error('shell-top must hold the watchdog script plus exactly one open app <script>');
+if (!top.includes('SLP-WATCHDOG')) throw new Error('shell-top watchdog block missing');
 let js = '';
 for (const [dir, f] of MODULES) {
   const src = readFileSync(dir === 'sa' ? sa(f) : mob(f), 'utf8');

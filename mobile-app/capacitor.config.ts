@@ -3,7 +3,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'ph.shopledger.mobile',
   appName: 'Shop Ledger PH',
-  webDir: 'www',
+  webDir: 'www/app',
   server: {
     // Shop Wi-Fi is plain http: allow the WebView to reach it and call it.
     cleartext: true,
