@@ -12,9 +12,11 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const html = readFileSync(join(root, 'src/renderer/mobile.html'), 'utf8');
-const m = html.match(/<script>([\s\S]*?)<\/script>/);
-if (!m) throw new Error('no inline script found in mobile.html');
-let pageScript = m[1];
+const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+// shell-top holds the watchdog block first and the app bundle last — the
+// harness always evaluates the app block.
+if (!blocks.length) throw new Error('no inline script found in mobile.html');
+let pageScript = blocks[blocks.length - 1];
 
 pageScript += `
 ; {
