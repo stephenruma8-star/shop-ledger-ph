@@ -53,6 +53,69 @@ async function runStandaloneAudit() {
   await A('presets-manager', async () => { showView('sale'); managePresets(); });
   await A('debt-form-setup', async () => { showView('debts'); openDebtFormSetup(); });
   await A('debt-form-preview', async () => { previewDebtForm('portrait'); });
+  await A('view-meta-complete', async () => {
+    const views = ['catalog', 'clients', 'sale', 'pay', 'inventory', 'transactions', 'expenses', 'suppliers', 'purchase-orders', 'reports', 'settings', 'stocktake', 'audit', 'help', 'debts'];
+    const missing = views.filter(v => !VIEW_META[v] || !T(VIEW_META[v].title) || VIEW_META[v].title === 'View');
+    if (missing.length) throw new Error('no sheet meta: ' + missing.join(','));
+  });
+  await A('onboarding-card', async () => {
+    if (typeof onboardingCard !== 'function') throw new Error('missing fn');
+    const html = onboardingCard();
+    if (typeof html !== 'string') throw new Error('bad return');
+  });
+  await A('rate-preset', async () => {
+    showView('sale');
+    const sel = document.getElementById('sale-client');
+    if (!sel) throw new Error('no client select');
+    const opt = [...sel.options].find(o => o.text.includes('Maria Clara'));
+    if (!opt) throw new Error('demo client missing');
+    sel.value = opt.value;
+    applyClientRate();
+    const box = document.getElementById('sale-interest');
+    if (!box || String(box.value) !== '10') throw new Error('rate not preset, got ' + (box && box.value));
+  });
+  await A('presets-roundtrip', async () => {
+    const before = (await apiGet('/api/quick-items')).length;
+    await apiPost('/api/quick-items', { name: 'Audit Preset', price: 7 });
+    const mid = await apiGet('/api/quick-items');
+    if (mid.length !== before + 1) throw new Error('preset not added');
+    await apiPost('/api/quick-items/' + mid.find(q => q.name === 'Audit Preset').id, {}, 'DELETE');
+    const after = await apiGet('/api/quick-items');
+    if (after.length !== before) throw new Error('preset not deleted');
+  });
+  await A('stocktake-submit', async () => {
+    showView('stocktake');
+    const it = (data.inventory || []).find(i => (i.stock || 0) > 0);
+    stocktakeTouched = {};
+    stocktakeTouched[it.id] = (it.stock || 0) + 1;
+    await submitStocktake();
+    await loadAll();
+    const now = (data.inventory || []).find(i => i.id === it.id);
+    if ((now.stock || 0) !== (it.stock || 0) + 1) throw new Error('count not saved');
+  });
+  await A('backup-ui-guards', async () => {
+    showView('settings');
+    updateBackupRow();
+    await exportBackup();
+    await importBackup();
+  });
+  await A('debt-share-guard', async () => {
+    await shareDebtForm();
+  });
+  await A('settings-rows', async () => {
+    showView('settings');
+    updateInstallRow(); updatePinRow(); updateDisplayRow(); updateUpdateRow(); updateBioRow(); updateDiagRow(); updateWeatherRow();
+    if (typeof updateBackupRow === 'function') updateBackupRow();
+  });
+  await A('update-check-logic', async () => {
+    if (typeof _cmpVersions !== 'function') throw new Error('missing compare');
+    if (_cmpVersions('4.7.5', '4.7.5') !== 0) throw new Error('equal');
+    if (!(_cmpVersions('4.8.0', '4.7.9') > 0)) throw new Error('greater');
+    if (!(_cmpVersions('4.7.4', '4.7.5') < 0)) throw new Error('lesser');
+  });
+  await A('stock-notify-guard', async () => {
+    await checkStockNotify();
+  });
   await A('stocktake-submit-dry', async () => { showView('stocktake'); });
   await A('pay-submit', async () => {
     showView('pay');

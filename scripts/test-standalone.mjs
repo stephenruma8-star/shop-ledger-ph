@@ -348,5 +348,38 @@ await throws(400, () => A('POST', '/api/suppliers/' + sup.id, {}, 'DELETE'), 'de
 await throws(400, () => A('POST', '/api/sales', { items: [{ description: 'X', qty: 0, unitCost: 5 }] }), 'zero qty rejected');
 await throws(400, () => A('POST', '/api/sales', { items: [{ description: 'X', qty: -2, unitCost: 5 }] }), 'negative qty rejected');
 
+// parallel sales must mint distinct invoice numbers (mutex check)
+{
+  const before = (await A('GET', '/api/transactions?limit=500')).length;
+  const results = await Promise.all([1, 2, 3, 4, 5].map(() =>
+    A('POST', '/api/sales', { items: [{ description: 'Oil', qty: 1, unitCost: 30, invId: it2.id }], paymentMethod: 'Cash' })
+  ));
+  const nos = results.map(r => r.invoiceNo);
+  ok(new Set(nos).size === 5 && nos.every(n => /^INV-\d{5}$/.test(n)), 'parallel sales get unique invoice numbers');
+  ok((await A('GET', '/api/transactions?limit=500')).length === before + 5, 'all parallel sales persisted');
+}
+
+// hostile names must not break lists or detail renders
+const evil = await A('POST', '/api/clients', { name: '"><img src=x onerror=alert(1)>', phone: '1' });
+{
+  const all = await A('GET', '/api/clients');
+  ok(all.some(c => c.id === evil.id), 'hostile name stored');
+  const h = await A('GET', '/api/clients/' + evil.id + '/history');
+  ok(h.client.name.includes('<img'), 'name round-trips raw in API (views escape it)');
+}
+const evilItem = await A('POST', '/api/inventory', { name: "O'Brien \"Special\" <b>", sellPrice: 9, stock: 5 });
+ok((await A('GET', '/api/inventory')).some(i => i.id === evilItem.id), 'quoted name stored');
+
+// full return twice: second must refuse, not corrupt
+const frSale = await A('POST', '/api/sales', { items: [{ description: 'Oil', qty: 1, unitCost: 30, invId: it2.id }], paymentMethod: 'Cash' });
+const fr1 = await A('POST', '/api/returns', { invoiceNo: frSale.invoiceNo });
+ok(fr1.success, 'full return succeeds');
+await throws(400, () => A('POST', '/api/returns', { invoiceNo: frSale.invoiceNo }), 'second full return refused');
+
+// oversell is allowed but tracked (matches desktop): stock may go negative
+const osItem = await A('POST', '/api/inventory', { name: 'Oversell Item', sellPrice: 5, stock: 1 });
+await A('POST', '/api/sales', { items: [{ description: 'Oversell Item', qty: 3, unitCost: 5, invId: osItem.id }], paymentMethod: 'Cash' });
+ok((await A('GET', '/api/inventory')).find(i => i.id === osItem.id).stock === -2, 'oversell tracked as negative stock');
+
 console.log(`\nSTANDALONE STORE: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

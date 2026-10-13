@@ -28,7 +28,7 @@ async function seedDemoShop() {
     clientId: c1.id,
     items: [
       { description: 'Rice 1kg', qty: 2, unitCost: 52, invId: ids['Rice 1kg'] },
-      { description: 'Coffee Sachet', qty: 5, unitCost: 12, invId: ids['Coffee Sachet'] }
+      { description: 'Coffee Sachet', qty: 5, unitCost: 12, intRate: 10, invId: ids['Coffee Sachet'] }
     ],
     paymentMethod: 'GCash', discount: 0
   });
