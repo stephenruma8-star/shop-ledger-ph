@@ -56,7 +56,7 @@ async function sendSmsReminders() {  if (!takeSubmitLock('sms')) return;
         </a>`).join('');
       document.getElementById('modal-root').innerHTML = `
         <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
-          <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:92dvh;overflow-y:auto" onclick="event.stopPropagation()">
+          <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:92vh;max-height:92dvh;overflow-y:auto" onclick="event.stopPropagation()">
             <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
             <h3 class="font-bold text-gray-100 text-sm mb-1 flex items-center gap-2"><span class="icon-tile bg-orange-500/15 text-orange-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>Reminders (${r.texts.length})</h3>
             <p class="text-[11px] text-gray-500 mb-2">Tap Text to open each message ready to send.</p>

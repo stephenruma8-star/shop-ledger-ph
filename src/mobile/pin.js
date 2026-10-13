@@ -76,6 +76,8 @@ function lockPhoneNow(msg) {
   renderPinLock(false, msg || '');
 }
 function renderPinLock(atBoot, notice) {
+  // A visible lock screen is a live app, not a failed boot.
+  try { if (typeof window !== 'undefined') window.__slpBootOk = true; } catch (e) {}
   try { const old = document.getElementById('pin-lock'); if (old) old.remove(); } catch (e) {}
   const ls = document.getElementById('loading-screen');
   if (ls) ls.classList.add('hidden');

@@ -68,6 +68,8 @@ function startApp() { return startStandalone(); }
 // ledger opens. There is no reset path (no server to revoke against) — the
 // screen says so, and backups are the way back.
 async function renderFirstRunPin() {
+  // A visible lock screen is a live app, not a failed boot.
+  try { if (typeof window !== 'undefined') window.__slpBootOk = true; } catch (e) {}
   try { const ls = document.getElementById('loading-screen'); if (ls) ls.classList.add('hidden'); } catch (e) {}
   document.body.insertAdjacentHTML('beforeend', `
     <div id="pin-lock" class="fixed inset-0 z-[60] flex items-center justify-center" style="background:linear-gradient(135deg,#0f172a,#1e3a5f 55%,#1d4ed8);padding:1rem">
