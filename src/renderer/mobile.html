@@ -198,7 +198,10 @@ body.big-text .btn-sm{font-size:.85rem}
 <script>
 /*SLP-WATCHDOG: survives even if the main bundle fails to parse. If no view
 renders within 10s, replace the screen with the captured error so a dead
-app always explains itself (screenshot it and send it to support).*/
+app always explains itself (screenshot it and send it to support). Skipped
+entirely outside browsers (test harnesses).*/
+try {
+if (typeof window === 'undefined' || typeof document === 'undefined') throw new Error('no-dom');
 window.__slpBootOk = false;
 window.__slpBootErrors = [];
 try {
@@ -223,6 +226,7 @@ setTimeout(function () {
     document.body.appendChild(box);
   } catch (_) {}
 }, 10000);
+} catch (_) {}
 </script>
 <script>
 
