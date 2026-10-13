@@ -45,6 +45,13 @@ async function seedDemoShop() {
 }
 (async () => {
   try { localStorage.clear(); } catch (e) {}
+  if (/[?&]noanim=1/.test(window.location.search)) {
+    try {
+      const st = document.createElement('style');
+      st.textContent = '*,*::before,*::after{animation:none!important;transition:none!important}';
+      document.head.appendChild(st);
+    } catch (e) {}
+  }
   applyDisplayPrefs();
   applyStaticLang();
   setupPullRefresh();
@@ -68,4 +75,24 @@ async function seedDemoShop() {
   const m = (window.location.hash || '').match(/^#\/([a-z-]+)/);
   showView((m && m[1]) || 'home');
   document.title = 'preview:' + ((m && m[1]) || 'home');
+  // Dev-only deep link for screenshots: #/call/fnName/arg
+  const mc = (window.location.hash || '').match(/^#\/call\/([A-Za-z_$][\w$]*)(?:\/(.*))?$/);
+  if (mc && typeof window[mc[1]] === 'function') {
+    try {
+      const r = window[mc[1]](mc[2] === undefined ? undefined : decodeURIComponent(mc[2]));
+      if (r && typeof r.then === 'function') await r.catch(() => {});
+      if (/[?&]dbgmodal=1/.test(window.location.search)) {
+        const has = (document.getElementById('modal-root') || {}).childElementCount;
+        document.title += ' callok=' + mc[1] + ' kids=' + has;
+      }
+    } catch (e) {
+      if (/[?&]dbgmodal=1/.test(window.location.search)) document.title += ' callerr=' + String((e && e.message) || e).slice(0, 120);
+    }
+  }
+  if (/[?&]dbgmodal=1/.test(window.location.search)) {
+    const m = document.querySelector('#modal-root > div');
+    const r = m ? m.getBoundingClientRect().toJSON() : null;
+    const cs = m ? getComputedStyle(m) : null;
+    document.title += ' modal=' + JSON.stringify(r) + ' display=' + (cs && cs.display);
+  }
 })();
