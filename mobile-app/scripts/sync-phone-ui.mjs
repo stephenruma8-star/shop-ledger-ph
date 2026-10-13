@@ -28,6 +28,14 @@ const rootMirrors = [
   ['src/renderer/assets/pwa-512.png', 'assets/pwa-512.png'],
 ];
 const version = { desktopVersion: pkg.version, syncedAt: new Date().toISOString() };
+// Shared web assets the standalone bundle (www/app, owned by
+// scripts/build-standalone.mjs) references relatively. Kept fresh here so
+// the APK never ships stale CSS/icons.
+const standaloneDir = (...p) => resolve(root, 'mobile-app', 'www', 'app', ...p);
+const standaloneMirrors = [
+  ['src/renderer/assets/tailwind.css', 'assets/tailwind.css'],
+  ['src/renderer/assets/icon.png', 'assets/icon.png'],
+];
 
 let stale = false;
 mkdirSync(app('assets'), { recursive: true });
@@ -42,6 +50,8 @@ function syncFile(from, dest) {
 }
 for (const [from, to] of files) syncFile(from, app(to));
 for (const [from, to] of rootMirrors) syncFile(from, www(to));
+mkdirSync(standaloneDir('assets'), { recursive: true });
+for (const [from, to] of standaloneMirrors) syncFile(from, standaloneDir(to));
 const versionPath = app('version.json');
 const versionJson = JSON.stringify(version, null, 2) + '\n';
 // syncedAt moves every run by design — staleness is about the desktop
