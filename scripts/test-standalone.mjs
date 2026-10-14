@@ -363,7 +363,6 @@ await throws(400, () => A('POST', '/api/sales', { items: [{ description: 'X', qt
 }
 
 // parallel sales must mint distinct invoice numbers (mutex check)
-{
   const before = (await A('GET', '/api/transactions?limit=500')).length;
   const results = await Promise.all([1, 2, 3, 4, 5].map(() =>
     A('POST', '/api/sales', { items: [{ description: 'Oil', qty: 1, unitCost: 30, invId: it2.id }], paymentMethod: 'Cash' })
@@ -371,7 +370,6 @@ await throws(400, () => A('POST', '/api/sales', { items: [{ description: 'X', qt
   const nos = results.map(r => r.invoiceNo);
   ok(new Set(nos).size === 5 && nos.every(n => /^INV-\d{5}$/.test(n)), 'parallel sales get unique invoice numbers');
   ok((await A('GET', '/api/transactions?limit=500')).length === before + 5, 'all parallel sales persisted');
-}
 
 // hostile names must not break lists or detail renders
 const evil = await A('POST', '/api/clients', { name: '"><img src=x onerror=alert(1)>', phone: '1' });
@@ -394,6 +392,20 @@ await throws(400, () => A('POST', '/api/returns', { invoiceNo: frSale.invoiceNo 
 const osItem = await A('POST', '/api/inventory', { name: 'Oversell Item', sellPrice: 5, stock: 1 });
 await A('POST', '/api/sales', { items: [{ description: 'Oversell Item', qty: 3, unitCost: 5, invId: osItem.id }], paymentMethod: 'Cash' });
 ok((await A('GET', '/api/inventory')).find(i => i.id === osItem.id).stock === -2, 'oversell tracked as negative stock');
+
+// per-line rates + variant lines
+const vrSale = await A('POST', '/api/sales', { items: [
+  { description: 'Rice', qty: 1, unitCost: 50, intRate: 0, invId: it1.id },
+  { description: 'Rice', qty: 1, unitCost: 50, intRate: 20, invId: it1.id, variantName: '1kg' }
+], paymentMethod: 'Cash' });
+const vrDet = await A('GET', '/api/transactions/' + vrSale.invoiceNo);
+ok(vrDet.subtotal === 100 && vrDet.totalInterest === 10 && vrDet.grandTotal === 110, 'per-line interest totals');
+ok(vrDet.items[1].variantName === '1kg', 'variant name stored on line');
+const vItem = await A('POST', '/api/inventory', { name: 'Var Item', sellPrice: 10, stock: 0, variants: [{ name: 'S', stock: 7 }, { name: 'L', stock: 5 }] });
+await A('POST', '/api/sales', { items: [{ description: 'Var Item', qty: 2, unitCost: 10, invId: vItem.id, variantName: 'S' }], paymentMethod: 'Cash' });
+const vAfter = await A('GET', '/api/inventory');
+const vRow = vAfter.find(i => i.id === vItem.id);
+ok(vRow && vRow.variants.find(v => v.name === 'S').stock === 5, 'variant stock decremented on sale');
 
 console.log(`\nSTANDALONE STORE: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
