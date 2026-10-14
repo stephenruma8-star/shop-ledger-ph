@@ -3,7 +3,7 @@
 // names and response shapes as the LAN client, so every shared view works
 // unchanged. No imports/exports: concatenated. Requires store.js first.
 const IS_STANDALONE = true;
-const STANDALONE_VERSION = '4.7.8';
+const STANDALONE_VERSION = '4.7.9';
 function isNativeApp() {
   try { return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); } catch (e) { return false; }
 }
@@ -404,7 +404,10 @@ async function checkStandaloneUpdate(manual) {
     const r = await (await fetch('https://api.github.com/repos/stephenruma8-star/shop-ledger-ph/releases?per_page=20', { headers: { Accept: 'application/vnd.github+json' } })).json();
     const mobile = (Array.isArray(r) ? r : [])
       .filter(x => x && /^mobile-v\d+\.\d+\.\d+$/.test(x.tag_name || ''))
-      .map(x => ({ tag: x.tag_name.slice('mobile-v'.length), url: (x.assets || []).map(a => a.browser_download_url).find(u => /standalone\.apk$/i.test(u || '')) || x.html_url, name: x.name || x.tag_name }));
+      .map(x => {
+        const url = (x.assets || []).map(a => a.browser_download_url).find(u => /standalone\.apk$/i.test(u || '')) || x.html_url;
+        return { tag: x.tag_name.slice('mobile-v'.length), url, file: String(url || '').split('/').pop() || 'Shop-Ledger-Mobile-update.apk', name: x.name || x.tag_name };
+      });
     mobile.sort((x, y) => _cmpVersions(y.tag, x.tag));
     const best = mobile[0];
     try { localStorage.setItem('slpUpdCheck', new Date().toISOString()); } catch (e) {}
@@ -415,7 +418,7 @@ async function checkStandaloneUpdate(manual) {
     }
     say(`<div class="rounded-xl p-3 mb-2" style="background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.35)">
       <p class="text-xs font-bold text-blue-300 mb-1">New version ${esc(best.tag)} available</p>
-      <button onclick="openStandaloneUpdate(${JSON.stringify(best.url)})" class="w-full py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold">Download ${esc(best.tag)}</button>
+      <button onclick="openStandaloneUpdate(${JSON.stringify(best.url)}, ${JSON.stringify(best.file)})" class="w-full py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold">Download ${esc(best.tag)}</button>
     </div>`);
     if (!manual) toast('App update available: v' + best.tag, 'info');
     return true;
@@ -424,12 +427,35 @@ async function checkStandaloneUpdate(manual) {
     return false;
   }
 }
-function openStandaloneUpdate(url) {
+function openStandaloneUpdate(url, fileName) {
+  // Primary path: system downloader + installer prompt. Fallbacks below
+  // exist for browsers; every failure now says so instead of going silent
+  // (the old Browser.open().catch(()=>{}) swallowed real failures).
+  try {
+    const U = nativePlugin('ShopUpdater');
+    if (U && typeof U.fetchAndInstall === 'function') {
+      U.fetchAndInstall({ url, fileName: fileName || 'Shop-Ledger-Mobile-update.apk' })
+        .then(() => toast('Downloading update — check notifications', 'ok'))
+        .catch((e) => {
+          const msg = String((e && e.message) || '');
+          if (msg.indexOf('ENABLE_INSTALL') === 0) toast('Allow installs for this app in Settings, then tap Download again', 'info');
+          else openStandaloneUpdateFallback(url);
+        });
+      return;
+    }
+  } catch (e) {}
+  openStandaloneUpdateFallback(url);
+}
+function openStandaloneUpdateFallback(url) {
   try {
     const B = nativePlugin('Browser');
-    if (B && typeof B.open === 'function') { B.open({ url }).catch(() => {}); return; }
+    if (B && typeof B.open === 'function') {
+      B.open({ url }).then(() => {}).catch(() => toast('Browser could not open the download', 'err'));
+      return;
+    }
   } catch (e) {}
-  try { window.open(url, '_blank'); } catch (e) {}
+  try { window.open(url, '_blank'); toast('Opening download…', 'info'); }
+  catch (e) { toast('Could not open download', 'err'); }
 }
 async function maybeAutoUpdateCheck() {
   try {

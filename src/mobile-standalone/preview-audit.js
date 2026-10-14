@@ -112,6 +112,8 @@ async function runStandaloneAudit() {
     if (_cmpVersions('4.7.5', '4.7.5') !== 0) throw new Error('equal');
     if (!(_cmpVersions('4.8.0', '4.7.9') > 0)) throw new Error('greater');
     if (!(_cmpVersions('4.7.4', '4.7.5') < 0)) throw new Error('lesser');
+    await openStandaloneUpdate('https://example.com/x.apk', 'x.apk');
+    openStandaloneUpdateFallback('https://example.com/x.apk');
   });
   await A('stock-notify-guard', async () => {
     await checkStockNotify();
