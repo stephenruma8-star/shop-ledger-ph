@@ -3245,7 +3245,8 @@ function saleRateAll() {
     l.intRate = v;
     const box = document.getElementById('sale-rate-' + idx);
     if (box) {
-      let opt = [...box.options].find(o => parseFloat(o.value) === v);
+      const opts = (box.options && typeof box.options.length === 'number') ? [...box.options] : [];
+      let opt = opts.find(o => parseFloat(o.value) === v);
       if (!opt && v > 0) {
         opt = document.createElement('option');
         opt.value = String(v);
@@ -3271,7 +3272,8 @@ function applyClientRate() {
     const rate = (c && parseFloat(c.lastRate)) || 0;
     const box = document.getElementById('sale-interest');
     if (!box) return;
-    let opt = [...box.options].find(o => parseFloat(o.value) === rate);
+    const opts = (box.options && typeof box.options.length === 'number') ? [...box.options] : [];
+    let opt = opts.find(o => parseFloat(o.value) === rate);
     if (!opt && rate > 0) {
       opt = document.createElement('option');
       opt.value = String(rate);
