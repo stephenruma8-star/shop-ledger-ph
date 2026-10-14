@@ -195,12 +195,13 @@ function renderClientForm(id) {
               <span class="text-sm text-gray-300">PWD</span>
             </label>
           </div>
-          <button onclick="submitClientForm(${id ? JSON.stringify(id) : 'null'})" class="btn btn-primary btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('cli.save')}</button>
+          <button onclick="submitClientForm(${id ? JSON.stringify(id) : 'null'})" class="btn ${id ? 'btn-primary btn-lg' : 'btn-primary'}"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('cli.save')}</button>
+          ${id ? '' : `<button onclick="submitClientForm(null, true)" class="btn btn-lg" style="background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.5);color:#4ade80"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>${T('cli.save_new_sale')}</button>`}
         </div>
       </div>
     </div>`;
 }
-async function submitClientForm(id) {
+async function submitClientForm(id, andSale) {
   const name = ((document.getElementById('cf-name') || {}).value || '').trim();
   if (!name) { toast(T('cli.need_name'), 'err'); return; }
   if (!takeSubmitLock('client')) return;
@@ -214,13 +215,15 @@ async function submitClientForm(id) {
   const pwdEl = document.getElementById('cf-pwd');
   body.isSC = !!(scEl && scEl.checked);
   body.isPWD = !!(pwdEl && pwdEl.checked);
+  let newId = null;
   try {
     if (id) await apiPost('/api/clients/' + encodeURIComponent(id), body, 'PUT');
-    else await apiPost('/api/clients', body);
+    else { const r = await apiPost('/api/clients', body); newId = r && r.id; }
     closeQuick();
     toast(id ? T('cli.updated') : T('cli.added'), 'ok');
     await refreshAll();
     if (id) openClientDetail(id);
+    else if (andSale && newId != null) { showView('sale', newId); return; }
   } catch (e) { toast(T('cli.failed', { msg: e.message }), 'err'); }
   finally { releaseSubmitLock('client'); }
 }

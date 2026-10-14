@@ -80,6 +80,17 @@ async function runStandaloneAudit() {
     if (!sel || String(sel.value) !== '1') throw new Error('client not preselected, got ' + (sel && sel.value));
     showView('home');
   });
+  await A('save-and-new-sale', async () => {
+    renderClientForm(null);
+    if (!document.getElementById('modal-root').innerHTML.includes('submitClientForm(null, true)')) throw new Error('no save-and-new-sale button');
+    document.getElementById('cf-name').value = 'Audit Buyer';
+    await submitClientForm(null, true);
+    const me = (data.clients || []).find(c => c.name === 'Audit Buyer');
+    if (!me) throw new Error('client not created');
+    const sel = document.getElementById('sale-client');
+    if (!sel || String(sel.value) !== String(me.id)) throw new Error('sale not preset, got ' + (sel && sel.value));
+    showView('home');
+  });
   await A('presets-roundtrip', async () => {
     const before = (await apiGet('/api/quick-items')).length;
     await apiPost('/api/quick-items', { name: 'Audit Preset', price: 7 });
