@@ -91,6 +91,7 @@ function renderPinLock(atBoot, notice) {
       <input id="pin-unlock" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="••••" class="w-40 mx-auto text-center text-2xl font-mono font-bold tracking-[0.3em] px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-100 outline-none focus:border-blue-500 mb-2" />
       <p id="pin-unlock-error" class="hidden text-xs text-red-400 mb-2"></p>
       <button onclick="unlockPhone(${atBoot ? 'true' : 'false'})" class="w-full py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-500">${T('lock.unlock')}</button>
+      ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button onclick="renderPinRecovery(${atBoot ? 'true' : 'false'})" class="w-full mt-2 py-2 text-xs text-gray-400 hover:text-gray-200">Forgot PIN? Restore from backup</button>` : ''}
       <div id="bio-unlock-slot"></div>
     </div>`;
   document.body.appendChild(ov);
@@ -153,8 +154,54 @@ async function unlockPhone(atBoot) {
     finishPhoneUnlock(atBoot);
   } else if (err) { err.textContent = T('lock.wrong'); err.classList.remove('hidden'); }
 }
-function pinMsg(t, isErr) {
-  const el = document.getElementById('pin-msg');
+// Forgot-PIN recovery (standalone only): prove ownership with a backup file
+// (+ its password), then the ledger is restored and the old PIN is cleared.
+// No backup + no password = no way back, by design (a thief has neither).
+function renderPinRecovery(atBoot) {
+  const ov = document.getElementById('pin-lock');
+  if (!ov) return;
+  ov.innerHTML = `
+    <div class="glass-card rounded-2xl p-6 w-full max-w-xs text-center fade-in">
+      <div class="text-lg font-bold text-gray-100 mb-1">Forgot PIN?</div>
+      <p class="text-xs text-gray-400 mb-3">Pick a backup file and enter its password. Everything on this phone will be replaced by the backup, and the old PIN cleared.</p>
+      <input id="pin-rec-file" type="file" accept=".json,application/json" class="text-[11px] text-gray-400 mb-2 w-full" />
+      <input id="pin-rec-pass" type="password" inputmode="numeric" autocomplete="off" maxlength="32" placeholder="Backup password (if set)" class="w-full text-center px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-100 outline-none focus:border-blue-500 mb-2" />
+      <p id="pin-rec-error" class="hidden text-xs text-red-400 mb-2"></p>
+      <button onclick="recoverFromBackup(${atBoot ? 'true' : 'false'})" class="w-full py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-500">Restore + clear PIN</button>
+      <button onclick="renderPinLock(${atBoot ? 'true' : 'false'})" class="w-full mt-2 py-2 text-xs text-gray-400 hover:text-gray-200">← Back to PIN</button>
+    </div>`;
+}
+async function recoverFromBackup(atBoot) {
+  const errEl = document.getElementById('pin-rec-error');
+  const fail = (msg) => { if (errEl) { errEl.textContent = msg; errEl.classList.remove('hidden'); } feelErr(); };
+  const inp = document.getElementById('pin-rec-file');
+  const file = inp && inp.files && inp.files[0];
+  if (!file) { fail('Pick a backup file first'); return; }
+  if (!takeSubmitLock('pinrec')) return;
+  try {
+    const text = await file.text();
+    let obj;
+    try { obj = JSON.parse(text); } catch (e) { throw new Error('Not a backup file'); }
+    let inner;
+    if (obj && obj.enc === 'none' && obj.data) inner = obj.data;
+    else {
+      const pw = ((document.getElementById('pin-rec-pass') || {}).value || '');
+      inner = JSON.parse(await backupDecrypt(obj, pw));
+    }
+    const r = await apiPost('/api/backup/import', { backup: inner });
+    if (!r || !r.success) throw new Error('Restore rejected the file');
+    try { localStorage.removeItem('slpPinHash'); } catch (e) {}
+    pinSessionSet(true);
+    try { const ov = document.getElementById('pin-lock'); if (ov) ov.remove(); } catch (e) {}
+    feelOk();
+    toast('Recovered — set a new PIN in Settings', 'ok');
+    watchPinActivity(); armAutoLock();
+    if (atBoot) startApp();
+    else if (typeof showView === 'function') showView('home');
+  } catch (e) { fail(e.message === 'Wrong backup password' ? e.message : 'Restore failed: ' + e.message); }
+  finally { releaseSubmitLock('pinrec'); }
+}
+function pinMsg(t, isErr) {  const el = document.getElementById('pin-msg');
   if (el) {
     el.textContent = t;
     el.classList.remove('hidden');

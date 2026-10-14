@@ -733,6 +733,7 @@ function renderPinLock(atBoot, notice) {
       <input id="pin-unlock" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="••••" class="w-40 mx-auto text-center text-2xl font-mono font-bold tracking-[0.3em] px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-100 outline-none focus:border-blue-500 mb-2" />
       <p id="pin-unlock-error" class="hidden text-xs text-red-400 mb-2"></p>
       <button onclick="unlockPhone(${atBoot ? 'true' : 'false'})" class="w-full py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-500">${T('lock.unlock')}</button>
+      ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button onclick="renderPinRecovery(${atBoot ? 'true' : 'false'})" class="w-full mt-2 py-2 text-xs text-gray-400 hover:text-gray-200">Forgot PIN? Restore from backup</button>` : ''}
       <div id="bio-unlock-slot"></div>
     </div>`;
   document.body.appendChild(ov);
@@ -795,8 +796,54 @@ async function unlockPhone(atBoot) {
     finishPhoneUnlock(atBoot);
   } else if (err) { err.textContent = T('lock.wrong'); err.classList.remove('hidden'); }
 }
-function pinMsg(t, isErr) {
-  const el = document.getElementById('pin-msg');
+// Forgot-PIN recovery (standalone only): prove ownership with a backup file
+// (+ its password), then the ledger is restored and the old PIN is cleared.
+// No backup + no password = no way back, by design (a thief has neither).
+function renderPinRecovery(atBoot) {
+  const ov = document.getElementById('pin-lock');
+  if (!ov) return;
+  ov.innerHTML = `
+    <div class="glass-card rounded-2xl p-6 w-full max-w-xs text-center fade-in">
+      <div class="text-lg font-bold text-gray-100 mb-1">Forgot PIN?</div>
+      <p class="text-xs text-gray-400 mb-3">Pick a backup file and enter its password. Everything on this phone will be replaced by the backup, and the old PIN cleared.</p>
+      <input id="pin-rec-file" type="file" accept=".json,application/json" class="text-[11px] text-gray-400 mb-2 w-full" />
+      <input id="pin-rec-pass" type="password" inputmode="numeric" autocomplete="off" maxlength="32" placeholder="Backup password (if set)" class="w-full text-center px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-100 outline-none focus:border-blue-500 mb-2" />
+      <p id="pin-rec-error" class="hidden text-xs text-red-400 mb-2"></p>
+      <button onclick="recoverFromBackup(${atBoot ? 'true' : 'false'})" class="w-full py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-500">Restore + clear PIN</button>
+      <button onclick="renderPinLock(${atBoot ? 'true' : 'false'})" class="w-full mt-2 py-2 text-xs text-gray-400 hover:text-gray-200">← Back to PIN</button>
+    </div>`;
+}
+async function recoverFromBackup(atBoot) {
+  const errEl = document.getElementById('pin-rec-error');
+  const fail = (msg) => { if (errEl) { errEl.textContent = msg; errEl.classList.remove('hidden'); } feelErr(); };
+  const inp = document.getElementById('pin-rec-file');
+  const file = inp && inp.files && inp.files[0];
+  if (!file) { fail('Pick a backup file first'); return; }
+  if (!takeSubmitLock('pinrec')) return;
+  try {
+    const text = await file.text();
+    let obj;
+    try { obj = JSON.parse(text); } catch (e) { throw new Error('Not a backup file'); }
+    let inner;
+    if (obj && obj.enc === 'none' && obj.data) inner = obj.data;
+    else {
+      const pw = ((document.getElementById('pin-rec-pass') || {}).value || '');
+      inner = JSON.parse(await backupDecrypt(obj, pw));
+    }
+    const r = await apiPost('/api/backup/import', { backup: inner });
+    if (!r || !r.success) throw new Error('Restore rejected the file');
+    try { localStorage.removeItem('slpPinHash'); } catch (e) {}
+    pinSessionSet(true);
+    try { const ov = document.getElementById('pin-lock'); if (ov) ov.remove(); } catch (e) {}
+    feelOk();
+    toast('Recovered — set a new PIN in Settings', 'ok');
+    watchPinActivity(); armAutoLock();
+    if (atBoot) startApp();
+    else if (typeof showView === 'function') showView('home');
+  } catch (e) { fail(e.message === 'Wrong backup password' ? e.message : 'Restore failed: ' + e.message); }
+  finally { releaseSubmitLock('pinrec'); }
+}
+function pinMsg(t, isErr) {  const el = document.getElementById('pin-msg');
   if (el) {
     el.textContent = t;
     el.classList.remove('hidden');
@@ -1341,7 +1388,7 @@ const LANG_STRINGS = {
     'lock.setup_title': 'Protect this shop',
     'lock.setup_sub': 'Set a 4–8 digit PIN. The app asks for it on every fresh start.',
     'lock.setup_btn': 'Set PIN and open shop',
-    'lock.setup_noreset': 'Write it down — a forgotten PIN cannot be reset. Backups are the way back.',
+    'lock.setup_noreset': 'Write it down. Forgot it? Tap Forgot PIN on the lock screen and restore a backup (you need the backup password).',
     'lock.wrong': 'Wrong PIN',
     'lock.unlocked': 'Unlocked',
     'sale.scan': 'Scan', 'sale.add_items': 'Add Items',
@@ -1382,7 +1429,7 @@ const LANG_STRINGS = {
     'set.install_btn': 'Install Shop Ledger',
     'set.install_prompt': 'Installs Shop Ledger as a fullscreen app on this phone.',
     'set.pin_title': 'Phone lock',
-    'set.pin_desc': 'Locks this phone behind a short PIN. A forgotten PIN cannot be reset — reinstalling wipes the ledger, so keep a backup from Settings → Backup.',
+    'set.pin_desc': 'Locks this phone behind a short PIN. Forgot it? Use Forgot PIN on the lock screen with a backup (needs the backup password).',
     'set.pin_new_ph': 'New PIN (4-8 digits)', 'set.pin_confirm_ph': 'Repeat PIN',
     'set.pin_set': 'Set PIN', 'set.pin_current_ph': 'Current PIN',
     'set.pin_remove': 'Remove PIN', 'set.pin_locknow': 'Lock now',
@@ -1646,7 +1693,7 @@ const LANG_STRINGS = {
     'help.s4t': 'Backing up your ledger',
     'help.s4b': 'This phone holds the only copy of your data. Open <b>Settings → Backup</b> and <b>export regularly</b> — keep a copy in Drive. A password is safer. To restore, pick the file on the same screen; it replaces everything, so export first if unsure.',
     'help.s5t': 'Locking this phone',
-    'help.s5b': 'You set a PIN on first launch. It auto-locks after 5 idle minutes, and fingerprint unlock is optional in Settings. <b>A forgotten PIN cannot be reset</b> — reinstalling wipes the ledger, and only a backup brings it back.',
+    'help.s5b': 'You set a PIN on first launch. It auto-locks after 5 idle minutes, and fingerprint unlock is optional in Settings. <b>Forgot it?</b> Tap Forgot PIN on the lock screen and restore a backup (needs the backup password).',
     'help.s6t': 'Troubleshooting',
     'help.s6b': '<b>Print failed</b> — set the thermal printer IP in Settings (shop edit); the phone must be on the same Wi-Fi as the printer. <b>Something looks stale</b> — pull down from the top to refresh. <b>Wrong figures</b> — void or return the sale from its receipt; history is never deleted silently.',
     'pin.need4': 'PIN needs at least 4 digits',
@@ -1699,7 +1746,7 @@ const LANG_STRINGS = {
     'lock.setup_title': 'Protektahan ang tindahan',
     'lock.setup_sub': 'Magtakda ng 4–8 digit na PIN. Hihingin ito sa bawat bagong bukas.',
     'lock.setup_btn': 'Itakda ang PIN at buksan',
-    'lock.setup_noreset': 'Isulat ito — ang nakalimutang PIN ay hindi na maibabalik. Backup ang sagot.',
+    'lock.setup_noreset': 'Isulat ito. Nakalimutan? Pindutin ang Forgot PIN sa lock screen at mag-restore ng backup (kailangan ang backup password).',
     'lock.wrong': 'Maling PIN',
     'lock.unlocked': 'Na-unlock',
     'sale.scan': 'I-scan', 'sale.add_items': 'Magdagdag',
@@ -1741,7 +1788,7 @@ const LANG_STRINGS = {
     'set.install_btn': 'I-install ang Shop Ledger',
     'set.install_prompt': 'Ini-install ang Shop Ledger bilang fullscreen app sa phone na ito.',
     'set.pin_title': 'Lock ng Phone',
-    'set.pin_desc': 'Ila-lock ang phone gamit ang PIN. Ang nakalimutang PIN ay hindi na maibabalik — buburahin ng reinstall ang ledger, kaya mag-backup mula sa Settings → Backup.',
+    'set.pin_desc': 'Ila-lock ang phone gamit ang PIN. Nakalimutan? Gamitin ang Forgot PIN sa lock screen kasama ng backup (kailangan ang backup password).',
     'set.pin_new_ph': 'Bagong PIN (4-8 digits)', 'set.pin_confirm_ph': 'Ulitin ang PIN',
     'set.pin_set': 'Mag-set ng PIN', 'set.pin_current_ph': 'Kasalukuyang PIN',
     'set.pin_remove': 'Tanggalin ang PIN', 'set.pin_locknow': 'I-lock ngayon',
@@ -2005,7 +2052,7 @@ const LANG_STRINGS = {
     'help.s4t': 'Pag-backup ng ledger',
     'help.s4b': 'Ang phone na ito ang tanging kopya ng data mo. Buksan ang <b>Settings → Backup</b> at <b>mag-export nang regular</b> — magtago ng kopya sa Drive. Mas ligtas kung may password. Sa pag-restore, piliin ang file sa parehong screen; pinapalitan nito ang lahat, kaya mag-export muna kung hindi sigurado.',
     'help.s5t': 'Pag-lock ng phone na ito',
-    'help.s5b': 'Nag-set ka ng PIN sa unang bukas. Auto-lock ito pagkalipas ng 5 minutong idle, at opsyonal ang fingerprint sa Settings. <b>Ang nakalimutang PIN ay hindi na maibabalik</b> — buburahin ng reinstall ang ledger, at backup lang ang sagot.',
+    'help.s5b': 'Nag-set ka ng PIN sa unang bukas. Auto-lock ito pagkalipas ng 5 minutong idle, at opsyonal ang fingerprint sa Settings. <b>Nakalimutan?</b> Pindutin ang Forgot PIN sa lock screen at mag-restore ng backup (kailangan ang backup password).',
     'help.s6t': 'Troubleshooting',
     'help.s6b': '<b>Nabigo ang print</b> — itakda ang IP ng thermal printer sa Settings (shop edit); dapat nasa iisang Wi-Fi ang phone at printer. <b>Mukhang luma ang data</b> — hilahin pababa para mag-refresh. <b>Maling figures</b> — i-void o ibalik ang benta mula sa resibo nito; hindi kailanman tahimik na binubura ang history.',
     'pin.need4': 'Kailangan ng hindi bababa sa 4 digits ang PIN',

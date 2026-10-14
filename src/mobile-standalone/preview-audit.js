@@ -198,8 +198,7 @@ async function runStandaloneAudit() {
     if (!pinHashGet()) throw new Error('PIN not saved');
     try { localStorage.removeItem('slpPinHash'); } catch (e) {}
   });
-  await A('pin-lock-unlock', async () => {
-    try { localStorage.setItem('slpPinHash', await sha256hex('slp-pin:9999')); } catch (e) {}
+  await A('pin-lock-unlock', async () => {    try { localStorage.setItem('slpPinHash', await sha256hex('slp-pin:9999')); } catch (e) {}
     pinSessionSet(false);
     renderPinLock(true);
     document.getElementById('pin-unlock').value = '9999';
@@ -209,6 +208,13 @@ async function runStandaloneAudit() {
     if (!pinSessionOk()) throw new Error('unlock failed');
     try { localStorage.removeItem('slpPinHash'); } catch (e) {}
     pinSessionSet(false);
+  });
+  await A('pin-recovery-screen', async () => {
+    renderPinLock(true);
+    renderPinRecovery(true);
+    const ov = document.getElementById('pin-lock');
+    if (!ov || !ov.innerHTML.includes('pin-rec-file')) throw new Error('recovery screen missing');
+    renderPinLock(true);
   });
   await A('interest-apply', async () => {
     const r = await apiPost('/api/interest/apply', {});
