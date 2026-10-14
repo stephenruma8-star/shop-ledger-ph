@@ -435,22 +435,41 @@ function openStandaloneUpdate(url, fileName, tag) {
   try {
     const U = nativePlugin('ShopUpdater');
     if (U && typeof U.fetchAndInstall === 'function') {
-      U.fetchAndInstall({ url, fileName: fileName || 'Shop-Ledger-Mobile-update.apk' })
-        .then((ret) => {
-          toast('Downloading update — watch it here', 'ok');
-          try { pollStandaloneDownload(U, ret && ret.downloadId, tag); } catch (e) {}
-        })
-        .catch((e) => {
-          const msg = String((e && e.message) || '');
-          if (msg.indexOf('ENABLE_INSTALL') === 0) toast('Allow installs for this app in Settings, then tap Download again', 'info');
-          else if (msg) { toast('System download failed: ' + msg.slice(0, 90), 'err'); openStandaloneUpdateFallback(url); }
-          else openStandaloneUpdateFallback(url);
-        });
+      toast('Saving safety backup…', 'info');
+      // A dated auto-backup lands in Documents BEFORE the APK touches the
+      // app: even in the worst case the ledger is restorable. Never blocks
+      // the download — failures here are silent by design.
+      autoPreUpdateBackup().catch(() => {}).then(() => {
+        U.fetchAndInstall({ url, fileName: fileName || 'Shop-Ledger-Mobile-update.apk' })
+          .then((ret) => {
+            toast('Downloading update — watch it here', 'ok');
+            try { pollStandaloneDownload(U, ret && ret.downloadId, tag); } catch (e) {}
+          })
+          .catch((e) => {
+            const msg = String((e && e.message) || '');
+            if (msg.indexOf('ENABLE_INSTALL') === 0) toast('Allow installs for this app in Settings, then tap Download again', 'info');
+            else if (msg) { toast('System download failed: ' + msg.slice(0, 90), 'err'); openStandaloneUpdateFallback(url); }
+            else openStandaloneUpdateFallback(url);
+          });
+      });
       return;
     }
     toast('System installer not available — opening browser', 'info');
   } catch (e) {}
   openStandaloneUpdateFallback(url);
+}
+// Silent safety net: unencrypted dated copy in Documents/ShopLedger/backups.
+// No share sheet, no password (unattended restore must just work).
+async function autoPreUpdateBackup() {
+  const r = await apiGet('/api/backup/export');
+  if (!r || !r.backup) throw new Error('empty backup');
+  const envelope = { app: 'shop-ledger-standalone-backup', v: 1, enc: 'none', auto: 'pre-update', data: r.backup };
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  const name = 'auto-pre-update-' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes()) + '.json';
+  const F = nativePlugin('Filesystem');
+  if (!F || typeof F.writeFile !== 'function') throw new Error('no fs');
+  await F.writeFile({ path: 'ShopLedger/backups/' + name, data: JSON.stringify(envelope), directory: 'DOCUMENTS', encoding: 'utf8', recursive: true });
 }
 let slpUpdTimer = null;
 function pollStandaloneDownload(U, downloadId, tag) {

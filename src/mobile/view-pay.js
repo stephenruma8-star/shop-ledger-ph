@@ -28,7 +28,9 @@ async function renderPay(preselectedId) {
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">Reference # (GCash/Maya/Bank, optional)</label>
           <input id="pay-ref" type="text" maxlength="40" placeholder="e.g. 1234 567 890" autocomplete="off" class="inp" />
         </div>
-        <button onclick="submitPay()" class="btn btn-success btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('pay.record')}</button>
+        <div id="pay-record-bar" style="position:sticky;bottom:0;padding:.6rem 0 .2rem;background:linear-gradient(transparent, rgba(15,23,42,.96) 35%)">
+          <button onclick="submitPay()" class="btn btn-success btn-lg w-full"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('pay.record')}</button>
+        </div>
       </div>
     </div>`;
 }

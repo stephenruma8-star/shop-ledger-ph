@@ -5,21 +5,23 @@ async function renderClients() {
   if (!data.clients.length) await loadClients();
   const total = data.clients.reduce((s, c) => s + (c.balance || 0), 0);
   v.innerHTML = `
-    <div class="flex items-center justify-between gap-2 mb-3 fade-in">
-      <div class="grid grid-cols-2 gap-2.5 flex-1">
-      <div class="stat-card rounded-2xl p-3.5 text-center">
+    <div class="mb-3 fade-in">
+      <button onclick="renderClientForm(null)" class="btn btn-primary w-full mb-2.5"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('cli.add')}</button>
+      <div class="grid grid-cols-2 gap-2.5 mb-2.5">
+      <div class="stat-card rounded-2xl p-3 text-center">
         <div class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-1">${T('cli.total_clients')}</div>
         <div class="text-xl font-bold text-blue-400 num">${data.clients.length}</div>
       </div>
-      <div class="stat-card rounded-2xl p-3.5 text-center">
+      <div class="stat-card rounded-2xl p-3 text-center">
         <div class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-1">${T('cli.total_debts')}</div>
         <div class="text-xl font-bold text-orange-400 num">${peso(total)}</div>
       </div>
       </div>
-      <button onclick="renderClientForm(null)" class="btn btn-primary btn-sm shrink-0 self-start"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('cli.add')}</button>
-      <button onclick="showView('debts')" class="btn btn-ghost btn-sm shrink-0 self-start"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>${T('view.debts.title')}</button>
-      ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button onclick="importClientsCsv()" class="btn btn-ghost btn-sm shrink-0 self-start"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Import</button>` : ''}
-      ${phoneRole() === 'cashier' ? '' : `<button onclick="exportClientsCsv()" class="btn btn-ghost btn-sm shrink-0 self-start">📥 CSV</button>`}
+      <div class="flex gap-1.5 flex-wrap">
+      <button onclick="showView('debts')" class="btn btn-ghost btn-sm flex-1"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>${T('view.debts.title')}</button>
+      ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button onclick="importClientsCsv()" class="btn btn-ghost btn-sm flex-1"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Import</button>` : ''}
+      ${phoneRole() === 'cashier' ? '' : `<button onclick="exportClientsCsv()" class="btn btn-ghost btn-sm flex-1">📥 CSV</button>`}
+      </div>
     </div>
     <div class="relative mb-3 fade-in">
       <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>

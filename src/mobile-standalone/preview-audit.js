@@ -119,6 +119,21 @@ async function runStandaloneAudit() {
     closeQuick();
     showView('home');
   });
+  await A('pay-record-visible', async () => {
+    showView('pay');
+    if (!document.getElementById('pay-record-bar')) throw new Error('record button has no sticky bar');
+    showView('home');
+  });
+  await A('clients-header-order', async () => {
+    showView('clients');
+    const h = (document.getElementById('sheet-body') || document.body).innerHTML;
+    const addAt = h.indexOf('renderClientForm(null)');
+    const debtsAt = h.indexOf('cli.total_debts');
+    if (addAt < 0 || debtsAt < 0) throw new Error('clients header parts missing');
+    if (!(addAt < debtsAt)) throw new Error('add-client must sit above total-debts');
+    if (typeof autoPreUpdateBackup !== 'function') throw new Error('no auto-backup fn');
+    showView('home');
+  });
   await A('presets-roundtrip', async () => {
     const before = (await apiGet('/api/quick-items')).length;
     await apiPost('/api/quick-items', { name: 'Audit Preset', price: 7 });
