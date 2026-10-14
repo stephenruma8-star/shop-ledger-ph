@@ -98,6 +98,8 @@ async function runStandaloneAudit() {
     if (!host) { host = document.createElement('div'); host.id = 'update-row'; document.body.appendChild(host); made = true; }
     updateUpdateRow();
     if (!host.innerHTML.includes('checkStandaloneUpdate(true)')) throw new Error('no check-for-updates button');
+    if (typeof pollStandaloneDownload !== 'function') throw new Error('no poll fn');
+    pollStandaloneDownload(null, null, 'x'); // no native in audit env: must no-op, not throw
     host.innerHTML = '';
     if (made) host.remove();
   });

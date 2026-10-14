@@ -119,9 +119,48 @@ public class ShopUpdater extends Plugin {
             }
             JSObject ret = new JSObject();
             ret.put("started", true);
+            ret.put("downloadId", downloadId);
             call.resolve(ret);
         } catch (Exception e) {
             call.reject(e.getMessage() != null ? e.getMessage() : "Download failed");
+        }
+    }
+
+    @PluginMethod
+    public void queryProgress(PluginCall call) {
+        long downloadId = -1;
+        try { downloadId = call.getData().optLong("downloadId", -1); } catch (Exception ignored) {}
+        if (downloadId < 0) {
+            call.reject("downloadId required");
+            return;
+        }
+        JSObject ret = new JSObject();
+        try {
+            DownloadManager dm = (DownloadManager) getContext().getSystemService(Context.DOWNLOAD_SERVICE);
+            if (dm == null) {
+                call.reject("no download service on this device");
+                return;
+            }
+            Cursor cur = dm.query(new DownloadManager.Query().setFilterById(downloadId));
+            boolean found = false;
+            if (cur != null) {
+                try {
+                    if (cur.moveToFirst()) {
+                        found = true;
+                        int st = cur.getInt(cur.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
+                        long dl = cur.getLong(cur.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
+                        long total = cur.getLong(cur.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
+                        ret.put("status", st == DownloadManager.STATUS_SUCCESSFUL ? "done"
+                                : st == DownloadManager.STATUS_FAILED ? "failed" : "active");
+                        ret.put("downloaded", dl);
+                        ret.put("total", total);
+                    }
+                } finally { try { cur.close(); } catch (Exception ignored) {} }
+            }
+            if (!found) ret.put("status", "unknown");
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject(e.getMessage() != null ? e.getMessage() : "query failed");
         }
     }
 }

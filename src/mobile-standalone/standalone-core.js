@@ -3,7 +3,7 @@
 // names and response shapes as the LAN client, so every shared view works
 // unchanged. No imports/exports: concatenated. Requires store.js first.
 const IS_STANDALONE = true;
-const STANDALONE_VERSION = '4.8.4';
+const STANDALONE_VERSION = '4.8.5';
 function isNativeApp() {
   try { return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); } catch (e) { return false; }
 }
@@ -418,7 +418,7 @@ async function checkStandaloneUpdate(manual) {
     }
     say(`<div class="rounded-xl p-3 mb-2" style="background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.35)">
       <p class="text-xs font-bold text-blue-300 mb-2">New version ${esc(best.tag)} available</p>
-      <button onclick="openStandaloneUpdate(${JSON.stringify(best.url)}, ${JSON.stringify(best.file)})" class="w-full py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold mb-1.5">Download & install ${esc(best.tag)}</button>
+      <button onclick="openStandaloneUpdate(${JSON.stringify(best.url)}, ${JSON.stringify(best.file)}, ${JSON.stringify(best.tag)})" class="w-full py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold mb-1.5">Download & install ${esc(best.tag)}</button>
       <button onclick="openStandaloneUpdateFallback(${JSON.stringify(best.url)})" class="w-full py-2 rounded-xl text-xs font-semibold btn-ghost">Open in browser instead</button>
     </div>`);
     if (!manual) toast('App update available: v' + best.tag, 'info');
@@ -428,14 +428,18 @@ async function checkStandaloneUpdate(manual) {
     return false;
   }
 }
-function openStandaloneUpdate(url, fileName) {
-  // Primary path: system downloader + installer prompt. Every outcome toasts —
-  // nothing in this chain is allowed to fail silently anymore.
+function openStandaloneUpdate(url, fileName, tag) {
+  // Primary path: system downloader + installer prompt, with a live in-app
+  // progress bar. Every outcome toasts — nothing in this chain is allowed
+  // to fail silently anymore.
   try {
     const U = nativePlugin('ShopUpdater');
     if (U && typeof U.fetchAndInstall === 'function') {
       U.fetchAndInstall({ url, fileName: fileName || 'Shop-Ledger-Mobile-update.apk' })
-        .then(() => toast('Downloading update — check notifications', 'ok'))
+        .then((ret) => {
+          toast('Downloading update — watch it here', 'ok');
+          try { pollStandaloneDownload(U, ret && ret.downloadId, tag); } catch (e) {}
+        })
         .catch((e) => {
           const msg = String((e && e.message) || '');
           if (msg.indexOf('ENABLE_INSTALL') === 0) toast('Allow installs for this app in Settings, then tap Download again', 'info');
@@ -447,6 +451,34 @@ function openStandaloneUpdate(url, fileName) {
     toast('System installer not available — opening browser', 'info');
   } catch (e) {}
   openStandaloneUpdateFallback(url);
+}
+let slpUpdTimer = null;
+function pollStandaloneDownload(U, downloadId, tag) {
+  try { if (slpUpdTimer) { clearInterval(slpUpdTimer); slpUpdTimer = null; } } catch (e) {}
+  const slot = document.getElementById('upd-check');
+  if (!slot || !U || typeof U.queryProgress !== 'function' || downloadId == null) return;
+  const label = 'v' + (tag || 'update');
+  const paint = (pct, text) => {
+    slot.innerHTML = `<div class="rounded-xl p-3 mb-2" style="background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.35)">
+      <p class="text-xs font-bold text-blue-300 mb-2">Downloading ${esc(label)}… ${esc(text)}</p>
+      <div class="h-2.5 rounded-full" style="background:rgba(148,163,184,.2)"><div class="h-2.5 rounded-full" style="width:${pct}%;background:#3b82f6;transition:width .3s"></div></div>
+    </div>`;
+  };
+  paint(0, 'starting…');
+  slpUpdTimer = setInterval(async () => {
+    const stop = () => { try { clearInterval(slpUpdTimer); } catch (e) {} slpUpdTimer = null; };
+    let st = null;
+    try { st = await U.queryProgress({ downloadId }); }
+    catch (e) { stop(); return; }
+    if (!st) return;
+    if (st.status === 'done') { stop(); paint(100, 'finished'); toast('Download finished — opening installer…', 'ok'); return; }
+    if (st.status === 'failed') { stop(); toast('Download failed — try the browser option below', 'err'); try { updateUpdateRow(); await checkStandaloneUpdate(true); } catch (e) {} return; }
+    const dl = st.downloaded || 0, total = st.total || 0;
+    if (total > 0) {
+      const p = Math.max(0, Math.min(99, Math.round(dl * 100 / total)));
+      paint(p, p + '%');
+    } else paint(0, dl > 0 ? (dl / 1048576).toFixed(1) + ' MB' : 'starting…');
+  }, 600);
 }
 function openStandaloneUpdateFallback(url) {
   try {
