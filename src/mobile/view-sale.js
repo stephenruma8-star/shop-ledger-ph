@@ -1,5 +1,9 @@
 // ---------- NEW SALE (cart-based) ----------
-function renderSale() {
+// saleClientPreset: client id pre-picked by the caller (e.g. client detail's
+// New Sale button). Replaces the dead preselectedId reference.
+let saleClientPreset = null;
+function renderSale(presetId) {
+  if (presetId !== undefined && presetId !== null && presetId !== '') saleClientPreset = presetId;
   const v = document.getElementById('view');
   if (!cart.length) tendered = 0;
   const sub = cart.reduce((s, i) => s + i.qty * i.price, 0);
@@ -82,9 +86,10 @@ function renderSale() {
       <button onclick="submitSale()" class="btn btn-primary btn-lg" id="sale-btn"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>${T('sale.save')}</button>
     </div>`;
   saleTotals();
+  applyClientRate();
 }
 function clientOptions() {
-  return '<option value="">' + T('sale.walkin') + '</option>' + data.clients.map(c => '<option value="' + c.id + '">' + esc(c.name) + ' — ' + peso(c.balance) + '</option>').join('');
+  return '<option value="">' + T('sale.walkin') + '</option>' + data.clients.map(c => '<option value="' + c.id + '"' + (saleClientPreset != null && String(c.id) === String(saleClientPreset) ? ' selected' : '') + '>' + esc(c.name) + ' — ' + peso(c.balance) + '</option>').join('');
 }
 // Preset the interest picker from the client's most recent rated sale
 // (mirrors the desktop rate memory; the cashier can still change it).
@@ -220,8 +225,9 @@ async function submitSale() {
   const body = { clientId: charge ? clientId : null, items, paymentMethod, discount: disc };
   try {
     const r = await apiPost('/api/sales', body);
-    if (r.queued) { lastFailedSale = null; tendered = 0; toast(T('sale.queued'), 'ok'); cart = []; updateCartUI(); showView('home'); await refreshAll(); return; }
+    if (r.queued) { lastFailedSale = null; tendered = 0; try { saleClientPreset = null; } catch (e) {} toast(T('sale.queued'), 'ok'); cart = []; updateCartUI(); showView('home'); await refreshAll(); return; }
     lastFailedSale = null; tendered = 0;
+    try { saleClientPreset = null; } catch (e) {}
     saleSuccessSheet(r.invoiceNo);
   } catch (e) {
     // Cart is kept intact so nothing is lost; one tap retries the same payload.

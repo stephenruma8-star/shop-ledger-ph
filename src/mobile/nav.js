@@ -57,6 +57,8 @@ function navTap(view) {
     if (navModalOpen || currentView !== 'home') showView('home');
     return;
   }
+  // Fresh tab entry starts a clean sale (no leftover client preset).
+  if (view === 'sale') { try { saleClientPreset = null; } catch (e) {} }
   if (navModalOpen && currentView === view) { closeNavModal(); return; }
   showView(view);
 }
@@ -77,7 +79,7 @@ function showView(view, arg) {
     if (!navModalOpen) openNavModal(view); else { updateNavMeta(view); markNavActive(view); }
     if (view === 'clients') renderClients();
     else if (view === 'catalog') renderCatalog(null);
-    else if (view === 'sale') renderSale();
+    else if (view === 'sale') renderSale(arg);
     else if (view === 'pay') renderPay(arg);
     else if (view === 'inventory') renderInventory();
     else if (view === 'transactions') renderTransactions();

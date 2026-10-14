@@ -74,6 +74,12 @@ async function runStandaloneAudit() {
     const box = document.getElementById('sale-interest');
     if (!box || String(box.value) !== '10') throw new Error('rate not preset, got ' + (box && box.value));
   });
+  await A('client-to-sale-preset', async () => {
+    showView('sale', 1);
+    const sel = document.getElementById('sale-client');
+    if (!sel || String(sel.value) !== '1') throw new Error('client not preselected, got ' + (sel && sel.value));
+    showView('home');
+  });
   await A('presets-roundtrip', async () => {
     const before = (await apiGet('/api/quick-items')).length;
     await apiPost('/api/quick-items', { name: 'Audit Preset', price: 7 });
