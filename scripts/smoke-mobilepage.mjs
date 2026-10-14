@@ -282,12 +282,12 @@ try {
   getEl('sale-sc').checked = true;
   getEl('sale-interest').value = '10';
   getEl('sale-discount').value = '10';
-  gcall(`saleTotals()`);
+  gcall(`saleRateAll()`);
   ok(getEl('sale-total').textContent === '₱80.00', 'sale totals: 100 + 10% interest - 20% SC - 10 = 80.00');
   getEl('sale-sc').checked = false;
   getEl('sale-interest').value = '0';
   getEl('sale-discount').value = '0';
-  gcall(`saleTotals()`);
+  gcall(`saleRateAll()`);
   ok(getEl('sale-total').textContent === '₱100.00', 'sale totals reset to 100 without add-ons');
 
   // submit sale (charged to client)

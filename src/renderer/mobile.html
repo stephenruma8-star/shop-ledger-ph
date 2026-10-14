@@ -3279,7 +3279,8 @@ function applyClientRate() {
       box.appendChild(opt);
     }
     box.value = String(rate);
-    if (typeof saleTotals === 'function') saleTotals();
+    if (typeof saleRateAll === 'function') saleRateAll();
+    else if (typeof saleTotals === 'function') saleTotals();
   } catch (e) {}
 }
 function saleTotals() {
