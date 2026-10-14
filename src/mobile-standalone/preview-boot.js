@@ -93,6 +93,9 @@ async function seedDemoShop() {
     const m = document.querySelector('#modal-root > div');
     const r = m ? m.getBoundingClientRect().toJSON() : null;
     const cs = m ? getComputedStyle(m) : null;
-    document.title += ' modal=' + JSON.stringify(r) + ' display=' + (cs && cs.display);
+    const x = document.querySelector('#modal-root button[aria-label="Close"]');
+    const xr = x ? x.getBoundingClientRect().toJSON() : null;
+    const xcs = x ? getComputedStyle(x) : null;
+    document.title += ' modal=' + JSON.stringify(r) + ' display=' + (cs && cs.display) + ' xbtn=' + JSON.stringify(xr) + ' xvis=' + (xcs && xcs.visibility) + ' xop=' + (xcs && xcs.opacity);
   }
 })();
