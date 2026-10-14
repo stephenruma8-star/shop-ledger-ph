@@ -3,7 +3,7 @@
 // names and response shapes as the LAN client, so every shared view works
 // unchanged. No imports/exports: concatenated. Requires store.js first.
 const IS_STANDALONE = true;
-const STANDALONE_VERSION = '4.8.3';
+const STANDALONE_VERSION = '4.8.4';
 function isNativeApp() {
   try { return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); } catch (e) { return false; }
 }
@@ -417,8 +417,9 @@ async function checkStandaloneUpdate(manual) {
       return false;
     }
     say(`<div class="rounded-xl p-3 mb-2" style="background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.35)">
-      <p class="text-xs font-bold text-blue-300 mb-1">New version ${esc(best.tag)} available</p>
-      <button onclick="openStandaloneUpdate(${JSON.stringify(best.url)}, ${JSON.stringify(best.file)})" class="w-full py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold">Download ${esc(best.tag)}</button>
+      <p class="text-xs font-bold text-blue-300 mb-2">New version ${esc(best.tag)} available</p>
+      <button onclick="openStandaloneUpdate(${JSON.stringify(best.url)}, ${JSON.stringify(best.file)})" class="w-full py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold mb-1.5">Download & install ${esc(best.tag)}</button>
+      <button onclick="openStandaloneUpdateFallback(${JSON.stringify(best.url)})" class="w-full py-2 rounded-xl text-xs font-semibold btn-ghost">Open in browser instead</button>
     </div>`);
     if (!manual) toast('App update available: v' + best.tag, 'info');
     return true;
@@ -428,9 +429,8 @@ async function checkStandaloneUpdate(manual) {
   }
 }
 function openStandaloneUpdate(url, fileName) {
-  // Primary path: system downloader + installer prompt. Fallbacks below
-  // exist for browsers; every failure now says so instead of going silent
-  // (the old Browser.open().catch(()=>{}) swallowed real failures).
+  // Primary path: system downloader + installer prompt. Every outcome toasts —
+  // nothing in this chain is allowed to fail silently anymore.
   try {
     const U = nativePlugin('ShopUpdater');
     if (U && typeof U.fetchAndInstall === 'function') {
@@ -439,10 +439,12 @@ function openStandaloneUpdate(url, fileName) {
         .catch((e) => {
           const msg = String((e && e.message) || '');
           if (msg.indexOf('ENABLE_INSTALL') === 0) toast('Allow installs for this app in Settings, then tap Download again', 'info');
+          else if (msg) { toast('System download failed: ' + msg.slice(0, 90), 'err'); openStandaloneUpdateFallback(url); }
           else openStandaloneUpdateFallback(url);
         });
       return;
     }
+    toast('System installer not available — opening browser', 'info');
   } catch (e) {}
   openStandaloneUpdateFallback(url);
 }
@@ -450,9 +452,12 @@ function openStandaloneUpdateFallback(url) {
   try {
     const B = nativePlugin('Browser');
     if (B && typeof B.open === 'function') {
-      B.open({ url }).then(() => {}).catch(() => toast('Browser could not open the download', 'err'));
+      B.open({ url })
+        .then(() => toast('Browser opened — finish the download there, then tap the APK', 'info'))
+        .catch(() => toast('Browser could not open the download', 'err'));
       return;
     }
+    toast('Browser plugin missing — opening download directly', 'info');
   } catch (e) {}
   try { window.open(url, '_blank'); toast('Opening download…', 'info'); }
   catch (e) { toast('Could not open download', 'err'); }

@@ -91,6 +91,16 @@ async function runStandaloneAudit() {
     if (!sel || String(sel.value) !== String(me.id)) throw new Error('sale not preset, got ' + (sel && sel.value));
     showView('home');
   });
+  await A('update-card', async () => {
+    if (typeof openStandaloneUpdate !== 'function' || typeof openStandaloneUpdateFallback !== 'function' || typeof checkStandaloneUpdate !== 'function') throw new Error('update fns missing');
+    let host = document.getElementById('update-row');
+    let made = false;
+    if (!host) { host = document.createElement('div'); host.id = 'update-row'; document.body.appendChild(host); made = true; }
+    updateUpdateRow();
+    if (!host.innerHTML.includes('checkStandaloneUpdate(true)')) throw new Error('no check-for-updates button');
+    host.innerHTML = '';
+    if (made) host.remove();
+  });
   await A('presets-roundtrip', async () => {
     const before = (await apiGet('/api/quick-items')).length;
     await apiPost('/api/quick-items', { name: 'Audit Preset', price: 7 });
