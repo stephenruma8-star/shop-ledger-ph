@@ -60,7 +60,7 @@ function openDebtFormSetup() {
   const rc = getDebtRowCount();
   document.getElementById('modal-root').innerHTML = `
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
-      <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:92vh;max-height:92dvh;overflow-y:auto" onclick="event.stopPropagation()">
+      <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:94vh;max-height:94dvh;overflow-y:auto" onclick="event.stopPropagation()">
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
         <h3 class="font-bold text-gray-100 text-sm mb-3 flex items-center gap-2"><span class="icon-tile bg-orange-500/15 text-orange-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>Blank debt form</h3>
         <p class="text-[11px] text-gray-500 mb-2">Columns to show:</p>
@@ -102,7 +102,7 @@ function previewDebtForm(orientation) {
   const frame = `<iframe title="Debt form preview" sandbox="" srcdoc="${html.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}" style="width:100%;height:52vh;height:52dvh;background:#fff;border-radius:.75rem;border:1px solid rgba(255,255,255,.1)"></iframe>`;
   document.getElementById('modal-root').innerHTML = `
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
-      <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:92vh;max-height:92dvh;overflow-y:auto" onclick="event.stopPropagation()">
+      <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:94vh;max-height:94dvh;overflow-y:auto" onclick="event.stopPropagation()">
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
         <h3 class="font-bold text-gray-100 text-sm mb-3">Debt form (${orientation})</h3>
         ${frame}

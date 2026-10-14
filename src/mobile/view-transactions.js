@@ -72,7 +72,7 @@ async function openTxnDetail(id) {
   try { if (returnArmTimer) clearTimeout(returnArmTimer); } catch (e) {}
   document.getElementById('modal-root').innerHTML = `
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
-      <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:92vh;max-height:92dvh;overflow-y:auto" onclick="event.stopPropagation()">
+      <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:94vh;max-height:94dvh;overflow-y:auto" onclick="event.stopPropagation()">
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
         <div id="txn-detail-body">${skeleton(T('common.loading'))}</div>
       </div>
@@ -196,7 +196,7 @@ async function previewReceiptTxn(id) {
   L.push(center(s.receiptFooter || 'Thank you for your patronage!'));
   document.getElementById('modal-root').innerHTML = `
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
-      <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:92vh;max-height:92dvh;overflow-y:auto" onclick="event.stopPropagation()">
+      <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:94vh;max-height:94dvh;overflow-y:auto" onclick="event.stopPropagation()">
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
         <h3 class="font-bold text-gray-100 text-sm mb-3 flex items-center gap-2"><span class="icon-tile bg-blue-500/15 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>${esc(t.invoiceNo || 'Receipt')}</h3>
         <pre class="text-gray-200 rounded-xl p-3 mb-3" style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.5;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.08);overflow-x:auto;white-space:pre">${esc(L.join('\n'))}</pre>

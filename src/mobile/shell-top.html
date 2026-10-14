@@ -86,6 +86,9 @@ header{position:sticky;top:0;z-index:30;padding-top:env(safe-area-inset-top, 0px
 .picked{outline:2px solid rgba(239,68,68,.55)!important;border-radius:.75rem;background:rgba(239,68,68,.07)!important}
 /* z-scale: 30 header · 35 nav sheet · 40 tab bar · 45 quick modals · 50 toast/banner · 60 locks · 70 boot splash */
 #modal-root>div{padding-bottom:calc(4.4rem + env(safe-area-inset-bottom))}
+/* Modal sheets: momentum scroll + guaranteed bottom clearance so the last
+button is never stuck under the fold (small screens, open keyboards). */
+#modal-root .glass-card{padding-bottom:calc(1.75rem + env(safe-area-inset-bottom,0px));-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scrollbar-width:thin}
 html,body{overscroll-behavior-y:none}
 body.day{background:#e8edf3;color:#0f172a;background-image:none}
 body.day header{background:rgba(255,255,255,.93);border-bottom-color:rgba(15,23,42,.08)}

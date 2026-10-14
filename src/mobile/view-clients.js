@@ -107,7 +107,7 @@ async function openClientDetail(id) {
   detailClientId = id;
   document.getElementById('modal-root').innerHTML = `
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
-      <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:92vh;max-height:92dvh;overflow-y:auto" onclick="event.stopPropagation()">
+      <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:94vh;max-height:94dvh;overflow-y:auto" onclick="event.stopPropagation()">
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
         <div id="client-detail-body">${skeleton(T('common.loading'))}</div>
       </div>
@@ -120,7 +120,7 @@ async function openClientDetail(id) {
   const c = h.client;
   box.innerHTML = `
     <div class="flex items-center gap-3 mb-3">
-      <span class="w-12 h-12 rounded-full bg-blue-600/20 text-blue-300 border border-blue-500/30 font-bold text-lg flex items-center justify-center shrink-0">${esc(((c.name || '?').trim().charAt(0) || '?').toUpperCase())}</span>
+      <span class="w-14 h-14 rounded-full bg-blue-600/20 text-blue-300 border border-blue-500/30 font-bold text-xl flex items-center justify-center shrink-0">${esc(((c.name || '?').trim().charAt(0) || '?').toUpperCase())}</span>
       <div class="flex-1 min-w-0">
         <div class="font-bold text-gray-100 truncate">${esc(c.name)}</div>
         <div class="text-[11px] text-gray-500 truncate">${esc(c.phone || '')}${c.address ? ' · ' + esc(c.address) : ''}</div>
@@ -162,13 +162,13 @@ function renderClientForm(id) {
   const c = id ? (data.clients || []).find(x => String(x.id) === String(id)) : null;
   document.getElementById('modal-root').innerHTML = `
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
-      <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:92vh;max-height:92dvh;overflow-y:auto" onclick="event.stopPropagation()">
+      <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-5 pb-6 slide-up glass-card" style="max-height:94vh;max-height:94dvh;overflow-y:auto" onclick="event.stopPropagation()">
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
-        <div class="flex items-center justify-between gap-2 mb-3"><h3 class="font-bold text-gray-100 text-sm flex items-center gap-2"><span class="icon-tile bg-blue-500/15 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>${id ? T('cli.edit_title') : T('cli.add_title')}</h3><button onclick="closeQuick()" aria-label="Close" class="w-9 h-9 rounded-xl btn-ghost flex items-center justify-center text-gray-400 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
-        <div class="space-y-3">
+        <div class="flex items-center justify-between gap-2 mb-4"><h3 class="font-bold text-gray-100 text-base flex items-center gap-2"><span class="icon-tile bg-blue-500/15 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>${id ? T('cli.edit_title') : T('cli.add_title')}</h3><button onclick="closeQuick()" aria-label="Close" class="w-9 h-9 rounded-xl btn-ghost flex items-center justify-center text-gray-400 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+        <div class="space-y-4">
           <div>
-            <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('cli.name')}</label>
-            <input id="cf-name" type="text" maxlength="80" value="${esc(c?.name || '')}" class="inp" />
+            <label class="text-xs font-semibold uppercase tracking-wider text-gray-400 block mb-1.5">${T('cli.name')}</label>
+            <input id="cf-name" type="text" maxlength="80" value="${esc(c?.name || '')}" class="inp" style="height:3.1rem;font-size:1rem" />
           </div>
           <div class="grid grid-cols-2 gap-2.5">
             <div>
