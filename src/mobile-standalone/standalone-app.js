@@ -3,7 +3,7 @@
 // go. PIN lock still guards the front door. Concatenated last.
 async function startStandalone() {
   try {
-    await initStore(makeCapacitorDriver());
+    await initStore(await makeCapacitorDriver());
   } catch (e) {
     try { diagPush('store-init', String((e && e.message) || e)); } catch (_) {}
     toast('Database failed to open: ' + ((e && e.message) || e), 'err');

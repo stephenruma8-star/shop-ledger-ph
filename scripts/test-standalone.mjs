@@ -348,6 +348,20 @@ await throws(400, () => A('POST', '/api/suppliers/' + sup.id, {}, 'DELETE'), 'de
 await throws(400, () => A('POST', '/api/sales', { items: [{ description: 'X', qty: 0, unitCost: 5 }] }), 'zero qty rejected');
 await throws(400, () => A('POST', '/api/sales', { items: [{ description: 'X', qty: -2, unitCost: 5 }] }), 'negative qty rejected');
 
+// launch-bug regression: initStore given an UNRESOLVED async driver (what
+// the real boot passed on device) must still end up usable
+{
+  const { makeNodeDriver: mk2 } = await import('../src/mobile-standalone/driver-node.mjs');
+  const vm3 = (await import('node:vm')).default;
+  const sb3 = { console };
+  vm3.createContext(sb3);
+  const fs3 = (await import('node:fs')).default;
+  vm3.runInContext(fs3.readFileSync('src/mobile-standalone/store.js', 'utf8') + '\nthis.__r = { localApi, initStore };', sb3);
+  await sb3.__r.initStore(Promise.resolve(mk2())); // bare promise, like the old boot call
+  const cc = await sb3.__r.localApi('POST', '/api/clients', { name: 'Promise Driver Client' });
+  ok(cc.success && cc.id, 'unawaited async driver still works after init');
+}
+
 // parallel sales must mint distinct invoice numbers (mutex check)
 {
   const before = (await A('GET', '/api/transactions?limit=500')).length;

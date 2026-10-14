@@ -9,7 +9,13 @@ let _dataVersion = 1;
 let _printerFn = null;
 function setStoreDriver(d) { _storeDriver = d; }
 function setPrinterFn(fn) { _printerFn = fn || null; }
-function _db() { if (!_storeDriver) throw _apiErr(503, 'Database not ready'); return _storeDriver; }
+function _db() {
+  const d = _storeDriver;
+  if (!d || typeof d.exec !== 'function' || typeof d.run !== 'function' || typeof d.get !== 'function' || typeof d.all !== 'function') {
+    throw _apiErr(503, 'Database driver incomplete — reinstall the app if this persists');
+  }
+  return d;
+}
 function _apiErr(status, message, extra) {
   const e = new Error(message);
   e.status = status; e.json = Object.assign({ success: false, error: message }, extra || {});
@@ -65,7 +71,9 @@ const STORE_SEED_SETTINGS = [
   ['thermalHost', ''], ['thermalPort', '9100'], ['currentCashier', '']
 ];
 async function initStore(driver) {
-  setStoreDriver(driver);
+  // Unwrap thenables: callers must pass a ready driver, but a bare promise
+  // (the exact 4.x launch bug) now resolves instead of failing every call.
+  setStoreDriver(await driver);
   const db = _db();
   for (const sql of STORE_SCHEMA) await db.exec(sql);
   for (const [k, v] of STORE_SEED_SETTINGS) {
