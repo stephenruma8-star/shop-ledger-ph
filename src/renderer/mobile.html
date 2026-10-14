@@ -3095,8 +3095,11 @@ async function quickSell(id) {
   const qty = Math.max(1, Math.min(qStepQty || 1, stock));
   if (!takeSubmitLock('quick')) return;
   try {
+    const vs = (item.variants || []);
     const r = await apiPost('/api/sales', {
-      clientId: null, items: [{ name: String(qty), description: item.name, qty, unitCost: item.price, intRate: 0, invId: id }],
+      clientId: null, items: [{ name: String(qty), description: item.name, qty,
+        unitCost: item.price, intRate: 0, invId: id,
+        variantName: vs.length ? vs[0].name : null }],
       paymentMethod: 'Cash', discount: 0
     });
     closeQuick();
@@ -3133,21 +3136,32 @@ function renderSale(presetId) {
     ${(data.quickItems || []).length ? `<div class="flex gap-1.5 mb-3 fade-in overflow-x-auto" style="scrollbar-width:none">${data.quickItems.slice(0, 12).map((q, qi) => `<button onclick="quickAddItem(${qi})" class="shrink-0 px-3 py-2 rounded-xl text-xs font-semibold" style="background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);color:#93c5fd">${esc(q.name)} · ${peso(q.price)}</button>`).join('')}${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button onclick="managePresets()" class="shrink-0 px-3 py-2 rounded-xl text-xs font-semibold" style="background:rgba(255,255,255,.06);border:1px dashed rgba(255,255,255,.2);color:#94a3b8">⚙️ Presets</button>` : ''}</div>` : ''}
     ${lastFailedSale ? `<button onclick="retrySale()" class="btn w-full mb-3 py-2.5 rounded-xl font-semibold text-sm fade-in" style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.5);color:#fbbf24"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>${T('sale.retry')}</button>` : ''}
     <div class="glass-card rounded-2xl p-2 mb-3 fade-in">
-      ${cart.length ? cart.map((i, idx) => `
-        <div class="row py-2.5 px-1.5" id="mc-row-${idx}">
-          <span class="w-10 h-10 rounded-xl overflow-hidden bg-gray-800 border border-white/10 flex items-center justify-center shrink-0">${itemById(i.invId) && itemImage(itemById(i.invId)) ? '<img src="' + itemImage(itemById(i.invId)) + '" alt="" class="w-full h-full object-cover" />' : '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>'}</span>
-          <div class="flex-1 min-w-0">
-            <div class="text-sm font-medium truncate text-gray-200">${esc(i.name)}</div>
-            <div class="text-[11px] text-gray-500">${peso(i.price)} ${T('sale.each')}</div>
+      ${cart.length ? cart.map((i, idx) => {
+        const item = itemById(i.invId);
+        const variants = (item && item.variants) || [];
+        const rate = i.intRate || 0;
+        return `
+        <div class="py-2.5 px-1.5" id="mc-row-${idx}">
+          <div class="row">
+            <span class="w-10 h-10 rounded-xl overflow-hidden bg-gray-800 border border-white/10 flex items-center justify-center shrink-0">${item && itemImage(item) ? '<img src="' + itemImage(item) + '" alt="" class="w-full h-full object-cover" />' : '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>'}</span>
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium truncate text-gray-200">${esc(i.name)}${i.variantName ? ' <span class="text-gray-500">· ' + esc(i.variantName) + '</span>' : ''}</div>
+              <div class="text-[11px] text-gray-500">${peso(i.price)} ${T('sale.each')}${i.date ? ' · ' + esc(i.date) : ''}</div>
+            </div>
+            <div class="flex items-center gap-1 shrink-0">
+              <button onclick="cartStep(${idx},-1)" class="w-8 h-8 rounded-lg font-bold text-gray-200" style="background:rgba(30,41,59,.6);border:1px solid rgba(255,255,255,.09)">−</button>
+              <span class="w-7 text-center text-sm font-bold text-gray-100 num">${i.qty}</span>
+              <button onclick="cartStep(${idx},1)" class="w-8 h-8 rounded-lg font-bold text-gray-200" style="background:rgba(30,41,59,.6);border:1px solid rgba(255,255,255,.09)">+</button>
+            </div>
+            <div class="text-[13px] font-bold w-[3.6rem] text-right text-gray-100 num shrink-0" id="mc-amt-${idx}">${peso(i.qty * i.price + i.qty * i.price * rate / 100)}</div>
+            <button onclick="cartRemove(${idx})" class="text-red-400 hover:text-red-300 p-1.5 shrink-0" title="Remove"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
           </div>
-          <div class="flex items-center gap-1 shrink-0">
-            <button onclick="cartStep(${idx},-1)" class="w-8 h-8 rounded-lg font-bold text-gray-200" style="background:rgba(30,41,59,.6);border:1px solid rgba(255,255,255,.09)">−</button>
-            <span class="w-7 text-center text-sm font-bold text-gray-100 num">${i.qty}</span>
-            <button onclick="cartStep(${idx},1)" class="w-8 h-8 rounded-lg font-bold text-gray-200" style="background:rgba(30,41,59,.6);border:1px solid rgba(255,255,255,.09)">+</button>
+          <div class="flex gap-1.5 mt-1.5 pl-[3.25rem]">
+            ${variants.length ? `<select onchange="cartLineVariant(${idx},this.value)" class="flex-1 min-w-0 text-[11px] px-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 outline-none">${variants.map(v => '<option value="' + esc(v.name) + '"' + ((i.variantName || variants[0].name) === v.name ? ' selected' : '') + '>' + esc(v.name) + '</option>').join('')}</select>` : ''}
+            <select id="sale-rate-${idx}" onchange="cartLineRate(${idx},this.value)" class="w-20 text-[11px] px-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 outline-none shrink-0" title="Interest">${intRateOptions(rate)}</select>
           </div>
-          <div class="text-sm font-bold w-16 text-right text-gray-100 num shrink-0">${peso(i.qty * i.price)}</div>
-          <button onclick="cartRemove(${idx})" class="text-red-400 hover:text-red-300 p-1.5 shrink-0" title="Remove"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
-        </div>`).join('')
+        </div>`;
+      }).join('')
       : `<p class="text-center text-gray-500 py-8 px-4 text-sm">${T('sale.empty_a')} <button class="text-blue-400 font-semibold underline" onclick="manualItem()">${T('sale.empty_manual')}</button></p>`}
     </div>
     <div class="glass-card rounded-2xl p-3 space-y-3 fade-in">
@@ -3163,7 +3177,7 @@ function renderSale(presetId) {
         </div>
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sale.interest')}</label>
-          <select id="sale-interest" onchange="saleTotals()" class="inp">${[0,5,10,15,20,25,30,40,50].map(r => '<option value="' + r + '"' + (r === 0 ? ' selected' : '') + '>' + (r === 0 ? T('sale.zero_cash') : r + '%') + '</option>').join('')}</select>
+          <select id="sale-interest" onchange="saleRateAll()" class="inp">${[0,5,10,15,20,25,30,40,50].map(r => '<option value="' + r + '"' + (r === 0 ? ' selected' : '') + '>' + (r === 0 ? T('sale.zero_cash') : r + '%') + '</option>').join('')}</select>
         </div>
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sale.discount')}</label>
@@ -3198,6 +3212,52 @@ function renderSale(presetId) {
   saleTotals();
   applyClientRate();
 }
+function intRateOptions(sel) {
+  const rates = [0, 5, 10, 15, 20, 25, 30, 40, 50];
+  if (sel > 0 && !rates.includes(sel)) rates.push(sel);
+  return rates.sort((a, b) => a - b).map(r => '<option value="' + r + '"' + (r === sel ? ' selected' : '') + '>' + (r === 0 ? T('sale.zero_cash') : r + '%') + '</option>').join('');
+}
+function cartLineVariant(idx, name) {
+  const line = cart[idx];
+  if (!line) return;
+  line.variantName = name || null;
+  if (currentView === 'sale') renderSale();
+}
+function cartLineRate(idx, val) {
+  const line = cart[idx];
+  if (!line) return;
+  line.intRate = Math.max(0, parseFloat(val) || 0);
+  saleTotals();
+  paintLineAmount(idx);
+}
+function paintLineAmount(idx) {
+  try {
+    const line = cart[idx];
+    if (!line) return;
+    const q = line.qty || 1, p = line.price || 0, r = line.intRate || 0;
+    const el = document.getElementById('mc-amt-' + idx);
+    if (el) el.textContent = peso(q * p + q * p * r / 100);
+  } catch (e) {}
+}
+function saleRateAll() {
+  const v = parseFloat((document.getElementById('sale-interest') || {}).value) || 0;
+  cart.forEach((l, idx) => {
+    l.intRate = v;
+    const box = document.getElementById('sale-rate-' + idx);
+    if (box) {
+      let opt = [...box.options].find(o => parseFloat(o.value) === v);
+      if (!opt && v > 0) {
+        opt = document.createElement('option');
+        opt.value = String(v);
+        opt.textContent = v + '%';
+        box.appendChild(opt);
+      }
+      box.value = String(v);
+    }
+    paintLineAmount(idx);
+  });
+  saleTotals();
+}
 function clientOptions() {
   return '<option value="">' + T('sale.walkin') + '</option>' + data.clients.map(c => '<option value="' + c.id + '"' + (saleClientPreset != null && String(c.id) === String(saleClientPreset) ? ' selected' : '') + '>' + esc(c.name) + ' — ' + peso(c.balance) + '</option>').join('');
 }
@@ -3223,9 +3283,8 @@ function applyClientRate() {
   } catch (e) {}
 }
 function saleTotals() {
-  const sub = cart.reduce((s, i) => s + i.qty * i.price, 0);
-  const rate = parseFloat(document.getElementById('sale-interest')?.value) || 0;
-  const interest = sub * (rate / 100);
+  const sub = cart.reduce((s, i) => s + (i.qty || 1) * (i.price || 0), 0);
+  const interest = cart.reduce((s, i) => s + ((i.qty || 1) * (i.price || 0)) * ((i.intRate || 0) / 100), 0);
   const sc = (document.getElementById('sale-sc')?.checked) ? sub * 0.2 : 0;
   const disc = Math.max(0, parseFloat(document.getElementById('sale-discount')?.value) || 0) + sc;
   const total = Math.max(0, sub + interest - disc);
@@ -3330,7 +3389,16 @@ async function submitSale() {
   const sc = (document.getElementById('sale-sc')?.checked) ? true : false;
   const discount = Math.max(0, parseFloat(document.getElementById('sale-discount')?.value) || 0);
   const paymentMethod = document.getElementById('sale-payment')?.value || 'Cash';
-  const items = cart.map(i => ({ name: String(i.qty), description: i.name, qty: i.qty, unitCost: i.price, intRate: rate, invId: i.invId }));
+  const items = cart.map(i => {
+    const it = itemById(i.invId);
+    const vs = (it && it.variants) || [];
+    return {
+      date: i.date || new Date().toISOString().split('T')[0],
+      name: String(i.qty), description: i.name, qty: i.qty, unitCost: i.price,
+      intRate: i.intRate || 0, invId: i.invId,
+      variantName: i.variantName || (vs.length ? vs[0].name : null)
+    };
+  });
   const disc = discount + (sc ? (items.reduce((s, i) => s + i.qty * i.unitCost, 0) * 0.2) : 0);
   const body = { clientId: charge ? clientId : null, items, paymentMethod, discount: disc };
   try {

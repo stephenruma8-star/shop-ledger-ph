@@ -71,8 +71,11 @@ async function quickSell(id) {
   const qty = Math.max(1, Math.min(qStepQty || 1, stock));
   if (!takeSubmitLock('quick')) return;
   try {
+    const vs = (item.variants || []);
     const r = await apiPost('/api/sales', {
-      clientId: null, items: [{ name: String(qty), description: item.name, qty, unitCost: item.price, intRate: 0, invId: id }],
+      clientId: null, items: [{ name: String(qty), description: item.name, qty,
+        unitCost: item.price, intRate: 0, invId: id,
+        variantName: vs.length ? vs[0].name : null }],
       paymentMethod: 'Cash', discount: 0
     });
     closeQuick();

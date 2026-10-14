@@ -74,6 +74,14 @@ async function seedDemoShop() {
   }
   const m = (window.location.hash || '').match(/^#\/([a-z-]+)/);
   showView((m && m[1]) || 'home');
+  if (/[?&]cartdemo=1/.test(window.location.search)) {
+    const r1 = (data.inventory || []).find(i => i.name === 'Rice 1kg');
+    const r2 = (data.inventory || []).find(i => i.name === 'Coffee Sachet');
+    if (r1) cart.push({ invId: r1.id, name: r1.name, qty: 2, price: r1.price || 0, intRate: 10 });
+    if (r2) cart.push({ invId: r2.id, name: r2.name, qty: 3, price: r2.price || 0, intRate: 0 });
+    updateCartUI();
+    showView('sale');
+  }
   document.title = 'preview:' + ((m && m[1]) || 'home');
   // Dev-only deep link for screenshots: #/call/fnName/arg
   const mc = (window.location.hash || '').match(/^#\/call\/([A-Za-z_$][\w$]*)(?:\/(.*))?$/);
@@ -81,7 +89,17 @@ async function seedDemoShop() {
     try {
       const r = window[mc[1]](mc[2] === undefined ? undefined : decodeURIComponent(mc[2]));
       if (r && typeof r.then === 'function') await r.catch(() => {});
-      if (/[?&]dbgmodal=1/.test(window.location.search)) {
+  if (/[?&](dbgmodal|cartdemo)=1/.test(window.location.search)) {
+    const de = document.documentElement;
+    let widest = '';
+    try {
+      document.querySelectorAll('#view *').forEach(el => {
+        try {
+          const r = el.getBoundingClientRect();
+          if (r.right > window.innerWidth + 1 && r.width > 50) widest += (el.id || el.className.toString().slice(0, 40)) + '@' + Math.round(r.right) + ' ';
+        } catch (e) {}
+      });
+    } catch (e) {}
         const has = (document.getElementById('modal-root') || {}).childElementCount;
         document.title += ' callok=' + mc[1] + ' kids=' + has;
       }
@@ -89,13 +107,34 @@ async function seedDemoShop() {
       if (/[?&]dbgmodal=1/.test(window.location.search)) document.title += ' callerr=' + String((e && e.message) || e).slice(0, 120);
     }
   }
-  if (/[?&]dbgmodal=1/.test(window.location.search)) {
+  if (/[?&](dbgmodal|cartdemo)=1/.test(window.location.search)) {
     const m = document.querySelector('#modal-root > div');
     const r = m ? m.getBoundingClientRect().toJSON() : null;
     const cs = m ? getComputedStyle(m) : null;
     const x = document.querySelector('#modal-root button[aria-label="Close"]');
     const xr = x ? x.getBoundingClientRect().toJSON() : null;
     const xcs = x ? getComputedStyle(x) : null;
-    document.title += ' modal=' + JSON.stringify(r) + ' display=' + (cs && cs.display) + ' xbtn=' + JSON.stringify(xr) + ' xvis=' + (xcs && xcs.visibility) + ' xop=' + (xcs && xcs.opacity);
+    const de = document.documentElement;
+    let widest = '';
+    try {
+      document.querySelectorAll('#view *').forEach(el => {
+        try {
+          const b = el.getBoundingClientRect();
+          if (b.right > window.innerWidth + 1 && b.width > 50) {
+            widest += (el.id || String(el.className || '').slice(0, 30)).replace(/\s+/g, '.') + '@' + Math.round(b.right) + ' ';
+            el.style.outline = '3px solid red';
+          }
+          const p = el.parentElement;
+          if (p && el.tagName !== 'BODY' && el.tagName !== 'HTML') {
+            const pb = p.getBoundingClientRect();
+            if (b.width > pb.width + 2 && b.width > 80) {
+              widest += 'KID>' + (p.id || String(p.className || '').slice(0, 24)).replace(/\s+/g, '.') + ':' + (el.tagName || '') + '.' + String(el.className || '').slice(0, 24).replace(/\s+/g, '.') + '@' + Math.round(b.width) + 'v' + Math.round(pb.width) + ' ';
+              el.style.outline = '3px solid yellow';
+            }
+          }
+        } catch (e) {}
+      });
+    } catch (e) {}
+    document.title += ' modal=' + JSON.stringify(r) + ' display=' + (cs && cs.display) + ' xbtn=' + JSON.stringify(xr) + ' xvis=' + (xcs && xcs.visibility) + ' xop=' + (xcs && xcs.opacity) + ' docW=' + de.scrollWidth + ' winW=' + window.innerWidth + ' wide=[' + widest.slice(0, 220) + ']';
   }
 })();
