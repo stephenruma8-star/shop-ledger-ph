@@ -64,7 +64,7 @@ function renderSale(presetId) {
         </div>
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sale.interest')}</label>
-          <select id="sale-interest" onchange="saleRateAll()" class="inp">${[0,5,10,15,20,25,30,40,50].map(r => '<option value="' + r + '"' + (r === 0 ? ' selected' : '') + '>' + (r === 0 ? T('sale.zero_cash') : r + '%') + '</option>').join('')}</select>
+          <select id="sale-interest" onchange="saleRateAll()" class="inp">${intRateOptions(0)}</select>
         </div>
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sale.discount')}</label>
@@ -100,7 +100,9 @@ function renderSale(presetId) {
   applyClientRate();
 }
 function intRateOptions(sel) {
-  const rates = [0, 5, 10, 15, 20, 25, 30, 40, 50];
+  // Same range as the desktop app: 0% then 0.5% steps up to 20%.
+  const rates = [0];
+  for (let i = 1; i <= 40; i++) rates.push(i / 2);
   if (sel > 0 && !rates.includes(sel)) rates.push(sel);
   return rates.sort((a, b) => a - b).map(r => '<option value="' + r + '"' + (r === sel ? ' selected' : '') + '>' + (r === 0 ? T('sale.zero_cash') : r + '%') + '</option>').join('');
 }
@@ -251,18 +253,29 @@ function manualItem() {
             </div>
           </div>
           <button onclick="addManualItem()" class="btn btn-primary btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>${T('manual.add')}</button>
+          <p class="text-center text-[11px] text-gray-500">Added: <span id="m-count" class="font-bold text-gray-300 num">0</span> — this stays open so you can add many items, then tap Done.</p>
+          <button onclick="closeQuick()" class="btn btn-ghost btn-lg">${T('manual.done')}</button>
         </div>
       </div>
     </div>`;
 }
 function addManualItem() {
-  const name = (document.getElementById('m-name').value || '').trim();
-  const price = parseFloat(document.getElementById('m-price').value);
-  const qty = parseInt(document.getElementById('m-qty').value) || 1;
+  const nameEl = document.getElementById('m-name');
+  const priceEl = document.getElementById('m-price');
+  const qtyEl = document.getElementById('m-qty');
+  const name = (nameEl && nameEl.value || '').trim();
+  const price = parseFloat(priceEl && priceEl.value);
+  const qty = parseInt(qtyEl && qtyEl.value) || 1;
   if (!name) { toast(T('manual.name_req'), 'err'); return; }
   if (isNaN(price) || price < 0) { toast(T('manual.price_req'), 'err'); return; }
   cart.push({ invId: null, name, qty: Math.max(1, qty), price });
-  closeQuick();
+  // Stay open for the next item: clear the fields, keep the qty, refocus.
+  if (nameEl) nameEl.value = '';
+  if (priceEl) priceEl.value = '';
+  try { if (nameEl) nameEl.focus(); } catch (e) {}
+  const added = cart.filter(i => !i.invId).length;
+  const cnt = document.getElementById('m-count');
+  if (cnt) cnt.textContent = String(added);
   updateCartUI();
   feelAdd();
   toast(T('sale.added_cart', { name }), 'ok');

@@ -103,6 +103,22 @@ async function runStandaloneAudit() {
     host.innerHTML = '';
     if (made) host.remove();
   });
+  await A('manual-stays-open', async () => {
+    const before = cart.length;
+    manualItem();
+    if (!document.getElementById('m-name')) throw new Error('manual modal missing');
+    document.getElementById('m-name').value = 'Audit Candy';
+    document.getElementById('m-price').value = '5';
+    document.getElementById('m-qty').value = '2';
+    addManualItem();
+    document.getElementById('m-name').value = 'Audit Chips';
+    document.getElementById('m-price').value = '10';
+    addManualItem();
+    if (cart.length !== before + 2) throw new Error('expected 2 manual lines, got ' + (cart.length - before));
+    if (!document.getElementById('m-name')) throw new Error('modal closed after add');
+    closeQuick();
+    showView('home');
+  });
   await A('presets-roundtrip', async () => {
     const before = (await apiGet('/api/quick-items')).length;
     await apiPost('/api/quick-items', { name: 'Audit Preset', price: 7 });
