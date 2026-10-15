@@ -270,9 +270,9 @@ ok((await A('POST', '/api/interest/apply', {})).applied === 0, 'same-day rerun a
 const intC = await A('POST', '/api/clients', { name: 'Interest Client' });
 await A('POST', '/api/sales', {
   clientId: intC.id,
-  items: [{ description: 'Oil', qty: 2, unitCost: 30, intRate: 10, invId: it2.id }],
+  items: [{ description: 'Oil', qty: 2, unitCost: 30, intRate: 10, invId: it2.id, date: monthAgo }],
   paymentMethod: 'GCash'
-}); // balance 66 (60 + 6 interest), rate 10
+}); // balance 66 (60 + 6 interest over 30 backdated days), rate 10
 {
   const exp0 = await A('GET', '/api/backup/export');
   const bk = JSON.parse(JSON.stringify(exp0.backup));
@@ -407,10 +407,10 @@ const osItem = await A('POST', '/api/inventory', { name: 'Oversell Item', sellPr
 await A('POST', '/api/sales', { items: [{ description: 'Oversell Item', qty: 3, unitCost: 5, invId: osItem.id }], paymentMethod: 'Cash' });
 ok((await A('GET', '/api/inventory')).find(i => i.id === osItem.id).stock === -2, 'oversell tracked as negative stock');
 
-// per-line rates + variant lines
+// per-line rates + variant lines (rated line backdated 30 days = full month)
 const vrSale = await A('POST', '/api/sales', { items: [
   { description: 'Rice', qty: 1, unitCost: 50, intRate: 0, invId: it1.id },
-  { description: 'Rice', qty: 1, unitCost: 50, intRate: 20, invId: it1.id, variantName: '1kg' }
+  { description: 'Rice', qty: 1, unitCost: 50, intRate: 20, invId: it1.id, variantName: '1kg', date: monthAgo }
 ], paymentMethod: 'Cash' });
 const vrDet = await A('GET', '/api/transactions/' + vrSale.invoiceNo);
 ok(vrDet.subtotal === 100 && vrDet.totalInterest === 10 && vrDet.grandTotal === 110, 'per-line interest totals');
