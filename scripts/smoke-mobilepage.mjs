@@ -277,13 +277,13 @@ try {
   const cartHtml = getEl('view').innerHTML;
   ok(cartHtml.includes('Coke 500ml') && cartHtml.includes('₱100.00'), 'sale cart lists added item with line total');
 
-  // totals: SC/PWD + interest + discount
+  // totals: SC/PWD + interest + discount (same-day 10% prorates to rate/30, desktop parity)
   gcall(`renderSale()`);
   getEl('sale-sc').checked = true;
   getEl('sale-interest').value = '10';
   getEl('sale-discount').value = '10';
   gcall(`saleRateAll()`);
-  ok(getEl('sale-total').textContent === '₱80.00', 'sale totals: 100 + 10% interest - 20% SC - 10 = 80.00');
+  ok(getEl('sale-total').textContent === '₱70.33', 'sale totals: 100 + 10%/30 interest - 20% SC - 10 = 70.33');
   getEl('sale-sc').checked = false;
   getEl('sale-interest').value = '0';
   getEl('sale-discount').value = '0';

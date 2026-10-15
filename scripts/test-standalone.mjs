@@ -77,12 +77,17 @@ ok((await A('GET', '/api/quick-items')).length === 1, 'quick add/list');
 await A('POST', '/api/quick-items/' + q1.id, {}, 'DELETE');
 ok((await A('GET', '/api/quick-items')).length === 0, 'quick delete');
 
-// sale: 2 Rice @50 + 3 Oil @30 intRate 10, discount 5, GCash (credit)
+// sale: 2 Rice @50 + 3 Oil @30 intRate 10 (Oil backdated 30 days so the
+// monthly rate applies in full, desktop-style), discount 5, GCash (credit)
+const _p2 = (n) => String(n).padStart(2, '0');
+const _nowD = new Date();
+const _backD = new Date(_nowD.getFullYear(), _nowD.getMonth(), _nowD.getDate() - 30);
+const monthAgo = _backD.getFullYear() + '-' + _p2(_backD.getMonth() + 1) + '-' + _p2(_backD.getDate());
 const sale = await A('POST', '/api/sales', {
   clientId: c1.id,
   items: [
     { description: 'Rice', qty: 2, unitCost: 50, intRate: 0, invId: it1.id },
-    { description: 'Oil', qty: 3, unitCost: 30, intRate: 10, invId: it2.id }
+    { description: 'Oil', qty: 3, unitCost: 30, intRate: 10, invId: it2.id, date: monthAgo }
   ],
   paymentMethod: 'GCash', discount: 5
 });
@@ -94,9 +99,11 @@ const invAfter = await A('GET', '/api/inventory');
 ok(invAfter.find(i => i.name === 'Rice').stock === 98, 'stock decremented');
 const h1 = await A('GET', '/api/clients/' + c1.id + '/history');
 ok(h1.client.balance === 194 && h1.client.loyaltyPoints === 194 && h1.sales.length === 1, 'balance + loyalty + history');
-// cash sale: no balance
-const cs = await A('POST', '/api/sales', { items: [{ description: 'Oil', qty: 1, unitCost: 30, invId: it2.id }], paymentMethod: 'Cash' });
+// cash sale with same-day rated item: accrues rate/30 (desktop parity)
+const cs = await A('POST', '/api/sales', { items: [{ description: 'Oil', qty: 1, unitCost: 30, intRate: 10, invId: it2.id }], paymentMethod: 'Cash' });
 ok(cs.invoiceNo === 'INV-00002', 'cash sale invoice');
+const csDet = await A('GET', '/api/transactions/INV-00002');
+ok(Math.abs(csDet.totalInterest - 0.1) < 1e-9 && Math.abs(csDet.grandTotal - 30.1) < 1e-9, 'same-day interest prorated');
 ok((await A('GET', '/api/clients/' + c1.id + '/history')).client.balance === 194, 'cash sale adds no balance');
 await throws(400, () => A('POST', '/api/sales', { items: [] }), 'sale needs items');
 const txns = await A('GET', '/api/transactions?limit=100');

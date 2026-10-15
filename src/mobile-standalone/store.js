@@ -487,10 +487,23 @@ async function _applySale(body) {
   if (paymentMethod && !PAY_METHODS.includes(paymentMethod)) throw _apiErr(400, 'Invalid payment method');
   return _withNumbering(async () => {
     const invoiceNo = await _nextInvoiceNo(db);
-    const subtotal = items.reduce((s, i) => s + (((i.qty || 1) * (i.unitCost || 0))), 0);
-    const totalInterest = items.reduce((s, i) => s + (((i.qty || 1) * (i.unitCost || 0)) * ((i.intRate || 0) / 100)), 0);
+    const today = _todayStr();
+    const lineSub = (i) => ((i.qty || 1) * (i.unitCost || 0));
+    // Desktop parity: rate is %/month, prorated by whole days from the line
+    // date (min 1 day), rounded per line like the desktop lineInt.
+    const lineInt = (i) => {
+      const rate = parseFloat(i.intRate) || 0;
+      if (!rate || !lineSub(i)) return 0;
+      const d = String(i.date || today).slice(0, 10);
+      let days = Math.floor((new Date(today) - new Date(d)) / 86400000);
+      if (isNaN(days)) return 0;
+      days = Math.max(1, days);
+      return _r2(lineSub(i) * (rate / 100) * (days / 30));
+    };
+    const subtotal = items.reduce((s, i) => s + lineSub(i), 0);
+    const totalInterest = _r2(items.reduce((s, i) => s + lineInt(i), 0));
     const d = parseFloat(discount) || 0;
-    const grandTotal = Math.max(0, subtotal + totalInterest - d);
+    const grandTotal = Math.max(0, _r2(subtotal + totalInterest - d));
     let clientName = 'Walk-in';
     if (clientId) {
       const cd = await db.get('SELECT * FROM clients WHERE id = ?', [clientId]);
@@ -498,7 +511,7 @@ async function _applySale(body) {
     }
     const payMethod = paymentMethod || 'Cash';
     const storedItems = items.map(i => Object.assign({}, i, {
-      amount: ((i.qty || 1) * (i.unitCost || 0)) + ((i.qty || 1) * (i.unitCost || 0)) * ((i.intRate || 0) / 100)
+      amount: _r2(lineSub(i) + lineInt(i))
     }));
     const now = new Date().toISOString();
     await db.run(

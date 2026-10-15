@@ -215,6 +215,23 @@ async function runStandaloneAudit() {
     h = await apiGet('/api/clients/' + cid + '/history');
     if ((h.client.balance || 0) !== 0) throw new Error('delete invented debt: ' + h.client.balance);
   });
+  await A('line-date-prorates', async () => {
+    showView('sale');
+    const n = cart.length;
+    cart.push({ invId: null, name: 'Audit Dated', qty: 1, price: 300, date: phoneToday() });
+    renderSale();
+    const idx = cart.length - 1;
+    cartLineRate(idx, 10);
+    const sameDay = document.getElementById('mc-amt-' + idx).textContent;
+    if (sameDay !== peso(301)) throw new Error('same-day should accrue rate/30, got ' + sameDay);
+    const d = new Date(); const b = new Date(d.getFullYear(), d.getMonth(), d.getDate() - 30);
+    const p2 = (x) => String(x).padStart(2, '0');
+    cartLineDate(idx, b.getFullYear() + '-' + p2(b.getMonth() + 1) + '-' + p2(b.getDate()));
+    const backdated = document.getElementById('mc-amt-' + idx).textContent;
+    if (backdated !== peso(330)) throw new Error('30-day 10% should be full rate, got ' + backdated);
+    cart.length = n;
+    showView('home');
+  });
   await A('escattr-quotes', async () => {
     if (escAttr('a"b\'c<d') !== 'a&quot;b&#39;c&lt;d') throw new Error('bad escAttr: ' + escAttr('a"b\'c<d'));
   });

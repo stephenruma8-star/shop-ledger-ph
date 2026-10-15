@@ -68,11 +68,12 @@ function renderSale(presetId) {
               <span class="w-7 text-center text-sm font-bold text-gray-100 num">${i.qty}</span>
               <button onclick="cartStep(${idx},1)" class="w-8 h-8 rounded-lg font-bold text-gray-200" style="background:rgba(30,41,59,.6);border:1px solid rgba(255,255,255,.09)">+</button>
             </div>
-            <div class="text-[13px] font-bold w-[3.6rem] text-right text-gray-100 num shrink-0" id="mc-amt-${idx}">${peso(i.qty * i.price + i.qty * i.price * rate / 100)}</div>
+            <div class="text-[13px] font-bold w-[3.6rem] text-right text-gray-100 num shrink-0" id="mc-amt-${idx}">${peso(i.qty * i.price + lineIntCalc(i.qty * i.price, rate, i.date))}</div>
             <button onclick="cartRemove(${idx})" class="text-red-400 hover:text-red-300 p-1.5 shrink-0" title="Remove"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
           </div>
           <div class="flex gap-1.5 mt-1.5 pl-[3.25rem]">
-            ${variants.length ? `<select onchange="cartLineVariant(${idx},this.value)" class="flex-1 min-w-0 text-[11px] px-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 outline-none">${variants.map(v => '<option value="' + esc(v.name) + '"' + ((i.variantName || variants[0].name) === v.name ? ' selected' : '') + '>' + esc(v.name) + '</option>').join('')}</select>` : ''}
+            <input type="date" value="${escAttr(i.date || phoneToday())}" onchange="cartLineDate(${idx},this.value)" class="w-[6.8rem] text-[11px] px-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 outline-none shrink-0" title="Item date — interest counts from here" />
+            ${variants.length ? `<select onchange="cartLineVariant(${idx},this.value)" class="flex-1 min-w-0 text-[11px] px-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 outline-none">${variants.map(v => '<option value="' + escAttr(v.name) + '"' + ((i.variantName || variants[0].name) === v.name ? ' selected' : '') + '>' + esc(v.name) + '</option>').join('')}</select>` : ''}
             <select id="sale-rate-${idx}" onchange="cartLineRate(${idx},this.value)" class="w-20 text-[11px] px-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 outline-none shrink-0" title="Interest">${intRateOptions(rate)}</select>
           </div>
         </div>`;
@@ -159,8 +160,15 @@ function paintLineAmount(idx) {
     if (!line) return;
     const q = line.qty || 1, p = line.price || 0, r = line.intRate || 0;
     const el = document.getElementById('mc-amt-' + idx);
-    if (el) el.textContent = peso(q * p + q * p * r / 100);
+    if (el) el.textContent = peso(q * p + lineIntCalc(q * p, r, line.date));
   } catch (e) {}
+}
+function cartLineDate(idx, val) {
+  const line = cart[idx];
+  if (!line) return;
+  line.date = val || phoneToday();
+  saleTotals();
+  paintLineAmount(idx);
 }
 function saleRateAll() {
   const v = parseFloat((document.getElementById('sale-interest') || {}).value) || 0;
@@ -250,7 +258,7 @@ function applyClientRate() {
 }
 function saleTotals() {
   const sub = cart.reduce((s, i) => s + (i.qty || 1) * (i.price || 0), 0);
-  const interest = cart.reduce((s, i) => s + ((i.qty || 1) * (i.price || 0)) * ((i.intRate || 0) / 100), 0);
+  const interest = cart.reduce((s, i) => s + lineIntCalc((i.qty || 1) * (i.price || 0), (i.intRate || 0), i.date), 0);
   const sc = (document.getElementById('sale-sc')?.checked) ? sub * 0.2 : 0;
   const disc = Math.max(0, parseFloat(document.getElementById('sale-discount')?.value) || 0) + sc;
   const total = Math.max(0, sub + interest - disc);
@@ -317,6 +325,10 @@ function manualItem() {
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('manual.name')}</label>
             <input id="m-name" type="text" placeholder="${esc(T('manual.name_ph'))}" class="inp" />
           </div>
+          <div>
+            <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('manual.date')}</label>
+            <input id="m-date" type="date" value="${escAttr(phoneToday())}" class="inp" />
+          </div>
           <div class="grid grid-cols-2 gap-2.5">
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('manual.price')}</label>
@@ -338,13 +350,14 @@ function addManualItem() {
   const nameEl = document.getElementById('m-name');
   const priceEl = document.getElementById('m-price');
   const qtyEl = document.getElementById('m-qty');
+  const dateEl = document.getElementById('m-date');
   const name = (nameEl && nameEl.value || '').trim();
   const price = parseFloat(priceEl && priceEl.value);
   const qty = parseInt(qtyEl && qtyEl.value) || 1;
   if (!name) { toast(T('manual.name_req'), 'err'); return; }
   if (isNaN(price) || price < 0) { toast(T('manual.price_req'), 'err'); return; }
-  cart.push({ invId: null, name, qty: Math.max(1, qty), price });
-  // Stay open for the next item: clear the fields, keep the qty, refocus.
+  cart.push({ invId: null, name, qty: Math.max(1, qty), price, date: (dateEl && dateEl.value) || phoneToday() });
+  // Stay open for the next item: clear the fields, keep qty + date, refocus.
   if (nameEl) nameEl.value = '';
   if (priceEl) priceEl.value = '';
   try { if (nameEl) nameEl.focus(); } catch (e) {}
@@ -373,7 +386,7 @@ async function submitSale() {
     const it = itemById(i.invId);
     const vs = (it && it.variants) || [];
     return {
-      date: i.date || new Date().toISOString().split('T')[0],
+      date: i.date || phoneToday(),
       name: String(i.qty), description: i.name, qty: i.qty, unitCost: i.price,
       intRate: i.intRate || 0, invId: i.invId,
       variantName: i.variantName || (vs.length ? vs[0].name : null)

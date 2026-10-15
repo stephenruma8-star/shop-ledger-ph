@@ -19,6 +19,25 @@ function esc(s) { const d = document.createElement('div'); d.textContent = s == 
 // " raw), so it is unsafe inside attribute values and quoted JS strings.
 // Use this for value="...", placeholder="...", data-* and similar spots.
 function escAttr(s) { return esc(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+// Local YYYY-MM-DD (matches the desktop today() and the store _todayStr;
+// toISOString would be UTC and can disagree near midnight).
+function phoneToday() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+// Desktop-parity line interest: rate is %/MONTH, prorated by whole days from
+// the line date to today (min 1 day). Same-day items accrue rate/30 — the
+// old flat full-rate charge overbilled ~30x versus desktop.
+function lineIntCalc(sub, rate, dateStr, todayStr) {
+  sub = Number(sub) || 0; rate = Number(rate) || 0;
+  if (!sub || !rate) return 0;
+  const t = String(todayStr || phoneToday()).slice(0, 10);
+  const d = String(dateStr || t).slice(0, 10);
+  let days = Math.floor((new Date(t) - new Date(d)) / 86400000);
+  if (isNaN(days)) return 0;
+  days = Math.max(1, days);
+  return Math.round(sub * (rate / 100) * (days / 30) * 100) / 100;
+}
 function fmtDate(d) {
   if (!d) return '';
   const dt = new Date(d);
