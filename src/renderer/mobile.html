@@ -1439,6 +1439,8 @@ const LANG_STRINGS = {
     'sale.tender_title': 'Cash tendered', 'sale.tender_exact': 'Exact', 'sale.tender_clear': 'Clear',
     'sale.tender_custom_ph': 'Or type custom amount…',
     'sale.tendered': 'Tendered', 'sale.change': 'Change due', 'sale.dash': '—',
+    'sale.bal_walkin': 'Walk-in — no balance recorded', 'sale.bal_owes': 'Owes {amt}',
+    'sale.bal_adds': 'this sale adds {amt}', 'sale.bal_cash': 'Cash sale — no balance added. Turn on Charge for credit.',
     'sale.retry': '↻ Retry last failed sale',
     'sale.success_title': 'Sale saved', 'sale.print': '🖨️ Print counter receipt',
     'sale.share': '📤 Share receipt', 'sale.new': 'New sale',
@@ -1802,6 +1804,8 @@ const LANG_STRINGS = {
     'sale.tender_title': 'Iniabot na cash', 'sale.tender_exact': 'Sakto', 'sale.tender_clear': 'Burahin',
     'sale.tender_custom_ph': 'O mag-type ng ibang halaga…',
     'sale.tendered': 'Iniabot', 'sale.change': 'Sukli', 'sale.dash': '—',
+    'sale.bal_walkin': 'Walk-in — walang utang na itatala', 'sale.bal_owes': 'May utang na {amt}',
+    'sale.bal_adds': 'ang bentang ito ay magdaragdag ng {amt}', 'sale.bal_cash': 'Cash na benta — walang idaragdag. I-on ang Charge para sa utang.',
     'sale.retry': '↻ Subukang muli ang nabigong benta',
     'sale.success_title': 'Na-save ang benta', 'sale.print': '🖨️ I-print ang resibo',
     'sale.share': '📤 I-share ang resibo', 'sale.new': 'Bagong benta',
@@ -3261,10 +3265,11 @@ function renderSale(presetId) {
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sale.client')}</label>
           <select id="sale-client" onchange="saleClientChanged()" class="inp">${clientOptions()}</select>
+          <div id="sale-client-bal" class="text-[11px] text-gray-500 mt-1"></div>
         </div>
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sale.payment')}</label>
-          <select id="sale-payment" class="inp">${['Cash', 'GCash', 'Maya', 'Bank Transfer'].map(p => '<option' + (p === keepPay ? ' selected' : '') + '>' + p + '</option>').join('')}</select>
+          <select id="sale-payment" onchange="saleHeaderChanged()" class="inp">${['Cash', 'GCash', 'Maya', 'Bank Transfer'].map(p => '<option' + (p === keepPay ? ' selected' : '') + '>' + p + '</option>').join('')}</select>
         </div>
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sale.interest')}</label>
@@ -3281,7 +3286,7 @@ function renderSale(presetId) {
       </label>
       <label class="flex items-center justify-between gap-3 py-1 cursor-pointer">
         <span class="text-sm text-gray-300">${T('sale.charge')}</span>
-        <input type="checkbox" id="sale-charge"${keepCharge ? ' checked' : ''} class="switch" />
+        <input type="checkbox" id="sale-charge" onchange="saleHeaderChanged()"${keepCharge ? ' checked' : ''} class="switch" />
       </label>
       <div class="flex justify-between items-center border-t border-white/10 pt-3">
         <span class="font-bold text-gray-200">${T('sale.total')}</span>
@@ -3442,6 +3447,28 @@ function saleTotals() {
   const se = document.getElementById('sale-sub'); if (se) se.textContent = peso(sub);
   lastSaleTotal = total;
   updateTender();
+  updateSaleClientPreview();
+}
+// Live consequence line under the client picker: exactly what saving will do
+// to the client's balance (mirrors the server rule: charge + non-cash).
+function saleHeaderChanged() { try { saleTotals(); } catch (e) {} }
+function updateSaleClientPreview() {
+  try {
+    const box = document.getElementById('sale-client-bal');
+    if (!box) return;
+    const sel = document.getElementById('sale-client');
+    const id = sel && sel.value ? sel.value : null;
+    if (!id) { box.innerHTML = `<span class="text-gray-600">${esc(T('sale.bal_walkin'))}</span>`; return; }
+    const c = (data.clients || []).find(x => String(x.id) === String(id));
+    const charge = !!(document.getElementById('sale-charge') || {}).checked;
+    const pay = (document.getElementById('sale-payment') || {}).value || 'Cash';
+    const owes = (c && c.balance) || 0;
+    if (charge && pay !== 'Cash') {
+      box.innerHTML = `<span class="text-gray-400">${esc(T('sale.bal_owes', { amt: peso(owes) }))}</span> · <span class="text-orange-400 font-semibold">${esc(T('sale.bal_adds', { amt: peso(lastSaleTotal || 0) }))}</span>`;
+    } else {
+      box.innerHTML = `<span class="text-gray-400">${esc(T('sale.bal_owes', { amt: peso(owes) }))}</span> · <span class="text-gray-500">${esc(T('sale.bal_cash'))}</span>`;
+    }
+  } catch (e) {}
 }
 // Tender/change calculator state. Tendered persists across re-renders so
 // stepping quantities mid-tender never wipes it; cleared on sale completion.

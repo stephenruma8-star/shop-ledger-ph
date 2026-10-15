@@ -250,6 +250,25 @@ async function runStandaloneAudit() {
     closeQuick();
     showView('home');
   });
+  await A('sale-balance-preview', async () => {
+    showView('sale');
+    cart.push({ invId: null, name: 'Audit Bal', qty: 1, price: 100 });
+    renderSale();
+    if (!document.getElementById('sale-client-bal')) throw new Error('no balance preview line');
+    const c = (data.clients || [])[0];
+    if (!c) throw new Error('no demo client');
+    document.getElementById('sale-client').value = String(c.id);
+    document.getElementById('sale-charge').checked = true;
+    document.getElementById('sale-payment').value = 'GCash';
+    saleHeaderChanged();
+    const box = document.getElementById('sale-client-bal');
+    if (!box.textContent.includes('100.00')) throw new Error('preview missing adds amount: ' + box.textContent);
+    document.getElementById('sale-charge').checked = false;
+    saleHeaderChanged();
+    if (!box.textContent.includes('Cash')) throw new Error('cash path not shown in preview');
+    cart = [];
+    showView('home');
+  });
   await A('presets-roundtrip', async () => {
     const before = (await apiGet('/api/quick-items')).length;
     await apiPost('/api/quick-items', { name: 'Audit Preset', price: 7 });
