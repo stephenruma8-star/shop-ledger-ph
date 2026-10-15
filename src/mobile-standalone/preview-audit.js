@@ -235,6 +235,21 @@ async function runStandaloneAudit() {
   await A('escattr-quotes', async () => {
     if (escAttr('a"b\'c<d') !== 'a&quot;b&#39;c&lt;d') throw new Error('bad escAttr: ' + escAttr('a"b\'c<d'));
   });
+  await A('settle-line-ui', async () => {
+    const r = await apiPost('/api/clients', { name: 'Audit Settle' });
+    const inv = (data.inventory || []).find(i => (i.stock || 0) > 0);
+    if (!inv) throw new Error('no stock for settle fixture');
+    const s = await apiPost('/api/sales', { clientId: r.id, items: [{ description: 'Audit Settle Item', qty: 1, unitCost: 77, intRate: 0, invId: inv.id }], paymentMethod: 'GCash' });
+    await openTxnDetail(s.invoiceNo);
+    if (!document.getElementById('txn-detail-body').innerHTML.includes('settleTxnLine')) throw new Error('no settle button');
+    settleTxnLine(s.invoiceNo, 0);
+    await settleTxnLine(s.invoiceNo, 0);
+    const h = await apiGet('/api/clients/' + r.id + '/history');
+    if ((h.client.balance || 0) !== 0) throw new Error('settle did not clear balance, got ' + h.client.balance);
+    if (!(h.payments || []).some(p => p.type === 'Settle' && p.amount === 77)) throw new Error('no settle payment');
+    closeQuick();
+    showView('home');
+  });
   await A('presets-roundtrip', async () => {
     const before = (await apiGet('/api/quick-items')).length;
     await apiPost('/api/quick-items', { name: 'Audit Preset', price: 7 });

@@ -421,5 +421,28 @@ const vAfter = await A('GET', '/api/inventory');
 const vRow = vAfter.find(i => i.id === vItem.id);
 ok(vRow && vRow.variants.find(v => v.name === 'S').stock === 5, 'variant stock decremented on sale');
 
+// settle-item: pay off one line without touching the other
+const setC = await A('POST', '/api/clients', { name: 'Settle Client' });
+const setSale = await A('POST', '/api/sales', { clientId: setC.id, items: [
+  { description: 'Rice', qty: 1, unitCost: 50, intRate: 0, invId: it1.id },
+  { description: 'Oil', qty: 2, unitCost: 30, intRate: 10, invId: it2.id, date: monthAgo }
+], paymentMethod: 'GCash' });
+ok(setSale.success, 'settle fixture sale');
+const set1 = await A('POST', '/api/sales/settle-item', { invoiceNo: setSale.invoiceNo, index: 1 });
+ok(set1.success && set1.amount === 66 && set1.allSettled === false, 'settle oil line (60 + 6 interest)');
+let setH = await A('GET', '/api/clients/' + setC.id + '/history');
+ok(setH.client.balance === 50 && setH.payments.length === 1 && setH.payments[0].type === 'Settle', 'settle payment + balance exact');
+const setDet = await A('GET', '/api/transactions/' + setSale.invoiceNo);
+ok(setDet.items[1].settled && setDet.items[1].settled.amount === 66 && !setDet.items[0].settled && setDet.status === 'pending', 'line flagged, sale still pending');
+await throws(400, () => A('POST', '/api/sales/settle-item', { invoiceNo: setSale.invoiceNo, index: 1 }), 'double settle rejected');
+await throws(404, () => A('POST', '/api/sales/settle-item', { invoiceNo: setSale.invoiceNo, index: 9 }), 'bad line index rejected');
+const walkSale = await A('POST', '/api/sales', { items: [{ description: 'Oil', qty: 1, unitCost: 30, invId: it2.id }], paymentMethod: 'Cash' });
+await throws(400, () => A('POST', '/api/sales/settle-item', { invoiceNo: walkSale.invoiceNo, index: 0 }), 'walk-in needs no settling');
+const set2 = await A('POST', '/api/sales/settle-item', { invoiceNo: setSale.invoiceNo, index: 0 });
+ok(set2.success && set2.amount === 50 && set2.allSettled === true, 'settle last line marks sale paid');
+setH = await A('GET', '/api/clients/' + setC.id + '/history');
+ok(setH.client.balance === 0, 'balance zero after all settled');
+ok((await A('GET', '/api/transactions/' + setSale.invoiceNo)).status === 'paid', 'sale status paid');
+
 console.log(`\nSTANDALONE STORE: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

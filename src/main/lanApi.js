@@ -944,6 +944,19 @@ function createLanApiRouter(deps) {
     res.json({ success: true });
   }));
 
+  router.post('/api/sales/settle-item', wrap(async (req, res) => {
+    if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
+    const { invoiceNo, index } = req.body || {};
+    if (!invoiceNo || typeof invoiceNo !== 'string') return res.status(400).json({ error: 'invoiceNo required' });
+    const idx = parseInt(index);
+    if (isNaN(idx) || idx < 0) return res.status(400).json({ error: 'item index required' });
+    const out = JSON.parse(await deps.rendererExec(`JSON.stringify(await settleTxnItemCore(${JSON.stringify(invoiceNo)}, ${idx}).then(r=>Object.assign({ok:true},r),e=>({ok:false,error:String((e&&e.message)||e)})))`));
+    if (!out || !out.ok) return res.status(400).json({ error: (out && out.error) || 'Settle failed' });
+    try { await deps.rendererExec(`(async()=>{try{await logAudit('settle','Mobile item settlement ' + ${JSON.stringify(invoiceNo)} + ${JSON.stringify(devTag(req))});}catch(e){}})()`); } catch (e) {}
+    bump({ source: 'api', kind: 'settle' });
+    res.json({ success: true, amount: out.amount, paymentId: out.paymentId, allSettled: !!out.allSettled });
+  }));
+
   router.post('/api/sales', wrap(async (req, res) => {
     if (req.query.offline === 'true') {
       _offlineQueue.push({ type: 'sale', body: req.body, timestamp: Date.now() });

@@ -64,12 +64,16 @@ async function voidTxn(id) {
 let returnArmTimer = null;
 let detailTxn = null;
 let returnSel = new Set();
+let settleArmedFor = null;
+let settleArmTimer = null;
 async function openTxnDetail(id) {
   // A stale arm from another invoice must never confirm a new one.
   returnArmedFor = null;
+  settleArmedFor = null;
   returnSel = new Set();
   detailTxn = null;
   try { if (returnArmTimer) clearTimeout(returnArmTimer); } catch (e) {}
+  try { if (settleArmTimer) clearTimeout(settleArmTimer); } catch (e) {}
   document.getElementById('modal-root').innerHTML = `
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
       <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:94vh;max-height:94dvh;overflow-y:auto" onclick="event.stopPropagation()">
@@ -90,11 +94,18 @@ async function openTxnDetail(id) {
     <p class="text-[11px] text-gray-500 mb-3">${esc(t.clientName || 'Walk-in')} · ${esc(t.date || '')} · ${esc(t.paymentMethod || 'Cash')}</p>
     ${canReturn && (t.items || []).length ? `<p class="text-[11px] text-gray-500 mb-2">${T('ret.pick_hint')}</p>` : ''}
     <div class="space-y-1.5 mb-3">
-      ${(t.items || []).map((it, idx) => `
+      ${(t.items || []).map((it, idx) => {
+        const payoff = (parseFloat(it.amount) || 0) > 0 ? parseFloat(it.amount) : (parseFloat(it.qty) || 1) * (it.unitCost || it.price || 0);
+        const canSettle = t.clientId && (t.status === 'pending') && !it.settled;
+        return `<div class="py-1">
         <div class="flex justify-between text-sm gap-2 ${canReturn ? 'rounded-xl px-2 -mx-2 py-1' : ''}" ${canReturn ? `id="ret-line-${idx}" onclick="toggleReturnLine(${idx})" style="cursor:pointer"` : ''}>
           <span class="text-gray-200 truncate">${esc(it.description || it.name || 'Item')} <span class="text-gray-500">x${it.qty || 1}</span></span>
           <span class="num shrink-0">${peso((parseFloat(it.qty) || 1) * (it.unitCost || it.price || 0))}</span>
-        </div>`).join('') || `<p class="text-xs text-gray-500">${T('txn.no_lines')}</p>`}
+        </div>
+        ${it.settled ? `<div class="text-[11px] text-green-400 font-semibold mt-0.5">${esc(T('txn.settled_chip', { amt: peso(it.settled.amount), date: it.settled.date || '' }))}</div>`
+          : (canSettle ? `<button id="settle-btn-${idx}" onclick="event.stopPropagation();settleTxnLine(${JSON.stringify(t.invoiceNo || t.id)}, ${idx})" class="btn btn-sm mt-1 w-full" style="background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);color:#93c5fd">${esc(T('txn.settle_item', { amt: peso(payoff) }))}</button>` : '')}
+        </div>`;
+      }).join('') || `<p class="text-xs text-gray-500">${T('txn.no_lines')}</p>`}
     </div>
     <div class="flex justify-between items-center border-t border-white/10 pt-2 mb-3">
       <span class="font-bold text-gray-200">${T('txn.total')}</span>
@@ -120,6 +131,31 @@ async function toggleReturnLine(idx) {
     const btn = document.getElementById('return-btn');
     if (btn) btn.textContent = returnSel.size ? T('ret.selected', { n: returnSel.size }) : T('txn.return');
   } catch (e) {}
+}
+// Per-item settlement: two-tap confirm (first tap arms, second posts),
+// same pattern as return/void. Reopens the detail so settled flags show.
+async function settleTxnLine(inv, idx) {
+  const key = String(inv) + ':' + idx;
+  const btn = document.getElementById('settle-btn-' + idx);
+  if (settleArmedFor !== key) {
+    settleArmedFor = key;
+    if (btn) btn.textContent = T('txn.settle_confirm');
+    try { if (settleArmTimer) clearTimeout(settleArmTimer); } catch (e) {}
+    settleArmTimer = setTimeout(() => { settleArmedFor = null; }, 5000);
+    return;
+  }
+  settleArmedFor = null;
+  try { if (settleArmTimer) clearTimeout(settleArmTimer); } catch (e) {}
+  if (!takeSubmitLock('settle')) return;
+  try {
+    const r = await apiPost('/api/sales/settle-item', { invoiceNo: inv, index: idx });
+    closeQuick();
+    feelSale();
+    toast(T('txn.settled', { amt: peso(r.amount) }), 'ok');
+    await refreshAll();
+    openTxnDetail(inv);
+  } catch (e) { feelErr(); toast(T('txn.settle_failed', { msg: e.message }), 'err'); }
+  finally { releaseSubmitLock('settle'); }
 }
 async function returnTxn(id) {
   const btn = document.getElementById('return-btn');

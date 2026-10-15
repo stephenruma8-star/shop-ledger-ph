@@ -3,7 +3,7 @@ import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
 import { calcInterest, closeModal, confetti, confirmModal, debounce, escapeHtml, filterByYear, modal, parseCSVLine, playSound, searchData, toast, validatePhone } from './helpers.js'
 import { escHtml, excelTableCss, openPrintWindow } from './printLayout.js'
 import { fmtDate, fmtDateTime, now, peso, state, today } from './state.js'
-import { adjustStock, getQty, resolveInvIds, undoSale } from './transactions.js'
+import { adjustStock, getQty, lineAmt, resolveInvIds, undoSale } from './transactions.js'
 
 // Month-opening balance snapshots: one record per month capturing every client's
 // balance the first time the app runs that month. Powers historical receivables
@@ -301,9 +301,13 @@ export async function viewClientHistory(id) {
             <div class="flex items-center gap-2"><span class="text-sm font-semibold text-blue-600">${peso(t.grandTotal)}</span><span class="text-xs ${t.paymentMethod==='Cash'?'text-green-600':'text-orange-600'}">${escHtml(t.paymentMethod||'')}</span><span class="text-xs font-mono ${rb>0?'text-orange-600':'text-gray-500'}">Bal: ${peso(rb)}</span><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-400"><polyline points="6 9 12 15 18 9"/></svg></div>
           </div>
           <div class="hidden px-3 pb-2">
-            <table class="w-full text-xs mt-1"><thead><tr class="text-gray-500"><th class="p-1 text-left">Item</th><th class="p-1 text-center">Qty</th><th class="p-1 text-right">Price</th><th class="p-1 text-right">Int</th><th class="p-1 text-right">Amount</th></tr></thead><tbody>
-            ${(t.items||[]).map(i => `<tr class="border-b dark:border-gray-700 last:border-0"><td class="p-1">${escHtml(i.description||'')}</td><td class="p-1 text-center">${escHtml(i.name||'1')}</td><td class="p-1 text-right">${peso(i.unitCost||0)}</td><td class="p-1 text-right">${i.intRate?i.intRate+'%':'-'}</td><td class="p-1 text-right font-medium">${peso((getQty(i.name||i.qty||1)*(i.unitCost||0)))}</td></tr>`).join('')}
-            ${t.totalInterest > 0 || t.discount > 0 || t.scDiscount > 0 ? `<tr class="font-semibold"><td colspan="4" class="p-1 text-right text-xs">${t.totalInterest>0?'Interest: '+peso(t.totalInterest)+' ':''}${t.scDiscount>0?'SC/PWD: -'+peso(t.scDiscount)+' ':''}${t.discount>0?'Discount: -'+peso(t.discount):''}</td><td class="p-1 text-right font-bold">${peso(t.grandTotal)}</td></tr>` : ''}
+            <table class="w-full text-xs mt-1"><thead><tr class="text-gray-500"><th class="p-1 text-left">Item</th><th class="p-1 text-center">Qty</th><th class="p-1 text-right">Price</th><th class="p-1 text-right">Int</th><th class="p-1 text-right">Amount</th><th class="p-1 text-right">Settle</th></tr></thead><tbody>
+            ${(t.items||[]).map((i, ii) => {
+              const payoff = (parseFloat(i.amount) || 0) > 0 ? parseFloat(i.amount) : lineAmt(i);
+              const canSettle = t.status === 'pending' && t.clientId && !i.settled;
+              return `<tr class="border-b dark:border-gray-700 last:border-0"><td class="p-1">${escHtml(i.description||'')}</td><td class="p-1 text-center">${escHtml(i.name||'1')}</td><td class="p-1 text-right">${peso(i.unitCost||0)}</td><td class="p-1 text-right">${i.intRate?i.intRate+'%':'-'}</td><td class="p-1 text-right font-medium">${peso((getQty(i.name||i.qty||1)*(i.unitCost||0)))}</td><td class="p-1 text-right">${i.settled ? '<span class="text-green-600 font-medium">✓ Settled</span>' : (canSettle ? `<button onclick="event.stopPropagation();settleClientItem('${t.invoiceNo}',${ii})" class="text-blue-600 hover:text-blue-800 underline whitespace-nowrap" title="Pay off this item only">Settle ${peso(payoff)}</button>` : '')}</td></tr>`;
+            }).join('')}
+            ${t.totalInterest > 0 || t.discount > 0 || t.scDiscount > 0 ? `<tr class="font-semibold"><td colspan="5" class="p-1 text-right text-xs">${t.totalInterest>0?'Interest: '+peso(t.totalInterest)+' ':''}${t.scDiscount>0?'SC/PWD: -'+peso(t.scDiscount)+' ':''}${t.discount>0?'Discount: -'+peso(t.discount):''}</td><td class="p-1 text-right font-bold">${peso(t.grandTotal)}</td></tr>` : ''}
             </tbody></table>
             <button onclick="deleteClientSale(${t.id},${c.id})" class="text-xs text-red-500 hover:text-red-700 mt-1">Delete this sale</button>
           </div>
@@ -508,6 +512,51 @@ export async function saveClientPayment(id) {
   toast('Payment recorded ✓', 'success');
 }
 
+// Per-item settlement: pay off ONE line (including its sale-time interest)
+// without touching the rest of the sale. Records a real 'Settle' payment so
+// the ledger reconciles, flags the line, and marks the sale paid when every
+// line is settled. Throws on any validation problem (LAN API relies on it).
+export async function settleTxnItemCore(invoiceNo, idx) {
+  const t = state.transactions.find(x => x.invoiceNo === invoiceNo);
+  if (!t) throw new Error('Sale not found');
+  if (t.status === 'voided' || t.status === 'return') throw new Error('Sale is closed');
+  const items = t.items || [];
+  const it = items[idx];
+  if (!it) throw new Error('Item not found');
+  if (it.settled) throw new Error('Item already settled');
+  if (!t.clientId) throw new Error('Walk-in sales need no settling');
+  const c = await dbGet('clients', t.clientId);
+  if (!c) throw new Error('Client not found');
+  if (!((c.balance || 0) > 0)) throw new Error('Client has no balance to settle');
+  const payoff = (parseFloat(it.amount) || 0) > 0 ? parseFloat(it.amount) : lineAmt(it);
+  const amount = Math.min(payoff, c.balance || 0);
+  const pid = await dbAdd('payments', { clientId: c.id, clientName: c.name, amount, date: today(), type: 'Settle', notes: `Settled ${it.description || it.name || 'item'} (${invoiceNo})`, createdAt: now() });
+  it.settled = { amount, date: today(), paymentId: pid };
+  const allSettled = items.length > 0 && items.every(x => x && x.settled);
+  if (allSettled) t.status = 'paid';
+  await dbPut('transactions', t);
+  c.balance = (c.balance || 0) - amount;
+  await dbPut('clients', c);
+  await logAudit('settle', `Settled ${it.description || it.name} (${invoiceNo}) - ${peso(amount)}`);
+  state.transactions = await dbAll('transactions');
+  state.clients = await dbAll('clients');
+  state.payments = await dbAll('payments');
+  return { success: true, amount, paymentId: pid, allSettled };
+}
+
+export async function settleClientItem(invoiceNo, idx) {
+  const t = state.transactions.find(x => x.invoiceNo === invoiceNo);
+  const it = t && (t.items || [])[idx];
+  if (!t || !it) { toast('Item not found', 'error'); return; }
+  const payoff = (parseFloat(it.amount) || 0) > 0 ? parseFloat(it.amount) : lineAmt(it);
+  if (!await confirmModal(`Settle "${it.description || it.name || 'item'}" for ${peso(payoff)}? The rest of ${invoiceNo} stays untouched.`)) return;
+  try {
+    const r = await settleTxnItemCore(invoiceNo, idx);
+    toast(`Settled ${peso(r.amount)}`, 'success');
+    await viewClientHistory(t.clientId);
+  } catch (e) { toast(e.message || 'Settle failed', 'error'); }
+}
+
 export async function deleteClientSale(txnId, clientId) {
   if (!await confirmModal('Delete this sale? Client balance will be adjusted.')) return;
   const t = state.transactions.find(x => x.id === txnId);
@@ -661,6 +710,8 @@ Object.defineProperties(window, {
   recordClientPayment: { get: () => recordClientPayment, configurable: true },
   saveClientPayment: { get: () => saveClientPayment, configurable: true },
   deleteClientSale: { get: () => deleteClientSale, configurable: true },
+  settleTxnItemCore: { get: () => settleTxnItemCore, configurable: true },
+  settleClientItem: { get: () => settleClientItem, configurable: true },
   importClients: { get: () => importClients, configurable: true },
   deleteClient: { get: () => deleteClient, configurable: true },
   exportAllClientsCSV: { get: () => exportAllClientsCSV, configurable: true },

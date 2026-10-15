@@ -584,6 +584,7 @@ function _mapTxnList(t) {
 async function _apiSales(method, parts, body, query) {
   const db = _db();
   if (method === 'POST' && parts.length === 0) return _applySale(body || {});
+  if (method === 'POST' && parts.length === 1 && parts[0] === 'settle-item') return _apiSettleItem(body || {});
   if (method === 'GET' && parts.length === 0) {
     const limit = Math.min(parseInt(query.limit) || 200, 500);
     // SQL-level cap: years of sales must never all land in memory at once.
@@ -605,6 +606,43 @@ async function _apiSales(method, parts, body, query) {
     };
   }
   throw _apiErr(404, 'Not found');
+}
+async function _apiSettleItem(body) {
+  // Pay off ONE sale line (including its sale-time interest) without touching
+  // the rest of the sale. Records a real 'Settle' payment so the ledger
+  // reconciles, flags the line, and marks the sale paid when all lines settle.
+  const db = _db();
+  const ref = body && (body.invoiceNo ?? body.id);
+  const idx = parseInt(body && body.index);
+  if (ref === undefined || ref === null || String(ref).trim() === '') throw _apiErr(400, 'invoiceNo required');
+  if (isNaN(idx) || idx < 0) throw _apiErr(400, 'item index required');
+  const t = await db.get('SELECT * FROM transactions WHERE invoiceNo = ? OR id = ?', [String(ref), String(ref)]);
+  if (!t) throw _apiErr(404, 'Transaction not found');
+  if (t.status === 'voided' || t.status === 'return') throw _apiErr(400, 'Sale is closed');
+  const items = _parseJson(t.items, []);
+  const it = items[idx];
+  if (!it) throw _apiErr(404, 'Item not found');
+  if (it.settled) throw _apiErr(400, 'Item already settled');
+  if (!t.clientId) throw _apiErr(400, 'Walk-in sales need no settling');
+  const c = await db.get('SELECT * FROM clients WHERE id = ?', [t.clientId]);
+  if (!c) throw _apiErr(404, 'Client not found');
+  if (!((c.balance || 0) > 0)) throw _apiErr(400, 'Client has no balance to settle');
+  const qty = parseFloat(it.qty) || 1;
+  const payoff = (parseFloat(it.amount) || 0) > 0 ? parseFloat(it.amount) : _r2(qty * (it.unitCost || it.price || 0));
+  const amount = Math.min(payoff, c.balance || 0);
+  const now = new Date().toISOString();
+  const pr = await db.run(
+    'INSERT INTO payments (clientId, amount, appliedAmount, type, date, notes, referenceNo, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [c.id, amount, amount, 'Settle', _todayStr(), 'Settled ' + (it.description || it.name || 'item') + ' (' + t.invoiceNo + ')', '', now]
+  );
+  it.settled = { amount, date: _todayStr(), paymentId: (pr && pr.lastID) || 0 };
+  await db.run('UPDATE transactions SET items = ? WHERE id = ?', [JSON.stringify(items), t.id]);
+  const allSettled = items.length > 0 && items.every(x => x && x.settled);
+  if (allSettled) await db.run("UPDATE transactions SET status = 'paid' WHERE id = ?", [t.id]);
+  await db.run('UPDATE clients SET balance = ? WHERE id = ?', [(c.balance || 0) - amount, c.id]);
+  await _audit('settle', 'Settled item ' + (it.description || it.name || '') + ' (' + t.invoiceNo + ') - ₱' + amount.toFixed(2) + ' (phone)');
+  _bump();
+  return { success: true, amount, paymentId: (pr && pr.lastID) || 0, allSettled };
 }
 async function _apiVoid(body) {
   const db = _db();
@@ -767,7 +805,7 @@ async function _apiPayments(method, parts, body) {
     const ref = String(referenceNo || '').trim().slice(0, 40);
     const c = clientId ? await db.get('SELECT * FROM clients WHERE id = ?', [clientId]) : null;
     const balBefore = c ? (c.balance || 0) : 0;
-    const pt = (type === 'Full' || type === 'Partial') ? type : (amtNum >= balBefore ? 'Full' : 'Partial');
+    const pt = (type === 'Full' || type === 'Partial' || type === 'Settle') ? type : (amtNum >= balBefore ? 'Full' : 'Partial');
     const applied = c ? Math.min(amtNum, Math.max(0, balBefore)) : amtNum;
     await db.run('INSERT INTO payments (clientId, amount, appliedAmount, type, date, notes, referenceNo, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [clientId || null, amtNum, applied, pt, safeDate, '', ref, new Date().toISOString()]);
