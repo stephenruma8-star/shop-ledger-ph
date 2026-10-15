@@ -18,6 +18,12 @@
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f172a;color:#f1f5f9;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 body{background-image:radial-gradient(ellipse 80% 50% at 50% -20%,rgba(59,130,246,.14),transparent),radial-gradient(ellipse 60% 40% at 90% 110%,rgba(29,78,216,.10),transparent)}
 ::-webkit-scrollbar{width:0;height:0}
+/* Scrollable sheets keep a slim visible scrollbar: with zero-width bars
+nowhere, users cannot tell long lists (clients, sales) continue below. */
+#sheet-body{scrollbar-width:thin;scrollbar-color:rgba(148,163,184,.45) transparent}
+#sheet-body::-webkit-scrollbar,#modal-root ::-webkit-scrollbar{width:6px;height:6px}
+#sheet-body::-webkit-scrollbar-thumb,#modal-root ::-webkit-scrollbar-thumb{background:rgba(148,163,184,.4);border-radius:9999px}
+#sheet-body::-webkit-scrollbar-track,#modal-root ::-webkit-scrollbar-track{background:transparent}
 .fade-in{animation:fadeIn .2s ease-out}@keyframes fadeIn{from{opacity:0}to{opacity:1}}
 .slide-in{animation:slideIn .25s ease-out}@keyframes slideIn{from{transform:translateY(10px);opacity:0}to{transform:translateY(0);opacity:1}}
 .slide-up{animation:slideUp .28s cubic-bezier(.32,.72,.28,1)}@keyframes slideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}
@@ -251,6 +257,10 @@ const API = (() => {
 })();
 const peso = (n) => '₱' + (Number(n) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+// escAttr: esc() does NOT escape quotes (text-node serialization leaves ' and
+// " raw), so it is unsafe inside attribute values and quoted JS strings.
+// Use this for value="...", placeholder="...", data-* and similar spots.
+function escAttr(s) { return esc(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
 function fmtDate(d) {
   if (!d) return '';
   const dt = new Date(d);
@@ -1304,7 +1314,7 @@ function navTap(view) {
     return;
   }
   // Fresh tab entry starts a clean sale (no leftover client preset).
-  if (view === 'sale') { try { saleClientPreset = null; } catch (e) {} }
+  if (view === 'sale') { try { saleClientPreset = null; saleRateClient = null; } catch (e) {} }
   if (navModalOpen && currentView === view) { closeNavModal(); return; }
   showView(view);
 }
@@ -1520,7 +1530,7 @@ const LANG_STRINGS = {
     'sale.fail_generic': 'Sale failed: {msg}',
     'manual.title': 'Add Manual Item', 'manual.name': 'Item name',
     'manual.name_ph': 'e.g. Candies', 'manual.price': 'Price (₱)',
-    'manual.qty': 'Qty', 'manual.add': 'Add to Cart', 'manual.done': 'Done',
+    'manual.qty': 'Qty', 'manual.add': 'Add to Cart', 'manual.done': 'Done', 'manual.added_count': 'Added', 'manual.multi_hint': 'This stays open so you can add many items, then tap Done.',
     'manual.name_req': 'Enter an item name',
     'manual.price_req': 'Enter a valid price',
     'cli.total_clients': 'Total clients', 'cli.total_debts': 'Total debts',
@@ -1879,7 +1889,7 @@ const LANG_STRINGS = {
     'sale.fail_generic': 'Nabigo ang benta: {msg}',
     'manual.title': 'Magdagdag ng Manual na Item', 'manual.name': 'Pangalan ng item',
     'manual.name_ph': 'hal. Candy', 'manual.price': 'Presyo (₱)',
-    'manual.qty': 'Dami', 'manual.add': 'Idagdag sa Cart', 'manual.done': 'Tapos na',
+    'manual.qty': 'Dami', 'manual.add': 'Idagdag sa Cart', 'manual.done': 'Tapos na', 'manual.added_count': 'Nadagdag', 'manual.multi_hint': 'Hindi ito nagsasara para makapagdagdag ka ng marami, pagkatapos ay pindutin ang Tapos na.',
     'manual.name_req': 'Maglagay ng pangalan ng item',
     'manual.price_req': 'Maglagay ng wastong presyo',
     'cli.total_clients': 'Kabuuang kliyente', 'cli.total_debts': 'Kabuuang utang',
@@ -2706,7 +2716,7 @@ function clientListHTML(clients) {
 function filterClients(q) {
   q = (q || '').toLowerCase();
   const grid = document.getElementById('client-grid');
-  if (grid) grid.innerHTML = clientListHTML(data.clients.filter(c => (c.name || '').toLowerCase().includes(q) || (c.phone || '').includes(q)));
+  if (grid) grid.innerHTML = clientListHTML(data.clients.filter(c => (c.name || '').toLowerCase().includes(q) || (c.phone || '').includes(q) || (c.address || '').toLowerCase().includes(q)));
 }
 function csvCell(v) {
   const s = String(v ?? '');
@@ -2776,6 +2786,8 @@ async function openClientDetail(id) {
   let h = null;
   try { h = await apiGet('/api/clients/' + encodeURIComponent(id) + '/history'); }
   catch (e) { toast(T('cli.load_fail', { msg: e.message }), 'err'); closeQuick(); return; }
+  // A slow response for client A must not overwrite client B's modal.
+  if (detailClientId !== id) return;
   const box = document.getElementById('client-detail-body');
   if (!box || !h || !h.client) return;
   const c = h.client;
@@ -2830,21 +2842,21 @@ function renderClientForm(id) {
         <div class="space-y-4">
           <div>
             <label class="text-xs font-semibold uppercase tracking-wider text-gray-400 block mb-1.5">${T('cli.name')}</label>
-            <input id="cf-name" type="text" maxlength="80" value="${esc(c?.name || '')}" class="inp" style="height:3.1rem;font-size:1rem" />
+            <input id="cf-name" type="text" maxlength="80" value="${escAttr(c?.name || '')}" class="inp" style="height:3.1rem;font-size:1rem" />
           </div>
           <div class="grid grid-cols-2 gap-2.5">
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('cli.phone')}</label>
-              <input id="cf-phone" type="tel" maxlength="20" value="${esc(c?.phone || '')}" class="inp" />
+              <input id="cf-phone" type="tel" maxlength="20" value="${escAttr(c?.phone || '')}" class="inp" />
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('cli.due')}</label>
-              <input id="cf-due" type="date" value="${esc(c?.dueDate || '')}" class="inp" />
+              <input id="cf-due" type="date" value="${escAttr(c?.dueDate || '')}" class="inp" />
             </div>
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('cli.address')}</label>
-            <input id="cf-address" type="text" maxlength="200" value="${esc(c?.address || '')}" class="inp" />
+            <input id="cf-address" type="text" maxlength="200" value="${escAttr(c?.address || '')}" class="inp" />
           </div>
           <div class="grid grid-cols-2 gap-2.5">
             <label class="flex items-center gap-2 py-1 cursor-pointer">
@@ -2949,7 +2961,7 @@ function renderPaymentEdit(id, amount, referenceNo) {
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
         <div class="flex items-center justify-between gap-2 mb-3"><h3 class="font-bold text-gray-100 text-sm flex items-center gap-2"><span class="icon-tile bg-green-500/15 text-green-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>${T('pay.edit_title')}</h3><button onclick="closeQuick()" aria-label="Close" class="w-9 h-9 rounded-xl btn-ghost flex items-center justify-center text-gray-400 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
         <input id="pe-amount" type="number" min="0" step="0.01" value="${amount || ''}" class="inp mb-3" />
-        <input id="pe-ref" type="text" maxlength="40" value="${esc(referenceNo || '')}" placeholder="Reference # (optional)" autocomplete="off" class="inp mb-3" />
+        <input id="pe-ref" type="text" maxlength="40" value="${escAttr(referenceNo || '')}" placeholder="Reference # (optional)" autocomplete="off" class="inp mb-3" />
         <button onclick="submitPaymentEdit(${JSON.stringify(id)})" class="btn btn-primary btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('pay.save_edit')}</button>
       </div>
     </div>`;
@@ -3120,10 +3132,26 @@ async function quickSell(id) {
 // saleClientPreset: client id pre-picked by the caller (e.g. client detail's
 // New Sale button). Replaces the dead preselectedId reference.
 let saleClientPreset = null;
+let saleRateClient = null; // client key whose rate was last bulk-applied to lines
 function renderSale(presetId) {
   if (presetId !== undefined && presetId !== null && presetId !== '') saleClientPreset = presetId;
   const v = document.getElementById('view');
   if (!cart.length) tendered = 0;
+  // Preserve cashier-entered header state across re-renders (qty steps, cart
+  // edits, pull-refresh and LAN updates all re-render; losing the discount
+  // or client pick mid-sale is a data-entry bug, not a refresh).
+  let keepDisc = 0, keepSc = false, keepPay = 'Cash', keepCharge = false, keepTenderCustom = '';
+  try {
+    if (v && v.innerHTML.indexOf('sale-discount') >= 0) {
+      keepDisc = Math.max(0, parseFloat((document.getElementById('sale-discount') || {}).value) || 0);
+      keepSc = !!((document.getElementById('sale-sc') || {}).checked);
+      keepCharge = !!((document.getElementById('sale-charge') || {}).checked);
+      const ps = document.getElementById('sale-payment'); if (ps && ps.value) keepPay = ps.value;
+      const tc = document.getElementById('tender-custom'); if (tc) keepTenderCustom = tc.value || '';
+      const cs = document.getElementById('sale-client');
+      if ((presetId === undefined || presetId === null || presetId === '') && cs && cs.value) saleClientPreset = cs.value;
+    }
+  } catch (e) {}
   const sub = cart.reduce((s, i) => s + i.qty * i.price, 0);
   v.innerHTML = `
     <div class="flex items-center justify-between gap-2 mb-3 fade-in">
@@ -3178,7 +3206,7 @@ function renderSale(presetId) {
         </div>
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sale.payment')}</label>
-          <select id="sale-payment" class="inp"><option>Cash</option><option>GCash</option><option>Maya</option><option>Bank Transfer</option></select>
+          <select id="sale-payment" class="inp">${['Cash', 'GCash', 'Maya', 'Bank Transfer'].map(p => '<option' + (p === keepPay ? ' selected' : '') + '>' + p + '</option>').join('')}</select>
         </div>
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sale.interest')}</label>
@@ -3186,16 +3214,16 @@ function renderSale(presetId) {
         </div>
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sale.discount')}</label>
-          <input id="sale-discount" type="number" min="0" step="0.01" value="0" oninput="saleTotals()" class="inp" />
+          <input id="sale-discount" type="number" min="0" step="0.01" value="${keepDisc || 0}" oninput="saleTotals()" class="inp" />
         </div>
       </div>
       <label class="flex items-center justify-between gap-3 py-1 cursor-pointer">
         <span class="text-sm text-gray-300">${T('sale.sc')}</span>
-        <input type="checkbox" id="sale-sc" onchange="saleTotals()" class="switch" />
+        <input type="checkbox" id="sale-sc" onchange="saleTotals()"${keepSc ? ' checked' : ''} class="switch" />
       </label>
       <label class="flex items-center justify-between gap-3 py-1 cursor-pointer">
         <span class="text-sm text-gray-300">${T('sale.charge')}</span>
-        <input type="checkbox" id="sale-charge" class="switch" />
+        <input type="checkbox" id="sale-charge"${keepCharge ? ' checked' : ''} class="switch" />
       </label>
       <div class="flex justify-between items-center border-t border-white/10 pt-3">
         <span class="font-bold text-gray-200">${T('sale.total')}</span>
@@ -3208,11 +3236,17 @@ function renderSale(presetId) {
           <button onclick="setTenderExact()" class="px-3 py-2 rounded-xl text-sm font-bold text-gray-100" style="background:rgba(30,41,59,.6);border:1px solid rgba(255,255,255,.09)">${T('sale.tender_exact')}</button>
           <button onclick="setTender(0)" class="px-3 py-2 rounded-xl text-sm text-gray-400" style="background:transparent;border:1px solid rgba(255,255,255,.09)">${T('sale.tender_clear')}</button>
         </div>
-        <input id="tender-custom" type="number" min="0" step="0.01" placeholder="${esc(T('sale.tender_custom_ph'))}" oninput="setTender(parseFloat(this.value) || 0)" class="inp" />
+        <input id="tender-custom" type="number" min="0" step="0.01" placeholder="${escAttr(T('sale.tender_custom_ph'))}" value="${escAttr(keepTenderCustom)}" oninput="setTender(parseFloat(this.value) || 0)" class="inp" />
         <div class="flex justify-between text-sm mt-2"><span class="text-gray-400">${T('sale.tendered')}</span><span id="tendered-amt" class="num text-gray-200">—</span></div>
         <div class="flex justify-between text-sm"><span class="text-gray-400">${T('sale.change')}</span><span id="tender-change" class="font-bold num text-gray-400">—</span></div>
       </div>
-      <button onclick="submitSale()" class="btn btn-primary btn-lg" id="sale-btn"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>${T('sale.save')}</button>
+    </div>
+    <div id="sale-save-bar" class="glass-card rounded-2xl px-3 pt-2.5 fade-in" style="position:sticky;bottom:0;margin-top:.75rem;background:linear-gradient(rgba(15,23,42,0), rgba(15,23,42,.96) 30%)">
+      <div class="flex justify-between items-center mb-2">
+        <span class="font-bold text-gray-200">${T('sale.total')}</span>
+        <span class="font-bold text-lg text-green-400 num" id="sale-total-bar">${peso(sub)}</span>
+      </div>
+      <button onclick="submitSale()" class="btn btn-primary btn-lg w-full" id="sale-btn"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>${T('sale.save')}</button>
     </div>`;
   saleTotals();
   applyClientRate();
@@ -3271,6 +3305,8 @@ function clientOptions() {
 }
 // Preset the interest picker from the client's most recent rated sale
 // (mirrors the desktop rate memory; the cashier can still change it).
+// Bulk-applies to lines ONLY when the client (or their rate) actually
+// changed — every renderSale must not nuke per-line customizations.
 function applyClientRate() {
   try {
     const sel = document.getElementById('sale-client');
@@ -3288,8 +3324,12 @@ function applyClientRate() {
       box.appendChild(opt);
     }
     box.value = String(rate);
-    if (typeof saleRateAll === 'function') saleRateAll();
-    else if (typeof saleTotals === 'function') saleTotals();
+    const key = String(id || '') + ':' + String(rate);
+    if (saleRateClient !== key) {
+      saleRateClient = key;
+      if (typeof saleRateAll === 'function') saleRateAll();
+      else if (typeof saleTotals === 'function') saleTotals();
+    } else if (typeof saleTotals === 'function') saleTotals();
   } catch (e) {}
 }
 function saleTotals() {
@@ -3299,6 +3339,7 @@ function saleTotals() {
   const disc = Math.max(0, parseFloat(document.getElementById('sale-discount')?.value) || 0) + sc;
   const total = Math.max(0, sub + interest - disc);
   const el = document.getElementById('sale-total'); if (el) el.textContent = peso(total);
+  const bar = document.getElementById('sale-total-bar'); if (bar) bar.textContent = peso(total);
   const se = document.getElementById('sale-sub'); if (se) se.textContent = peso(sub);
   lastSaleTotal = total;
   updateTender();
@@ -3371,7 +3412,7 @@ function manualItem() {
             </div>
           </div>
           <button onclick="addManualItem()" class="btn btn-primary btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>${T('manual.add')}</button>
-          <p class="text-center text-[11px] text-gray-500">Added: <span id="m-count" class="font-bold text-gray-300 num">0</span> — this stays open so you can add many items, then tap Done.</p>
+          <p class="text-center text-[11px] text-gray-500">${T('manual.added_count')}: <span id="m-count" class="font-bold text-gray-300 num">0</span> — ${T('manual.multi_hint')}</p>
           <button onclick="closeQuick()" class="btn btn-ghost btn-lg">${T('manual.done')}</button>
         </div>
       </div>
@@ -3401,11 +3442,13 @@ function addManualItem() {
 }
 async function submitSale() {
   if (!cart.length) return toast(T('sale.need_items'), 'err');
-  if (!takeSubmitLock('sale')) return;
   const clientSel = document.getElementById('sale-client');
   const clientId = clientSel && clientSel.value ? parseInt(clientSel.value) : null;
   const charge = document.getElementById('sale-charge')?.checked;
+  // Validate BEFORE taking the lock: an early return past takeSubmitLock
+  // would wedge the Save button until reload.
   if (charge && !clientId) return toast(T('sale.need_client'), 'err');
+  if (!takeSubmitLock('sale')) return;
   const rate = parseFloat(document.getElementById('sale-interest')?.value) || 0;
   const sc = (document.getElementById('sale-sc')?.checked) ? true : false;
   const discount = Math.max(0, parseFloat(document.getElementById('sale-discount')?.value) || 0);
@@ -3424,9 +3467,9 @@ async function submitSale() {
   const body = { clientId: charge ? clientId : null, items, paymentMethod, discount: disc };
   try {
     const r = await apiPost('/api/sales', body);
-    if (r.queued) { lastFailedSale = null; tendered = 0; try { saleClientPreset = null; } catch (e) {} toast(T('sale.queued'), 'ok'); cart = []; updateCartUI(); showView('home'); await refreshAll(); return; }
+    if (r.queued) { lastFailedSale = null; tendered = 0; try { saleClientPreset = null; saleRateClient = null; } catch (e) {} toast(T('sale.queued'), 'ok'); cart = []; updateCartUI(); showView('home'); await refreshAll(); return; }
     lastFailedSale = null; tendered = 0;
-    try { saleClientPreset = null; } catch (e) {}
+    try { saleClientPreset = null; saleRateClient = null; } catch (e) {}
     saleSuccessSheet(r.invoiceNo);
   } catch (e) {
     // Cart is kept intact so nothing is lost; one tap retries the same payload.
@@ -3457,8 +3500,8 @@ function saleSuccessSheet(invoiceNo) {
       <div class="text-4xl mb-2">✅</div>
       <div class="text-lg font-bold text-gray-100 mb-1">${T('sale.success_title')}</div>
       <div class="text-sm text-gray-400 mb-4">${esc(invoiceNo || '')}</div>
-      <button onclick="printSaleReceipt('${esc(invoiceNo || '')}')" class="btn btn-primary btn-lg mb-2"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>${T('sale.print')}</button>
-      <button onclick="shareReceiptTxn('${esc(invoiceNo || '')}')" class="btn btn-ghost btn-lg mb-2"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>${T('sale.share')}</button>
+      <button onclick="printSaleReceipt(this.dataset.inv)" data-inv="${escAttr(invoiceNo || '')}" class="btn btn-primary btn-lg mb-2"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>${T('sale.print')}</button>
+      <button onclick="shareReceiptTxn(this.dataset.inv)" data-inv="${escAttr(invoiceNo || '')}" class="btn btn-ghost btn-lg mb-2"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>${T('sale.share')}</button>
       <button onclick="showView('sale')" class="btn btn-ghost btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('sale.new')}</button>
     </div>`;
   try { window.scrollTo(0, 0); } catch (e) {}
@@ -3676,7 +3719,7 @@ async function renderPay(preselectedId) {
       <div class="space-y-3.5">
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sale.client')}</label>
-          <select id="pay-client" class="inp">${data.clients.map(c => '<option value="' + c.id + '"' + (c.id === preselectedId ? ' selected' : '') + '>' + esc(c.name) + ' — ' + peso(c.balance) + '</option>').join('')}</select>
+          <select id="pay-client" class="inp">${data.clients.map(c => '<option value="' + c.id + '"' + (String(c.id) === String(preselectedId) ? ' selected' : '') + '>' + esc(c.name) + ' — ' + peso(c.balance) + '</option>').join('')}</select>
         </div>
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('pay.amount')}</label>
@@ -3705,13 +3748,17 @@ async function renderPay(preselectedId) {
 function setAmt(val) {
   const input = document.getElementById('pay-amount');
   if (!input) return;
-  if (val === 'full') { const id = parseInt(document.getElementById('pay-client').value); const c = data.clients.find(x => x.id === id); input.value = c ? (c.balance || 0).toFixed(2) : ''; }
+  if (val === 'full') { const sel = document.getElementById('pay-client'); const id = sel ? parseInt(sel.value) : NaN; const c = data.clients.find(x => String(x.id) === String(id)); input.value = c ? (c.balance || 0).toFixed(2) : ''; }
   else input.value = ((parseFloat(input.value) || 0) + val).toFixed(2);
 }
 async function submitPay() {
-  const clientId = parseInt(document.getElementById('pay-client').value);
-  const amount = parseFloat(document.getElementById('pay-amount').value);
-  const type = document.getElementById('pay-type').value;
+  const sel = document.getElementById('pay-client');
+  const amtEl = document.getElementById('pay-amount');
+  const typeEl = document.getElementById('pay-type');
+  if (!sel || !amtEl || !typeEl) return toast(T('pay.fill'), 'err');
+  const clientId = parseInt(sel.value);
+  const amount = parseFloat(amtEl.value);
+  const type = typeEl.value;
   const referenceNo = ((document.getElementById('pay-ref') || {}).value || '').trim().slice(0, 40);
   if (!clientId || !amount) return toast(T('pay.fill'), 'err');
   if (!takeSubmitLock('pay')) return;

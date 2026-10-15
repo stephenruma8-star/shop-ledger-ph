@@ -2,10 +2,26 @@
 // saleClientPreset: client id pre-picked by the caller (e.g. client detail's
 // New Sale button). Replaces the dead preselectedId reference.
 let saleClientPreset = null;
+let saleRateClient = null; // client key whose rate was last bulk-applied to lines
 function renderSale(presetId) {
   if (presetId !== undefined && presetId !== null && presetId !== '') saleClientPreset = presetId;
   const v = document.getElementById('view');
   if (!cart.length) tendered = 0;
+  // Preserve cashier-entered header state across re-renders (qty steps, cart
+  // edits, pull-refresh and LAN updates all re-render; losing the discount
+  // or client pick mid-sale is a data-entry bug, not a refresh).
+  let keepDisc = 0, keepSc = false, keepPay = 'Cash', keepCharge = false, keepTenderCustom = '';
+  try {
+    if (v && v.innerHTML.indexOf('sale-discount') >= 0) {
+      keepDisc = Math.max(0, parseFloat((document.getElementById('sale-discount') || {}).value) || 0);
+      keepSc = !!((document.getElementById('sale-sc') || {}).checked);
+      keepCharge = !!((document.getElementById('sale-charge') || {}).checked);
+      const ps = document.getElementById('sale-payment'); if (ps && ps.value) keepPay = ps.value;
+      const tc = document.getElementById('tender-custom'); if (tc) keepTenderCustom = tc.value || '';
+      const cs = document.getElementById('sale-client');
+      if ((presetId === undefined || presetId === null || presetId === '') && cs && cs.value) saleClientPreset = cs.value;
+    }
+  } catch (e) {}
   const sub = cart.reduce((s, i) => s + i.qty * i.price, 0);
   v.innerHTML = `
     <div class="flex items-center justify-between gap-2 mb-3 fade-in">
@@ -60,7 +76,7 @@ function renderSale(presetId) {
         </div>
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sale.payment')}</label>
-          <select id="sale-payment" class="inp"><option>Cash</option><option>GCash</option><option>Maya</option><option>Bank Transfer</option></select>
+          <select id="sale-payment" class="inp">${['Cash', 'GCash', 'Maya', 'Bank Transfer'].map(p => '<option' + (p === keepPay ? ' selected' : '') + '>' + p + '</option>').join('')}</select>
         </div>
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sale.interest')}</label>
@@ -68,16 +84,16 @@ function renderSale(presetId) {
         </div>
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sale.discount')}</label>
-          <input id="sale-discount" type="number" min="0" step="0.01" value="0" oninput="saleTotals()" class="inp" />
+          <input id="sale-discount" type="number" min="0" step="0.01" value="${keepDisc || 0}" oninput="saleTotals()" class="inp" />
         </div>
       </div>
       <label class="flex items-center justify-between gap-3 py-1 cursor-pointer">
         <span class="text-sm text-gray-300">${T('sale.sc')}</span>
-        <input type="checkbox" id="sale-sc" onchange="saleTotals()" class="switch" />
+        <input type="checkbox" id="sale-sc" onchange="saleTotals()"${keepSc ? ' checked' : ''} class="switch" />
       </label>
       <label class="flex items-center justify-between gap-3 py-1 cursor-pointer">
         <span class="text-sm text-gray-300">${T('sale.charge')}</span>
-        <input type="checkbox" id="sale-charge" class="switch" />
+        <input type="checkbox" id="sale-charge"${keepCharge ? ' checked' : ''} class="switch" />
       </label>
       <div class="flex justify-between items-center border-t border-white/10 pt-3">
         <span class="font-bold text-gray-200">${T('sale.total')}</span>
@@ -90,11 +106,17 @@ function renderSale(presetId) {
           <button onclick="setTenderExact()" class="px-3 py-2 rounded-xl text-sm font-bold text-gray-100" style="background:rgba(30,41,59,.6);border:1px solid rgba(255,255,255,.09)">${T('sale.tender_exact')}</button>
           <button onclick="setTender(0)" class="px-3 py-2 rounded-xl text-sm text-gray-400" style="background:transparent;border:1px solid rgba(255,255,255,.09)">${T('sale.tender_clear')}</button>
         </div>
-        <input id="tender-custom" type="number" min="0" step="0.01" placeholder="${esc(T('sale.tender_custom_ph'))}" oninput="setTender(parseFloat(this.value) || 0)" class="inp" />
+        <input id="tender-custom" type="number" min="0" step="0.01" placeholder="${escAttr(T('sale.tender_custom_ph'))}" value="${escAttr(keepTenderCustom)}" oninput="setTender(parseFloat(this.value) || 0)" class="inp" />
         <div class="flex justify-between text-sm mt-2"><span class="text-gray-400">${T('sale.tendered')}</span><span id="tendered-amt" class="num text-gray-200">—</span></div>
         <div class="flex justify-between text-sm"><span class="text-gray-400">${T('sale.change')}</span><span id="tender-change" class="font-bold num text-gray-400">—</span></div>
       </div>
-      <button onclick="submitSale()" class="btn btn-primary btn-lg" id="sale-btn"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>${T('sale.save')}</button>
+    </div>
+    <div id="sale-save-bar" class="glass-card rounded-2xl px-3 pt-2.5 fade-in" style="position:sticky;bottom:0;margin-top:.75rem;background:linear-gradient(rgba(15,23,42,0), rgba(15,23,42,.96) 30%)">
+      <div class="flex justify-between items-center mb-2">
+        <span class="font-bold text-gray-200">${T('sale.total')}</span>
+        <span class="font-bold text-lg text-green-400 num" id="sale-total-bar">${peso(sub)}</span>
+      </div>
+      <button onclick="submitSale()" class="btn btn-primary btn-lg w-full" id="sale-btn"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>${T('sale.save')}</button>
     </div>`;
   saleTotals();
   applyClientRate();
@@ -153,6 +175,8 @@ function clientOptions() {
 }
 // Preset the interest picker from the client's most recent rated sale
 // (mirrors the desktop rate memory; the cashier can still change it).
+// Bulk-applies to lines ONLY when the client (or their rate) actually
+// changed — every renderSale must not nuke per-line customizations.
 function applyClientRate() {
   try {
     const sel = document.getElementById('sale-client');
@@ -170,8 +194,12 @@ function applyClientRate() {
       box.appendChild(opt);
     }
     box.value = String(rate);
-    if (typeof saleRateAll === 'function') saleRateAll();
-    else if (typeof saleTotals === 'function') saleTotals();
+    const key = String(id || '') + ':' + String(rate);
+    if (saleRateClient !== key) {
+      saleRateClient = key;
+      if (typeof saleRateAll === 'function') saleRateAll();
+      else if (typeof saleTotals === 'function') saleTotals();
+    } else if (typeof saleTotals === 'function') saleTotals();
   } catch (e) {}
 }
 function saleTotals() {
@@ -181,6 +209,7 @@ function saleTotals() {
   const disc = Math.max(0, parseFloat(document.getElementById('sale-discount')?.value) || 0) + sc;
   const total = Math.max(0, sub + interest - disc);
   const el = document.getElementById('sale-total'); if (el) el.textContent = peso(total);
+  const bar = document.getElementById('sale-total-bar'); if (bar) bar.textContent = peso(total);
   const se = document.getElementById('sale-sub'); if (se) se.textContent = peso(sub);
   lastSaleTotal = total;
   updateTender();
@@ -253,7 +282,7 @@ function manualItem() {
             </div>
           </div>
           <button onclick="addManualItem()" class="btn btn-primary btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>${T('manual.add')}</button>
-          <p class="text-center text-[11px] text-gray-500">Added: <span id="m-count" class="font-bold text-gray-300 num">0</span> — this stays open so you can add many items, then tap Done.</p>
+          <p class="text-center text-[11px] text-gray-500">${T('manual.added_count')}: <span id="m-count" class="font-bold text-gray-300 num">0</span> — ${T('manual.multi_hint')}</p>
           <button onclick="closeQuick()" class="btn btn-ghost btn-lg">${T('manual.done')}</button>
         </div>
       </div>
@@ -283,11 +312,13 @@ function addManualItem() {
 }
 async function submitSale() {
   if (!cart.length) return toast(T('sale.need_items'), 'err');
-  if (!takeSubmitLock('sale')) return;
   const clientSel = document.getElementById('sale-client');
   const clientId = clientSel && clientSel.value ? parseInt(clientSel.value) : null;
   const charge = document.getElementById('sale-charge')?.checked;
+  // Validate BEFORE taking the lock: an early return past takeSubmitLock
+  // would wedge the Save button until reload.
   if (charge && !clientId) return toast(T('sale.need_client'), 'err');
+  if (!takeSubmitLock('sale')) return;
   const rate = parseFloat(document.getElementById('sale-interest')?.value) || 0;
   const sc = (document.getElementById('sale-sc')?.checked) ? true : false;
   const discount = Math.max(0, parseFloat(document.getElementById('sale-discount')?.value) || 0);
@@ -306,9 +337,9 @@ async function submitSale() {
   const body = { clientId: charge ? clientId : null, items, paymentMethod, discount: disc };
   try {
     const r = await apiPost('/api/sales', body);
-    if (r.queued) { lastFailedSale = null; tendered = 0; try { saleClientPreset = null; } catch (e) {} toast(T('sale.queued'), 'ok'); cart = []; updateCartUI(); showView('home'); await refreshAll(); return; }
+    if (r.queued) { lastFailedSale = null; tendered = 0; try { saleClientPreset = null; saleRateClient = null; } catch (e) {} toast(T('sale.queued'), 'ok'); cart = []; updateCartUI(); showView('home'); await refreshAll(); return; }
     lastFailedSale = null; tendered = 0;
-    try { saleClientPreset = null; } catch (e) {}
+    try { saleClientPreset = null; saleRateClient = null; } catch (e) {}
     saleSuccessSheet(r.invoiceNo);
   } catch (e) {
     // Cart is kept intact so nothing is lost; one tap retries the same payload.
@@ -339,8 +370,8 @@ function saleSuccessSheet(invoiceNo) {
       <div class="text-4xl mb-2">✅</div>
       <div class="text-lg font-bold text-gray-100 mb-1">${T('sale.success_title')}</div>
       <div class="text-sm text-gray-400 mb-4">${esc(invoiceNo || '')}</div>
-      <button onclick="printSaleReceipt('${esc(invoiceNo || '')}')" class="btn btn-primary btn-lg mb-2"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>${T('sale.print')}</button>
-      <button onclick="shareReceiptTxn('${esc(invoiceNo || '')}')" class="btn btn-ghost btn-lg mb-2"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>${T('sale.share')}</button>
+      <button onclick="printSaleReceipt(this.dataset.inv)" data-inv="${escAttr(invoiceNo || '')}" class="btn btn-primary btn-lg mb-2"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>${T('sale.print')}</button>
+      <button onclick="shareReceiptTxn(this.dataset.inv)" data-inv="${escAttr(invoiceNo || '')}" class="btn btn-ghost btn-lg mb-2"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>${T('sale.share')}</button>
       <button onclick="showView('sale')" class="btn btn-ghost btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('sale.new')}</button>
     </div>`;
   try { window.scrollTo(0, 0); } catch (e) {}

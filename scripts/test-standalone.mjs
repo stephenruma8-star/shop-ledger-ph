@@ -113,6 +113,13 @@ ok(h2.client.balance === 74, 'payment edit rebalances');
 await A('POST', '/api/payments/' + h2.payments[0].id, {}, 'DELETE');
 h2 = await A('GET', '/api/clients/' + c1.id + '/history');
 ok(h2.client.balance === 194 && h2.payments.length === 0, 'payment delete refunds balance');
+// overpay clamps (no negative debt) and delete reverses exactly
+await A('POST', '/api/payments', { clientId: c1.id, amount: 500 });
+h2 = await A('GET', '/api/clients/' + c1.id + '/history');
+ok(h2.client.balance === 0 && h2.payments.length === 1, 'overpay clamps to zero');
+await A('POST', '/api/payments/' + h2.payments[0].id, {}, 'DELETE');
+h2 = await A('GET', '/api/clients/' + c1.id + '/history');
+ok(h2.client.balance === 194 && h2.payments.length === 0, 'overpay delete reverses exactly');
 
 // returns: partial 1 Rice from INV-00001 (unit 50, origSub 199, discount 5)
 const ret = await A('POST', '/api/returns', { invoiceNo: 'INV-00001', items: [{ invId: it1.id, description: 'Rice', qty: 1 }] });

@@ -47,7 +47,7 @@ function clientListHTML(clients) {
 function filterClients(q) {
   q = (q || '').toLowerCase();
   const grid = document.getElementById('client-grid');
-  if (grid) grid.innerHTML = clientListHTML(data.clients.filter(c => (c.name || '').toLowerCase().includes(q) || (c.phone || '').includes(q)));
+  if (grid) grid.innerHTML = clientListHTML(data.clients.filter(c => (c.name || '').toLowerCase().includes(q) || (c.phone || '').includes(q) || (c.address || '').toLowerCase().includes(q)));
 }
 function csvCell(v) {
   const s = String(v ?? '');
@@ -117,6 +117,8 @@ async function openClientDetail(id) {
   let h = null;
   try { h = await apiGet('/api/clients/' + encodeURIComponent(id) + '/history'); }
   catch (e) { toast(T('cli.load_fail', { msg: e.message }), 'err'); closeQuick(); return; }
+  // A slow response for client A must not overwrite client B's modal.
+  if (detailClientId !== id) return;
   const box = document.getElementById('client-detail-body');
   if (!box || !h || !h.client) return;
   const c = h.client;
@@ -171,21 +173,21 @@ function renderClientForm(id) {
         <div class="space-y-4">
           <div>
             <label class="text-xs font-semibold uppercase tracking-wider text-gray-400 block mb-1.5">${T('cli.name')}</label>
-            <input id="cf-name" type="text" maxlength="80" value="${esc(c?.name || '')}" class="inp" style="height:3.1rem;font-size:1rem" />
+            <input id="cf-name" type="text" maxlength="80" value="${escAttr(c?.name || '')}" class="inp" style="height:3.1rem;font-size:1rem" />
           </div>
           <div class="grid grid-cols-2 gap-2.5">
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('cli.phone')}</label>
-              <input id="cf-phone" type="tel" maxlength="20" value="${esc(c?.phone || '')}" class="inp" />
+              <input id="cf-phone" type="tel" maxlength="20" value="${escAttr(c?.phone || '')}" class="inp" />
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('cli.due')}</label>
-              <input id="cf-due" type="date" value="${esc(c?.dueDate || '')}" class="inp" />
+              <input id="cf-due" type="date" value="${escAttr(c?.dueDate || '')}" class="inp" />
             </div>
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('cli.address')}</label>
-            <input id="cf-address" type="text" maxlength="200" value="${esc(c?.address || '')}" class="inp" />
+            <input id="cf-address" type="text" maxlength="200" value="${escAttr(c?.address || '')}" class="inp" />
           </div>
           <div class="grid grid-cols-2 gap-2.5">
             <label class="flex items-center gap-2 py-1 cursor-pointer">
@@ -290,7 +292,7 @@ function renderPaymentEdit(id, amount, referenceNo) {
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
         <div class="flex items-center justify-between gap-2 mb-3"><h3 class="font-bold text-gray-100 text-sm flex items-center gap-2"><span class="icon-tile bg-green-500/15 text-green-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>${T('pay.edit_title')}</h3><button onclick="closeQuick()" aria-label="Close" class="w-9 h-9 rounded-xl btn-ghost flex items-center justify-center text-gray-400 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
         <input id="pe-amount" type="number" min="0" step="0.01" value="${amount || ''}" class="inp mb-3" />
-        <input id="pe-ref" type="text" maxlength="40" value="${esc(referenceNo || '')}" placeholder="Reference # (optional)" autocomplete="off" class="inp mb-3" />
+        <input id="pe-ref" type="text" maxlength="40" value="${escAttr(referenceNo || '')}" placeholder="Reference # (optional)" autocomplete="off" class="inp mb-3" />
         <button onclick="submitPaymentEdit(${JSON.stringify(id)})" class="btn btn-primary btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('pay.save_edit')}</button>
       </div>
     </div>`;

@@ -55,7 +55,7 @@ const STORE_SCHEMA = [
   `CREATE TABLE IF NOT EXISTS clients (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, phone TEXT, address TEXT, balance REAL DEFAULT 0, dueDate TEXT, createdAt TEXT, ledgerYear TEXT, isSC INTEGER DEFAULT 0, isPWD INTEGER DEFAULT 0, loyaltyPoints INTEGER DEFAULT 0, totalSpent REAL DEFAULT 0, redeemedDiscount REAL DEFAULT 0)`,
   `CREATE TABLE IF NOT EXISTS inventory (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, description TEXT, sku TEXT, barcode TEXT, category TEXT, sellPrice REAL DEFAULT 0, costPrice REAL DEFAULT 0, stock INTEGER DEFAULT 0, minStock INTEGER DEFAULT 5, lowStock INTEGER DEFAULT 5, unit TEXT DEFAULT 'pcs', image TEXT, expiryDate TEXT, variants TEXT DEFAULT '[]', createdAt TEXT, updatedAt TEXT)`,
   `CREATE TABLE IF NOT EXISTS transactions (id INTEGER PRIMARY KEY AUTOINCREMENT, invoiceNo TEXT, clientId INTEGER, clientName TEXT, date TEXT, createdAt TEXT, items TEXT DEFAULT '[]', subtotal REAL DEFAULT 0, totalInterest REAL DEFAULT 0, discount REAL DEFAULT 0, scDiscount REAL DEFAULT 0, grandTotal REAL DEFAULT 0, commissionRate REAL DEFAULT 0, commissionAmount REAL DEFAULT 0, paymentMethod TEXT DEFAULT 'Cash', status TEXT DEFAULT 'pending', balanceAdded INTEGER DEFAULT 0, vatExclusive REAL DEFAULT 0, vatAmount REAL DEFAULT 0, vatRate REAL DEFAULT 0.12, editedAt TEXT, returnReason TEXT, refundMethod TEXT, returnNotes TEXT, refId INTEGER, refInvoiceNo TEXT, partial INTEGER DEFAULT 0, voidReason TEXT, voidNotes TEXT, voidedAt TEXT)`,
-  `CREATE TABLE IF NOT EXISTS payments (id INTEGER PRIMARY KEY AUTOINCREMENT, clientId INTEGER, clientName TEXT, amount REAL DEFAULT 0, date TEXT, type TEXT, notes TEXT, referenceNo TEXT DEFAULT '', createdAt TEXT, updatedAt TEXT)`,
+  `CREATE TABLE IF NOT EXISTS payments (id INTEGER PRIMARY KEY AUTOINCREMENT, clientId INTEGER, clientName TEXT, amount REAL DEFAULT 0, appliedAmount REAL DEFAULT NULL, date TEXT, type TEXT, notes TEXT, referenceNo TEXT DEFAULT '', createdAt TEXT, updatedAt TEXT)`,
   `CREATE TABLE IF NOT EXISTS expenses (id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT, category TEXT, description TEXT, amount REAL DEFAULT 0, payee TEXT, type TEXT, refType TEXT, refId INTEGER, createdAt TEXT)`,
   `CREATE TABLE IF NOT EXISTS suppliers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, contact TEXT, email TEXT, category TEXT, address TEXT, createdAt TEXT)`,
   `CREATE TABLE IF NOT EXISTS purchase_orders (id INTEGER PRIMARY KEY AUTOINCREMENT, poNo TEXT, supplierId INTEGER, supplierName TEXT, date TEXT, items TEXT DEFAULT '[]', total REAL DEFAULT 0, status TEXT DEFAULT 'Pending', createdAt TEXT, receivedAt TEXT)`,
@@ -85,6 +85,12 @@ async function initStore(driver) {
     const cols = await db.all('PRAGMA table_info(payments)', []);
     if (!cols.some(c => c.name === 'referenceNo')) {
       await db.exec('ALTER TABLE payments ADD COLUMN referenceNo TEXT DEFAULT \'\'');
+    }
+    // appliedAmount: portion of the payment that actually reduced the balance
+    // (overpayments are clamped, never negative debt). Lets delete/edit
+    // reverse the EXACT effect instead of inventing balance.
+    if (!cols.some(c => c.name === 'appliedAmount')) {
+      await db.exec('ALTER TABLE payments ADD COLUMN appliedAmount REAL DEFAULT NULL');
     }
   } catch (e) {}
   return true;
@@ -749,8 +755,9 @@ async function _apiPayments(method, parts, body) {
     const c = clientId ? await db.get('SELECT * FROM clients WHERE id = ?', [clientId]) : null;
     const balBefore = c ? (c.balance || 0) : 0;
     const pt = (type === 'Full' || type === 'Partial') ? type : (amtNum >= balBefore ? 'Full' : 'Partial');
-    await db.run('INSERT INTO payments (clientId, amount, type, date, notes, referenceNo, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [clientId || null, amtNum, pt, safeDate, '', ref, new Date().toISOString()]);
+    const applied = c ? Math.min(amtNum, Math.max(0, balBefore)) : amtNum;
+    await db.run('INSERT INTO payments (clientId, amount, appliedAmount, type, date, notes, referenceNo, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [clientId || null, amtNum, applied, pt, safeDate, '', ref, new Date().toISOString()]);
     if (c) await db.run('UPDATE clients SET balance = ? WHERE id = ?', [Math.max(0, balBefore - amtNum), c.id]);
     await _audit('payment', 'Mobile payment ' + (c ? c.name : 'client') + ' - ₱' + amtNum.toFixed(2) + ' (phone)');
     _bump();
@@ -762,11 +769,16 @@ async function _apiPayments(method, parts, body) {
     const amtNum = _r2(body && body.amount);
     if (!_validateAmount(amtNum) || amtNum <= 0) throw _apiErr(400, 'Valid amount required');
     const ref = body && body.referenceNo !== undefined ? String(body.referenceNo || '').trim().slice(0, 40) : (p.referenceNo || '');
-    const diff = amtNum - (p.amount || 0);
+    const oldApplied = (p.appliedAmount != null) ? p.appliedAmount : (p.amount || 0);
     await db.run('UPDATE payments SET amount = ?, referenceNo = ? WHERE id = ?', [amtNum, ref, p.id]);
     if (p.clientId) {
       const c = await db.get('SELECT * FROM clients WHERE id = ?', [p.clientId]);
-      if (c) await db.run('UPDATE clients SET balance = ? WHERE id = ?', [Math.max(0, (c.balance || 0) - diff), c.id]);
+      if (c) {
+        const base = (c.balance || 0) + oldApplied;
+        const newApplied = Math.min(amtNum, Math.max(0, base));
+        await db.run('UPDATE clients SET balance = ? WHERE id = ?', [Math.max(0, base - newApplied), c.id]);
+        await db.run('UPDATE payments SET appliedAmount = ? WHERE id = ?', [newApplied, p.id]);
+      }
     }
     await _audit('payment', 'Mobile payment edit (phone)');
     _bump();
@@ -778,7 +790,9 @@ async function _apiPayments(method, parts, body) {
     await db.run('DELETE FROM payments WHERE id = ?', [p.id]);
     if (p.clientId) {
       const c = await db.get('SELECT * FROM clients WHERE id = ?', [p.clientId]);
-      if (c) await db.run('UPDATE clients SET balance = ? WHERE id = ?', [(c.balance || 0) + (p.amount || 0), c.id]);
+      // Reverse only what the payment actually applied — never invent debt.
+      const wasApplied = (p.appliedAmount != null) ? p.appliedAmount : (p.amount || 0);
+      if (c) await db.run('UPDATE clients SET balance = ? WHERE id = ?', [(c.balance || 0) + wasApplied, c.id]);
     }
     await _audit('payment', 'Mobile payment delete (phone)');
     _bump();

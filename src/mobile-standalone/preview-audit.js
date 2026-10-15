@@ -134,6 +134,45 @@ async function runStandaloneAudit() {
     if (typeof autoPreUpdateBackup !== 'function') throw new Error('no auto-backup fn');
     showView('home');
   });
+  await A('sale-lock-survives', async () => {
+    showView('sale');
+    const n = cart.length;
+    cart.push({ invId: null, name: 'Audit Lock', qty: 1, price: 1 });
+    document.getElementById('sale-charge').checked = true;
+    document.getElementById('sale-client').value = '';
+    await submitSale(); // charge without client: must refuse WITHOUT wedging the lock
+    cart.length = n;
+    if (!takeSubmitLock('sale')) throw new Error('sale lock stuck after refused submit');
+    releaseSubmitLock('sale');
+    showView('home');
+  });
+  await A('sale-keeps-discount', async () => {
+    showView('sale');
+    const n = cart.length;
+    cart.push({ invId: null, name: 'Audit Keep', qty: 1, price: 100 });
+    renderSale();
+    document.getElementById('sale-discount').value = '25';
+    document.getElementById('sale-sc').checked = true;
+    renderSale(); // qty steps, refreshes and LAN updates all re-render
+    if (document.getElementById('sale-discount').value !== '25') throw new Error('discount wiped by re-render');
+    if (!document.getElementById('sale-sc').checked) throw new Error('sc wiped by re-render');
+    cart.length = n;
+    showView('home');
+  });
+  await A('pay-overpay-delete', async () => {
+    const r = await apiPost('/api/clients', { name: 'Audit Overpay' });
+    const cid = r.id;
+    await apiPost('/api/payments', { clientId: cid, amount: 500, type: 'Partial', date: '2026-10-15' });
+    let h = await apiGet('/api/clients/' + cid + '/history');
+    if ((h.client.balance || 0) !== 0) throw new Error('zero-balance pay moved balance to ' + h.client.balance);
+    const pid = (h.payments || []).find(p => p.amount === 500).id;
+    await apiPost('/api/payments/' + pid, {}, 'DELETE');
+    h = await apiGet('/api/clients/' + cid + '/history');
+    if ((h.client.balance || 0) !== 0) throw new Error('delete invented debt: ' + h.client.balance);
+  });
+  await A('escattr-quotes', async () => {
+    if (escAttr('a"b\'c<d') !== 'a&quot;b&#39;c&lt;d') throw new Error('bad escAttr: ' + escAttr('a"b\'c<d'));
+  });
   await A('presets-roundtrip', async () => {
     const before = (await apiGet('/api/quick-items')).length;
     await apiPost('/api/quick-items', { name: 'Audit Preset', price: 7 });

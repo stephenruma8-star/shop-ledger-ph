@@ -8,7 +8,7 @@ async function renderPay(preselectedId) {
       <div class="space-y-3.5">
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sale.client')}</label>
-          <select id="pay-client" class="inp">${data.clients.map(c => '<option value="' + c.id + '"' + (c.id === preselectedId ? ' selected' : '') + '>' + esc(c.name) + ' — ' + peso(c.balance) + '</option>').join('')}</select>
+          <select id="pay-client" class="inp">${data.clients.map(c => '<option value="' + c.id + '"' + (String(c.id) === String(preselectedId) ? ' selected' : '') + '>' + esc(c.name) + ' — ' + peso(c.balance) + '</option>').join('')}</select>
         </div>
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('pay.amount')}</label>
@@ -37,13 +37,17 @@ async function renderPay(preselectedId) {
 function setAmt(val) {
   const input = document.getElementById('pay-amount');
   if (!input) return;
-  if (val === 'full') { const id = parseInt(document.getElementById('pay-client').value); const c = data.clients.find(x => x.id === id); input.value = c ? (c.balance || 0).toFixed(2) : ''; }
+  if (val === 'full') { const sel = document.getElementById('pay-client'); const id = sel ? parseInt(sel.value) : NaN; const c = data.clients.find(x => String(x.id) === String(id)); input.value = c ? (c.balance || 0).toFixed(2) : ''; }
   else input.value = ((parseFloat(input.value) || 0) + val).toFixed(2);
 }
 async function submitPay() {
-  const clientId = parseInt(document.getElementById('pay-client').value);
-  const amount = parseFloat(document.getElementById('pay-amount').value);
-  const type = document.getElementById('pay-type').value;
+  const sel = document.getElementById('pay-client');
+  const amtEl = document.getElementById('pay-amount');
+  const typeEl = document.getElementById('pay-type');
+  if (!sel || !amtEl || !typeEl) return toast(T('pay.fill'), 'err');
+  const clientId = parseInt(sel.value);
+  const amount = parseFloat(amtEl.value);
+  const type = typeEl.value;
   const referenceNo = ((document.getElementById('pay-ref') || {}).value || '').trim().slice(0, 40);
   if (!clientId || !amount) return toast(T('pay.fill'), 'err');
   if (!takeSubmitLock('pay')) return;
