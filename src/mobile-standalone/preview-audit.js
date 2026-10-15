@@ -140,16 +140,31 @@ async function runStandaloneAudit() {
     if (typeof autoPreUpdateBackup !== 'function') throw new Error('no auto-backup fn');
     showView('home');
   });
-  await A('sale-lock-survives', async () => {
+  await A('sale-links-client', async () => {
+    const c = (data.clients || [])[0];
+    if (!c) throw new Error('no demo client');
+    const h0 = await apiGet('/api/clients/' + c.id + '/history');
     showView('sale');
-    const n = cart.length;
-    cart.push({ invId: null, name: 'Audit Lock', qty: 1, price: 1 });
-    document.getElementById('sale-charge').checked = true;
-    document.getElementById('sale-client').value = '';
-    await submitSale(); // charge without client: must refuse WITHOUT wedging the lock
-    cart.length = n;
-    if (!takeSubmitLock('sale')) throw new Error('sale lock stuck after refused submit');
-    releaseSubmitLock('sale');
+    cart.push({ invId: null, name: 'Audit Link Cash', qty: 1, price: 40 });
+    renderSale();
+    document.getElementById('sale-client').value = String(c.id);
+    document.getElementById('sale-payment').value = 'Cash';
+    await submitSale(); // cash: linked to client, no balance effect
+    const inv1 = (document.getElementById('view').textContent.match(/INV-\d+/) || [])[0];
+    if (!inv1) throw new Error('no invoice after cash sale');
+    const d1 = await apiGet('/api/transactions/' + inv1);
+    if (String(d1.clientId) !== String(c.id)) throw new Error('cash sale not linked to client');
+    const hb = (await apiGet('/api/clients/' + c.id + '/history')).client.balance || 0;
+    if (hb !== (h0.client.balance || 0)) throw new Error('cash sale moved balance');
+    showView('sale');
+    cart.push({ invId: null, name: 'Audit Link Credit', qty: 1, price: 40 });
+    renderSale();
+    document.getElementById('sale-client').value = String(c.id);
+    document.getElementById('sale-payment').value = 'GCash';
+    await submitSale(); // credit: linked AND adds to balance
+    const ha = (await apiGet('/api/clients/' + c.id + '/history')).client.balance || 0;
+    if (Math.abs(ha - hb - 40) > 1e-9) throw new Error('credit sale did not add balance, got ' + ha);
+    cart = [];
     showView('home');
   });
   await A('sale-keeps-discount', async () => {
@@ -264,12 +279,11 @@ async function runStandaloneAudit() {
     const c = (data.clients || [])[0];
     if (!c) throw new Error('no demo client');
     document.getElementById('sale-client').value = String(c.id);
-    document.getElementById('sale-charge').checked = true;
     document.getElementById('sale-payment').value = 'GCash';
     saleHeaderChanged();
     const box = document.getElementById('sale-client-bal');
     if (!box.textContent.includes('100.00')) throw new Error('preview missing adds amount: ' + box.textContent);
-    document.getElementById('sale-charge').checked = false;
+    document.getElementById('sale-payment').value = 'Cash';
     saleHeaderChanged();
     if (!box.textContent.includes('Cash')) throw new Error('cash path not shown in preview');
     cart = [];

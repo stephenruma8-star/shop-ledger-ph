@@ -96,7 +96,8 @@ async function openTxnDetail(id) {
     <div class="space-y-1.5 mb-3">
       ${(t.items || []).map((it, idx) => {
         const payoff = (parseFloat(it.amount) || 0) > 0 ? parseFloat(it.amount) : (parseFloat(it.qty) || 1) * (it.unitCost || it.price || 0);
-        const canSettle = t.clientId && (t.status === 'pending') && !it.settled;
+        const clientBal = t.clientId ? ((((data.clients || []).find(x => String(x.id) === String(t.clientId))) || {}).balance || 0) : 0;
+        const canSettle = t.clientId && (t.status === 'pending') && !it.settled && clientBal > 0;
         return `<div class="py-1">
         <div class="flex justify-between text-sm gap-2 ${canReturn ? 'rounded-xl px-2 -mx-2 py-1' : ''}" ${canReturn ? `id="ret-line-${idx}" onclick="toggleReturnLine(${idx})" style="cursor:pointer"` : ''}>
           <span class="text-gray-200 truncate">${esc(it.description || it.name || 'Item')} <span class="text-gray-500">x${it.qty || 1}</span></span>

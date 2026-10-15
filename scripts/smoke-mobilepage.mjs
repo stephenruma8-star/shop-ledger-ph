@@ -290,9 +290,8 @@ try {
   gcall(`saleRateAll()`);
   ok(getEl('sale-total').textContent === '₱100.00', 'sale totals reset to 100 without add-ons');
 
-  // submit sale (charged to client)
+  // submit sale (picked client is always linked, even for cash)
   getEl('sale-client').value = '1';
-  getEl('sale-charge').checked = true;
   const beforeSalePosts = posts.length;
   await gcall(`submitSale()`);
   const salePost = posts[beforeSalePosts];

@@ -22,12 +22,11 @@ function renderSale(presetId) {
   // Preserve cashier-entered header state across re-renders (qty steps, cart
   // edits, pull-refresh and LAN updates all re-render; losing the discount
   // or client pick mid-sale is a data-entry bug, not a refresh).
-  let keepDisc = 0, keepSc = false, keepPay = 'Cash', keepCharge = false, keepTenderCustom = '';
+  let keepDisc = 0, keepSc = false, keepPay = 'Cash', keepTenderCustom = '';
   try {
     if (v && v.innerHTML.indexOf('sale-discount') >= 0) {
       keepDisc = Math.max(0, parseFloat((document.getElementById('sale-discount') || {}).value) || 0);
       keepSc = !!((document.getElementById('sale-sc') || {}).checked);
-      keepCharge = !!((document.getElementById('sale-charge') || {}).checked);
       const ps = document.getElementById('sale-payment'); if (ps && ps.value) keepPay = ps.value;
       const tc = document.getElementById('tender-custom'); if (tc) keepTenderCustom = tc.value || '';
       const cs = document.getElementById('sale-client');
@@ -104,10 +103,6 @@ function renderSale(presetId) {
       <label class="flex items-center justify-between gap-3 py-1 cursor-pointer">
         <span class="text-sm text-gray-300">${T('sale.sc')}</span>
         <input type="checkbox" id="sale-sc" onchange="saleTotals()"${keepSc ? ' checked' : ''} class="switch" />
-      </label>
-      <label class="flex items-center justify-between gap-3 py-1 cursor-pointer">
-        <span class="text-sm text-gray-300">${T('sale.charge')}</span>
-        <input type="checkbox" id="sale-charge" onchange="saleHeaderChanged()"${keepCharge ? ' checked' : ''} class="switch" />
       </label>
       <div class="flex justify-between items-center border-t border-white/10 pt-3">
         <span class="font-bold text-gray-200">${T('sale.total')}</span>
@@ -272,7 +267,8 @@ function saleTotals() {
   updateSaleClientPreview();
 }
 // Live consequence line under the client picker: exactly what saving will do
-// to the client's balance (mirrors the server rule: charge + non-cash).
+// (mirrors the server rule: the picked client is always linked; only
+// non-cash methods add to the balance).
 function saleHeaderChanged() { try { saleTotals(); } catch (e) {} }
 function updateSaleClientPreview() {
   try {
@@ -282,13 +278,13 @@ function updateSaleClientPreview() {
     const id = sel && sel.value ? sel.value : null;
     if (!id) { box.innerHTML = `<span class="text-gray-600">${esc(T('sale.bal_walkin'))}</span>`; return; }
     const c = (data.clients || []).find(x => String(x.id) === String(id));
-    const charge = !!(document.getElementById('sale-charge') || {}).checked;
     const pay = (document.getElementById('sale-payment') || {}).value || 'Cash';
     const owes = (c && c.balance) || 0;
-    if (charge && pay !== 'Cash') {
+    const nm = (c && c.name) || '';
+    if (pay !== 'Cash') {
       box.innerHTML = `<span class="text-gray-400">${esc(T('sale.bal_owes', { amt: peso(owes) }))}</span> · <span class="text-orange-400 font-semibold">${esc(T('sale.bal_adds', { amt: peso(lastSaleTotal || 0) }))}</span>`;
     } else {
-      box.innerHTML = `<span class="text-gray-400">${esc(T('sale.bal_owes', { amt: peso(owes) }))}</span> · <span class="text-gray-500">${esc(T('sale.bal_cash'))}</span>`;
+      box.innerHTML = `<span class="text-gray-400">${esc(T('sale.bal_owes', { amt: peso(owes) }))}</span> · <span class="text-gray-500">${esc(T('sale.bal_cash', { name: nm }))}</span>`;
     }
   } catch (e) {}
 }
@@ -397,10 +393,6 @@ async function submitSale() {
   if (!cart.length) return toast(T('sale.need_items'), 'err');
   const clientSel = document.getElementById('sale-client');
   const clientId = clientSel && clientSel.value ? parseInt(clientSel.value) : null;
-  const charge = document.getElementById('sale-charge')?.checked;
-  // Validate BEFORE taking the lock: an early return past takeSubmitLock
-  // would wedge the Save button until reload.
-  if (charge && !clientId) return toast(T('sale.need_client'), 'err');
   if (!takeSubmitLock('sale')) return;
   const rate = parseFloat(document.getElementById('sale-interest')?.value) || 0;
   const sc = (document.getElementById('sale-sc')?.checked) ? true : false;
@@ -417,7 +409,9 @@ async function submitSale() {
     };
   });
   const disc = discount + (sc ? (items.reduce((s, i) => s + i.qty * i.unitCost, 0) * 0.2) : 0);
-  const body = { clientId: charge ? clientId : null, items, paymentMethod, discount: disc };
+  // The picked client is ALWAYS linked (cash sales show in their history
+  // with no balance effect); only non-cash methods add to the balance.
+  const body = { clientId, items, paymentMethod, discount: disc };
   try {
     const r = await apiPost('/api/sales', body);
     if (r.queued) { lastFailedSale = null; tendered = 0; try { saleClientPreset = null; saleRateClient = null; saleCartClient = ''; } catch (e) {} toast(T('sale.queued'), 'ok'); cart = []; updateCartUI(); showView('home'); await refreshAll(); return; }
@@ -426,7 +420,7 @@ async function submitSale() {
     saleSuccessSheet(r.invoiceNo);
   } catch (e) {
     // Cart is kept intact so nothing is lost; one tap retries the same payload.
-    lastFailedSale = { clientId: charge ? clientId : null, items, paymentMethod, discount: disc };
+    lastFailedSale = { clientId, items, paymentMethod, discount: disc };
     feelErr();
     toast(T('sale.failed_keep'), 'err');
     if (currentView === 'sale') renderSale();
