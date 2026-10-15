@@ -26,6 +26,7 @@ function makeSandbox(fetchImpl) {
   };
   vm.createContext(sandbox);
   vm.runInContext('function esc(s){return String(s==null?"":s);}', sandbox);
+  vm.runInContext('function escAttr(s){return esc(s).replace(/"/g,"&quot;").replace(/\'/g,"&#39;");}', sandbox);
   vm.runInContext(src, sandbox);
   return { sandbox, store, els };
 }
