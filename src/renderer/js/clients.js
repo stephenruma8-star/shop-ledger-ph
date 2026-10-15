@@ -110,7 +110,7 @@ export function openClientModal(c) {
       <div class="flex justify-between items-center mb-4 shrink-0"><h3 class="text-xl font-bold">${isEdit ? 'Edit' : 'New'} Client</h3><button onclick="saveClientDraft();closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
       <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 flex-1 min-h-0">
         <div class="lg:col-span-2 space-y-3">
-          <div><label class="text-xs text-gray-500 block mb-1">Name *</label><input id="cf-name" value="${isEdit ? escapeHtml(c.name||'') : escapeHtml(draft.name||'')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" oninput="saveClientDraft()" /></div>
+          <div><label class="text-xs text-gray-500 block mb-1">Name *</label><input id="cf-name" value="${isEdit ? escapeHtml(c.name||'') : escapeHtml(draft.name||'')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" oninput="saveClientDraft();cfUpdateTotals()" /></div>
           <div class="grid grid-cols-2 gap-2">
             <div><label class="text-xs text-gray-500 block mb-1">Phone</label><input id="cf-phone" value="${isEdit ? escapeHtml(c.phone||'') : escapeHtml(draft.phone||'')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" oninput="saveClientDraft()" /></div>
             <div><label class="text-xs text-gray-500 block mb-1">Balance</label><input id="cf-balance" type="number" step="0.01" value="${c?.balance||0}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
@@ -140,7 +140,7 @@ export function openClientModal(c) {
           <h4 class="font-semibold text-sm mb-1 shrink-0">Cart Items</h4>
           <div id="cf-cart" class="flex-1 overflow-auto border dark:border-gray-700 rounded-lg mb-2 min-h-0"></div>
           <div id="cf-totals" class="space-y-1 text-sm shrink-0"></div>
-          <div class="shrink-0 flex items-center gap-2"><label class="text-xs text-gray-500">Payment:</label><select id="cf-payment" class="px-2 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs"><option>Cash</option><option>GCash</option><option>Maya</option><option>Bank Transfer</option></select></div>
+          <div class="shrink-0 flex items-center gap-2"><label class="text-xs text-gray-500">Payment:</label><select id="cf-payment" onchange="cfUpdateTotals()" class="px-2 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs"><option>Cash</option><option>GCash</option><option>Maya</option><option>Bank Transfer</option></select></div>
         </div>
       </div>
       <div class="flex gap-2 pt-3 shrink-0"><button onclick="saveClient(${isEdit ? c.id : 'null'})" class="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="20 6 9 17 4 12"/></svg>${isEdit ? 'Update' : 'Save & Create Sale'}</button><button onclick="saveClientDraft();closeModal()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Cancel</button></div>
@@ -192,7 +192,15 @@ export function cfUpdateTotals() {
   el.innerHTML = `
     <div class="flex justify-between"><span>Subtotal</span><span>${peso(subtotal)}</span></div>
     ${totalInt > 0 ? `<div class="flex justify-between text-amber-600"><span>Interest</span><span>${peso(totalInt)}</span></div>` : ''}
-    <div class="flex justify-between font-bold"><span>Total</span><span class="text-green-600">${peso(grand)}</span></div>`;
+    <div class="flex justify-between font-bold"><span>Total</span><span class="text-green-600">${peso(grand)}</span></div>
+    ${(() => {
+      const pm = (document.getElementById('cf-payment') || {}).value || 'Cash';
+      const nm = ((document.getElementById('cf-name') || {}).value || '').trim() || 'client';
+      const bal = parseFloat((document.getElementById('cf-balance') || {}).value) || 0;
+      return pm !== 'Cash'
+        ? `<div class="text-xs text-gray-500">${escapeHtml(nm)} owes ${peso(bal)} · <span class="text-orange-600 font-semibold">this adds ${peso(grand)}</span></div>`
+        : `<div class="text-xs text-gray-400">Cash for ${escapeHtml(nm)} — recorded, no balance added.</div>`;
+    })()}`;
   if (_lastCfTotal !== null && _lastCfTotal !== grand) {
     el.classList.remove('total-flash'); void el.offsetWidth; el.classList.add('total-flash');
   }

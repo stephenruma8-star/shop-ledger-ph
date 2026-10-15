@@ -164,6 +164,7 @@ async function runStandaloneAudit() {
     await submitSale(); // credit: linked AND adds to balance
     const ha = (await apiGet('/api/clients/' + c.id + '/history')).client.balance || 0;
     if (Math.abs(ha - hb - 40) > 1e-9) throw new Error('credit sale did not add balance, got ' + ha);
+    if (!document.getElementById('toast-root').innerHTML.includes('now owes')) throw new Error('no balance proof toast after save');
     cart = [];
     showView('home');
   });

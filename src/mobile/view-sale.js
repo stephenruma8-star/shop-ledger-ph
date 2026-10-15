@@ -418,6 +418,7 @@ async function submitSale() {
     lastFailedSale = null; tendered = 0;
     try { saleClientPreset = null; saleRateClient = null; saleCartClient = ''; } catch (e) {}
     saleSuccessSheet(r.invoiceNo);
+    announceClientBalance(clientId);
   } catch (e) {
     // Cart is kept intact so nothing is lost; one tap retries the same payload.
     lastFailedSale = { clientId, items, paymentMethod, discount: disc };
@@ -429,14 +430,25 @@ async function submitSale() {
 async function retrySale() {
   if (!lastFailedSale) return;
   if (!takeSubmitLock('sale')) return;
+  const rcid = lastFailedSale.clientId || null;
   toast(T('sale.retrying'), 'info');
   try {
     const r = await apiPost('/api/sales', lastFailedSale);
     if (r.queued) { lastFailedSale = null; tendered = 0; toast(T('sale.queued'), 'ok'); cart = []; updateCartUI(); showView('home'); await refreshAll(); return; }
     lastFailedSale = null; tendered = 0;
     saleSuccessSheet(r.invoiceNo);
+    announceClientBalance(rcid);
   } catch (e) { feelErr(); toast(T('sale.still_failing', { msg: e.message }), 'err'); }
   finally { releaseSubmitLock('sale'); }
+}
+// After a client sale saves, announce their resulting balance: the visible
+// proof of what the sale did (or that a cash sale added nothing).
+async function announceClientBalance(clientId) {
+  if (!clientId) return;
+  try {
+    const h = await apiGet('/api/clients/' + encodeURIComponent(clientId) + '/history');
+    if (h && h.client) toast((h.client.name || 'Client') + ' now owes ' + peso(h.client.balance || 0), 'info');
+  } catch (e) {}
 }
 function saleSuccessSheet(invoiceNo) {
   cart = []; updateCartUI();

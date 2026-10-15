@@ -140,7 +140,7 @@ export function renderTransactionModal(editTxn) {
         <div class="space-y-3">
           <div class="grid grid-cols-2 gap-2">
             <div><label class="text-xs text-gray-500 block">Client</label><select id="tm-client" onchange="autoApplyClientDiscount(this)" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"><option value="">Walk-in</option>${clients.map(c => `<option value="${c.id}" ${c.id === selClient ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}</select></div>
-            <div><label class="text-xs text-gray-500 block">Payment</label><select id="tm-payment" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"><option ${selPay==='Cash'?'selected':''}>Cash</option><option ${selPay==='GCash'?'selected':''}>GCash</option><option ${selPay==='Maya'?'selected':''}>Maya</option><option ${selPay==='Bank Transfer'?'selected':''}>Bank Transfer</option></select></div>
+            <div><label class="text-xs text-gray-500 block">Payment</label><select id="tm-payment" onchange="updateTMTotals()" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"><option ${selPay==='Cash'?'selected':''}>Cash</option><option ${selPay==='GCash'?'selected':''}>GCash</option><option ${selPay==='Maya'?'selected':''}>Maya</option><option ${selPay==='Bank Transfer'?'selected':''}>Bank Transfer</option></select></div>
           </div>
           <div class="grid grid-cols-2 gap-2">
             <div><label class="text-xs text-gray-500 block">Discount (₱)</label><input id="tm-discount" type="number" value="${selDisc}" min="0" step="0.01" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" oninput="updateTMTotals()" /></div>
@@ -165,6 +165,7 @@ export function renderTransactionModal(editTxn) {
           <div class="flex justify-between items-center mb-2"><h4 class="font-semibold text-sm">Items</h4><button onclick="txCart.push({date:today(),description:'',name:'1',unitCost:0,intRate:0,invId:null});renderTMCart();updateTMTotals()" class="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs hover:bg-green-700"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Blank Row</button></div>
           <div id="tm-cart" class="max-h-72 overflow-auto border dark:border-gray-700 rounded-lg mb-2"></div>
           <div id="tm-totals" class="space-y-1 text-sm"></div>
+          <div id="tm-conseq" class="text-xs mt-1"></div>
           <button onclick="saveTransaction()" class="w-full mt-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="20 6 9 17 4 12"/></svg>${isEdit ? 'Update Sale' : 'Complete Sale'}</button>
           ${isEdit ? `<p class="text-xs text-gray-400 mt-1 text-center">Editing ${editTxn.invoiceNo} — old data will be replaced</p>` : ''}
         </div>
@@ -284,6 +285,15 @@ export function updateTMTotals() {
     <div class="flex justify-between font-bold text-lg border-t dark:border-gray-700 pt-1"><span>Total</span><span id="tm-grand-total" class="text-green-600">${peso(grandTotal)}</span></div>
     ${commissionRate > 0 ? `<div class="flex justify-between text-purple-600 text-xs mt-1"><span>Commission (${commissionRate}%)</span><span>${peso(commissionAmount)}</span></div>` : ''}`;
   if (flashTotal(el, grandTotal)) popEl(document.getElementById('tm-grand-total'));
+  const cq = document.getElementById('tm-conseq');
+  if (cq) {
+    const cid = parseInt(document.getElementById('tm-client')?.value) || null;
+    const pm = document.getElementById('tm-payment')?.value || 'Cash';
+    const cc = cid ? state.clients.find(x => x.id === cid) : null;
+    if (!cc) cq.innerHTML = '<span class="text-gray-400">Walk-in — no balance recorded.</span>';
+    else if (pm !== 'Cash') cq.innerHTML = `<span class="text-gray-500">${escapeHtml(cc.name)} owes ${peso(cc.balance || 0)}</span> · <span class="text-orange-600 font-semibold">this sale adds ${peso(grandTotal)}</span>`;
+    else cq.innerHTML = `<span class="text-gray-500">${escapeHtml(cc.name)} owes ${peso(cc.balance || 0)}</span> · <span class="text-gray-400">Cash sale — recorded, no balance added.</span>`;
+  }
 }
 
 export function toggleSC() { updateTMTotals(); }
@@ -514,6 +524,10 @@ export async function doSaveTransaction() {
   if (window.electronAPI) window.electronAPI.signalLanUpdate();
   closeModal();
   renderTxTable();
+  if (clientId) {
+    const cc = state.clients.find(x => x.id === clientId);
+    if (cc) toast(`${cc.name} now owes ${peso(cc.balance)}`, 'info');
+  }
 }
 
 // Loyalty points earned for a purchase amount, per the pointsPerPeso setting
