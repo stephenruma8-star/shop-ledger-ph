@@ -125,13 +125,14 @@ function renderSale(presetId) {
         <div class="flex justify-between text-sm"><span class="text-gray-400">${T('sale.change')}</span><span id="tender-change" class="font-bold num text-gray-400">—</span></div>
       </div>
     </div>
-    <div id="sale-save-bar" class="glass-card rounded-2xl px-3 pt-2.5 fade-in" style="position:sticky;bottom:0;margin-top:.75rem;background:linear-gradient(rgba(15,23,42,0), rgba(15,23,42,.96) 30%)">
+    <div id="sale-save-bar" class="glass-card rounded-2xl px-3 pt-2.5 pb-3 fade-in" style="position:fixed;bottom:calc(4.4rem + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:min(29.5rem,calc(100% - 1.5rem));box-shadow:0 -8px 30px rgba(0,0,0,.5)">
       <div class="flex justify-between items-center mb-2">
         <span class="font-bold text-gray-200">${T('sale.total')}</span>
         <span class="font-bold text-lg text-green-400 num" id="sale-total-bar">${peso(sub)}</span>
       </div>
       <button onclick="submitSale()" class="btn btn-primary btn-lg w-full" id="sale-btn"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>${T('sale.save')}</button>
-    </div>`;
+    </div>
+    <div style="height:9rem"></div>`;
   saleTotals();
   applyClientRate();
 }

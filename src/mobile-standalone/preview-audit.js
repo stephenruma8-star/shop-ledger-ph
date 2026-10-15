@@ -121,7 +121,13 @@ async function runStandaloneAudit() {
   });
   await A('pay-record-visible', async () => {
     showView('pay');
-    if (!document.getElementById('pay-record-bar')) throw new Error('record button has no sticky bar');
+    const bar = document.getElementById('pay-record-bar');
+    if (!bar) throw new Error('record button has no bar');
+    if (!String(bar.getAttribute('style') || '').includes('position:fixed')) throw new Error('pay bar is not fixed to the screen');
+    showView('sale');
+    const sbar = document.getElementById('sale-save-bar');
+    if (!sbar) throw new Error('save button has no bar');
+    if (!String(sbar.getAttribute('style') || '').includes('position:fixed')) throw new Error('sale bar is not fixed to the screen');
     showView('home');
   });
   await A('clients-header-order', async () => {
