@@ -211,7 +211,7 @@ function updateWeatherRow() {
       <button onclick="setWeatherAuto(${auto ? 'false' : 'true'})" class="px-3 py-1.5 rounded-xl text-xs font-semibold ${auto ? 'bg-green-600 text-white' : 'bg-white/5 border border-white/10 text-gray-200'}">${auto ? 'On' : 'Off'}</button>
     </div>
     <div class="flex gap-2">
-      <input id="wx-loc" type="text" maxlength="60" value="${esc(weatherLocGet())}" placeholder="City (e.g. Manila)" autocomplete="off" class="inp flex-1" />
+      <input id="wx-loc" type="text" maxlength="60" value="${escAttr(weatherLocGet())}" placeholder="City (e.g. Manila)" autocomplete="off" class="inp flex-1" />
       <button onclick="saveWeatherLoc()" class="btn btn-ghost btn-sm shrink-0">Set</button>
     </div>
     <p class="text-[11px] text-gray-500 mt-1.5">Auto uses GPS (needs location permission); otherwise the city above is used.</p>`;

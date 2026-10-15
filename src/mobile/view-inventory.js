@@ -79,16 +79,16 @@ function renderItemForm(id) {
         <div class="space-y-3">
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('inv.name')}</label>
-            <input id="if-name" type="text" maxlength="80" value="${esc(it?.name || '')}" class="inp" />
+            <input id="if-name" type="text" maxlength="80" value="${escAttr(it?.name || '')}" class="inp" />
           </div>
           <div class="grid grid-cols-2 gap-2.5">
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('inv.sku')}</label>
-              <input id="if-sku" type="text" maxlength="40" value="${esc(it?.sku || '')}" class="inp" />
+              <input id="if-sku" type="text" maxlength="40" value="${escAttr(it?.sku || '')}" class="inp" />
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('inv.barcode')}</label>
-              <input id="if-barcode" type="text" maxlength="40" value="${esc(it?.barcode || '')}" class="inp" />
+              <input id="if-barcode" type="text" maxlength="40" value="${escAttr(it?.barcode || '')}" class="inp" />
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('inv.sell')}</label>
@@ -108,23 +108,23 @@ function renderItemForm(id) {
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('inv.category')}</label>
-              <input id="if-category" type="text" maxlength="40" value="${esc(it?.category || '')}" class="inp" />
+              <input id="if-category" type="text" maxlength="40" value="${escAttr(it?.category || '')}" class="inp" />
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('inv.unit')}</label>
-              <input id="if-unit" type="text" maxlength="12" value="${esc(it?.unit || 'pcs')}" class="inp" />
+              <input id="if-unit" type="text" maxlength="12" value="${escAttr(it?.unit || 'pcs')}" class="inp" />
             </div>
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('inv.expiry')}</label>
-            <input id="if-expiry" type="date" value="${esc(it?.expiryDate || '')}" class="inp" />
+            <input id="if-expiry" type="date" value="${escAttr(it?.expiryDate || '')}" class="inp" />
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('inv.variants')}</label>
             <div id="if-vars" class="space-y-2">
               ${(vs.length ? vs : [{ name: '', stock: '' }]).slice(0, 5).map(vv => `
               <div class="flex gap-2">
-                <input type="text" maxlength="40" value="${esc(vv.name || '')}" placeholder="Size" class="inp flex-1 iv-name" />
+                <input type="text" maxlength="40" value="${escAttr(vv.name || '')}" placeholder="Size" class="inp flex-1 iv-name" />
                 <input type="number" min="0" value="${vv.stock ?? ''}" placeholder="0" class="inp w-20 iv-stock" />
               </div>`).join('')}
             </div>

@@ -122,7 +122,7 @@ function renderExpenseEdit(id) {
         <div class="space-y-3">
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('exp.desc')}</label>
-            <input id="ee-desc" type="text" value="${esc(e.description || '')}" class="inp" />
+            <input id="ee-desc" type="text" value="${escAttr(e.description || '')}" class="inp" />
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('exp.amount')}</label>

@@ -2364,7 +2364,7 @@ function updateWeatherRow() {
       <button onclick="setWeatherAuto(${auto ? 'false' : 'true'})" class="px-3 py-1.5 rounded-xl text-xs font-semibold ${auto ? 'bg-green-600 text-white' : 'bg-white/5 border border-white/10 text-gray-200'}">${auto ? 'On' : 'Off'}</button>
     </div>
     <div class="flex gap-2">
-      <input id="wx-loc" type="text" maxlength="60" value="${esc(weatherLocGet())}" placeholder="City (e.g. Manila)" autocomplete="off" class="inp flex-1" />
+      <input id="wx-loc" type="text" maxlength="60" value="${escAttr(weatherLocGet())}" placeholder="City (e.g. Manila)" autocomplete="off" class="inp flex-1" />
       <button onclick="saveWeatherLoc()" class="btn btn-ghost btn-sm shrink-0">Set</button>
     </div>
     <p class="text-[11px] text-gray-500 mt-1.5">Auto uses GPS (needs location permission); otherwise the city above is used.</p>`;
@@ -3981,16 +3981,16 @@ function renderItemForm(id) {
         <div class="space-y-3">
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('inv.name')}</label>
-            <input id="if-name" type="text" maxlength="80" value="${esc(it?.name || '')}" class="inp" />
+            <input id="if-name" type="text" maxlength="80" value="${escAttr(it?.name || '')}" class="inp" />
           </div>
           <div class="grid grid-cols-2 gap-2.5">
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('inv.sku')}</label>
-              <input id="if-sku" type="text" maxlength="40" value="${esc(it?.sku || '')}" class="inp" />
+              <input id="if-sku" type="text" maxlength="40" value="${escAttr(it?.sku || '')}" class="inp" />
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('inv.barcode')}</label>
-              <input id="if-barcode" type="text" maxlength="40" value="${esc(it?.barcode || '')}" class="inp" />
+              <input id="if-barcode" type="text" maxlength="40" value="${escAttr(it?.barcode || '')}" class="inp" />
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('inv.sell')}</label>
@@ -4010,23 +4010,23 @@ function renderItemForm(id) {
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('inv.category')}</label>
-              <input id="if-category" type="text" maxlength="40" value="${esc(it?.category || '')}" class="inp" />
+              <input id="if-category" type="text" maxlength="40" value="${escAttr(it?.category || '')}" class="inp" />
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('inv.unit')}</label>
-              <input id="if-unit" type="text" maxlength="12" value="${esc(it?.unit || 'pcs')}" class="inp" />
+              <input id="if-unit" type="text" maxlength="12" value="${escAttr(it?.unit || 'pcs')}" class="inp" />
             </div>
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('inv.expiry')}</label>
-            <input id="if-expiry" type="date" value="${esc(it?.expiryDate || '')}" class="inp" />
+            <input id="if-expiry" type="date" value="${escAttr(it?.expiryDate || '')}" class="inp" />
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('inv.variants')}</label>
             <div id="if-vars" class="space-y-2">
               ${(vs.length ? vs : [{ name: '', stock: '' }]).slice(0, 5).map(vv => `
               <div class="flex gap-2">
-                <input type="text" maxlength="40" value="${esc(vv.name || '')}" placeholder="Size" class="inp flex-1 iv-name" />
+                <input type="text" maxlength="40" value="${escAttr(vv.name || '')}" placeholder="Size" class="inp flex-1 iv-name" />
                 <input type="number" min="0" value="${vv.stock ?? ''}" placeholder="0" class="inp w-20 iv-stock" />
               </div>`).join('')}
             </div>
@@ -4521,7 +4521,7 @@ function renderExpenseEdit(id) {
         <div class="space-y-3">
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('exp.desc')}</label>
-            <input id="ee-desc" type="text" value="${esc(e.description || '')}" class="inp" />
+            <input id="ee-desc" type="text" value="${escAttr(e.description || '')}" class="inp" />
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('exp.amount')}</label>
@@ -4967,7 +4967,7 @@ async function renderReports() {
     <h2 class="card-title text-base mb-3 fade-in"><span class="icon-tile bg-blue-500/15 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></span>Reports</h2>
     <div class="glass-card rounded-2xl p-3 mb-3 fade-in flex items-center gap-2">
       <span class="text-xs text-gray-400 shrink-0">${T('rep.month')}</span>
-      <input id="rep-month" type="month" value="${esc(repMonth)}" max="${esc(monthKey(new Date()))}" onchange="loadReportMonth()" class="inp flex-1" style="height:2.4rem" />
+      <input id="rep-month" type="month" value="${escAttr(repMonth)}" max="${escAttr(monthKey(new Date()))}" onchange="loadReportMonth()" class="inp flex-1" style="height:2.4rem" />
       ${phoneRole() === 'cashier' ? '' : `<button onclick="exportMonthCsv()" class="btn btn-ghost btn-sm shrink-0">📥 ${T('rep.export')}</button>`}
     </div>
     <div class="grid grid-cols-2 gap-2 mb-3 fade-in">
@@ -5247,42 +5247,42 @@ function renderShopEdit() {
         <div class="space-y-3">
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('set.shop_name')}</label>
-            <input id="se-name" type="text" maxlength="80" value="${esc(s.shopName || '')}" class="inp" />
+            <input id="se-name" type="text" maxlength="80" value="${escAttr(s.shopName || '')}" class="inp" />
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('set.shop_address')}</label>
-            <input id="se-address" type="text" maxlength="200" value="${esc(s.shopAddress || '')}" class="inp" />
+            <input id="se-address" type="text" maxlength="200" value="${escAttr(s.shopAddress || '')}" class="inp" />
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('set.shop_contact')}</label>
-            <input id="se-contact" type="text" maxlength="40" value="${esc(s.shopContact || '')}" class="inp" />
+            <input id="se-contact" type="text" maxlength="40" value="${escAttr(s.shopContact || '')}" class="inp" />
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('set.shop_receipt_footer')}</label>
-            <input id="se-footer" type="text" maxlength="200" value="${esc(s.receiptFooter || '')}" class="inp" />
+            <input id="se-footer" type="text" maxlength="200" value="${escAttr(s.receiptFooter || '')}" class="inp" />
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">Receipt header (printed above shop name)</label>
-            <input id="se-headertext" type="text" maxlength="200" value="${esc(s.receiptHeaderText || '')}" class="inp" />
+            <input id="se-headertext" type="text" maxlength="200" value="${escAttr(s.receiptHeaderText || '')}" class="inp" />
           </div>
           ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `
           <div class="grid grid-cols-2 gap-2.5">
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">VAT % (0 = off)</label>
-              <input id="se-vat" type="number" min="0" max="100" step="0.01" value="${esc(s.vatRate ?? 0)}" class="inp" />
+              <input id="se-vat" type="number" min="0" max="100" step="0.01" value="${escAttr(s.vatRate ?? 0)}" class="inp" />
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">Printer port</label>
-              <input id="se-thermalport" type="number" min="1" max="65535" value="${esc(s.thermalPort || '9100')}" class="inp" />
+              <input id="se-thermalport" type="number" min="1" max="65535" value="${escAttr(s.thermalPort || '9100')}" class="inp" />
             </div>
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">Loyalty points per ₱1</label>
-            <input id="se-ppp" type="number" min="0" step="0.01" value="${esc(s.pointsPerPeso ?? 1)}" class="inp" />
+            <input id="se-ppp" type="number" min="0" step="0.01" value="${escAttr(s.pointsPerPeso ?? 1)}" class="inp" />
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">Printer IP (Wi-Fi receipt printer)</label>
-            <input id="se-thermal" type="text" maxlength="40" placeholder="192.168.1.50" value="${esc(s.thermalHost || '')}" class="inp" />
+            <input id="se-thermal" type="text" maxlength="40" placeholder="192.168.1.50" value="${escAttr(s.thermalHost || '')}" class="inp" />
           </div>` : ''}
           <button onclick="submitShopEdit()" class="btn btn-primary btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('set.save_shop')}</button>
         </div>
@@ -5564,7 +5564,7 @@ async function sendSmsReminders() {  if (!takeSubmitLock('sms')) return;
     // per debtor (smsto: needs no permission, one tap each).
     if (r && Array.isArray(r.texts) && r.texts.length) {
       const list = r.texts.map((t, i) =>
-        `<a href="smsto:${esc(t.phone)}?body=${encodeURIComponent(t.text)}" class="row py-2.5" style="text-decoration:none">
+        `<a href="smsto:${escAttr(t.phone)}?body=${encodeURIComponent(t.text)}" class="row py-2.5" style="text-decoration:none">
           <span class="flex-1 min-w-0"><span class="block font-semibold text-sm text-gray-200 truncate">${esc(t.name)}</span>
           <span class="block text-[11px] text-gray-500 truncate">${esc(t.phone)}</span></span>
           <span class="btn btn-ghost btn-sm shrink-0">📩 Text</span>

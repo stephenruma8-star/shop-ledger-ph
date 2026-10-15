@@ -9,7 +9,7 @@ async function renderReports() {
     <h2 class="card-title text-base mb-3 fade-in"><span class="icon-tile bg-blue-500/15 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></span>Reports</h2>
     <div class="glass-card rounded-2xl p-3 mb-3 fade-in flex items-center gap-2">
       <span class="text-xs text-gray-400 shrink-0">${T('rep.month')}</span>
-      <input id="rep-month" type="month" value="${esc(repMonth)}" max="${esc(monthKey(new Date()))}" onchange="loadReportMonth()" class="inp flex-1" style="height:2.4rem" />
+      <input id="rep-month" type="month" value="${escAttr(repMonth)}" max="${escAttr(monthKey(new Date()))}" onchange="loadReportMonth()" class="inp flex-1" style="height:2.4rem" />
       ${phoneRole() === 'cashier' ? '' : `<button onclick="exportMonthCsv()" class="btn btn-ghost btn-sm shrink-0">📥 ${T('rep.export')}</button>`}
     </div>
     <div class="grid grid-cols-2 gap-2 mb-3 fade-in">

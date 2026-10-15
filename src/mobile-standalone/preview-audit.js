@@ -324,6 +324,25 @@ async function runStandaloneAudit() {
     try { if (prev == null) localStorage.removeItem('slpRole'); else localStorage.setItem('slpRole', prev); } catch (e) {}
     showView('home');
   });
+  await A('quoted-names-roundtrip', async () => {
+    const nm = `O'Brien "Jr"`;
+    const r = await apiPost('/api/clients', { name: nm, phone: '0917', address: 'a"b' });
+    await loadAll();
+    renderClientForm(r.id);
+    if (document.getElementById('cf-name').value !== nm) throw new Error('client name mangled in form');
+    if (document.getElementById('cf-address').value !== 'a"b') throw new Error('address mangled in form');
+    closeQuick();
+    showView('sale');
+    manualItem();
+    document.getElementById('m-name').value = `Candy "Lito"`;
+    document.getElementById('m-price').value = '5';
+    addManualItem();
+    const line = cart[cart.length - 1];
+    if (!line || line.name !== `Candy "Lito"`) throw new Error('manual item name mangled');
+    cart = [];
+    closeQuick();
+    showView('home');
+  });
   await A('presets-roundtrip', async () => {
     const before = (await apiGet('/api/quick-items')).length;
     await apiPost('/api/quick-items', { name: 'Audit Preset', price: 7 });

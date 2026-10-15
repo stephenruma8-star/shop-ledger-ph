@@ -76,42 +76,42 @@ function renderShopEdit() {
         <div class="space-y-3">
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('set.shop_name')}</label>
-            <input id="se-name" type="text" maxlength="80" value="${esc(s.shopName || '')}" class="inp" />
+            <input id="se-name" type="text" maxlength="80" value="${escAttr(s.shopName || '')}" class="inp" />
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('set.shop_address')}</label>
-            <input id="se-address" type="text" maxlength="200" value="${esc(s.shopAddress || '')}" class="inp" />
+            <input id="se-address" type="text" maxlength="200" value="${escAttr(s.shopAddress || '')}" class="inp" />
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('set.shop_contact')}</label>
-            <input id="se-contact" type="text" maxlength="40" value="${esc(s.shopContact || '')}" class="inp" />
+            <input id="se-contact" type="text" maxlength="40" value="${escAttr(s.shopContact || '')}" class="inp" />
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('set.shop_receipt_footer')}</label>
-            <input id="se-footer" type="text" maxlength="200" value="${esc(s.receiptFooter || '')}" class="inp" />
+            <input id="se-footer" type="text" maxlength="200" value="${escAttr(s.receiptFooter || '')}" class="inp" />
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">Receipt header (printed above shop name)</label>
-            <input id="se-headertext" type="text" maxlength="200" value="${esc(s.receiptHeaderText || '')}" class="inp" />
+            <input id="se-headertext" type="text" maxlength="200" value="${escAttr(s.receiptHeaderText || '')}" class="inp" />
           </div>
           ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `
           <div class="grid grid-cols-2 gap-2.5">
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">VAT % (0 = off)</label>
-              <input id="se-vat" type="number" min="0" max="100" step="0.01" value="${esc(s.vatRate ?? 0)}" class="inp" />
+              <input id="se-vat" type="number" min="0" max="100" step="0.01" value="${escAttr(s.vatRate ?? 0)}" class="inp" />
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">Printer port</label>
-              <input id="se-thermalport" type="number" min="1" max="65535" value="${esc(s.thermalPort || '9100')}" class="inp" />
+              <input id="se-thermalport" type="number" min="1" max="65535" value="${escAttr(s.thermalPort || '9100')}" class="inp" />
             </div>
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">Loyalty points per ₱1</label>
-            <input id="se-ppp" type="number" min="0" step="0.01" value="${esc(s.pointsPerPeso ?? 1)}" class="inp" />
+            <input id="se-ppp" type="number" min="0" step="0.01" value="${escAttr(s.pointsPerPeso ?? 1)}" class="inp" />
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">Printer IP (Wi-Fi receipt printer)</label>
-            <input id="se-thermal" type="text" maxlength="40" placeholder="192.168.1.50" value="${esc(s.thermalHost || '')}" class="inp" />
+            <input id="se-thermal" type="text" maxlength="40" placeholder="192.168.1.50" value="${escAttr(s.thermalHost || '')}" class="inp" />
           </div>` : ''}
           <button onclick="submitShopEdit()" class="btn btn-primary btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('set.save_shop')}</button>
         </div>

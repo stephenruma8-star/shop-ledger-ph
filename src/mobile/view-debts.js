@@ -49,7 +49,7 @@ async function sendSmsReminders() {  if (!takeSubmitLock('sms')) return;
     // per debtor (smsto: needs no permission, one tap each).
     if (r && Array.isArray(r.texts) && r.texts.length) {
       const list = r.texts.map((t, i) =>
-        `<a href="smsto:${esc(t.phone)}?body=${encodeURIComponent(t.text)}" class="row py-2.5" style="text-decoration:none">
+        `<a href="smsto:${escAttr(t.phone)}?body=${encodeURIComponent(t.text)}" class="row py-2.5" style="text-decoration:none">
           <span class="flex-1 min-w-0"><span class="block font-semibold text-sm text-gray-200 truncate">${esc(t.name)}</span>
           <span class="block text-[11px] text-gray-500 truncate">${esc(t.phone)}</span></span>
           <span class="btn btn-ghost btn-sm shrink-0">📩 Text</span>
