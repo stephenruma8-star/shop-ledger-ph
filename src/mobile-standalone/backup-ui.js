@@ -62,6 +62,7 @@ async function importBackup() {
   const inp = document.getElementById('bk-file');
   const file = inp && inp.files && inp.files[0];
   if (!file) { toast('Pick a backup file first', 'err'); return; }
+  if ((file.size || 0) > 25 * 1024 * 1024) { toast('That file is too big to be a backup (max 25MB)', 'err'); return; }
   if (!backupImportArmed) {
     backupImportArmed = true;
     toast('Tap Restore again to REPLACE everything with this file', 'info');

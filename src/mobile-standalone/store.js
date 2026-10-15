@@ -928,7 +928,9 @@ async function _apiSuppliers(method, parts, body) {
   if (method === 'GET' && parts.length === 0) {
     const sups = await db.all('SELECT * FROM suppliers', []);
     const pays = await db.all('SELECT supplierId, amount FROM supplier_payments', []);
-    const pos = await db.all('SELECT supplierId, total FROM purchase_orders', []);
+    // Only RECEIVED orders count as bought (matches the detail screen) —
+    // pending orders are not debt yet.
+    const pos = await db.all("SELECT supplierId, total FROM purchase_orders WHERE status = 'Received'", []);
     const paid = {}, purchased = {};
     pays.forEach(p => { paid[p.supplierId] = (paid[p.supplierId] || 0) + (p.amount || 0); });
     pos.forEach(po => { purchased[po.supplierId] = (purchased[po.supplierId] || 0) + (po.total || 0); });
@@ -1000,8 +1002,14 @@ async function _apiPOs(method, parts, body) {
   if (method === 'POST' && parts.length === 0) {
     const { supplierId, items, date } = body || {};
     if (!items || !items.length) throw _apiErr(400, 'No items');
+    for (const i of items) {
+      const q = parseInt(i && i.qty);
+      if (isNaN(q) || q < 1) throw _apiErr(400, 'Each PO line needs quantity ≥ 1');
+      if ((parseFloat(i && i.price) || 0) < 0) throw _apiErr(400, 'PO prices cannot be negative');
+    }
     const s = supplierId ? await db.get('SELECT * FROM suppliers WHERE id = ?', [supplierId]) : null;
     const supplierName = s ? s.name : 'Unknown';
+    return _withNumbering(async () => {
     const pos = await db.all("SELECT poNo FROM purchase_orders WHERE poNo LIKE 'PO-%'", []);
     let mx = 0;
     for (const p of pos) { const n = parseInt(String(p.poNo || '').replace('PO-', '')) || 0; if (n > mx) mx = n; }
@@ -1013,6 +1021,7 @@ async function _apiPOs(method, parts, body) {
     await _audit('po', 'PO ' + poNo + ' created from ' + supplierName + ' (phone)');
     _bump();
     return { success: true, poNo };
+    });
   }
   if (method === 'DELETE' && parts.length === 1) {
     const po = await db.get('SELECT * FROM purchase_orders WHERE id = ?', [parts[0]]);
@@ -1032,6 +1041,11 @@ async function _apiPOs(method, parts, body) {
     if (po.status === 'Received') throw _apiErr(400, 'Received orders cannot be edited');
     const items = b.items !== undefined ? b.items : _parseJson(po.items, []);
     if (!Array.isArray(items) || !items.length) throw _apiErr(400, 'No items');
+    for (const i of items) {
+      const q = parseInt(i && i.qty);
+      if (isNaN(q) || q < 1) throw _apiErr(400, 'Each PO line needs quantity ≥ 1');
+      if ((parseFloat(i && i.price) || 0) < 0) throw _apiErr(400, 'PO prices cannot be negative');
+    }
     const cleanItems = items.map(i => ({ invId: i.invId || null, name: String(i.name || 'Item'), price: parseFloat(i.price) || 0, qty: parseInt(i.qty) || 1, variantName: i.variantName || null }));
     const total = cleanItems.reduce((s, i) => s + (i.price * i.qty), 0);
     let supplierId = po.supplierId, supplierName = po.supplierName;

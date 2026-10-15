@@ -3908,11 +3908,11 @@ async function renderInventory() {
   v.innerHTML = `
     <div class="flex items-center justify-between gap-2 mb-3 fade-in">
       <h2 class="card-title text-base"><span class="icon-tile bg-blue-500/15 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></span>${T('view.inventory.title')} <span class="text-sm text-gray-500 font-normal">(${T('inv.count', { n: data.inventory.length })})</span></h2>
-      <button onclick="renderItemForm(null)" class="btn btn-primary btn-sm shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('inv.add')}</button>
+      ${phoneRole() === 'cashier' ? '' : `<button onclick="renderItemForm(null)" class="btn btn-primary btn-sm shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('inv.add')}</button>`}
     </div>
     <div class="mb-3 fade-in"><span class="chip ${low > 0 ? 'chip-amber' : 'chip-green'}">${low > 0 ? T('inv.low_n', { n: low }) : T('inv.all_ok')}</span></div>
     <div id="inv-valuation" class="mb-3"></div>
-      <button onclick="showView('stocktake')" class="btn btn-ghost w-full mb-3"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>${T('st.start')}</button>
+${phoneRole() === 'cashier' ? '' : `<button onclick="showView('stocktake')" class="btn btn-ghost w-full mb-3"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>${T('st.start')}</button>`}
     <div class="relative mb-3 fade-in">
       <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <input id="inv-search" type="text" placeholder="${esc(T('cat.search_ph'))}" oninput="filterInventory(this.value)" class="inp pl-10" />
@@ -4038,6 +4038,7 @@ function renderItemForm(id) {
     </div>`;
 }
 async function submitItemForm(id) {
+  if (phoneRole() === 'cashier') return toast(T('nav.owner_only'), 'err');
   const val = (x) => ((document.getElementById(x) || {}).value || '');
   const name = val('if-name').trim();
   if (!name) { toast(T('inv.need_name'), 'err'); return; }
@@ -4401,7 +4402,7 @@ const EXPENSE_CATS = ['Purchases','Utilities','Rent','Supplies','Transportation'
 async function renderExpenses() {
   const v = document.getElementById('view');
   if (!data.expenses.length) { v.innerHTML = skeleton(T('common.loading')); await loadAll(); }
-  const month = (data.expenses || []).filter(e => (e.date || '').startsWith(new Date().toISOString().split('T')[0].slice(0, 7)));
+  const month = (data.expenses || []).filter(e => (e.date || '').startsWith(phoneToday().slice(0, 7)));
   const monthTotal = month.reduce((s, e) => s + (e.amount || 0), 0);
   v.innerHTML = `
     <div class="flex items-center justify-between gap-2 mb-3 fade-in">
@@ -4475,7 +4476,7 @@ function addExpense() {
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('exp.date')}</label>
-              <input id="ex-date" type="date" value="${new Date().toISOString().split('T')[0]}" class="inp" />
+              <input id="ex-date" type="date" value="${phoneToday()}" class="inp" />
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('exp.payee')}</label>
@@ -4488,11 +4489,11 @@ function addExpense() {
     </div>`;
 }
 async function submitExpense() {
-  const description = (document.getElementById('ex-desc').value || '').trim();
-  const amount = parseFloat(document.getElementById('ex-amount').value);
-  const category = document.getElementById('ex-category').value;
-  const date = document.getElementById('ex-date').value || new Date().toISOString().split('T')[0];
-  const payee = (document.getElementById('ex-payee').value || '').trim();
+  const description = ((document.getElementById('ex-desc') || {}).value || '').trim();
+  const amount = parseFloat((document.getElementById('ex-amount') || {}).value);
+  const category = (document.getElementById('ex-category') || {}).value;
+  const date = (document.getElementById('ex-date') || {}).value || phoneToday();
+  const payee = ((document.getElementById('ex-payee') || {}).value || '').trim();
   if (!amount || amount <= 0) return toast(T('exp.need_amount'), 'err');
   if (!takeSubmitLock('expense')) return;
   try {
@@ -4644,6 +4645,7 @@ function supplierListHTML(items) {
       <div class="flex gap-1.5 mt-2 items-center">
         <span class="chip chip-blue">${T('sup.bought', { amt: peso(s.purchased) })}</span>
         <span class="chip chip-green">${T('sup.paid', { amt: peso(s.paid) })}</span>
+        ${(s.owed || 0) > 0 && phoneRole() !== 'cashier' ? `<button onclick="renderSupplierPay(${JSON.stringify(s.id)})" class="btn btn-ghost btn-sm shrink-0">Pay</button>` : ''}
         ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button onclick="deleteSupplier(${JSON.stringify(s.id)})" id="sup-del-${s.id}" class="ml-auto text-[11px] text-red-400 px-2 py-1 rounded-lg shrink-0" style="background:rgba(239,68,68,.1)">🗑</button>` : ''}
       </div>
     </div>`).join('');
@@ -4794,7 +4796,7 @@ async function renderPOs() {
             <span class="chip chip-amber">${esc(po.status || 'Pending')}</span>
           </div>
           <div class="text-[11px] text-gray-500 mt-0.5">${esc(po.supplierName || T('po.unknown_supplier'))} · ${fmtDate(po.date)}</div>
-          <div class="text-[11px] text-gray-500 mt-0.5">${po.items.length} ${po.items.length === 1 ? T('cat.item') : T('cat.items')}</div>
+          <div class="text-[11px] text-gray-500 mt-0.5">${(po.items || []).length} ${(po.items || []).length === 1 ? T('cat.item') : T('cat.items')}</div>
           <div class="flex items-center justify-between mt-1.5">
             <div class="text-sm font-bold text-teal-400 num">${peso(po.total)}</div>
             <div class="flex gap-1.5">
@@ -4884,8 +4886,8 @@ function poAddItem() {
   if (!opt || !opt.value) return toast(T('po.select_item_err'), 'err');
   const invId = parseInt(opt.value);
   const name = opt.dataset.name || 'Item';
-  const price = parseFloat(document.getElementById('po-price').value) || (parseFloat(opt.dataset.price) || 0);
-  const qty = Math.max(1, parseInt(document.getElementById('po-qty').value) || 1);
+  const price = parseFloat((document.getElementById('po-price') || {}).value) || (parseFloat(opt.dataset.price) || 0);
+  const qty = Math.max(1, parseInt((document.getElementById('po-qty') || {}).value) || 1);
   const existing = poItems.find(i => i.invId === invId);
   if (existing) { existing.qty += qty; existing.price = price; }
   else poItems.push({ invId, name, price, qty });
@@ -4984,17 +4986,17 @@ async function renderReports() {
       <div class="stat-card rounded-2xl p-3.5">
         <div class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-1">${T('rep.today_profit')}</div>
         <div class="text-xl font-bold num ${(r.today.profit || 0) >= 0 ? 'text-blue-400' : 'text-red-400'}">${peso(r.today.profit)}</div>
-        <div class="text-[11px] text-gray-500 mt-1">${T('home.collected')} <span class="text-green-400 font-semibold num">${peso(r.today.collected)}</span>
+        <div class="text-[11px] text-gray-500 mt-1">${T('home.collected')} <span class="text-green-400 font-semibold num">${peso(r.today.collected)}</span></div></div>
       </div>
       <div class="stat-card rounded-2xl p-3.5">
         <div class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-1">${T('home.month_sales')}</div>
         <div class="text-xl font-bold text-green-400 num">${peso(r.month.sales)}</div>
-        <div class="text-[11px] text-gray-500 mt-1">${T('home.expenses')} <span class="text-red-400 font-semibold num">${peso(r.month.expenses)}</span>
+        <div class="text-[11px] text-gray-500 mt-1">${T('home.expenses')} <span class="text-red-400 font-semibold num">${peso(r.month.expenses)}</span></div>
       </div>
       <div class="stat-card rounded-2xl p-3.5">
         <div class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-1">${T('rep.month_profit')}</div>
         <div class="text-xl font-bold num ${(r.month.profit || 0) >= 0 ? 'text-blue-400' : 'text-red-400'}">${peso(r.month.profit)}</div>
-        <div class="text-[11px] text-gray-500 mt-1">${T('home.collected')} <span class="text-green-400 font-semibold num">${peso(r.month.collected)}</span>
+        <div class="text-[11px] text-gray-500 mt-1">${T('home.collected')} <span class="text-green-400 font-semibold num">${peso(r.month.collected)}</span></div>
       </div>
     </div>
     <section class="glass-card rounded-2xl p-3 mb-3 fade-in">
@@ -5337,8 +5339,9 @@ async function renderStocktake() {
       <input id="st-search" type="text" placeholder="${esc(T('st.search_ph'))}" oninput="filterStocktake(this.value)" autocomplete="off" class="inp pl-10" />
     </div>
     <div class="grid gap-2.5 fade-in" id="st-grid">${stocktakeListHTML(data.inventory)}</div>
-    <button onclick="submitStocktake()" class="btn btn-primary btn-lg mt-3"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('st.save')}</button>
-    <p class="text-[11px] text-gray-500 text-center mt-2">${T('st.note')}</p>`;
+    <p class="text-[11px] text-gray-500 text-center mt-2 mb-2">${T('st.note')}</p>
+    <div style="height:6rem"></div>
+    ${phoneRole() === 'cashier' ? '' : `<div id="st-save-bar" class="glass-card rounded-2xl px-3 pt-2.5 pb-3 fade-in" style="position:fixed;bottom:calc(4.4rem + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:min(29.5rem,calc(100% - 1.5rem));box-shadow:0 -8px 30px rgba(0,0,0,.5)"><button onclick="submitStocktake()" class="btn btn-primary btn-lg w-full"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('st.save')}</button></div>`}`;
 }
 function stocktakeCounted(item) {
   if (Object.prototype.hasOwnProperty.call(stocktakeTouched, item.id)) return stocktakeTouched[item.id];
@@ -5405,6 +5408,9 @@ function filterStocktake(q) {
   if (g) g.innerHTML = stocktakeListHTML((data.inventory || []).filter(i => ((i.name || '') + ' ' + (i.sku || '') + ' ' + (i.barcode || '')).toLowerCase().includes(q)));
 }
 async function submitStocktake() {
+  if (phoneRole() === 'cashier') return toast(T('nav.owner_only'), 'err');
+  if (!takeSubmitLock('stocktake')) return;
+  try {
   const changes = Object.keys(stocktakeTouched).map(k => {
     const item = (data.inventory || []).find(i => String(i.id) === String(k));
     if (!item) return null;
@@ -5428,6 +5434,7 @@ async function submitStocktake() {
   if (errors.length) toast(errors.slice(0, 2).join('; ') + (errors.length > 2 ? ` (+${errors.length - 2} ${T('st.more')})` : ''), 'err');
   await refreshAll();
   if (currentView === 'stocktake') renderStocktake();
+  } finally { releaseSubmitLock('stocktake'); }
 }
 
 // ===== src/mobile/view-audit.js =====
@@ -5527,7 +5534,7 @@ async function renderDebts() {
     <div class="flex items-center justify-between gap-2 mb-3 fade-in">
       <h2 class="card-title text-base"><span class="icon-tile bg-orange-500/15 text-orange-400"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>${T('view.debts.title')}</h2>
       <div class="flex gap-1.5 shrink-0">
-      <button onclick="openDebtFormSetup()" class="btn btn-ghost btn-sm shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Form</button>      ${owner ? `<button onclick="sendSmsReminders()" class="btn btn-ghost btn-sm shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>${T('debts.sms')}</button>` : ''}
+      ${owner ? `<button onclick="openDebtFormSetup()" class="btn btn-ghost btn-sm shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Form</button>` : ''}      ${owner ? `<button onclick="sendSmsReminders()" class="btn btn-ghost btn-sm shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>${T('debts.sms')}</button>` : ''}
       ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button onclick="applyInterestNow()" class="btn btn-ghost btn-sm shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Interest</button>` : ''}
       </div>
     </div>

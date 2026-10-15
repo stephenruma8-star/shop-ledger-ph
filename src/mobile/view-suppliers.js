@@ -35,6 +35,7 @@ function supplierListHTML(items) {
       <div class="flex gap-1.5 mt-2 items-center">
         <span class="chip chip-blue">${T('sup.bought', { amt: peso(s.purchased) })}</span>
         <span class="chip chip-green">${T('sup.paid', { amt: peso(s.paid) })}</span>
+        ${(s.owed || 0) > 0 && phoneRole() !== 'cashier' ? `<button onclick="renderSupplierPay(${JSON.stringify(s.id)})" class="btn btn-ghost btn-sm shrink-0">Pay</button>` : ''}
         ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button onclick="deleteSupplier(${JSON.stringify(s.id)})" id="sup-del-${s.id}" class="ml-auto text-[11px] text-red-400 px-2 py-1 rounded-lg shrink-0" style="background:rgba(239,68,68,.1)">🗑</button>` : ''}
       </div>
     </div>`).join('');

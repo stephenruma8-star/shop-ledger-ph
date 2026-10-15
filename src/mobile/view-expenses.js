@@ -3,7 +3,7 @@ const EXPENSE_CATS = ['Purchases','Utilities','Rent','Supplies','Transportation'
 async function renderExpenses() {
   const v = document.getElementById('view');
   if (!data.expenses.length) { v.innerHTML = skeleton(T('common.loading')); await loadAll(); }
-  const month = (data.expenses || []).filter(e => (e.date || '').startsWith(new Date().toISOString().split('T')[0].slice(0, 7)));
+  const month = (data.expenses || []).filter(e => (e.date || '').startsWith(phoneToday().slice(0, 7)));
   const monthTotal = month.reduce((s, e) => s + (e.amount || 0), 0);
   v.innerHTML = `
     <div class="flex items-center justify-between gap-2 mb-3 fade-in">
@@ -77,7 +77,7 @@ function addExpense() {
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('exp.date')}</label>
-              <input id="ex-date" type="date" value="${new Date().toISOString().split('T')[0]}" class="inp" />
+              <input id="ex-date" type="date" value="${phoneToday()}" class="inp" />
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('exp.payee')}</label>
@@ -90,11 +90,11 @@ function addExpense() {
     </div>`;
 }
 async function submitExpense() {
-  const description = (document.getElementById('ex-desc').value || '').trim();
-  const amount = parseFloat(document.getElementById('ex-amount').value);
-  const category = document.getElementById('ex-category').value;
-  const date = document.getElementById('ex-date').value || new Date().toISOString().split('T')[0];
-  const payee = (document.getElementById('ex-payee').value || '').trim();
+  const description = ((document.getElementById('ex-desc') || {}).value || '').trim();
+  const amount = parseFloat((document.getElementById('ex-amount') || {}).value);
+  const category = (document.getElementById('ex-category') || {}).value;
+  const date = (document.getElementById('ex-date') || {}).value || phoneToday();
+  const payee = ((document.getElementById('ex-payee') || {}).value || '').trim();
   if (!amount || amount <= 0) return toast(T('exp.need_amount'), 'err');
   if (!takeSubmitLock('expense')) return;
   try {

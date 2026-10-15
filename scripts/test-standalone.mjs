@@ -168,7 +168,13 @@ ok((await A('GET', '/api/inventory')).find(i => i.name === 'Oil').stock === 52, 
 await throwsJson(400, async () => A('POST', '/api/purchase-orders/' + poId + '/receive', {}), 'double receive rejected');
 await A('POST', '/api/supplier-payments', { supplierId: sup.id, amount: 100, paymentMethod: 'GCash' });
 const supDet = await A('GET', '/api/suppliers/' + sup.id + '/payments');
-ok(supDet.purchased === 200 && supDet.paid === 100 && supDet.owed === 100, 'supplier balances');
+  ok(supDet.purchased === 200 && supDet.paid === 100 && supDet.owed === 100, 'supplier balances');
+  await throws(400, () => A('POST', '/api/purchase-orders', { supplierId: sup.id, items: [{ name: 'Bad', price: 5, qty: -2 }] }), 'negative PO qty rejected');
+  await throws(400, () => A('POST', '/api/purchase-orders', { supplierId: sup.id, items: [{ name: 'Bad', price: -5, qty: 2 }] }), 'negative PO price rejected');
+  // pending POs are not debt yet: list owed matches the received-only detail
+  const poPend = await A('POST', '/api/purchase-orders', { supplierId: sup.id, items: [{ name: 'Later', price: 50, qty: 4 }] });
+  ok((await A('GET', '/api/suppliers')).find(s => s.id === sup.id).owed === 100, 'pending PO excluded from list owed');
+  await A('POST', '/api/purchase-orders/' + (await A('GET', '/api/purchase-orders')).find(p => p.poNo === poPend.poNo).id, {}, 'DELETE');
 
 // loyalty redeem (Maria has 194 pts from the ₱194 sale)
 const red = await A('POST', '/api/clients/' + c1.id + '/redeem', {});
@@ -241,7 +247,8 @@ const poEdit = await A('POST', '/api/purchase-orders', { supplierId: sup.id, ite
 const poEditId = (await A('GET', '/api/purchase-orders')).find(p => p.poNo === poEdit.poNo).id;
 const poUpd = await A('POST', '/api/purchase-orders/' + poEditId, { items: [{ name: 'Sugar', price: 12, qty: 5 }] }, 'PUT');
 ok(poUpd.poNo === poEdit.poNo, 'PO edit keeps number');
-ok((await A('GET', '/api/purchase-orders')).find(p => p.poNo === poEdit.poNo).total === 60, 'PO edit recomputes total');
+  ok((await A('GET', '/api/purchase-orders')).find(p => p.poNo === poEdit.poNo).total === 60, 'PO edit recomputes total');
+  await throws(400, () => A('POST', '/api/purchase-orders/' + poEditId, { items: [{ name: 'Sugar', price: 12, qty: -1 }] }, 'PUT'), 'PO edit negative qty rejected');
 await throws(400, () => A('POST', '/api/purchase-orders/' + poId, {}, 'PUT'), 'edit received PO blocked');
 
 // expiring alerts

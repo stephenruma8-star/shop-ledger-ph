@@ -15,7 +15,7 @@ async function renderPOs() {
             <span class="chip chip-amber">${esc(po.status || 'Pending')}</span>
           </div>
           <div class="text-[11px] text-gray-500 mt-0.5">${esc(po.supplierName || T('po.unknown_supplier'))} · ${fmtDate(po.date)}</div>
-          <div class="text-[11px] text-gray-500 mt-0.5">${po.items.length} ${po.items.length === 1 ? T('cat.item') : T('cat.items')}</div>
+          <div class="text-[11px] text-gray-500 mt-0.5">${(po.items || []).length} ${(po.items || []).length === 1 ? T('cat.item') : T('cat.items')}</div>
           <div class="flex items-center justify-between mt-1.5">
             <div class="text-sm font-bold text-teal-400 num">${peso(po.total)}</div>
             <div class="flex gap-1.5">
@@ -105,8 +105,8 @@ function poAddItem() {
   if (!opt || !opt.value) return toast(T('po.select_item_err'), 'err');
   const invId = parseInt(opt.value);
   const name = opt.dataset.name || 'Item';
-  const price = parseFloat(document.getElementById('po-price').value) || (parseFloat(opt.dataset.price) || 0);
-  const qty = Math.max(1, parseInt(document.getElementById('po-qty').value) || 1);
+  const price = parseFloat((document.getElementById('po-price') || {}).value) || (parseFloat(opt.dataset.price) || 0);
+  const qty = Math.max(1, parseInt((document.getElementById('po-qty') || {}).value) || 1);
   const existing = poItems.find(i => i.invId === invId);
   if (existing) { existing.qty += qty; existing.price = price; }
   else poItems.push({ invId, name, price, qty });

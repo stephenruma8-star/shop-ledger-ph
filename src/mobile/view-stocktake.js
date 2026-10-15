@@ -16,8 +16,9 @@ async function renderStocktake() {
       <input id="st-search" type="text" placeholder="${esc(T('st.search_ph'))}" oninput="filterStocktake(this.value)" autocomplete="off" class="inp pl-10" />
     </div>
     <div class="grid gap-2.5 fade-in" id="st-grid">${stocktakeListHTML(data.inventory)}</div>
-    <button onclick="submitStocktake()" class="btn btn-primary btn-lg mt-3"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('st.save')}</button>
-    <p class="text-[11px] text-gray-500 text-center mt-2">${T('st.note')}</p>`;
+    <p class="text-[11px] text-gray-500 text-center mt-2 mb-2">${T('st.note')}</p>
+    <div style="height:6rem"></div>
+    ${phoneRole() === 'cashier' ? '' : `<div id="st-save-bar" class="glass-card rounded-2xl px-3 pt-2.5 pb-3 fade-in" style="position:fixed;bottom:calc(4.4rem + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:min(29.5rem,calc(100% - 1.5rem));box-shadow:0 -8px 30px rgba(0,0,0,.5)"><button onclick="submitStocktake()" class="btn btn-primary btn-lg w-full"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('st.save')}</button></div>`}`;
 }
 function stocktakeCounted(item) {
   if (Object.prototype.hasOwnProperty.call(stocktakeTouched, item.id)) return stocktakeTouched[item.id];
@@ -84,6 +85,9 @@ function filterStocktake(q) {
   if (g) g.innerHTML = stocktakeListHTML((data.inventory || []).filter(i => ((i.name || '') + ' ' + (i.sku || '') + ' ' + (i.barcode || '')).toLowerCase().includes(q)));
 }
 async function submitStocktake() {
+  if (phoneRole() === 'cashier') return toast(T('nav.owner_only'), 'err');
+  if (!takeSubmitLock('stocktake')) return;
+  try {
   const changes = Object.keys(stocktakeTouched).map(k => {
     const item = (data.inventory || []).find(i => String(i.id) === String(k));
     if (!item) return null;
@@ -107,4 +111,5 @@ async function submitStocktake() {
   if (errors.length) toast(errors.slice(0, 2).join('; ') + (errors.length > 2 ? ` (+${errors.length - 2} ${T('st.more')})` : ''), 'err');
   await refreshAll();
   if (currentView === 'stocktake') renderStocktake();
+  } finally { releaseSubmitLock('stocktake'); }
 }

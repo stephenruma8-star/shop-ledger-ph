@@ -28,17 +28,17 @@ async function renderReports() {
       <div class="stat-card rounded-2xl p-3.5">
         <div class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-1">${T('rep.today_profit')}</div>
         <div class="text-xl font-bold num ${(r.today.profit || 0) >= 0 ? 'text-blue-400' : 'text-red-400'}">${peso(r.today.profit)}</div>
-        <div class="text-[11px] text-gray-500 mt-1">${T('home.collected')} <span class="text-green-400 font-semibold num">${peso(r.today.collected)}</span>
+        <div class="text-[11px] text-gray-500 mt-1">${T('home.collected')} <span class="text-green-400 font-semibold num">${peso(r.today.collected)}</span></div></div>
       </div>
       <div class="stat-card rounded-2xl p-3.5">
         <div class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-1">${T('home.month_sales')}</div>
         <div class="text-xl font-bold text-green-400 num">${peso(r.month.sales)}</div>
-        <div class="text-[11px] text-gray-500 mt-1">${T('home.expenses')} <span class="text-red-400 font-semibold num">${peso(r.month.expenses)}</span>
+        <div class="text-[11px] text-gray-500 mt-1">${T('home.expenses')} <span class="text-red-400 font-semibold num">${peso(r.month.expenses)}</span></div>
       </div>
       <div class="stat-card rounded-2xl p-3.5">
         <div class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-1">${T('rep.month_profit')}</div>
         <div class="text-xl font-bold num ${(r.month.profit || 0) >= 0 ? 'text-blue-400' : 'text-red-400'}">${peso(r.month.profit)}</div>
-        <div class="text-[11px] text-gray-500 mt-1">${T('home.collected')} <span class="text-green-400 font-semibold num">${peso(r.month.collected)}</span>
+        <div class="text-[11px] text-gray-500 mt-1">${T('home.collected')} <span class="text-green-400 font-semibold num">${peso(r.month.collected)}</span></div>
       </div>
     </div>
     <section class="glass-card rounded-2xl p-3 mb-3 fade-in">

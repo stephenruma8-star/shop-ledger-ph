@@ -289,6 +289,41 @@ async function runStandaloneAudit() {
     cart = [];
     showView('home');
   });
+  await A('supplier-pay-button', async () => {
+    const s = await apiPost('/api/suppliers', { name: 'Audit Supplier' });
+    const po = await apiPost('/api/purchase-orders', { supplierId: s.id, items: [{ name: 'Audit Goods', price: 20, qty: 5 }] });
+    const all = await apiGet('/api/purchase-orders');
+    await apiPost('/api/purchase-orders/' + all.find(p => p.poNo === po.poNo).id + '/receive', {});
+    await loadAll();
+    showView('suppliers');
+    if (!document.getElementById('sup-grid').innerHTML.includes('renderSupplierPay')) throw new Error('no supplier pay button');
+    showView('home');
+  });
+  await A('stocktake-lock-free', async () => {
+    showView('stocktake');
+    await submitStocktake();
+    if (!takeSubmitLock('stocktake')) throw new Error('stocktake lock stuck');
+    releaseSubmitLock('stocktake');
+    showView('home');
+  });
+  await A('reports-grid', async () => {
+    showView('reports');
+    const cards = (document.getElementById('view').innerHTML.match(/stat-card rounded-2xl p-3\.5/g) || []).length;
+    if (cards !== 4) throw new Error('reports grid broken, cards=' + cards);
+    showView('home');
+  });
+  await A('cashier-gates', async () => {
+    let prev = null;
+    try { prev = localStorage.getItem('slpRole'); localStorage.setItem('slpRole', 'cashier'); } catch (e) {}
+    showView('inventory');
+    if (document.getElementById('view').innerHTML.includes('renderItemForm(')) throw new Error('cashier sees item add');
+    showView('debts');
+    if (document.getElementById('view').innerHTML.includes('openDebtFormSetup(')) throw new Error('cashier sees debt form');
+    showView('suppliers');
+    if (currentView === 'suppliers') throw new Error('cashier reached suppliers');
+    try { if (prev == null) localStorage.removeItem('slpRole'); else localStorage.setItem('slpRole', prev); } catch (e) {}
+    showView('home');
+  });
   await A('presets-roundtrip', async () => {
     const before = (await apiGet('/api/quick-items')).length;
     await apiPost('/api/quick-items', { name: 'Audit Preset', price: 7 });
