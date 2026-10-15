@@ -159,6 +159,51 @@ async function runStandaloneAudit() {
     cart.length = n;
     showView('home');
   });
+  await A('catalog-search-keeps-input', async () => {
+    showView('catalog');
+    const input = document.getElementById('cat-search');
+    if (!input) throw new Error('no catalog search box');
+    input.value = 'a';
+    searchCatalog('a');
+    if (document.getElementById('cat-search') !== input) throw new Error('search box rebuilt on keystroke');
+    if (!document.getElementById('cat-grid')) throw new Error('no cat grid');
+    showView('home');
+  });
+  await A('sale-switch-confirm', async () => {
+    const ids = (data.clients || []).map(c => String(c.id));
+    if (ids.length < 2) throw new Error('need 2 demo clients');
+    showView('sale');
+    cart.push({ invId: null, name: 'Audit Switch', qty: 1, price: 5 });
+    saleCartClient = ids[0];
+    const sel = document.getElementById('sale-client');
+    sel.value = ids[1];
+    saleClientChanged();
+    if (!document.getElementById('modal-root').innerHTML.includes('doSwitchClient')) throw new Error('no switch confirm');
+    doSwitchClient();
+    if (cart.length !== 0) throw new Error('switch did not clear cart');
+    if (String(document.getElementById('sale-client').value) !== ids[1]) throw new Error('switch lost new client');
+    cart.push({ invId: null, name: 'Audit Keep', qty: 1, price: 7 });
+    saleCartClient = ids[1];
+    document.getElementById('sale-client').value = ids[0];
+    saleClientChanged();
+    keepSwitchClient();
+    if (cart.length !== 1) throw new Error('keep path dropped items');
+    if (String(document.getElementById('sale-client').value) !== ids[1]) throw new Error('keep path did not revert client');
+    cart = [];
+    showView('home');
+  });
+  await A('preset-adopts-walkin', async () => {
+    const c = (data.clients || [])[0];
+    if (!c) throw new Error('no demo client');
+    showView('sale');
+    cart.push({ invId: null, name: 'Audit Adopt', qty: 1, price: 3 });
+    saleCartClient = '';
+    showView('sale', c.id);
+    if (cart.length !== 1) throw new Error('walk-in draft wiped by preset');
+    if (String(document.getElementById('sale-client').value) !== String(c.id)) throw new Error('preset client lost');
+    cart = [];
+    showView('home');
+  });
   await A('pay-overpay-delete', async () => {
     const r = await apiPost('/api/clients', { name: 'Audit Overpay' });
     const cid = r.id;

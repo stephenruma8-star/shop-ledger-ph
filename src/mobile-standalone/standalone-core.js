@@ -14,6 +14,10 @@ const API = '';
 const HDR = () => ({});
 const peso = (n) => '₱' + (Number(n) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+// escAttr: esc() does NOT escape quotes (text-node serialization leaves ' and
+// " raw), so it is unsafe inside attribute values and quoted JS strings.
+// Use this for value="...", placeholder="...", data-* and similar spots.
+function escAttr(s) { return esc(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
 function fmtDate(d) {
   if (!d) return '';
   const dt = new Date(d);

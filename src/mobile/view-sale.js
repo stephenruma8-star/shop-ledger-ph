@@ -3,8 +3,20 @@
 // New Sale button). Replaces the dead preselectedId reference.
 let saleClientPreset = null;
 let saleRateClient = null; // client key whose rate was last bulk-applied to lines
+let saleCartClient = ''; // who the current cart items are for ('' = walk-in); switching asks first
 function renderSale(presetId) {
-  if (presetId !== undefined && presetId !== null && presetId !== '') saleClientPreset = presetId;
+  if (presetId !== undefined && presetId !== null && presetId !== '') {
+    // An explicit "New sale for X" starts fresh: items rung up for a
+    // DIFFERENT client must not leak into the new client's sale. Untouched
+    // walk-in drafts are adopted, not wiped.
+    if (cart.length && saleCartClient && String(saleCartClient) !== String(presetId)) {
+      cart = []; tendered = 0;
+      const nc = (data.clients || []).find(x => String(x.id) === String(presetId));
+      try { toast(T('sale.cart_cleared', { name: nc ? nc.name : '' }), 'info'); } catch (e) {}
+    }
+    saleClientPreset = presetId;
+    saleCartClient = String(presetId);
+  }
   const v = document.getElementById('view');
   if (!cart.length) tendered = 0;
   // Preserve cashier-entered header state across re-renders (qty steps, cart
@@ -72,7 +84,7 @@ function renderSale(presetId) {
       <div class="grid grid-cols-2 gap-2.5">
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sale.client')}</label>
-          <select id="sale-client" onchange="applyClientRate()" class="inp">${clientOptions()}</select>
+          <select id="sale-client" onchange="saleClientChanged()" class="inp">${clientOptions()}</select>
         </div>
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sale.payment')}</label>
@@ -173,8 +185,42 @@ function saleRateAll() {
 function clientOptions() {
   return '<option value="">' + T('sale.walkin') + '</option>' + data.clients.map(c => '<option value="' + c.id + '"' + (saleClientPreset != null && String(c.id) === String(saleClientPreset) ? ' selected' : '') + '>' + esc(c.name) + ' — ' + peso(c.balance) + '</option>').join('');
 }
-// Preset the interest picker from the client's most recent rated sale
-// (mirrors the desktop rate memory; the cashier can still change it).
+// Manual client switch with items in the cart: the old items were rung up
+// for someone else, so ask before wiping them. Programmatic presets bypass
+// this (renderSale handles those itself).
+function saleClientChanged() {
+  const sel = document.getElementById('sale-client');
+  const nid = sel && sel.value ? String(sel.value) : '';
+  if (!cart.length || String(saleCartClient || '') === nid) { applyClientRate(); return; }
+  const c = (data.clients || []).find(x => String(x.id) === nid);
+  const n = cart.reduce((s, i) => s + (i.qty || 1), 0);
+  document.getElementById('modal-root').innerHTML = `
+    <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)keepSwitchClient()">
+      <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-5 pb-6 slide-up glass-card" style="max-height:94vh;max-height:94dvh;overflow-y:auto" onclick="event.stopPropagation()">
+        <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
+        <h3 class="font-bold text-gray-100 text-base mb-2">${T('sale.switch_title')}</h3>
+        <p class="text-sm text-gray-400 mb-4">${esc(T('sale.switch_msg', { n, name: c ? c.name : T('sale.walkin') }))}</p>
+        <button onclick="doSwitchClient()" class="btn btn-primary btn-lg mb-2">${T('sale.switch_clear')}</button>
+        <button onclick="keepSwitchClient()" class="btn btn-ghost btn-lg">${T('sale.switch_keep')}</button>
+      </div>
+    </div>`;
+}
+function doSwitchClient() {
+  const sel = document.getElementById('sale-client');
+  const nid = sel && sel.value ? String(sel.value) : '';
+  cart = []; tendered = 0;
+  saleCartClient = nid;
+  saleClientPreset = nid || null;
+  try { updateCartUI(); } catch (e) {}
+  closeQuick();
+  renderSale();
+}
+function keepSwitchClient() {
+  const sel = document.getElementById('sale-client');
+  if (sel) sel.value = saleCartClient || '';
+  closeQuick();
+  applyClientRate();
+}
 // Bulk-applies to lines ONLY when the client (or their rate) actually
 // changed — every renderSale must not nuke per-line customizations.
 function applyClientRate() {
@@ -337,9 +383,9 @@ async function submitSale() {
   const body = { clientId: charge ? clientId : null, items, paymentMethod, discount: disc };
   try {
     const r = await apiPost('/api/sales', body);
-    if (r.queued) { lastFailedSale = null; tendered = 0; try { saleClientPreset = null; saleRateClient = null; } catch (e) {} toast(T('sale.queued'), 'ok'); cart = []; updateCartUI(); showView('home'); await refreshAll(); return; }
+    if (r.queued) { lastFailedSale = null; tendered = 0; try { saleClientPreset = null; saleRateClient = null; saleCartClient = ''; } catch (e) {} toast(T('sale.queued'), 'ok'); cart = []; updateCartUI(); showView('home'); await refreshAll(); return; }
     lastFailedSale = null; tendered = 0;
-    try { saleClientPreset = null; saleRateClient = null; } catch (e) {}
+    try { saleClientPreset = null; saleRateClient = null; saleCartClient = ''; } catch (e) {}
     saleSuccessSheet(r.invoiceNo);
   } catch (e) {
     // Cart is kept intact so nothing is lost; one tap retries the same payload.

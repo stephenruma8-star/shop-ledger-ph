@@ -79,6 +79,9 @@ header{position:sticky;top:0;z-index:30;padding-top:env(safe-area-inset-top, 0px
 #nav-modal{display:none;position:fixed;inset:0;z-index:35;align-items:flex-end;justify-content:center}
 #nav-backdrop{position:absolute;inset:0;background:rgba(2,6,23,.7);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
 #sheet{position:relative;width:100%;max-width:31rem;max-height:calc(100vh - 4.9rem - env(safe-area-inset-bottom));max-height:calc(100dvh - 4.9rem - env(safe-area-inset-bottom));display:flex;flex-direction:column;background:rgba(15,23,42,.97);border:1px solid rgba(255,255,255,.09);border-bottom:none;border-radius:1.25rem 1.25rem 0 0;box-shadow:0 -12px 40px rgba(0,0,0,.55);overflow:hidden}
+/* Phones: every section fills the screen like the sale sheet does — short
+content no longer collapses into a stubby half-sheet. */
+@media(max-width:639px){#sheet{min-height:calc(100vh - 4.9rem - env(safe-area-inset-bottom));min-height:calc(100dvh - 4.9rem - env(safe-area-inset-bottom))}}
 @media(min-width:640px){#nav-modal{align-items:center;padding-bottom:5rem}#sheet{max-height:min(88dvh,46rem);max-height:min(88vh,46rem);border-radius:1.25rem;border-bottom:1px solid rgba(255,255,255,.09)}}
 #sheet-head{display:flex;align-items:center;gap:.75rem;padding:.65rem .9rem .6rem;border-bottom:1px solid rgba(255,255,255,.06);flex:none}
 #sheet-title{font-size:1.02rem;font-weight:800;color:#f1f5f9;line-height:1.15}
@@ -1314,7 +1317,7 @@ function navTap(view) {
     return;
   }
   // Fresh tab entry starts a clean sale (no leftover client preset).
-  if (view === 'sale') { try { saleClientPreset = null; saleRateClient = null; } catch (e) {} }
+  if (view === 'sale') { try { saleClientPreset = null; saleRateClient = null; if (!cart.length) saleCartClient = ''; } catch (e) {} }
   if (navModalOpen && currentView === view) { closeNavModal(); return; }
   showView(view);
 }
@@ -1412,6 +1415,8 @@ const LANG_STRINGS = {
     'sale.interest': 'Interest (%/mo)', 'sale.discount': 'Discount (₱)',
     'sale.sc': 'SC/PWD 20% Discount', 'sale.charge': 'Charge to client (credit)',
     'sale.total': 'Total', 'sale.save': 'Save Sale',
+    'sale.switch_title': 'Switch client?', 'sale.switch_clear': 'Clear & switch', 'sale.switch_keep': 'Keep items',
+    'sale.switch_msg': '{n} item(s) in the cart are for someone else. Clear them and start fresh for {name}?', 'sale.cart_cleared': 'Cart cleared — fresh sale for {name}',
     'sale.tender_title': 'Cash tendered', 'sale.tender_exact': 'Exact', 'sale.tender_clear': 'Clear',
     'sale.tender_custom_ph': 'Or type custom amount…',
     'sale.tendered': 'Tendered', 'sale.change': 'Change due', 'sale.dash': '—',
@@ -1770,6 +1775,8 @@ const LANG_STRINGS = {
     'sale.interest': 'Interes (%/buwan)', 'sale.discount': 'Diskwento (₱)',
     'sale.sc': 'Diskwentong SC/PWD 20%', 'sale.charge': 'I-charge sa kliyente (utang)',
     'sale.total': 'Kabuuan', 'sale.save': 'I-save ang Benta',
+    'sale.switch_title': 'Palitan ang kliyente?', 'sale.switch_clear': 'Linisin at palitan', 'sale.switch_keep': 'Itago ang mga item',
+    'sale.switch_msg': 'May {n} item sa cart na para sa iba. Linisin at magsimula ng bago para kay {name}?', 'sale.cart_cleared': 'Nilinis ang cart — bagong benta para kay {name}',
     'sale.tender_title': 'Iniabot na cash', 'sale.tender_exact': 'Sakto', 'sale.tender_clear': 'Burahin',
     'sale.tender_custom_ph': 'O mag-type ng ibang halaga…',
     'sale.tendered': 'Iniabot', 'sale.change': 'Sukli', 'sale.dash': '—',
@@ -3009,11 +3016,15 @@ function renderCatalog(q) {
     <div class="flex items-center gap-2 mb-3 fade-in">
       <div class="relative flex-1">
         <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input id="cat-search" type="text" placeholder="${esc(T('cat.search_ph'))}" value="${esc(query)}" oninput="searchCatalog(this.value)" class="inp pl-10" />
+        <input id="cat-search" type="text" placeholder="${escAttr(T('cat.search_ph'))}" value="${escAttr(query)}" oninput="searchCatalog(this.value)" autocomplete="off" class="inp pl-10" />
       </div>
-      <span class="chip chip-blue">${items.length} ${items.length === 1 ? T('cat.item') : T('cat.items')}</span>
+      <span class="chip chip-blue" id="cat-count">${items.length} ${items.length === 1 ? T('cat.item') : T('cat.items')}</span>
     </div>
-    ${items.length ? `
+    <div id="cat-grid">${catGridHTML(items, query)}</div>`;
+}
+function catGridHTML(items, query) {
+  if (!items.length) return `<div class="text-center text-gray-500 py-16 fade-in"><svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-2"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>${query ? T('cat.no_match') : T('cat.empty')}</div>`;
+  return `
     <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 fade-in">
       ${items.map((i, idx) => {
         const stock = i.stock || 0;
@@ -3025,7 +3036,7 @@ function renderCatalog(q) {
         return `
         <button onclick="openQuick(${i.id}, ${idx})" class="glass-card rounded-2xl overflow-hidden text-left card-hover relative w-full">
           ${badge}
-          <div class="aspect-[4/3] bg-gray-800/60 flex items-center justify-center overflow-hidden">${itemImage(i) ? '<img src="' + itemImage(i) + '" alt="' + esc(i.name) + '" class="w-full h-full object-cover" loading="lazy" />' : '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>'}</div>
+          <div class="aspect-[4/3] bg-gray-800/60 flex items-center justify-center overflow-hidden">${itemImage(i) ? '<img src="' + itemImage(i) + '" alt="' + escAttr(i.name) + '" class="w-full h-full object-cover" loading="lazy" />' : '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>'}</div>
           <div class="p-2.5">
             <div class="font-semibold text-[13px] leading-tight truncate text-gray-200">${esc(i.name)}</div>
             <div class="text-green-400 font-bold text-[15px] num mt-0.5">${peso(i.price)}</div>
@@ -3033,9 +3044,18 @@ function renderCatalog(q) {
           </div>
         </button>`;
       }).join('')}
-    </div>` : `<div class="text-center text-gray-500 py-16 fade-in"><svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-2"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>${query ? T('cat.no_match') : T('cat.empty')}</div>`}`;
+    </div>`;
 }
-function searchCatalog(q) { renderCatalog(q); }
+// Grid-only refresh: rebuilding the whole view would destroy the search
+// input (and its focus) on every keystroke.
+function searchCatalog(q) {
+  const query = (q == null ? '' : q).toLowerCase();
+  const items = data.inventory.filter(i => !query || (i.name || '').toLowerCase().includes(query));
+  const grid = document.getElementById('cat-grid');
+  if (grid) grid.innerHTML = catGridHTML(items, query);
+  const cc = document.getElementById('cat-count');
+  if (cc) cc.textContent = items.length + ' ' + (items.length === 1 ? T('cat.item') : T('cat.items'));
+}
 function itemById(id) { return data.inventory.find(i => i.id === id); }
 
 // ===== src/mobile/view-quick.js =====
@@ -3133,8 +3153,20 @@ async function quickSell(id) {
 // New Sale button). Replaces the dead preselectedId reference.
 let saleClientPreset = null;
 let saleRateClient = null; // client key whose rate was last bulk-applied to lines
+let saleCartClient = ''; // who the current cart items are for ('' = walk-in); switching asks first
 function renderSale(presetId) {
-  if (presetId !== undefined && presetId !== null && presetId !== '') saleClientPreset = presetId;
+  if (presetId !== undefined && presetId !== null && presetId !== '') {
+    // An explicit "New sale for X" starts fresh: items rung up for a
+    // DIFFERENT client must not leak into the new client's sale. Untouched
+    // walk-in drafts are adopted, not wiped.
+    if (cart.length && saleCartClient && String(saleCartClient) !== String(presetId)) {
+      cart = []; tendered = 0;
+      const nc = (data.clients || []).find(x => String(x.id) === String(presetId));
+      try { toast(T('sale.cart_cleared', { name: nc ? nc.name : '' }), 'info'); } catch (e) {}
+    }
+    saleClientPreset = presetId;
+    saleCartClient = String(presetId);
+  }
   const v = document.getElementById('view');
   if (!cart.length) tendered = 0;
   // Preserve cashier-entered header state across re-renders (qty steps, cart
@@ -3202,7 +3234,7 @@ function renderSale(presetId) {
       <div class="grid grid-cols-2 gap-2.5">
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sale.client')}</label>
-          <select id="sale-client" onchange="applyClientRate()" class="inp">${clientOptions()}</select>
+          <select id="sale-client" onchange="saleClientChanged()" class="inp">${clientOptions()}</select>
         </div>
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sale.payment')}</label>
@@ -3303,8 +3335,42 @@ function saleRateAll() {
 function clientOptions() {
   return '<option value="">' + T('sale.walkin') + '</option>' + data.clients.map(c => '<option value="' + c.id + '"' + (saleClientPreset != null && String(c.id) === String(saleClientPreset) ? ' selected' : '') + '>' + esc(c.name) + ' — ' + peso(c.balance) + '</option>').join('');
 }
-// Preset the interest picker from the client's most recent rated sale
-// (mirrors the desktop rate memory; the cashier can still change it).
+// Manual client switch with items in the cart: the old items were rung up
+// for someone else, so ask before wiping them. Programmatic presets bypass
+// this (renderSale handles those itself).
+function saleClientChanged() {
+  const sel = document.getElementById('sale-client');
+  const nid = sel && sel.value ? String(sel.value) : '';
+  if (!cart.length || String(saleCartClient || '') === nid) { applyClientRate(); return; }
+  const c = (data.clients || []).find(x => String(x.id) === nid);
+  const n = cart.reduce((s, i) => s + (i.qty || 1), 0);
+  document.getElementById('modal-root').innerHTML = `
+    <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)keepSwitchClient()">
+      <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-5 pb-6 slide-up glass-card" style="max-height:94vh;max-height:94dvh;overflow-y:auto" onclick="event.stopPropagation()">
+        <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
+        <h3 class="font-bold text-gray-100 text-base mb-2">${T('sale.switch_title')}</h3>
+        <p class="text-sm text-gray-400 mb-4">${esc(T('sale.switch_msg', { n, name: c ? c.name : T('sale.walkin') }))}</p>
+        <button onclick="doSwitchClient()" class="btn btn-primary btn-lg mb-2">${T('sale.switch_clear')}</button>
+        <button onclick="keepSwitchClient()" class="btn btn-ghost btn-lg">${T('sale.switch_keep')}</button>
+      </div>
+    </div>`;
+}
+function doSwitchClient() {
+  const sel = document.getElementById('sale-client');
+  const nid = sel && sel.value ? String(sel.value) : '';
+  cart = []; tendered = 0;
+  saleCartClient = nid;
+  saleClientPreset = nid || null;
+  try { updateCartUI(); } catch (e) {}
+  closeQuick();
+  renderSale();
+}
+function keepSwitchClient() {
+  const sel = document.getElementById('sale-client');
+  if (sel) sel.value = saleCartClient || '';
+  closeQuick();
+  applyClientRate();
+}
 // Bulk-applies to lines ONLY when the client (or their rate) actually
 // changed — every renderSale must not nuke per-line customizations.
 function applyClientRate() {
@@ -3467,9 +3533,9 @@ async function submitSale() {
   const body = { clientId: charge ? clientId : null, items, paymentMethod, discount: disc };
   try {
     const r = await apiPost('/api/sales', body);
-    if (r.queued) { lastFailedSale = null; tendered = 0; try { saleClientPreset = null; saleRateClient = null; } catch (e) {} toast(T('sale.queued'), 'ok'); cart = []; updateCartUI(); showView('home'); await refreshAll(); return; }
+    if (r.queued) { lastFailedSale = null; tendered = 0; try { saleClientPreset = null; saleRateClient = null; saleCartClient = ''; } catch (e) {} toast(T('sale.queued'), 'ok'); cart = []; updateCartUI(); showView('home'); await refreshAll(); return; }
     lastFailedSale = null; tendered = 0;
-    try { saleClientPreset = null; saleRateClient = null; } catch (e) {}
+    try { saleClientPreset = null; saleRateClient = null; saleCartClient = ''; } catch (e) {}
     saleSuccessSheet(r.invoiceNo);
   } catch (e) {
     // Cart is kept intact so nothing is lost; one tap retries the same payload.

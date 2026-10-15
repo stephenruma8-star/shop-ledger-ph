@@ -79,6 +79,9 @@ header{position:sticky;top:0;z-index:30;padding-top:env(safe-area-inset-top, 0px
 #nav-modal{display:none;position:fixed;inset:0;z-index:35;align-items:flex-end;justify-content:center}
 #nav-backdrop{position:absolute;inset:0;background:rgba(2,6,23,.7);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
 #sheet{position:relative;width:100%;max-width:31rem;max-height:calc(100vh - 4.9rem - env(safe-area-inset-bottom));max-height:calc(100dvh - 4.9rem - env(safe-area-inset-bottom));display:flex;flex-direction:column;background:rgba(15,23,42,.97);border:1px solid rgba(255,255,255,.09);border-bottom:none;border-radius:1.25rem 1.25rem 0 0;box-shadow:0 -12px 40px rgba(0,0,0,.55);overflow:hidden}
+/* Phones: every section fills the screen like the sale sheet does — short
+content no longer collapses into a stubby half-sheet. */
+@media(max-width:639px){#sheet{min-height:calc(100vh - 4.9rem - env(safe-area-inset-bottom));min-height:calc(100dvh - 4.9rem - env(safe-area-inset-bottom))}}
 @media(min-width:640px){#nav-modal{align-items:center;padding-bottom:5rem}#sheet{max-height:min(88dvh,46rem);max-height:min(88vh,46rem);border-radius:1.25rem;border-bottom:1px solid rgba(255,255,255,.09)}}
 #sheet-head{display:flex;align-items:center;gap:.75rem;padding:.65rem .9rem .6rem;border-bottom:1px solid rgba(255,255,255,.06);flex:none}
 #sheet-title{font-size:1.02rem;font-weight:800;color:#f1f5f9;line-height:1.15}

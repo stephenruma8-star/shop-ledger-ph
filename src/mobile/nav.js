@@ -58,7 +58,7 @@ function navTap(view) {
     return;
   }
   // Fresh tab entry starts a clean sale (no leftover client preset).
-  if (view === 'sale') { try { saleClientPreset = null; saleRateClient = null; } catch (e) {} }
+  if (view === 'sale') { try { saleClientPreset = null; saleRateClient = null; if (!cart.length) saleCartClient = ''; } catch (e) {} }
   if (navModalOpen && currentView === view) { closeNavModal(); return; }
   showView(view);
 }
