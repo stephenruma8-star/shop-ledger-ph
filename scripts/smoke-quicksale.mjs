@@ -491,6 +491,36 @@ try {
   await win.saveClient(danRow.id);
   eq((await win.dbGet('clients', danRow.id)).balance, 120, 'editing a client can still set the balance');
 
+  // --- direct (Cash) sales are history-only: listed, running balance stays put ---
+  const histId = await win.dbAdd('clients', { name: 'History Cash', phone: '', address: '', balance: 100, createdAt: new Date().toISOString() });
+  win.state.selectedYear = 'all';
+  win.state.payments = [];
+  win.state.transactions = [
+    { id: 901, invoiceNo: 'INV-H1', clientId: histId, clientName: 'History Cash', date: '2026-10-01', createdAt: '2026-10-01T09:00:00.000Z', items: [{ description: 'Old Credit', name: '1', unitCost: 100, intRate: 0 }], subtotal: 100, totalInterest: 0, discount: 0, scDiscount: 0, grandTotal: 100, paymentMethod: 'GCash', status: 'pending', balanceAdded: true },
+    { id: 902, invoiceNo: 'INV-H2', clientId: histId, clientName: 'History Cash', date: '2026-10-02', createdAt: '2026-10-02T09:00:00.000Z', items: [{ description: 'Paid Cash', name: '1', unitCost: 500, intRate: 0 }], subtotal: 500, totalInterest: 0, discount: 0, scDiscount: 0, grandTotal: 500, paymentMethod: 'Cash', status: 'paid', balanceAdded: false }
+  ];
+  await win.viewClientHistory(histId);
+  const histHtml = document.getElementById('modal-root').innerHTML;
+  ok(histHtml.includes('INV-H2') && histHtml.includes('INV-H1'), 'cash sale is listed in client history');
+  ok(!/Bal: ₱(500|600)\.00/.test(histHtml), 'cash sale does not inflate the running balance');
+  eq((histHtml.match(/Bal: ₱100\.00/g) || []).length, 4, 'running balance stays ₱100.00 through the cash sale (both tabs)');
+
+  // statement print: cash sale row listed, running balance untouched
+  win.state.clients = await win.dbAll('clients');
+  const stmtWinsBefore = printWindows.length;
+  await win.printClientStatement(histId);
+  eq(printWindows.length, stmtWinsBefore + 1, 'client statement opens a print window');
+  const stmtHtml = printWindows[printWindows.length - 1].__html || '';
+  ok(stmtHtml.includes('INV-H2'), 'statement lists the direct (cash) sale');
+  ok(!stmtHtml.includes('₱600.00'), 'statement running balance ignores the cash sale');
+
+  // all-years overview: the "Charged" column counts debt only, not cash sales
+  win.state.expenses = [];
+  win.showAllYearsSummary();
+  const overviewHtml = document.getElementById('modal-root').innerHTML;
+  const histRow = (overviewHtml.match(/<tr[^>]*>(?:(?!<\/tr>).)*History Cash(?:(?!<\/tr>).)*<\/tr>/s) || [''])[0];
+  ok(histRow.includes('₱100.00') && !histRow.includes('₱600.00'), 'overview Charged column ignores cash sales');
+
   if (failures === 0) {
     console.log('QUICK CART FLOW OK: single sale + multi-item cart + SC/PWD + interest + paper sizes + client balance + stock + print all verified');
     process.exit(0);

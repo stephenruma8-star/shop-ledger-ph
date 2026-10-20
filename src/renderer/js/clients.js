@@ -3,7 +3,18 @@ import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
 import { calcInterest, closeModal, confetti, confirmModal, debounce, escapeHtml, filterByYear, modal, parseCSVLine, playSound, requireFields, searchData, toast, validatePhone } from './helpers.js'
 import { escHtml, excelTableCss, openPrintWindow } from './printLayout.js'
 import { fmtDate, fmtDateTime, now, peso, state, today } from './state.js'
-import { adjustStock, getQty, lineAmt, receiptContentHtml, resolveInvIds, undoSale } from './transactions.js'
+import { adjustStock, getQty, lineAmt, receiptContentHtml, resolveInvIds, undoSale, wasBalanceAdded } from './transactions.js'
+
+// Signed debt movement a history row actually caused. Cash sales are recorded
+// on the client (so they show in their history) but never touched the balance,
+// and voided rows were already reversed when voided — both must leave the
+// running "Bal" figure alone. Interest ledger rows DO grow the debt even
+// though they carry balanceAdded=false.
+function balanceDelta(t) {
+  if (!t || t.status === 'voided') return 0;
+  if (t.status === 'interest') return t.grandTotal || 0;
+  return wasBalanceAdded(t) ? (t.grandTotal || 0) : 0;
+}
 
 // Month-opening balance snapshots: one record per month capturing every client's
 // balance the first time the app runs that month. Powers historical receivables
@@ -326,7 +337,7 @@ export async function viewClientHistory(id) {
       if (item.type === 'sale') {
         const t = item.t;
         const rb = runningBal;
-        runningBal += t.status === 'interest' ? (t.grandTotal || 0) : -(t.grandTotal || 0);
+        runningBal -= balanceDelta(t);
         return `<div class="border dark:border-gray-700 rounded-lg mb-2 overflow-hidden">
           <div class="flex justify-between items-center px-3 py-2 bg-gray-50 dark:bg-gray-700 cursor-pointer" onclick="this.nextElementSibling.classList.toggle('hidden')">
             <div><span class="text-sm font-medium">${escHtml(t.invoiceNo||'Sale')}</span><span class="text-xs text-gray-400 ml-2">${fmtDateTime(t.createdAt)}</span></div>
@@ -410,7 +421,7 @@ export function printClientStatement(id) {
 
   let runningBalance = 0;
   for (const t of txs) {
-    runningBalance += (t.grandTotal || 0);
+    runningBalance += balanceDelta(t);
     const payment = (state.payments || []).filter(p => p.clientId === id && p.date === t.date).reduce((s, p) => s + (p.amount || 0), 0);
     runningBalance -= payment;
     html += `<tr><td>${escapeHtml(t.date || '')}</td><td>${escapeHtml(t.invoiceNo || '')}</td><td>${escapeHtml((t.items || []).map(i => i.description || i.name).join(', '))}</td><td class="num">${amt(t.grandTotal || 0)}</td><td class="num">${amt(payment)}</td><td class="num">${amt(runningBalance)}</td></tr>`;
@@ -446,7 +457,7 @@ export async function printClientInfo(id) {
     let runningBal = 0;
     txns.forEach((t, ti) => {
       if (ti > 0) html += `<div style="page-break-before:always;margin-top:0;height:0"></div>`;
-      runningBal += t.grandTotal || 0;
+      runningBal += balanceDelta(t);
       html += `<div style="page-break-inside:avoid;margin-bottom:14px">`;
       html += `<h4 style="margin:0 0 4px;font-size:12px;color:#0f172a">${escHtml(t.invoiceNo||'Sale')} — ${escHtml(fmtDate(t.date||t.createdAt))} — ₱${amt(t.grandTotal)} <span style="color:#d97706;font-weight:600">Bal: ₱${amt(runningBal)}</span></h4>`;
       html += `<table class="excel-table"><thead><tr><th>Date</th><th>Description</th><th class="ctr">Name/Qty</th><th class="num">Unit Cost</th><th class="num">Amount</th><th class="num">Interest</th><th class="num">Total</th></tr></thead><tbody>`;

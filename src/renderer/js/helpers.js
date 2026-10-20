@@ -231,7 +231,9 @@ export function showAllYearsSummary() {
   }).join('');
 
   let clientRows = state.clients.filter(c => (c.balance || 0) > 0).map(c => {
-    const charged = state.transactions.filter(t => t.clientId === c.id).reduce((s, t) => s + (t.grandTotal || 0), 0);
+    const charged = state.transactions
+      .filter(t => t.clientId === c.id && t.status !== 'voided')
+      .reduce((s, t) => s + ((t.status === 'interest' || (t.balanceAdded !== undefined ? !!t.balanceAdded : (t.paymentMethod || 'Cash') !== 'Cash')) ? (t.grandTotal || 0) : 0), 0);
     const paid = state.payments.filter(p => p.clientId === c.id).reduce((s, p) => s + (p.amount || 0), 0);
     const since = c.ledgerYear || (() => { const tx = state.transactions.filter(tx2 => tx2.clientId === c.id && tx2.date).sort((a, b) => a.date.localeCompare(b.date))[0]; return tx ? tx.date.split('-')[0] : '—'; })();
     return `<tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer" onclick="closeModal();viewClientHistory(${c.id})"><td class="p-2 font-medium">${escapeHtml(c.name)}</td><td class="p-2 text-xs text-gray-400">${since}</td><td class="p-2 text-right">${peso(charged)}</td><td class="p-2 text-right text-green-600">${peso(paid)}</td><td class="p-2 text-right font-bold ${(c.balance||0)>0?'text-red-600':'text-green-600'}">${peso(c.balance)}</td></tr>`;
