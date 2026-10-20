@@ -1,5 +1,5 @@
 {
-    "version":  "3.36.0",
-    "buildDate":  "2026-10-15T00:00:00.000Z",
-    "notes":  "Settle one sale line without touching the rest (client history + phone API). New Sale and client cart show a live balance consequence before saving, and saving announces the client's resulting balance."
+    "version":  "3.37.0",
+    "buildDate":  "2026-10-20T00:00:00.000Z",
+    "notes":  "Record debts from anywhere: New Sale and Add Client (desktop) plus the phone now support an explicit Credit (Utang) payment method and an Opening Balance when creating a client. Preview the receipt before saving on both desktop and phone."
 }
