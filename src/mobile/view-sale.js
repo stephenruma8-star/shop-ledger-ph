@@ -89,7 +89,7 @@ function renderSale(presetId) {
         </div>
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sale.payment')}</label>
-          <select id="sale-payment" onchange="saleHeaderChanged()" class="inp">${['Cash', 'GCash', 'Maya', 'Bank Transfer'].map(p => '<option' + (p === keepPay ? ' selected' : '') + '>' + p + '</option>').join('')}</select>
+          <select id="sale-payment" onchange="saleHeaderChanged()" class="inp">${['Cash', 'GCash', 'Maya', 'Bank Transfer', 'Credit (Utang)'].map(p => '<option' + (p === keepPay ? ' selected' : '') + '>' + p + '</option>').join('')}</select>
         </div>
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sale.interest')}</label>
@@ -125,7 +125,10 @@ function renderSale(presetId) {
         <span class="font-bold text-gray-200">${T('sale.total')}</span>
         <span class="font-bold text-lg text-green-400 num" id="sale-total-bar">${peso(sub)}</span>
       </div>
-      <button onclick="submitSale()" class="btn btn-primary btn-lg w-full" id="sale-btn"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>${T('sale.save')}</button>
+      <div class="flex gap-2">
+        <button onclick="previewSaleDraft()" class="btn btn-ghost" id="sale-preview-btn" style="flex:0 0 auto"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>${T('sale.preview')}</button>
+        <button onclick="submitSale()" class="btn btn-primary btn-lg flex-1" id="sale-btn"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>${T('sale.save')}</button>
+      </div>
     </div>
     <div style="height:9rem"></div>`;
   saleTotals();
@@ -449,6 +452,28 @@ async function announceClientBalance(clientId) {
     const h = await apiGet('/api/clients/' + encodeURIComponent(clientId) + '/history');
     if (h && h.client) toast((h.client.name || 'Client') + ' now owes ' + peso(h.client.balance || 0), 'info');
   } catch (e) {}
+}
+// Pre-save receipt preview: the same thermal layout the printer gets, built
+// from the current cart — so details can be verified before finalizing.
+function previewSaleDraft() {
+  if (!cart.length) { toast(T('sale.need_items'), 'err'); return; }
+  const sub = cart.reduce((s, i) => s + (i.qty || 1) * (i.price || 0), 0);
+  const interest = cart.reduce((s, i) => s + lineIntCalc((i.qty || 1) * (i.price || 0), (i.intRate || 0), i.date), 0);
+  const sc = document.getElementById('sale-sc')?.checked ? sub * 0.2 : 0;
+  const discInput = Math.max(0, parseFloat(document.getElementById('sale-discount')?.value) || 0);
+  const grand = Math.max(0, sub + interest - discInput - sc);
+  const sel = document.getElementById('sale-client');
+  const cid = sel && sel.value ? sel.value : null;
+  const client = cid ? (data.clients || []).find(x => String(x.id) === String(cid)) : null;
+  const draft = {
+    invoiceNo: 'PREVIEW',
+    clientName: client ? client.name : 'Walk-in',
+    createdAt: phoneToday(), date: phoneToday(),
+    items: cart.map(i => ({ description: i.name, qty: i.qty || 1, unitCost: i.price || 0, intRate: i.intRate || 0, date: i.date })),
+    subtotal: sub, totalInterest: interest, discount: discInput + sc, scDiscount: sc, grandTotal: grand,
+    paymentMethod: (document.getElementById('sale-payment') || {}).value || 'Cash'
+  };
+  showReceiptPreview(draft, { draft: true });
 }
 function saleSuccessSheet(invoiceNo) {
   cart = []; updateCartUI();

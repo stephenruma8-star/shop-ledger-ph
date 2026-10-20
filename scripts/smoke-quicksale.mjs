@@ -4,7 +4,7 @@
 // Uses a REAL in-memory IDB (records persist across dbAdd/dbGet/dbPut/dbAll)
 // so the actual sale code paths execute, not stubs.
 const noop = () => {};
-const sharedParent = { innerHTML: '', textContent: '', value: '', classList: { add: noop, remove: noop, toggle: noop, contains: () => false } };
+const sharedParent = { innerHTML: '', textContent: '', value: '', classList: { add: noop, remove: noop, toggle: noop, contains: () => false }, querySelector: () => null, querySelectorAll: () => [], appendChild: noop, removeChild: noop };
 const registry = new Map();
 function makeEl(id) {
   const el = {
@@ -16,7 +16,7 @@ function makeEl(id) {
     appendChild: (child) => { if (child && child.id) registry.set(child.id, child); },
     remove: () => { if (el.id) registry.delete(el.id); },
     querySelector: () => makeEl(), querySelectorAll: () => [], closest: () => makeEl(),
-    focus: noop, click: noop, setAttribute: noop, getAttribute: () => null,
+    focus: noop, click: noop, setAttribute: noop, getAttribute: () => null, insertAdjacentElement: noop, insertAdjacentHTML: noop,
     getContext: () => null, getBoundingClientRect: () => ({ width: 100, height: 100 }),
     select: noop, offsetParent: null,
   };
@@ -65,6 +65,7 @@ const fakeDB = {
 
 const domListeners = {};
 const printed = [];
+const printWindows = [];
 let lanSignals = 0;
 let capturedUpdateProgress = null;
 const win = new Proxy({
@@ -73,6 +74,11 @@ const win = new Proxy({
   addEventListener: noop, removeEventListener: noop,
   getComputedStyle: () => ({}), requestAnimationFrame: (f) => 0, cancelAnimationFrame: noop,
   matchMedia: () => ({ matches: false, addEventListener: noop }),
+  open: () => {
+    const pw = { document: { write: (html) => { pw.__html = (pw.__html || '') + html; }, close: noop }, close: noop, focus: noop };
+    printWindows.push(pw);
+    return pw;
+  },
   electronAPI: {
     signalLanUpdate: () => { lanSignals++; },
     printReceipt: async (p) => { printed.push(p); },
@@ -357,6 +363,42 @@ try {
   await win.undoSale(await win.dbGet('transactions', 1));
   eq((await win.dbGet('clients', cliId)).balance, 0, 'undo GCash sale reverses the added balance');
 
+  // --- New Sale modal: Credit (Utang) option + pre-save receipt preview ---
+  win.openTransactionModal();
+  ok(document.getElementById('modal-root').innerHTML.includes('Credit (Utang)'), 'New Sale modal offers Credit (Utang) payment option');
+  ok(document.getElementById('modal-root').innerHTML.includes('previewSaleDraft()'), 'New Sale modal has a Preview Receipt button');
+  win.txCart = [{ date: new Date().toISOString().split('T')[0], description: 'Coke 500ml', name: '2', unitCost: 100, intRate: 0, invId: invId1 }];
+  getEl('tm-client').options = [{ value: String(cliId), text: 'Maria Santos' }];
+  getEl('tm-client').value = String(cliId); getEl('tm-client').selectedIndex = 0;
+  getEl('tm-payment').value = 'Credit (Utang)';
+  getEl('tm-sc').checked = false;
+  getEl('tm-discount').value = '0';
+  const previewsBefore = printWindows.length;
+  win.previewSaleDraft();
+  eq(printWindows.length, previewsBefore + 1, 'previewSaleDraft opens a print preview window');
+  const previewHtml = printWindows[printWindows.length - 1].__html || '';
+  ok(previewHtml.includes('PREVIEW'), 'preview window marks the receipt as a PREVIEW');
+  ok(previewHtml.includes('draft-banner'), 'preview window renders the not-saved banner');
+  ok(previewHtml.includes('Maria Santos'), 'preview window shows the picked client');
+  ok(previewHtml.includes('Credit (Utang)'), 'preview window shows the chosen payment method');
+  ok(previewHtml.includes('200.00'), 'preview window shows the draft total (2 x 100)');
+  const txCountBefore = (await win.dbAll('transactions')).length;
+  ok((await win.dbAll('transactions')).length === txCountBefore, 'preview writes no transaction');
+
+  // --- New Sale: Credit (Utang) sale adds debt; via tm modal doSaveTransaction ---
+  const balBeforeCredit = (await win.dbGet('clients', cliId)).balance;
+  backdateStateTx();
+  await win.doSaveTransaction();
+  const creditTx = (await win.dbAll('transactions')).find(t => t.paymentMethod === 'Credit (Utang)');
+  ok(!!creditTx && creditTx.balanceAdded === true, 'Credit (Utang) sale flagged balanceAdded');
+  eq((await win.dbGet('clients', cliId)).balance, parseFloat((balBeforeCredit + 200).toFixed(2)), 'Credit (Utang) sale adds 200 to client debt');
+  await win.undoSale(creditTx);
+  eq((await win.dbGet('clients', cliId)).balance, balBeforeCredit, 'undo Credit (Utang) sale reverses the debt');
+  win.openTransactionModal();
+  getEl('tm-payment').value = 'Credit (Utang)';
+  getEl('tm-discount').value = '0';
+  win.txCart = [];
+
   // --- returns restock inventory (positive-qty input normalized to negative lines) ---
   const stockBeforeRet = (await win.dbGet('inventory', invId1)).stock;
   await win.doReturn(await win.dbGet('transactions', 2), [{ description: 'Coke 500ml', name: '1', unitCost: 100, invId: invId1 }], { reason: 'defective' });
@@ -430,6 +472,24 @@ try {
   eq(getEl('update-progress-bar').style.width, '42%', 'progress bar reflects 42%');
   eq(getEl('update-progress-text').textContent, 'Downloading… 42%', 'progress text shows 42%');
   eq(getEl('update-progress-meta').textContent, '10.0 MB of 23.8 MB · 1.0 MB/s', 'progress meta shows transferred/total/speed');
+
+  // --- client create persists an opening balance (debt they already owe) ---
+  await win.navigate('clients');
+  await win.openClientModal(null);
+  ok(document.getElementById('modal-root').innerHTML.includes('Opening Balance'), 'client create form labels the field Opening Balance');
+  getEl('cf-name').value = 'Debtor Dan';
+  getEl('cf-phone').value = '09171234567';
+  getEl('cf-address').value = 'St';
+  getEl('cf-dueDate').value = '';
+  getEl('cf-balance').value = '77';
+  await win.saveClient(null);
+  const danRow = (await win.dbAll('clients')).find(c => c.name === 'Debtor Dan');
+  ok(!!danRow, 'client created through the form');
+  eq(danRow.balance, 77, 'opening balance 77 stored on create');
+  await win.openClientModal(danRow.id);
+  getEl('cf-balance').value = '120';
+  await win.saveClient(danRow.id);
+  eq((await win.dbGet('clients', danRow.id)).balance, 120, 'editing a client can still set the balance');
 
   if (failures === 0) {
     console.log('QUICK CART FLOW OK: single sale + multi-item cart + SC/PWD + interest + paper sizes + client balance + stock + print all verified');

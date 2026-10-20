@@ -451,5 +451,17 @@ setH = await A('GET', '/api/clients/' + setC.id + '/history');
 ok(setH.client.balance === 0, 'balance zero after all settled');
 ok((await A('GET', '/api/transactions/' + setSale.invoiceNo)).status === 'paid', 'sale status paid');
 
+// opening debt at client creation + explicit Credit (Utang) payment method
+const odC = await A('POST', '/api/clients', { name: 'Opening Debt', balance: 150 });
+const odH = await A('GET', '/api/clients/' + odC.id + '/history');
+ok(odH.client.balance === 150, 'opening balance recorded at create');
+const crSale = await A('POST', '/api/sales', { clientId: odC.id, items: [{ description: 'Oil', qty: 2, unitCost: 30, invId: it2.id }], paymentMethod: 'Credit (Utang)' });
+ok(crSale.success, 'credit (utang) sale accepted');
+const odH2 = await A('GET', '/api/clients/' + odC.id + '/history');
+ok(odH2.client.balance === 210, 'credit sale adds to opening debt (150 + 60)');
+await throws(400, () => A('POST', '/api/sales', { items: [{ description: 'Oil', qty: 1, unitCost: 30, invId: it2.id }], paymentMethod: 'WeChat' }), 'unknown payment method rejected');
+await A('POST', '/api/clients/' + odC.id, { name: 'Opening Debt', balance: 9999 }, 'PUT');
+ok((await A('GET', '/api/clients/' + odC.id + '/history')).client.balance === 210, 'client edit cannot rewrite balance');
+
 console.log(`\nSTANDALONE STORE: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

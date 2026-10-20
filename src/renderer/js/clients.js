@@ -1,9 +1,9 @@
 import { logAudit } from './auth.js'
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
-import { calcInterest, closeModal, confetti, confirmModal, debounce, escapeHtml, filterByYear, modal, parseCSVLine, playSound, searchData, toast, validatePhone } from './helpers.js'
+import { calcInterest, closeModal, confetti, confirmModal, debounce, escapeHtml, filterByYear, modal, parseCSVLine, playSound, requireFields, searchData, toast, validatePhone } from './helpers.js'
 import { escHtml, excelTableCss, openPrintWindow } from './printLayout.js'
 import { fmtDate, fmtDateTime, now, peso, state, today } from './state.js'
-import { adjustStock, getQty, lineAmt, resolveInvIds, undoSale } from './transactions.js'
+import { adjustStock, getQty, lineAmt, receiptContentHtml, resolveInvIds, undoSale } from './transactions.js'
 
 // Month-opening balance snapshots: one record per month capturing every client's
 // balance the first time the app runs that month. Powers historical receivables
@@ -94,7 +94,8 @@ export function saveClientDraft() {
     phone: f('cf-phone').value,
     address: f('cf-address').value,
     dueDate: f('cf-dueDate').value,
-    ledgerYear: f('cf-ledgerYear')?.value || ''
+    ledgerYear: f('cf-ledgerYear')?.value || '',
+    balance: f('cf-balance')?.value || ''
   }));
 }
 export function openClientModal(c) {
@@ -113,7 +114,7 @@ export function openClientModal(c) {
           <div><label class="text-xs text-gray-500 block mb-1">Name *</label><input id="cf-name" value="${isEdit ? escapeHtml(c.name||'') : escapeHtml(draft.name||'')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" oninput="saveClientDraft();cfUpdateTotals()" /></div>
           <div class="grid grid-cols-2 gap-2">
             <div><label class="text-xs text-gray-500 block mb-1">Phone</label><input id="cf-phone" value="${isEdit ? escapeHtml(c.phone||'') : escapeHtml(draft.phone||'')}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" oninput="saveClientDraft()" /></div>
-            <div><label class="text-xs text-gray-500 block mb-1">Balance</label><input id="cf-balance" type="number" step="0.01" value="${c?.balance||0}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
+            <div><label class="text-xs text-gray-500 block mb-1">${isEdit ? 'Balance' : 'Opening Balance (₱)'}</label><input id="cf-balance" type="number" step="0.01" value="${isEdit ? (c?.balance || 0) : (parseFloat(draft.balance) || 0)}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" oninput="saveClientDraft()" /></div>
           </div>
           <div class="flex gap-4 mb-3">
             <label class="flex items-center gap-2 text-sm">
@@ -140,7 +141,7 @@ export function openClientModal(c) {
           <h4 class="font-semibold text-sm mb-1 shrink-0">Cart Items</h4>
           <div id="cf-cart" class="flex-1 overflow-auto border dark:border-gray-700 rounded-lg mb-2 min-h-0"></div>
           <div id="cf-totals" class="space-y-1 text-sm shrink-0"></div>
-          <div class="shrink-0 flex items-center gap-2"><label class="text-xs text-gray-500">Payment:</label><select id="cf-payment" onchange="cfUpdateTotals()" class="px-2 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs"><option>Cash</option><option>GCash</option><option>Maya</option><option>Bank Transfer</option></select></div>
+          <div class="shrink-0 flex items-center gap-2"><label class="text-xs text-gray-500">Payment:</label><select id="cf-payment" onchange="cfUpdateTotals()" class="px-2 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs"><option>Cash</option><option>GCash</option><option>Maya</option><option>Bank Transfer</option><option>Credit (Utang)</option></select><button onclick="previewClientSaleDraft()" class="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs hover:bg-gray-50 dark:hover:bg-gray-700" title="See the receipt before saving">Preview Receipt</button></div>
         </div>
       </div>
       <div class="flex gap-2 pt-3 shrink-0"><button onclick="saveClient(${isEdit ? c.id : 'null'})" class="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="20 6 9 17 4 12"/></svg>${isEdit ? 'Update' : 'Save & Create Sale'}</button><button onclick="saveClientDraft();closeModal()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Cancel</button></div>
@@ -207,6 +208,29 @@ export function cfUpdateTotals() {
   _lastCfTotal = grand;
 }
 
+// Pre-save receipt preview for the embedded cart (Save & Create Sale): the
+// same document printing would produce, before anything is written.
+export function previewClientSaleDraft() {
+  if (cfCart.length === 0) { toast('Cart is empty', 'error'); return; }
+  const subtotal = cfCart.reduce((s, i) => s + cfLineSub(i), 0);
+  const totalInterest = cfCart.reduce((s, i) => s + cfLineInt(i), 0);
+  const nameEl = document.getElementById('cf-name');
+  const cfPay = document.getElementById('cf-payment')?.value || 'Cash';
+  const draft = {
+    invoiceNo: 'PREVIEW',
+    clientId: null,
+    clientName: (nameEl && nameEl.value.trim()) || 'Walk-in',
+    date: today(), createdAt: now(),
+    items: cfCart.map(i => ({ date: i.date, description: i.description, name: i.name, unitCost: i.unitCost, intRate: i.intRate, amount: cfLineAmt(i), invId: i.invId })),
+    subtotal, totalInterest, discount: 0, scDiscount: 0,
+    grandTotal: subtotal + totalInterest,
+    paymentMethod: cfPay, status: 'preview'
+  };
+  openPrintWindow('Receipt Preview (not saved)', 420, 680, receiptContentHtml(draft, '80mm'), {
+    extraCss: '.print-preview{padding:16px;background:#fff}.print-header,.print-footer{display:none}'
+  });
+}
+
 export async function saveClient(id) {
   const nmEl = document.getElementById('cf-name');
   const phEl = document.getElementById('cf-phone');
@@ -257,7 +281,7 @@ export async function saveClient(id) {
     toast('Client updated');
     sessionStorage.removeItem('clientFormDraft');
   } else {
-    const clientId = await dbAdd('clients', { name, phone, address, balance: 0, dueDate: ddEl.value || '', createdAt: now(), ledgerYear: lyEl ? lyEl.value || '' : '', isSC: document.getElementById('client-sc')?.checked || false, isPWD: document.getElementById('client-pwd')?.checked || false });
+    const clientId = await dbAdd('clients', { name, phone, address, balance: parseFloat(blEl.value) || 0, dueDate: ddEl.value || '', createdAt: now(), ledgerYear: lyEl ? lyEl.value || '' : '', isSC: document.getElementById('client-sc')?.checked || false, isPWD: document.getElementById('client-pwd')?.checked || false });
     await logAudit('client-add', `Added client ${name}`);
     if (cfCart.length > 0) {
       await resolveInvIds(cfCart);
@@ -712,6 +736,7 @@ Object.defineProperties(window, {
   cfUpdateRowAmt: { get: () => cfUpdateRowAmt, configurable: true },
   cfRenderCart: { get: () => cfRenderCart, configurable: true },
   cfUpdateTotals: { get: () => cfUpdateTotals, configurable: true },
+  previewClientSaleDraft: { get: () => previewClientSaleDraft, configurable: true },
   saveClient: { get: () => saveClient, configurable: true },
   viewClientHistory: { get: () => viewClientHistory, configurable: true },
   printClientInfo: { get: () => printClientInfo, configurable: true },

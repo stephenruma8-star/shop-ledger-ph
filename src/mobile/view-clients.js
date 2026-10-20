@@ -185,6 +185,11 @@ function renderClientForm(id) {
               <input id="cf-due" type="date" value="${escAttr(c?.dueDate || '')}" class="inp" />
             </div>
           </div>
+          ${id ? '' : `<div>
+            <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('cli.open_bal')}</label>
+            <input id="cf-balance" type="number" step="0.01" min="0" value="0" class="inp" />
+            <p class="text-[11px] text-gray-600 mt-1">${T('cli.open_bal_hint')}</p>
+          </div>`}
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('cli.address')}</label>
             <input id="cf-address" type="text" maxlength="200" value="${escAttr(c?.address || '')}" class="inp" />
@@ -215,6 +220,13 @@ async function submitClientForm(id, andSale) {
     address: ((document.getElementById('cf-address') || {}).value || '').trim(),
     dueDate: (document.getElementById('cf-due') || {}).value || ''
   };
+  // Opening balance only on create: the client walks in already owing this.
+  // (Editing recorded debt stays a desktop job.)
+  if (!id) {
+    const balEl = document.getElementById('cf-balance');
+    const opening = parseFloat(balEl && balEl.value);
+    body.balance = isFinite(opening) ? Math.max(0, opening) : 0;
+  }
   const scEl = document.getElementById('cf-sc');
   const pwdEl = document.getElementById('cf-pwd');
   body.isSC = !!(scEl && scEl.checked);

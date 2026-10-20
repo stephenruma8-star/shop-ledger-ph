@@ -303,6 +303,25 @@ try {
   }
   ok(getEl('cart-count').textContent === '0', 'cart cleared after sale');
 
+  // ---- sale preview: draft receipt opens with PREVIEW banner, never posts ----
+  gcall(`showView('sale')`);
+  gcall(`openQuick(1)`);
+  gcall(`quickAdd(1)`);
+  getEl('sale-client').value = '1';
+  {
+    const beforePreview = posts.length;
+    gcall(`previewSaleDraft()`);
+    const modal = getEl('modal-root').innerHTML;
+    ok(modal.includes('PREVIEW'), 'sale draft preview shows PREVIEW banner');
+    ok(modal.includes('OFFICIAL RECEIPT'), 'sale draft preview shows thermal receipt layout');
+    ok(!modal.includes('printSaleReceipt'), 'draft preview offers no print (nothing saved to print)');
+    ok(posts.length === beforePreview, 'previewing the draft posts nothing');
+  }
+  gcall(`closeQuick()`);
+  cartRef().length = 0;
+  gcall(`showView('sale')`);
+  ok(getEl('view').innerHTML.includes('Credit (Utang)'), 'sale view offers Credit (Utang) payment option');
+
   // single-click quick sell + out-of-stock guard
   gcall(`showView('catalog')`);
   gcall(`openQuick(2)`);
@@ -642,12 +661,17 @@ try {
   // ---- clients: add form, detail, history, redeem, statement ----
   gcall(`renderClientForm(null)`);
   ok(getEl('modal-root').innerHTML.includes('cf-name'), 'client add form renders');
+  ok(getEl('modal-root').innerHTML.includes('cf-balance'), 'client add form has opening-balance field');
+  getEl('cf-balance').value = '450';
   await gcall(`submitClientForm(null)`);
   ok(getEl('toast-root').children.some(c => c.textContent.includes('client name')), 'empty client name rejected with guidance');
   getEl('cf-name').value = 'Tet New';
   const cliBefore = posts.length;
   await gcall(`submitClientForm(null)`);
   ok(posts.length === cliBefore + 1 && posts[cliBefore].path === '/api/clients', 'client add posts to the API');
+  ok(posts[cliBefore].body.balance === 450, 'opening balance sent with client create');
+  gcall(`renderClientForm(1)`);
+  ok(!getEl('modal-root').innerHTML.includes('cf-balance'), 'client edit form hides opening balance (debt edits stay on desktop)');
   await gcall(`openClientDetail(1)`);
   ok(getEl('client-detail-body').innerHTML.includes('Maria Santos'), 'client detail shows history');
   const redBefore = posts.length;

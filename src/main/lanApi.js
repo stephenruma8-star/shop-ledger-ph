@@ -281,17 +281,20 @@ function createLanApiRouter(deps) {
   }));
 
   // Client add/edit from phones (counter work: names, phones, addresses).
-  // Balance is deliberately NOT writable here — only the desktop edits debt.
+  // Balance may be set ONCE at creation as the client's opening debt; later
+  // edits still cannot touch it — only the desktop adjusts recorded debt.
   router.post('/api/clients', wrap(async (req, res) => {
     const b = req.body || {};
     const name = String(b.name || '').trim();
     if (!name) return res.status(400).json({ error: 'Client name required' });
     if (name.length > 80) return res.status(400).json({ error: 'Name too long (max 80)' });
     if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
+    const opening = parseFloat(b.balance);
     const rec = {
       name, phone: String(b.phone || '').trim().slice(0, 20),
       address: String(b.address || '').trim().slice(0, 200),
-      balance: 0, dueDate: String(b.dueDate || '').slice(0, 10),
+      balance: isFinite(opening) ? Math.max(-1e9, Math.min(1e9, opening)) : 0,
+      dueDate: String(b.dueDate || '').slice(0, 10),
       isSC: !!b.isSC, isPWD: !!b.isPWD, createdAt: new Date().toISOString()
     };
     const id = JSON.parse(await deps.rendererExec(`JSON.stringify(await dbAdd('clients', ${JSON.stringify(rec)}))`));
@@ -972,7 +975,7 @@ function createLanApiRouter(deps) {
       if (item.qty && (isNaN(parseInt(item.qty)) || parseInt(item.qty) < 1)) return res.status(400).json({ error: 'Invalid item quantity' });
     }
     if (discount && !validateAmount(discount)) return res.status(400).json({ error: 'Invalid discount' });
-    if (paymentMethod && !['Cash','GCash','Maya','Bank Transfer'].includes(paymentMethod)) return res.status(400).json({ error: 'Invalid payment method' });
+    if (paymentMethod && !['Cash','GCash','Maya','Bank Transfer','Credit (Utang)'].includes(paymentMethod)) return res.status(400).json({ error: 'Invalid payment method' });
     _invoiceMutex = _invoiceMutex.then(async () => {
       const invNos = JSON.parse(await deps.rendererExec(`JSON.stringify(state.transactions.filter(t=>t.invoiceNo?.startsWith('INV-')).map(t=>parseInt(t.invoiceNo.replace('INV-',''))||0))`));
       const nextNo = invNos.length > 0 ? Math.max(...invNos) + 1 : 1;

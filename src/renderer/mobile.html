@@ -1434,6 +1434,9 @@ const LANG_STRINGS = {
     'sale.interest': 'Interest (%/mo)', 'sale.discount': 'Discount (₱)',
     'sale.sc': 'SC/PWD 20% Discount', 'sale.charge': 'Charge to client (credit)',
     'sale.total': 'Total', 'sale.save': 'Save Sale',
+    'sale.preview': 'Preview Receipt', 'sale.preview_title': 'Receipt preview',
+    'sale.preview_note': 'PREVIEW — not saved yet',
+    'sale.preview_ok': 'Looks good — back to sale',
     'sale.switch_title': 'Switch client?', 'sale.switch_clear': 'Clear & switch', 'sale.switch_keep': 'Keep items',
     'sale.switch_msg': '{n} item(s) in the cart are for someone else. Clear them and start fresh for {name}?', 'sale.cart_cleared': 'Cart cleared — fresh sale for {name}',
     'sale.tender_title': 'Cash tendered', 'sale.tender_exact': 'Exact', 'sale.tender_clear': 'Clear',
@@ -1630,6 +1633,8 @@ const LANG_STRINGS = {
     'cli.add': 'Add Client', 'cli.edit': 'Edit', 'cli.save': 'Save Client', 'cli.save_new_sale': 'Save & New Sale',
     'cli.add_title': 'Add Client', 'cli.edit_title': 'Edit Client',
     'cli.name': 'Name', 'cli.phone': 'Phone', 'cli.address': 'Address',
+    'cli.open_bal': 'Opening Balance (₱)',
+    'cli.open_bal_hint': 'Debt the client already owes you when added. Leave 0 if none.',
     'cli.due': 'Due date',
     'cli.need_name': 'Enter the client name',
     'cli.added': 'Client added', 'cli.updated': 'Client updated',
@@ -1799,6 +1804,9 @@ const LANG_STRINGS = {
     'sale.interest': 'Interes (%/buwan)', 'sale.discount': 'Diskwento (₱)',
     'sale.sc': 'Diskwentong SC/PWD 20%', 'sale.charge': 'I-charge sa kliyente (utang)',
     'sale.total': 'Kabuuan', 'sale.save': 'I-save ang Benta',
+    'sale.preview': 'I-preview ang Resibo', 'sale.preview_title': 'Preview ng resibo',
+    'sale.preview_note': 'PREVIEW — hindi pa na-save',
+    'sale.preview_ok': 'Tama — bumalik sa benta',
     'sale.switch_title': 'Palitan ang kliyente?', 'sale.switch_clear': 'Linisin at palitan', 'sale.switch_keep': 'Itago ang mga item',
     'sale.switch_msg': 'May {n} item sa cart na para sa iba. Linisin at magsimula ng bago para kay {name}?', 'sale.cart_cleared': 'Nilinis ang cart — bagong benta para kay {name}',
     'sale.tender_title': 'Iniabot na cash', 'sale.tender_exact': 'Sakto', 'sale.tender_clear': 'Burahin',
@@ -1996,6 +2004,8 @@ const LANG_STRINGS = {
     'cli.add': 'Magdagdag ng Kliyente', 'cli.edit': 'I-edit', 'cli.save': 'I-save ang Kliyente', 'cli.save_new_sale': 'I-save at Bagong Benta',
     'cli.add_title': 'Magdagdag ng Kliyente', 'cli.edit_title': 'I-edit ang Kliyente',
     'cli.name': 'Pangalan', 'cli.phone': 'Phone', 'cli.address': 'Address',
+    'cli.open_bal': 'Opening Balance (₱)',
+    'cli.open_bal_hint': 'Utang na mayroon na ang kliyente pagdating. Mag-iwan ng 0 kung wala.',
     'cli.due': 'Takdang petsa',
     'cli.need_name': 'Ilagay ang pangalan ng kliyente',
     'cli.added': 'Nadagdag ang kliyente', 'cli.updated': 'Na-update ang kliyente',
@@ -2890,6 +2900,11 @@ function renderClientForm(id) {
               <input id="cf-due" type="date" value="${escAttr(c?.dueDate || '')}" class="inp" />
             </div>
           </div>
+          ${id ? '' : `<div>
+            <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('cli.open_bal')}</label>
+            <input id="cf-balance" type="number" step="0.01" min="0" value="0" class="inp" />
+            <p class="text-[11px] text-gray-600 mt-1">${T('cli.open_bal_hint')}</p>
+          </div>`}
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('cli.address')}</label>
             <input id="cf-address" type="text" maxlength="200" value="${escAttr(c?.address || '')}" class="inp" />
@@ -2920,6 +2935,13 @@ async function submitClientForm(id, andSale) {
     address: ((document.getElementById('cf-address') || {}).value || '').trim(),
     dueDate: (document.getElementById('cf-due') || {}).value || ''
   };
+  // Opening balance only on create: the client walks in already owing this.
+  // (Editing recorded debt stays a desktop job.)
+  if (!id) {
+    const balEl = document.getElementById('cf-balance');
+    const opening = parseFloat(balEl && balEl.value);
+    body.balance = isFinite(opening) ? Math.max(0, opening) : 0;
+  }
   const scEl = document.getElementById('cf-sc');
   const pwdEl = document.getElementById('cf-pwd');
   body.isSC = !!(scEl && scEl.checked);
@@ -3268,7 +3290,7 @@ function renderSale(presetId) {
         </div>
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sale.payment')}</label>
-          <select id="sale-payment" onchange="saleHeaderChanged()" class="inp">${['Cash', 'GCash', 'Maya', 'Bank Transfer'].map(p => '<option' + (p === keepPay ? ' selected' : '') + '>' + p + '</option>').join('')}</select>
+          <select id="sale-payment" onchange="saleHeaderChanged()" class="inp">${['Cash', 'GCash', 'Maya', 'Bank Transfer', 'Credit (Utang)'].map(p => '<option' + (p === keepPay ? ' selected' : '') + '>' + p + '</option>').join('')}</select>
         </div>
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sale.interest')}</label>
@@ -3304,7 +3326,10 @@ function renderSale(presetId) {
         <span class="font-bold text-gray-200">${T('sale.total')}</span>
         <span class="font-bold text-lg text-green-400 num" id="sale-total-bar">${peso(sub)}</span>
       </div>
-      <button onclick="submitSale()" class="btn btn-primary btn-lg w-full" id="sale-btn"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>${T('sale.save')}</button>
+      <div class="flex gap-2">
+        <button onclick="previewSaleDraft()" class="btn btn-ghost" id="sale-preview-btn" style="flex:0 0 auto"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>${T('sale.preview')}</button>
+        <button onclick="submitSale()" class="btn btn-primary btn-lg flex-1" id="sale-btn"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>${T('sale.save')}</button>
+      </div>
     </div>
     <div style="height:9rem"></div>`;
   saleTotals();
@@ -3628,6 +3653,28 @@ async function announceClientBalance(clientId) {
     const h = await apiGet('/api/clients/' + encodeURIComponent(clientId) + '/history');
     if (h && h.client) toast((h.client.name || 'Client') + ' now owes ' + peso(h.client.balance || 0), 'info');
   } catch (e) {}
+}
+// Pre-save receipt preview: the same thermal layout the printer gets, built
+// from the current cart — so details can be verified before finalizing.
+function previewSaleDraft() {
+  if (!cart.length) { toast(T('sale.need_items'), 'err'); return; }
+  const sub = cart.reduce((s, i) => s + (i.qty || 1) * (i.price || 0), 0);
+  const interest = cart.reduce((s, i) => s + lineIntCalc((i.qty || 1) * (i.price || 0), (i.intRate || 0), i.date), 0);
+  const sc = document.getElementById('sale-sc')?.checked ? sub * 0.2 : 0;
+  const discInput = Math.max(0, parseFloat(document.getElementById('sale-discount')?.value) || 0);
+  const grand = Math.max(0, sub + interest - discInput - sc);
+  const sel = document.getElementById('sale-client');
+  const cid = sel && sel.value ? sel.value : null;
+  const client = cid ? (data.clients || []).find(x => String(x.id) === String(cid)) : null;
+  const draft = {
+    invoiceNo: 'PREVIEW',
+    clientName: client ? client.name : 'Walk-in',
+    createdAt: phoneToday(), date: phoneToday(),
+    items: cart.map(i => ({ description: i.name, qty: i.qty || 1, unitCost: i.price || 0, intRate: i.intRate || 0, date: i.date })),
+    subtotal: sub, totalInterest: interest, discount: discInput + sc, scDiscount: sc, grandTotal: grand,
+    paymentMethod: (document.getElementById('sale-payment') || {}).value || 'Cash'
+  };
+  showReceiptPreview(draft, { draft: true });
 }
 function saleSuccessSheet(invoiceNo) {
   cart = []; updateCartUI();
@@ -4355,12 +4402,8 @@ async function returnTxn(id) {
 // ---------- receipt preview ----------
 // 32-column thermal layout in monospace — what the printer gets, before it
 // gets it. Print + Share act on the same sale from here.
-async function previewReceiptTxn(id) {
-  let t = (typeof detailTxn !== 'undefined' && detailTxn && (String(detailTxn.id) === String(id) || detailTxn.invoiceNo === String(id))) ? detailTxn : null;
-  if (!t) {
-    try { t = await apiGet('/api/transactions/' + encodeURIComponent(id)); }
-    catch (e) { toast(T('txn.load_fail', { msg: e.message }), 'err'); return; }
-  }
+// Pure line builder shared by the saved-sale preview and the pre-save draft.
+function receiptLines(t) {
   const s = (typeof data !== 'undefined' && data.settings) || {};
   const W = 32;
   const clip = (x) => String(x == null ? '' : x).slice(0, W);
@@ -4393,19 +4436,39 @@ async function previewReceiptTxn(id) {
   L.push('Payment: ' + (t.paymentMethod || 'Cash'));
   L.push('');
   L.push(center(s.receiptFooter || 'Thank you for your patronage!'));
+  return L;
+}
+// Modal shell for a receipt preview. opts.draft = unsaved sale: shows a
+// not-saved banner and only a "back to sale" action (no print/share yet —
+// there is no invoice to print until the sale is saved).
+function showReceiptPreview(t, opts) {
+  const o = opts || {};
+  const draft = !!o.draft;
+  const L = receiptLines(t);
   document.getElementById('modal-root').innerHTML = `
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
       <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:94vh;max-height:94dvh;overflow-y:auto" onclick="event.stopPropagation()">
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
-        <h3 class="font-bold text-gray-100 text-sm mb-3 flex items-center gap-2"><span class="icon-tile bg-blue-500/15 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>${esc(t.invoiceNo || 'Receipt')}</h3>
+        <h3 class="font-bold text-gray-100 text-sm mb-3 flex items-center gap-2"><span class="icon-tile bg-blue-500/15 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>${draft ? esc(T('sale.preview_title')) : esc(t.invoiceNo || 'Receipt')}</h3>
+        ${draft ? `<p class="text-[11px] font-semibold uppercase tracking-wider text-amber-400 mb-2">${esc(T('sale.preview_note'))}</p>` : ''}
         <pre class="text-gray-200 rounded-xl p-3 mb-3" style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.5;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.08);overflow-x:auto;white-space:pre">${esc(L.join('\n'))}</pre>
-        <div class="grid grid-cols-2 gap-2">
+        ${draft
+          ? `<button onclick="closeQuick()" class="btn btn-primary w-full">${esc(T('sale.preview_ok'))}</button>`
+          : `<div class="grid grid-cols-2 gap-2">
           <button onclick="printSaleReceipt(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-primary btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>${T('txn.print')}</button>
           <button onclick="shareReceiptTxn(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>${T('txn.share')}</button>
         </div>
-        <button onclick="openTxnDetail(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-ghost w-full mt-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>${T('txn.back_detail')}</button>
+        <button onclick="openTxnDetail(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-ghost w-full mt-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>${T('txn.back_detail')}</button>`}
       </div>
     </div>`;
+}
+async function previewReceiptTxn(id) {
+  let t = (typeof detailTxn !== 'undefined' && detailTxn && (String(detailTxn.id) === String(id) || detailTxn.invoiceNo === String(id))) ? detailTxn : null;
+  if (!t) {
+    try { t = await apiGet('/api/transactions/' + encodeURIComponent(id)); }
+    catch (e) { toast(T('txn.load_fail', { msg: e.message }), 'err'); return; }
+  }
+  showReceiptPreview(t);
 }
 
 // ===== src/mobile/view-expenses.js =====

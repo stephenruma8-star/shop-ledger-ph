@@ -155,9 +155,12 @@ async function _apiClients(method, parts, body) {
     const name = String(b.name || '').trim();
     if (!name) throw _apiErr(400, 'Client name required');
     if (name.length > 80) throw _apiErr(400, 'Name too long (max 80)');
+    const opening = parseFloat(body && body.balance);
+    const balance = isFinite(opening) ? Math.max(-1e9, Math.min(1e9, opening)) : 0;
     const r = await db.run(
-      'INSERT INTO clients (name, phone, address, balance, dueDate, isSC, isPWD, createdAt) VALUES (?, ?, ?, 0, ?, ?, ?, ?)',
+      'INSERT INTO clients (name, phone, address, balance, dueDate, isSC, isPWD, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [name, String(b.phone || '').trim().slice(0, 20), String(b.address || '').trim().slice(0, 200),
+       balance,
        String(b.dueDate || '').slice(0, 10), b.isSC ? 1 : 0, b.isPWD ? 1 : 0, new Date().toISOString()]
     );
     await _audit('client-add', 'Added client ' + name + ' (phone)');
@@ -461,7 +464,7 @@ async function _apiQuick(method, parts, body) {
 }
 
 // ---------- sales ----------
-const PAY_METHODS = ['Cash', 'GCash', 'Maya', 'Bank Transfer'];
+const PAY_METHODS = ['Cash', 'GCash', 'Maya', 'Bank Transfer', 'Credit (Utang)'];
 async function _nextInvoiceNo(db) {
   const rows = await db.all("SELECT invoiceNo FROM transactions WHERE invoiceNo LIKE 'INV-%'", []);
   let mx = 0;

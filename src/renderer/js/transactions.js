@@ -140,7 +140,7 @@ export function renderTransactionModal(editTxn) {
         <div class="space-y-3">
           <div class="grid grid-cols-2 gap-2">
             <div><label class="text-xs text-gray-500 block">Client</label><select id="tm-client" onchange="autoApplyClientDiscount(this)" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"><option value="">Walk-in</option>${clients.map(c => `<option value="${c.id}" ${c.id === selClient ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}</select></div>
-            <div><label class="text-xs text-gray-500 block">Payment</label><select id="tm-payment" onchange="updateTMTotals()" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"><option ${selPay==='Cash'?'selected':''}>Cash</option><option ${selPay==='GCash'?'selected':''}>GCash</option><option ${selPay==='Maya'?'selected':''}>Maya</option><option ${selPay==='Bank Transfer'?'selected':''}>Bank Transfer</option></select></div>
+            <div><label class="text-xs text-gray-500 block">Payment</label><select id="tm-payment" onchange="updateTMTotals()" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"><option ${selPay==='Cash'?'selected':''}>Cash</option><option ${selPay==='GCash'?'selected':''}>GCash</option><option ${selPay==='Maya'?'selected':''}>Maya</option><option ${selPay==='Bank Transfer'?'selected':''}>Bank Transfer</option><option ${selPay==='Credit (Utang)'?'selected':''}>Credit (Utang)</option></select></div>
           </div>
           <div class="grid grid-cols-2 gap-2">
             <div><label class="text-xs text-gray-500 block">Discount (₱)</label><input id="tm-discount" type="number" value="${selDisc}" min="0" step="0.01" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" oninput="updateTMTotals()" /></div>
@@ -166,7 +166,8 @@ export function renderTransactionModal(editTxn) {
           <div id="tm-cart" class="max-h-72 overflow-auto border dark:border-gray-700 rounded-lg mb-2"></div>
           <div id="tm-totals" class="space-y-1 text-sm"></div>
           <div id="tm-conseq" class="text-xs mt-1"></div>
-          <button onclick="saveTransaction()" class="w-full mt-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="20 6 9 17 4 12"/></svg>${isEdit ? 'Update Sale' : 'Complete Sale'}</button>
+          <button onclick="previewSaleDraft()" class="w-full mt-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 font-semibold text-sm"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Preview Receipt</button>
+          <button onclick="saveTransaction()" class="w-full mt-2 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="20 6 9 17 4 12"/></svg>${isEdit ? 'Update Sale' : 'Complete Sale'}</button>
           ${isEdit ? `<p class="text-xs text-gray-400 mt-1 text-center">Editing ${editTxn.invoiceNo} — old data will be replaced</p>` : ''}
         </div>
       </div>
@@ -335,6 +336,35 @@ export async function saveTransaction() {
     Proceed with this sale? (Save the sale?)`)) return;
     await doSaveTransaction();
   } finally { window.__app._savingTx = false; }
+}
+
+// Pre-save receipt preview: renders exactly what printing will produce from
+// the current modal state, before anything is written. Banner marks it as a
+// preview; the invoice number is not assigned until the sale is saved.
+export function previewSaleDraft() {
+  if (txCart.length === 0) { toast('Cart is empty', 'error'); return; }
+  const subtotal = txCart.reduce((s, i) => s + lineSub(i), 0);
+  const totalInterest = txCart.reduce((s, i) => s + lineInt(i), 0);
+  const scCheck = document.getElementById('tm-sc');
+  const scDiscount = scCheck && scCheck.checked ? subtotal * 0.2 : 0;
+  const discount = parseFloat(document.getElementById('tm-discount')?.value || 0) + scDiscount;
+  const grandTotal = round2(Math.max(0, subtotal + totalInterest - discount));
+  const clientSel = document.getElementById('tm-client');
+  const clientId = clientSel && clientSel.value ? parseInt(clientSel.value) : null;
+  const clientName = clientSel && clientSel.selectedIndex >= 0 ? clientSel.options[clientSel.selectedIndex].text : 'Walk-in';
+  const paymentMethod = document.getElementById('tm-payment')?.value || 'Cash';
+  const editing = txEditingId ? state.transactions.find(t => t.id === txEditingId) : null;
+  const draft = {
+    invoiceNo: editing ? editing.invoiceNo : 'PREVIEW',
+    clientId, clientName: clientId ? clientName : 'Walk-in',
+    date: today(), createdAt: now(),
+    items: txCart.map(i => ({ date: i.date, description: i.description, name: i.name, unitCost: i.unitCost, intRate: i.intRate, amount: lineAmt(i), invId: i.invId, variantName: i.variantName })),
+    subtotal, totalInterest, discount, scDiscount, grandTotal,
+    paymentMethod, status: 'preview'
+  };
+  openPrintWindow('Receipt Preview (not saved)', 420, 680, receiptContentHtml(draft, '80mm'), {
+    extraCss: '.print-preview{padding:16px;background:#fff}.print-header,.print-footer{display:none}'
+  });
 }
 
 export async function resolveInvIds(items) {
@@ -962,6 +992,25 @@ export async function doPrintReceipt(id, direct) {
   if (!t) { toast('Transaction not found', 'error'); return; }
   const sizeEl = document.getElementById('rp-size');
   const size = sizeEl ? sizeEl.value : '80mm';
+  const content = receiptContentHtml(t, size);
+
+  closeModal();
+  const isWide = size === 'letter';
+  if (direct && window.electronAPI) {
+    const paperWidth = size === '58mm' ? 220 : (size === '80mm' ? 300 : 600);
+    await window.electronAPI.printReceipt({ html: content, width: paperWidth });
+    toast('Receipt sent to printer', 'success');
+  } else {
+    openPrintWindow('Receipt - ' + (t.invoiceNo || ''), isWide ? 600 : 380, 600, content, {
+      extraCss: '.print-preview{padding:16px;background:#fff}.print-header,.print-footer{display:none}'
+    });
+  }
+}
+
+// Receipt document for a transaction at a given paper size. Shared by the
+// post-save printer (doPrintReceipt) and the pre-save draft preview so the
+// preview is pixel-identical to what printing will produce.
+export function receiptContentHtml(t, size) {
   const settingsMap = {};
   state.settings.forEach(s => settingsMap[s.key] = s.value);
   const shopName = settingsMap['shopName'] || 'Shop Ledger PH';
@@ -972,9 +1021,8 @@ export async function doPrintReceipt(id, direct) {
   const isWide = size === 'letter';
   const maxW = isWide ? '600px' : (size === '58mm' ? '220px' : '300px');
   const fontSize = isWide ? '12px' : (size === '58mm' ? '9px' : '11px');
-  const colDivider = isWide ? '' : '<style>.receipt-table td{padding:1px 2px}</style>';
 
-  let itemsHtml = (t.items || []).map(item => {
+  const itemsHtml = (t.items || []).map(item => {
     const qt = item.name || String(item.qty || 1);
     const rate = item.intRate != null ? item.intRate : (item.interest ? +((item.interest / (getQty(item.name) * (item.unitCost || 1)) * 100).toFixed(1)) : 0);
     const sub = getQty(item.name||item.qty) * (item.unitCost||item.price||0);
@@ -985,10 +1033,9 @@ export async function doPrintReceipt(id, direct) {
   }).join('');
 
   const hasInt = t.totalInterest > 0;
-  const colSpan = hasInt ? 4 : 3;
   const intCol = hasInt ? '<th style="text-align:right">Int</th>' : '';
 
-  const content = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Receipt ${escapeHtml(t.invoiceNo||'')}</title>
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Receipt ${escapeHtml(t.invoiceNo||'')}</title>
     <style>
       body{margin:0;padding:12px;font-family:'Courier New',monospace;font-size:${fontSize};line-height:1.3;color:#000}
       .receipt{max-width:${maxW};margin:0 auto}
@@ -1004,9 +1051,11 @@ export async function doPrintReceipt(id, direct) {
       .totals td{padding:1px 4px}
       .footer{text-align:center;margin-top:8px;font-size:${isWide?'11px':'9px'}}
       .payment{border-top:1px dashed #000;padding-top:4px;margin-top:4px}
+      .draft-banner{text-align:center;font-weight:700;font-size:12px;border:2px solid #b45309;color:#b45309;padding:4px;margin:0 0 8px;border-radius:4px}
       @media print{body{padding:0}}
     </style></head><body>
     <div class="receipt">
+      ${t.status === 'preview' ? '<div class="draft-banner">PREVIEW — details not saved yet</div>' : ''}
       <h1>${escapeHtml(shopName)}</h1>
       ${shopAddr ? `<div class="shop-info">${escapeHtml(shopAddr)}</div>` : ''}
       ${shopContact ? `<div class="shop-info">${escapeHtml(shopContact)}</div>` : ''}
@@ -1027,17 +1076,6 @@ export async function doPrintReceipt(id, direct) {
       <div class="payment">Payment: ${escapeHtml(t.paymentMethod||'Cash')}</div>
       <div class="footer">${escapeHtml(footerMsg)}</div>
     </div></body></html>`;
-
-  closeModal();
-  if (direct && window.electronAPI) {
-    const paperWidth = size === '58mm' ? 220 : (size === '80mm' ? 300 : 600);
-    await window.electronAPI.printReceipt({ html: content, width: paperWidth });
-    toast('Receipt sent to printer', 'success');
-  } else {
-    openPrintWindow('Receipt - ' + (t.invoiceNo || ''), isWide ? 600 : 380, 600, content, {
-      extraCss: '.print-preview{padding:16px;background:#fff}.print-header,.print-footer{display:none}'
-    });
-  }
 }
 
 export function toggleTxBulkBar() {
@@ -1091,6 +1129,8 @@ Object.defineProperties(window, {
   toggleSC: { get: () => toggleSC, configurable: true },
   autoApplyClientDiscount: { get: () => autoApplyClientDiscount, configurable: true },
   saveTransaction: { get: () => saveTransaction, configurable: true },
+  previewSaleDraft: { get: () => previewSaleDraft, configurable: true },
+  receiptContentHtml: { get: () => receiptContentHtml, configurable: true },
   doSaveTransaction: { get: () => doSaveTransaction, configurable: true },
   isDuplicateTx: { get: () => isDuplicateTx, configurable: true },
   checkDuplicateSale: { get: () => isDuplicateTx, configurable: true },
