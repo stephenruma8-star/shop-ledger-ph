@@ -36,6 +36,7 @@ function supplierListHTML(items) {
         <span class="chip chip-blue">${T('sup.bought', { amt: peso(s.purchased) })}</span>
         <span class="chip chip-green">${T('sup.paid', { amt: peso(s.paid) })}</span>
         ${(s.owed || 0) > 0 && phoneRole() !== 'cashier' ? `<button onclick="renderSupplierPay(${JSON.stringify(s.id)})" class="btn btn-ghost btn-sm shrink-0">Pay</button>` : ''}
+        ${phoneRole() !== 'cashier' ? `<button onclick="renderSupplierForm(${JSON.stringify(s.id)})" title="${esc(T('sup.edit'))}" class="btn btn-ghost btn-sm px-2 shrink-0">✏️</button>` : ''}
         ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button onclick="deleteSupplier(${JSON.stringify(s.id)})" id="sup-del-${s.id}" class="ml-auto text-[11px] text-red-400 px-2 py-1 rounded-lg shrink-0" style="background:rgba(239,68,68,.1)">🗑</button>` : ''}
       </div>
     </div>`).join('');
@@ -65,49 +66,52 @@ async function deleteSupplier(id) {
   } catch (e) { feelErr(); toast(e.message, 'err'); }
   finally { releaseSubmitLock('supdel'); }
 }
-function renderSupplierForm() {
+function renderSupplierForm(id) {
+  const s = id ? (data.suppliers || []).find(x => String(x.id) === String(id)) : null;
   document.getElementById('modal-root').innerHTML = `
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
       <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:94vh;max-height:94dvh;overflow-y:auto" onclick="event.stopPropagation()">
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
-        <div class="flex items-center justify-between gap-2 mb-3"><h3 class="font-bold text-gray-100 text-sm flex items-center gap-2"><span class="icon-tile bg-indigo-500/15 text-indigo-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>${T('sup.add')}</h3><button onclick="closeQuick()" aria-label="Close" class="w-9 h-9 rounded-xl btn-ghost flex items-center justify-center text-gray-400 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+        <div class="flex items-center justify-between gap-2 mb-3"><h3 class="font-bold text-gray-100 text-sm flex items-center gap-2"><span class="icon-tile bg-indigo-500/15 text-indigo-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>${s ? T('sup.edit') : T('sup.add')}</h3><button onclick="closeQuick()" aria-label="Close" class="w-9 h-9 rounded-xl btn-ghost flex items-center justify-center text-gray-400 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
         <div class="space-y-3">
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sup.name')}</label>
-            <input id="sp-name" type="text" maxlength="80" class="inp" />
+            <input id="sp-name" type="text" maxlength="80" class="inp" value="${s ? escAttr(s.name || '') : ''}" />
           </div>
           <div class="grid grid-cols-2 gap-2.5">
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sup.contact')}</label>
-              <input id="sp-contact" type="text" maxlength="40" class="inp" />
+              <input id="sp-contact" type="text" maxlength="40" class="inp" value="${s ? escAttr(s.contact || '') : ''}" />
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sup.email')}</label>
-              <input id="sp-email" type="text" maxlength="80" class="inp" />
+              <input id="sp-email" type="text" maxlength="80" class="inp" value="${s ? escAttr(s.email || '') : ''}" />
             </div>
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sup.address')}</label>
-            <input id="sp-address" type="text" maxlength="200" class="inp" />
+            <input id="sp-address" type="text" maxlength="200" class="inp" value="${s ? escAttr(s.address || '') : ''}" />
           </div>
-          <button onclick="submitSupplierForm()" class="btn btn-primary btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('sup.save')}</button>
+          <button onclick="submitSupplierForm(${s ? JSON.stringify(s.id) : 'null'})" class="btn btn-primary btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('sup.save')}</button>
         </div>
       </div>
     </div>`;
 }
-async function submitSupplierForm() {
+async function submitSupplierForm(id) {
   const name = ((document.getElementById('sp-name') || {}).value || '').trim();
   if (!name) { toast(T('sup.need_name'), 'err'); return; }
   if (!takeSubmitLock('supplier')) return;
   try {
-    await apiPost('/api/suppliers', {
+    const body = {
       name,
       contact: ((document.getElementById('sp-contact') || {}).value || '').trim(),
       email: ((document.getElementById('sp-email') || {}).value || '').trim(),
       address: ((document.getElementById('sp-address') || {}).value || '').trim()
-    });
+    };
+    if (id) await apiPost('/api/suppliers/' + encodeURIComponent(id), body, 'PUT');
+    else await apiPost('/api/suppliers', body);
     closeQuick();
-    toast(T('sup.added'), 'ok');
+    toast(id ? T('sup.updated') : T('sup.added'), 'ok');
     await refreshAll();
   } catch (e) { toast(T('sup.failed', { msg: e.message }), 'err'); }
   finally { releaseSubmitLock('supplier'); }

@@ -1608,7 +1608,7 @@ const LANG_STRINGS = {
     'sup.recorded': 'Supplier payment recorded',
     'sup.need_amount': 'Enter a valid amount',
     'sup.pay_failed': 'Payment failed: {msg}',
-    'sup.add': 'Add Supplier',
+    'sup.add': 'Add Supplier', 'sup.edit': 'Edit Supplier', 'sup.updated': 'Supplier updated',
     'sup.name': 'Name', 'sup.contact': 'Contact', 'sup.email': 'Email',
     'sup.address': 'Address', 'sup.save': 'Save Supplier',
     'sup.need_name': 'Enter the supplier name',
@@ -1664,8 +1664,13 @@ const LANG_STRINGS = {
     'txn.voided': 'Sale voided',
     'txn.void_failed': 'Void failed: {msg}',
     'txn.vat_incl': 'Includes {amt} VAT',
-    'inv.oos': 'OUT OF STOCK', 'inv.left': '{n} left',
-    'inv.low_n': '{n} low stock', 'inv.all_ok': 'All stocked',
+  'inv.oos': 'OUT OF STOCK', 'inv.left': '{n} left',
+  'inv.low_n': '{n} low stock', 'inv.all_ok': 'All stocked',
+  'inv.expiring': 'Expiring', 'inv.reorder': 'Reorder', 'inv.show_all': 'All',
+  'inv.expiring_note': 'Expiring or expired within 30 days: {n}',
+  'inv.reorder_note': 'At or below low-stock level: {n}',
+  'inv.none_expiring': 'No items expiring soon',
+  'inv.none_reorder': 'All items sufficiently stocked',
     'inv.add': 'Add Item', 'inv.edit': 'Edit Item',
     'inv.count': '{n} items',
     'inv.name': 'Name', 'inv.sku': 'SKU', 'inv.barcode': 'Barcode',
@@ -1979,7 +1984,7 @@ const LANG_STRINGS = {
     'sup.recorded': 'Na-record ang bayad sa supplier',
     'sup.need_amount': 'Maglagay ng wastong halaga',
     'sup.pay_failed': 'Nabigo ang bayad: {msg}',
-    'sup.add': 'Magdagdag ng Supplier',
+    'sup.add': 'Magdagdag ng Supplier', 'sup.edit': 'I-edit ang Supplier', 'sup.updated': 'Na-update ang supplier',
     'sup.name': 'Pangalan', 'sup.contact': 'Contact', 'sup.email': 'Email',
     'sup.address': 'Address', 'sup.save': 'I-save ang Supplier',
     'sup.need_name': 'Ilagay ang pangalan ng supplier',
@@ -2035,8 +2040,13 @@ const LANG_STRINGS = {
     'txn.voided': 'Na-void ang benta',
     'txn.void_failed': 'Nabigo ang pag-void: {msg}',
     'txn.vat_incl': 'Kasama ang {amt} VAT',
-    'inv.oos': 'UBOS NA', 'inv.left': '{n} ang natira',
-    'inv.add': 'Magdagdag ng Item', 'inv.edit': 'I-edit ang Item',
+  'inv.oos': 'UBOS NA', 'inv.left': '{n} ang natira',
+  'inv.expiring': 'Malapit nang ma-expire', 'inv.reorder': 'Muling bilhin', 'inv.show_all': 'Lahat',
+  'inv.expiring_note': 'Malapit nang ma-expire o expired sa loob ng 30 araw: {n}',
+  'inv.reorder_note': 'Nasa o mas mababa sa low-stock level: {n}',
+  'inv.none_expiring': 'Walang malapit nang ma-expire',
+  'inv.none_reorder': 'Sapat ang stock ng lahat',
+  'inv.add': 'Magdagdag ng Item', 'inv.edit': 'I-edit ang Item',
     'inv.count': '{n} na item',
     'inv.name': 'Pangalan', 'inv.sku': 'SKU', 'inv.barcode': 'Barcode',
     'inv.category': 'Kategorya', 'inv.sell': 'Presyong benta (₱)',
@@ -3960,16 +3970,29 @@ async function submitPay() {
 
 // ===== src/mobile/view-inventory.js =====
 // ---------- INVENTORY ----------
+let invFilter = 'all';
 async function renderInventory() {
   const v = document.getElementById('view');
-  if (!data.inventory.length) { v.innerHTML = skeleton(T('common.loading')); await loadAll(); }
+  invFilter = 'all';
   const low = data.inventory.filter(i => (i.stock || 0) <= (i.lowStock || 5)).length;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const expiring = (data.inventory || []).filter(i => {
+    if (!i.expiryDate) return false;
+    const d = Math.ceil((new Date(i.expiryDate + 'T00:00:00') - new Date(todayStr + 'T00:00:00')) / 86400000);
+    return d <= 30;
+  });
   v.innerHTML = `
     <div class="flex items-center justify-between gap-2 mb-3 fade-in">
       <h2 class="card-title text-base"><span class="icon-tile bg-blue-500/15 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></span>${T('view.inventory.title')} <span class="text-sm text-gray-500 font-normal">(${T('inv.count', { n: data.inventory.length })})</span></h2>
       ${phoneRole() === 'cashier' ? '' : `<button onclick="renderItemForm(null)" class="btn btn-primary btn-sm shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('inv.add')}</button>`}
     </div>
-    <div class="mb-3 fade-in"><span class="chip ${low > 0 ? 'chip-amber' : 'chip-green'}">${low > 0 ? T('inv.low_n', { n: low }) : T('inv.all_ok')}</span></div>
+    <div class="mb-2 fade-in"><span class="chip ${low > 0 ? 'chip-amber' : 'chip-green'}">${low > 0 ? T('inv.low_n', { n: low }) : T('inv.all_ok')}</span></div>
+    <div class="flex gap-1.5 mb-2 fade-in">
+      <button onclick="showExpiringInv()" class="btn btn-ghost btn-sm flex-1">⏳ ${T('inv.expiring')} (${expiring.length})</button>
+      <button onclick="showReorderInv()" class="btn btn-ghost btn-sm flex-1">🔄 ${T('inv.reorder')} (${low})</button>
+      <button onclick="showAllInv()" class="btn btn-ghost btn-sm">${T('inv.show_all')}</button>
+    </div>
+    <div id="inv-filter-note" class="hidden text-[11px] text-gray-500 mb-2"></div>
     <div id="inv-valuation" class="mb-3"></div>
 ${phoneRole() === 'cashier' ? '' : `<button onclick="showView('stocktake')" class="btn btn-ghost w-full mb-3"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>${T('st.start')}</button>`}
     <div class="relative mb-3 fade-in">
@@ -3999,10 +4022,52 @@ function invListHTML(items) {
     </div>`;
   }).join('');
 }
+function invExpiringItems() {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  return (data.inventory || [])
+    .filter(i => i.expiryDate)
+    .map(i => ({ ...i, _days: Math.ceil((new Date(i.expiryDate + 'T00:00:00') - new Date(todayStr + 'T00:00:00')) / 86400000) }))
+    .filter(i => i._days <= 30)
+    .sort((a, b) => a._days - b._days);
+}
+function invReorderItems() {
+  return (data.inventory || [])
+    .filter(i => (i.stock || 0) <= (i.lowStock || 5))
+    .sort((a, b) => ((a.stock || 0) / (a.lowStock || 5)) - ((b.stock || 0) / (b.lowStock || 5)));
+}
+function invFilterItems() {
+  if (invFilter === 'expiring') return invExpiringItems();
+  if (invFilter === 'reorder') return invReorderItems();
+  return data.inventory || [];
+}
+function paintInvFilter(items, note, emptyText) {
+  const g = document.getElementById('inv-grid');
+  const n = document.getElementById('inv-filter-note');
+  if (g) g.innerHTML = items.length ? invListHTML(items) : `<div class="text-center text-gray-500 py-10 fade-in"><p class="text-sm">${esc(emptyText)}</p></div>`;
+  if (n) {
+    n.textContent = note || '';
+    n.classList.toggle('hidden', !note);
+  }
+}
+function showExpiringInv() {
+  invFilter = 'expiring';
+  const items = invExpiringItems();
+  paintInvFilter(items, T('inv.expiring_note', { n: items.length }), T('inv.none_expiring'));
+}
+function showReorderInv() {
+  invFilter = 'reorder';
+  const items = invReorderItems();
+  paintInvFilter(items, T('inv.reorder_note', { n: items.length }), T('inv.none_reorder'));
+}
+function showAllInv() {
+  invFilter = 'all';
+  paintInvFilter(data.inventory || [], '', '');
+}
 function filterInventory(q) {
   q = (q || '').toLowerCase();
   const g = document.getElementById('inv-grid');
-  if (g) g.innerHTML = invListHTML(data.inventory.filter(i => (i.name || '').toLowerCase().includes(q)));
+  const items = invFilterItems().filter(i => (i.name || '').toLowerCase().includes(q));
+  if (g) g.innerHTML = invListHTML(items);
   loadValuation();
 }
 async function loadValuation() {
@@ -4721,6 +4786,7 @@ function supplierListHTML(items) {
         <span class="chip chip-blue">${T('sup.bought', { amt: peso(s.purchased) })}</span>
         <span class="chip chip-green">${T('sup.paid', { amt: peso(s.paid) })}</span>
         ${(s.owed || 0) > 0 && phoneRole() !== 'cashier' ? `<button onclick="renderSupplierPay(${JSON.stringify(s.id)})" class="btn btn-ghost btn-sm shrink-0">Pay</button>` : ''}
+        ${phoneRole() !== 'cashier' ? `<button onclick="renderSupplierForm(${JSON.stringify(s.id)})" title="${esc(T('sup.edit'))}" class="btn btn-ghost btn-sm px-2 shrink-0">✏️</button>` : ''}
         ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button onclick="deleteSupplier(${JSON.stringify(s.id)})" id="sup-del-${s.id}" class="ml-auto text-[11px] text-red-400 px-2 py-1 rounded-lg shrink-0" style="background:rgba(239,68,68,.1)">🗑</button>` : ''}
       </div>
     </div>`).join('');
@@ -4750,49 +4816,52 @@ async function deleteSupplier(id) {
   } catch (e) { feelErr(); toast(e.message, 'err'); }
   finally { releaseSubmitLock('supdel'); }
 }
-function renderSupplierForm() {
+function renderSupplierForm(id) {
+  const s = id ? (data.suppliers || []).find(x => String(x.id) === String(id)) : null;
   document.getElementById('modal-root').innerHTML = `
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
       <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:94vh;max-height:94dvh;overflow-y:auto" onclick="event.stopPropagation()">
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
-        <div class="flex items-center justify-between gap-2 mb-3"><h3 class="font-bold text-gray-100 text-sm flex items-center gap-2"><span class="icon-tile bg-indigo-500/15 text-indigo-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>${T('sup.add')}</h3><button onclick="closeQuick()" aria-label="Close" class="w-9 h-9 rounded-xl btn-ghost flex items-center justify-center text-gray-400 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+        <div class="flex items-center justify-between gap-2 mb-3"><h3 class="font-bold text-gray-100 text-sm flex items-center gap-2"><span class="icon-tile bg-indigo-500/15 text-indigo-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>${s ? T('sup.edit') : T('sup.add')}</h3><button onclick="closeQuick()" aria-label="Close" class="w-9 h-9 rounded-xl btn-ghost flex items-center justify-center text-gray-400 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
         <div class="space-y-3">
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sup.name')}</label>
-            <input id="sp-name" type="text" maxlength="80" class="inp" />
+            <input id="sp-name" type="text" maxlength="80" class="inp" value="${s ? escAttr(s.name || '') : ''}" />
           </div>
           <div class="grid grid-cols-2 gap-2.5">
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sup.contact')}</label>
-              <input id="sp-contact" type="text" maxlength="40" class="inp" />
+              <input id="sp-contact" type="text" maxlength="40" class="inp" value="${s ? escAttr(s.contact || '') : ''}" />
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sup.email')}</label>
-              <input id="sp-email" type="text" maxlength="80" class="inp" />
+              <input id="sp-email" type="text" maxlength="80" class="inp" value="${s ? escAttr(s.email || '') : ''}" />
             </div>
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sup.address')}</label>
-            <input id="sp-address" type="text" maxlength="200" class="inp" />
+            <input id="sp-address" type="text" maxlength="200" class="inp" value="${s ? escAttr(s.address || '') : ''}" />
           </div>
-          <button onclick="submitSupplierForm()" class="btn btn-primary btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('sup.save')}</button>
+          <button onclick="submitSupplierForm(${s ? JSON.stringify(s.id) : 'null'})" class="btn btn-primary btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('sup.save')}</button>
         </div>
       </div>
     </div>`;
 }
-async function submitSupplierForm() {
+async function submitSupplierForm(id) {
   const name = ((document.getElementById('sp-name') || {}).value || '').trim();
   if (!name) { toast(T('sup.need_name'), 'err'); return; }
   if (!takeSubmitLock('supplier')) return;
   try {
-    await apiPost('/api/suppliers', {
+    const body = {
       name,
       contact: ((document.getElementById('sp-contact') || {}).value || '').trim(),
       email: ((document.getElementById('sp-email') || {}).value || '').trim(),
       address: ((document.getElementById('sp-address') || {}).value || '').trim()
-    });
+    };
+    if (id) await apiPost('/api/suppliers/' + encodeURIComponent(id), body, 'PUT');
+    else await apiPost('/api/suppliers', body);
     closeQuick();
-    toast(T('sup.added'), 'ok');
+    toast(id ? T('sup.updated') : T('sup.added'), 'ok');
     await refreshAll();
   } catch (e) { toast(T('sup.failed', { msg: e.message }), 'err'); }
   finally { releaseSubmitLock('supplier'); }

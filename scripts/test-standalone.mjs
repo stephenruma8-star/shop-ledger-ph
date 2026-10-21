@@ -174,6 +174,12 @@ const supDet = await A('GET', '/api/suppliers/' + sup.id + '/payments');
   // pending POs are not debt yet: list owed matches the received-only detail
   const poPend = await A('POST', '/api/purchase-orders', { supplierId: sup.id, items: [{ name: 'Later', price: 50, qty: 4 }] });
   ok((await A('GET', '/api/suppliers')).find(s => s.id === sup.id).owed === 100, 'pending PO excluded from list owed');
+  const supEdit = await A('POST', '/api/suppliers/' + sup.id, { name: 'Acme Prime', contact: '0917', email: 'a@b.c', address: 'Manila' }, 'PUT');
+  ok(supEdit.success, 'supplier edit');
+  const supAfter = (await A('GET', '/api/suppliers')).find(s => s.id === sup.id);
+  ok(supAfter.name === 'Acme Prime' && supAfter.contact === '0917' && supAfter.email === 'a@b.c' && supAfter.address === 'Manila', 'supplier edit fields persisted');
+  await throws(400, () => A('POST', '/api/suppliers/' + sup.id, { name: '' }, 'PUT'), 'supplier edit requires name');
+  await throws(404, () => A('POST', '/api/suppliers/999999', { name: 'Ghost' }, 'PUT'), 'supplier edit 404');
   await A('POST', '/api/purchase-orders/' + (await A('GET', '/api/purchase-orders')).find(p => p.poNo === poPend.poNo).id, {}, 'DELETE');
 
 // loyalty redeem (Maria has 194 pts from the ₱194 sale)

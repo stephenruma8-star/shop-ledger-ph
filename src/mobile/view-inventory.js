@@ -1,14 +1,27 @@
 // ---------- INVENTORY ----------
+let invFilter = 'all';
 async function renderInventory() {
   const v = document.getElementById('view');
-  if (!data.inventory.length) { v.innerHTML = skeleton(T('common.loading')); await loadAll(); }
+  invFilter = 'all';
   const low = data.inventory.filter(i => (i.stock || 0) <= (i.lowStock || 5)).length;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const expiring = (data.inventory || []).filter(i => {
+    if (!i.expiryDate) return false;
+    const d = Math.ceil((new Date(i.expiryDate + 'T00:00:00') - new Date(todayStr + 'T00:00:00')) / 86400000);
+    return d <= 30;
+  });
   v.innerHTML = `
     <div class="flex items-center justify-between gap-2 mb-3 fade-in">
       <h2 class="card-title text-base"><span class="icon-tile bg-blue-500/15 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></span>${T('view.inventory.title')} <span class="text-sm text-gray-500 font-normal">(${T('inv.count', { n: data.inventory.length })})</span></h2>
       ${phoneRole() === 'cashier' ? '' : `<button onclick="renderItemForm(null)" class="btn btn-primary btn-sm shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('inv.add')}</button>`}
     </div>
-    <div class="mb-3 fade-in"><span class="chip ${low > 0 ? 'chip-amber' : 'chip-green'}">${low > 0 ? T('inv.low_n', { n: low }) : T('inv.all_ok')}</span></div>
+    <div class="mb-2 fade-in"><span class="chip ${low > 0 ? 'chip-amber' : 'chip-green'}">${low > 0 ? T('inv.low_n', { n: low }) : T('inv.all_ok')}</span></div>
+    <div class="flex gap-1.5 mb-2 fade-in">
+      <button onclick="showExpiringInv()" class="btn btn-ghost btn-sm flex-1">⏳ ${T('inv.expiring')} (${expiring.length})</button>
+      <button onclick="showReorderInv()" class="btn btn-ghost btn-sm flex-1">🔄 ${T('inv.reorder')} (${low})</button>
+      <button onclick="showAllInv()" class="btn btn-ghost btn-sm">${T('inv.show_all')}</button>
+    </div>
+    <div id="inv-filter-note" class="hidden text-[11px] text-gray-500 mb-2"></div>
     <div id="inv-valuation" class="mb-3"></div>
 ${phoneRole() === 'cashier' ? '' : `<button onclick="showView('stocktake')" class="btn btn-ghost w-full mb-3"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>${T('st.start')}</button>`}
     <div class="relative mb-3 fade-in">
@@ -38,10 +51,52 @@ function invListHTML(items) {
     </div>`;
   }).join('');
 }
+function invExpiringItems() {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  return (data.inventory || [])
+    .filter(i => i.expiryDate)
+    .map(i => ({ ...i, _days: Math.ceil((new Date(i.expiryDate + 'T00:00:00') - new Date(todayStr + 'T00:00:00')) / 86400000) }))
+    .filter(i => i._days <= 30)
+    .sort((a, b) => a._days - b._days);
+}
+function invReorderItems() {
+  return (data.inventory || [])
+    .filter(i => (i.stock || 0) <= (i.lowStock || 5))
+    .sort((a, b) => ((a.stock || 0) / (a.lowStock || 5)) - ((b.stock || 0) / (b.lowStock || 5)));
+}
+function invFilterItems() {
+  if (invFilter === 'expiring') return invExpiringItems();
+  if (invFilter === 'reorder') return invReorderItems();
+  return data.inventory || [];
+}
+function paintInvFilter(items, note, emptyText) {
+  const g = document.getElementById('inv-grid');
+  const n = document.getElementById('inv-filter-note');
+  if (g) g.innerHTML = items.length ? invListHTML(items) : `<div class="text-center text-gray-500 py-10 fade-in"><p class="text-sm">${esc(emptyText)}</p></div>`;
+  if (n) {
+    n.textContent = note || '';
+    n.classList.toggle('hidden', !note);
+  }
+}
+function showExpiringInv() {
+  invFilter = 'expiring';
+  const items = invExpiringItems();
+  paintInvFilter(items, T('inv.expiring_note', { n: items.length }), T('inv.none_expiring'));
+}
+function showReorderInv() {
+  invFilter = 'reorder';
+  const items = invReorderItems();
+  paintInvFilter(items, T('inv.reorder_note', { n: items.length }), T('inv.none_reorder'));
+}
+function showAllInv() {
+  invFilter = 'all';
+  paintInvFilter(data.inventory || [], '', '');
+}
 function filterInventory(q) {
   q = (q || '').toLowerCase();
   const g = document.getElementById('inv-grid');
-  if (g) g.innerHTML = invListHTML(data.inventory.filter(i => (i.name || '').toLowerCase().includes(q)));
+  const items = invFilterItems().filter(i => (i.name || '').toLowerCase().includes(q));
+  if (g) g.innerHTML = invListHTML(items);
   loadValuation();
 }
 async function loadValuation() {

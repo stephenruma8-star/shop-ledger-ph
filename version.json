@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.1",
+    "version":  "3.37.2",
     "buildDate":  "2026-10-21T00:00:00.000Z",
-    "notes":  "Full UI audit fixes: the Inventory Expiring Soon button now works, saving Settings completes reliably, and cash sales no longer reduce a client's utang balance in client history. Added an automated UI audit to the test suite to catch broken buttons and missing translations."
+    "notes":  "Parity fixes: purchase orders can now be edited until they are received, the phone Inventory screen gains Expiring and Reorder filters, and suppliers can be edited from the phone in both paired and standalone modes."
 }

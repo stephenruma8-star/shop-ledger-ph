@@ -704,6 +704,29 @@ function createLanApiRouter(deps) {
     res.json({ success: true, id });
   }));
 
+  router.put('/api/suppliers/:id', wrap(async (req, res) => {
+    const b = req.body || {};
+    const name = String(b.name || '').trim();
+    if (!name) return res.status(400).json({ error: 'Supplier name required' });
+    if (name.length > 80) return res.status(400).json({ error: 'Name too long (max 80)' });
+    if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
+    const dump = await load('suppliers');
+    const s = (dump.suppliers || []).find(x => String(x.id) === String(req.params.id));
+    if (!s) return res.status(404).json({ error: 'Supplier not found' });
+    const updated = {
+      ...s,
+      name,
+      contact: b.contact !== undefined ? String(b.contact || '').trim().slice(0, 40) : (s.contact || ''),
+      email: b.email !== undefined ? String(b.email || '').trim().slice(0, 80) : (s.email || ''),
+      category: b.category !== undefined ? String(b.category || '').trim().slice(0, 40) : (s.category || ''),
+      address: b.address !== undefined ? String(b.address || '').trim().slice(0, 200) : (s.address || '')
+    };
+    await deps.rendererExec(`dbPut('suppliers', ${JSON.stringify(updated)})`);
+    try { await deps.rendererExec(`(async()=>{try{await logAudit('supplier','Updated supplier: ' + ${JSON.stringify(name)} + ${JSON.stringify(devTag(req))});}catch(e){}})()`); } catch (e) {}
+    bump({ source: 'api', kind: 'supplier' });
+    res.json({ success: true });
+  }));
+
   router.get('/api/suppliers/:id/payments', wrap(async (req, res) => {
     const dump = await load('suppliers', 'supplierPayments', 'purchaseOrders');
     const s = (dump.suppliers || []).find(x => String(x.id) === String(req.params.id));

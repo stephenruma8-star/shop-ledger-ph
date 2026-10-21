@@ -953,6 +953,23 @@ async function _apiSuppliers(method, parts, body) {
     _bump();
     return { success: true, id: r.lastID };
   }
+  if (method === 'PUT' && parts.length === 1) {
+    const b = body || {};
+    const name = String(b.name || '').trim();
+    if (!name) throw _apiErr(400, 'Supplier name required');
+    if (name.length > 80) throw _apiErr(400, 'Name too long (max 80)');
+    const s = await db.get('SELECT * FROM suppliers WHERE id = ?', [parts[0]]);
+    if (!s) throw _apiErr(404, 'Supplier not found');
+    const contact = b.contact !== undefined ? String(b.contact || '').trim().slice(0, 40) : (s.contact || '');
+    const email = b.email !== undefined ? String(b.email || '').trim().slice(0, 80) : (s.email || '');
+    const category = b.category !== undefined ? String(b.category || '').trim().slice(0, 40) : (s.category || '');
+    const address = b.address !== undefined ? String(b.address || '').trim().slice(0, 200) : (s.address || '');
+    await db.run('UPDATE suppliers SET name = ?, contact = ?, email = ?, category = ?, address = ? WHERE id = ?',
+      [name, contact, email, category, address, s.id]);
+    await _audit('supplier', 'Updated supplier: ' + name + ' (phone)');
+    _bump();
+    return { success: true };
+  }
   if (method === 'DELETE' && parts.length === 1) {
     const s = await db.get('SELECT * FROM suppliers WHERE id = ?', [parts[0]]);
     if (!s) throw _apiErr(404, 'Supplier not found');
