@@ -131,7 +131,11 @@ const fakeFetch = async (url, opts) => {
   else if (path.startsWith('/api/settings')) payload = X.settings;
   else if (path.startsWith('/api/audit')) payload = [{ id: 1, action: 'sale', details: 'Mobile sale INV-00001', user: '', createdAt: '2026-09-24T10:00:00.000Z' }];
   else if (path === 'version.json' || path.endsWith('/version.json')) payload = { desktopVersion: '3.30.0' };
-  else if (path.endsWith('/releases/latest')) payload = { tag_name: 'v3.31.0', assets: [{ name: 'Shop-Ledger-Mobile-3.31.0-debug.apk', browser_download_url: 'https://example.com/app.apk' }] };
+  else if (path.endsWith('/releases?per_page=20')) payload = [
+    { tag_name: 'v3.32.0', assets: [{ name: 'Shop-Ledger-PH-Setup-3.32.0.exe', browser_download_url: 'https://example.com/desktop.exe' }] },
+    { tag_name: 'mobile-v3.31.0', assets: [{ name: 'Shop-Ledger-Mobile-3.31.0-debug.apk', browser_download_url: 'https://example.com/app.apk' }] },
+    { tag_name: 'mobile-v3.30.1', assets: [{ name: 'Shop-Ledger-Mobile-3.30.1-debug.apk', browser_download_url: 'https://example.com/old.apk' }] },
+  ];
   return { ok: true, json: async () => payload };
 };
 
@@ -617,7 +621,9 @@ try {
   // ---- phone app updater ----
   ok(gcall(`cmpAppVer('3.31.0', '3.30.0')`) === 1 && gcall(`cmpAppVer('3.30.0', '3.30.0')`) === 0 && gcall(`cmpAppVer('3.29.9', '3.30.0')`) === -1, 'updater compares versions');
   ok(await gcall(`checkMobileUpdate(true)`) === 'available', 'newer release detected');
+  ok([...seen].some(x => x.endsWith('/releases?per_page=20')), 'updater reads mobile releases instead of desktop latest');
   ok(getEl('modal-root').innerHTML.includes('Phone app update'), 'update sheet offers the download');
+  ok(getEl('modal-root').innerHTML.includes('downloadPendingUpdate()'), 'update sheet download handler is intact');
   gcall(`closeQuick()`);
   ok(await gcall(`checkMobileUpdate(false)`) === 'throttled', 'auto check throttled to once a day');
   gcall(`renderSettings()`);

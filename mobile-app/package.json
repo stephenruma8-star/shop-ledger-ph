@@ -1,6 +1,6 @@
 {
   "name": "shop-ledger-mobile",
-  "version": "4.8.19",
+  "version": "4.8.20",
   "private": true,
   "description": "Shop Ledger PH — standalone on-device POS. Own SQLite ledger, no desktop needed.",
   "scripts": {

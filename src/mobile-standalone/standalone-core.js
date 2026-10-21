@@ -3,7 +3,7 @@
 // names and response shapes as the LAN client, so every shared view works
 // unchanged. No imports/exports: concatenated. Requires store.js first.
 const IS_STANDALONE = true;
-const STANDALONE_VERSION = '4.8.19';
+const STANDALONE_VERSION = '4.8.20';
 function isNativeApp() {
   try { return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); } catch (e) { return false; }
 }
@@ -418,6 +418,17 @@ function _cmpVersions(a, b) {
   }
   return 0;
 }
+let pendingStandaloneUpdate = null;
+function standaloneUpdatePromptHTML(best) {
+  // Never interpolate the URL into an inline handler: JSON.stringify adds
+  // double quotes, which terminate the onclick attribute and make the button
+  // dead. Keep the payload in JS and call a no-argument handler instead.
+  return `<div class="rounded-xl p-3 mb-2" style="background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.35)">
+      <p class="text-xs font-bold text-blue-300 mb-2">New version ${esc(best.tag)} available</p>
+      <button onclick="openPendingStandaloneUpdate()" class="w-full py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold mb-1.5">Download & install ${esc(best.tag)}</button>
+      <button onclick="openPendingStandaloneUpdateFallback()" class="w-full py-2 rounded-xl text-xs font-semibold btn-ghost">Open in browser instead</button>
+    </div>`;
+}
 async function checkStandaloneUpdate(manual) {
   const slot = document.getElementById('upd-check');
   const say = (html) => { if (slot) slot.innerHTML = html; };
@@ -438,17 +449,24 @@ async function checkStandaloneUpdate(manual) {
       else if (slot) slot.innerHTML = '';
       return false;
     }
-    say(`<div class="rounded-xl p-3 mb-2" style="background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.35)">
-      <p class="text-xs font-bold text-blue-300 mb-2">New version ${esc(best.tag)} available</p>
-      <button onclick="openStandaloneUpdate(${JSON.stringify(best.url)}, ${JSON.stringify(best.file)}, ${JSON.stringify(best.tag)})" class="w-full py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold mb-1.5">Download & install ${esc(best.tag)}</button>
-      <button onclick="openStandaloneUpdateFallback(${JSON.stringify(best.url)})" class="w-full py-2 rounded-xl text-xs font-semibold btn-ghost">Open in browser instead</button>
-    </div>`);
+    pendingStandaloneUpdate = best;
+    say(standaloneUpdatePromptHTML(best));
     if (!manual) toast('App update available: v' + best.tag, 'info');
     return true;
   } catch (e) {
     if (manual) say('<p class="text-[11px] text-red-400 mb-2">Check failed — needs internet.</p>');
     return false;
   }
+}
+function openPendingStandaloneUpdate() {
+  const u = pendingStandaloneUpdate;
+  if (!u) return;
+  openStandaloneUpdate(u.url, u.file, u.tag);
+}
+function openPendingStandaloneUpdateFallback() {
+  const u = pendingStandaloneUpdate;
+  if (!u) return;
+  openStandaloneUpdateFallback(u.url);
 }
 function openStandaloneUpdate(url, fileName, tag) {
   // Primary path: system downloader + installer prompt, with a live in-app

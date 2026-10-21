@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.2",
+    "version":  "3.37.3",
     "buildDate":  "2026-10-21T00:00:00.000Z",
-    "notes":  "Parity fixes: purchase orders can now be edited until they are received, the phone Inventory screen gains Expiring and Reorder filters, and suppliers can be edited from the phone in both paired and standalone modes."
+    "notes":  "Phone updater fixes: paired phones now look for mobile releases instead of the desktop release, and standalone update buttons download again."
 }

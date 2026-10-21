@@ -5753,7 +5753,7 @@ async function applyInterestNow() {
 // sideloaded file. Silent unless an update is actually available.
 const UPDATE_CHECK_KEY = 'slpUpdateCheck';
 const UPDATE_CHECK_MS = 24 * 60 * 60 * 1000;
-const RELEASES_URL = 'https://api.github.com/repos/stephenruma8-star/shop-ledger-ph/releases/latest';
+const RELEASES_URL = 'https://api.github.com/repos/stephenruma8-star/shop-ledger-ph/releases?per_page=20';
 function cmpAppVer(a, b) {
   const pa = String(a || '').split('.').map(x => parseInt(x, 10) || 0);
   const pb = String(b || '').split('.').map(x => parseInt(x, 10) || 0);
@@ -5781,11 +5781,21 @@ async function bundledAppVersion() {
   } catch (e) {}
   return '';
 }
-async function fetchLatestRelease() {
+async function fetchLatestMobileRelease() {
   try {
     const r = await fetchTimeout(RELEASES_URL, { headers: { Accept: 'application/vnd.github+json' } });
     if (!r.ok) return null;
-    return await r.json().catch(() => null);
+    const list = await r.json().catch(() => null);
+    if (!Array.isArray(list)) return null;
+    const found = [];
+    for (const rel of list) {
+      const m = /^mobile-v(\d+\.\d+\.\d+)$/.exec(String((rel && rel.tag_name) || ''));
+      if (!m) continue;
+      const apk = findApkAsset(rel);
+      if (apk) found.push({ tag: m[1], apk });
+    }
+    found.sort((a, b) => cmpAppVer(b.tag, a.tag));
+    return found[0] || null;
   } catch (e) { return null; }
 }
 function findApkAsset(rel) {
@@ -5803,13 +5813,10 @@ async function checkMobileUpdate(manual) {
     try { localStorage.setItem(UPDATE_CHECK_KEY, String(Date.now())); } catch (e) {}
     const cur = await bundledAppVersion();
     if (!cur) return 'unknown';
-    const rel = await fetchLatestRelease();
+    const rel = await fetchLatestMobileRelease();
     if (!rel) return 'unknown';
-    const tag = String(rel.tag_name || '').replace(/^v/, '');
-    const apk = findApkAsset(rel);
-    if (!tag || !apk) return 'unknown';
-    if (cmpAppVer(tag, cur) <= 0) return 'updated';
-    renderUpdateSheet(tag, apk.url);
+    if (cmpAppVer(rel.tag, cur) <= 0) return 'updated';
+    renderUpdateSheet(rel.tag, rel.apk.url);
     return 'available';
   } catch (e) { return 'unknown'; }
 }

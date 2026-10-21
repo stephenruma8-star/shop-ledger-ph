@@ -93,6 +93,11 @@ async function runStandaloneAudit() {
   });
   await A('update-card', async () => {
     if (typeof openStandaloneUpdate !== 'function' || typeof openStandaloneUpdateFallback !== 'function' || typeof checkStandaloneUpdate !== 'function') throw new Error('update fns missing');
+    if (typeof openPendingStandaloneUpdate !== 'function' || typeof openPendingStandaloneUpdateFallback !== 'function') throw new Error('pending update fns missing');
+    const prompt = standaloneUpdatePromptHTML({ tag: '9.9.9', url: 'https://example.com/a.apk?x=1', file: 'a.apk' });
+    if (!prompt.includes('onclick="openPendingStandaloneUpdate()"')) throw new Error('update button handler broken');
+    if (!prompt.includes('onclick="openPendingStandaloneUpdateFallback()"')) throw new Error('fallback button handler broken');
+    if (/onclick="[^"]*https:\/\/example\.com/.test(prompt)) throw new Error('download URL leaked into inline handler');
     let host = document.getElementById('update-row');
     let made = false;
     if (!host) { host = document.createElement('div'); host.id = 'update-row'; document.body.appendChild(host); made = true; }

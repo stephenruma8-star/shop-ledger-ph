@@ -104,4 +104,8 @@ if (missing.length) {
   console.error('standalone refs MISSING: ' + missing.join(', '));
   process.exit(1);
 }
+if (/onclick="openStandaloneUpdate\(\$\{JSON\.stringify/.test(src)) {
+  console.error('standalone refs DEAD HANDLER: update URL interpolated into onclick');
+  process.exit(1);
+}
 console.log(`standalone refs OK (${declared.size} globals, ${called.size} call sites)`);
