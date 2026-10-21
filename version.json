@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.0",
-    "buildDate":  "2026-10-20T00:00:00.000Z",
-    "notes":  "Record debts from anywhere: New Sale and Add Client (desktop) plus the phone now support an explicit Credit (Utang) payment method and an Opening Balance when creating a client. Preview the receipt before saving on both desktop and phone."
+    "version":  "3.37.1",
+    "buildDate":  "2026-10-21T00:00:00.000Z",
+    "notes":  "Full UI audit fixes: the Inventory Expiring Soon button now works, saving Settings completes reliably, and cash sales no longer reduce a client's utang balance in client history. Added an automated UI audit to the test suite to catch broken buttons and missing translations."
 }

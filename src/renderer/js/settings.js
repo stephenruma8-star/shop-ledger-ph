@@ -478,7 +478,6 @@ export async function saveSettings() {
       });
     }
   }
-  for (const el of document.querySelectorAll('[data-qi-id]')) await updateQuickItemField(el);
   state.settings = await dbAll('settings');
   const shop = state.settings.find(x => x.key === 'shopName');
   if (shop) document.getElementById('shop-name').textContent = shop.value;
@@ -690,9 +689,6 @@ export async function rebuildApp() {
 Object.defineProperties(window, {
   viewSettings: { get: () => viewSettings, configurable: true },
   saveSettings: { get: () => saveSettings, configurable: true },
-  updateQuickItemField: { get: () => updateQuickItemField, configurable: true },
-  addQuickItem: { get: () => addQuickItem, configurable: true },
-  deleteQuickItem: { get: () => deleteQuickItem, configurable: true },
   uploadReceiptLogo: { get: () => uploadReceiptLogo, configurable: true },
   removeReceiptLogo: { get: () => removeReceiptLogo, configurable: true },
   selectCloudFolder: { get: () => selectCloudFolder, configurable: true },

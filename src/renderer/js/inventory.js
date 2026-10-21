@@ -467,6 +467,7 @@ Object.defineProperties(window, {
   saveInv: { get: () => saveInv, configurable: true },
   deleteInv: { get: () => deleteInv, configurable: true },
   showReorderSuggestions: { get: () => showReorderSuggestions, configurable: true },
+  filterExpiringSoon: { get: () => filterExpiringSoon, configurable: true },
   sendLowStockSMS: { get: () => sendLowStockSMS, configurable: true },
   toggleInvBulkBar: { get: () => toggleInvBulkBar, configurable: true },
   bulkDeleteInv: { get: () => bulkDeleteInv, configurable: true },
