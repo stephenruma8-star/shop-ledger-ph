@@ -242,7 +242,7 @@ function showReceiptPreview(t, opts) {
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
         <h3 class="font-bold text-gray-100 text-sm mb-3 flex items-center gap-2"><span class="icon-tile bg-blue-500/15 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>${draft ? esc(T('sale.preview_title')) : esc(t.invoiceNo || 'Receipt')}</h3>
         ${draft ? `<p class="text-[11px] font-semibold uppercase tracking-wider text-amber-400 mb-2">${esc(T('sale.preview_note'))}</p>` : ''}
-        <pre class="text-gray-200 rounded-xl p-3 mb-3" style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.5;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.08);overflow-x:auto;white-space:pre">${esc(L.join('\n'))}</pre>
+        <pre class="receipt-paper">${esc(L.join('\n'))}</pre>
         ${draft
           ? `<button onclick="closeQuick()" class="btn btn-primary w-full">${esc(T('sale.preview_ok'))}</button>`
           : `<div class="grid grid-cols-2 gap-2">

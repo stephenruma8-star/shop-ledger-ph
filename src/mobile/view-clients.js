@@ -136,12 +136,15 @@ async function openClientDetail(id) {
       </div>
       <button onclick="closeQuick()" aria-label="Close" class="w-9 h-9 rounded-xl btn-ghost flex items-center justify-center text-gray-400 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
-    <div class="grid grid-cols-3 gap-2 mb-3">
+    <div class="grid grid-cols-2 gap-2 mb-2">
       <button onclick="renderClientForm(${JSON.stringify(c.id)})" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>${T('cli.edit')}</button>
       <button onclick="shareClientStatement()" class="btn btn-ghost btn-sm">📤 ${T('cli.statement')}</button>
-      <button id="redeem-btn" onclick="redeemClientPoints(${JSON.stringify(c.id)})" class="btn btn-sm" style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.5);color:#fbbf24"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>${T('cli.redeem')}</button>
     </div>
-    <button onclick="closeQuick();showView('sale', ${JSON.stringify(c.id)})" class="btn btn-primary w-full mb-3"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>New sale for ${esc(c.name)}</button>
+    ${(c.loyaltyPoints || 0) >= 100 ? `<button id="redeem-btn" onclick="redeemClientPoints(${JSON.stringify(c.id)})" class="btn btn-sm w-full mb-2" style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.5);color:#fbbf24"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>${T('cli.redeem')}</button>` : ''}
+    <div class="grid grid-cols-2 gap-2 mb-3">
+      <button onclick="closeQuick();showView('pay', ${JSON.stringify(c.id)})" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>${T('cli.record_payment')}</button>
+      <button onclick="closeQuick();showView('sale', ${JSON.stringify(c.id)})" class="btn btn-primary btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>${T('sale.new')}</button>
+    </div>
     ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button id="client-del-btn" onclick="deleteClient(${JSON.stringify(c.id)})" class="btn btn-sm w-full mb-3" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);color:#f87171">🗑 Delete client</button>` : ''}
     <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">${T('cli.history_sales')}</h4>
     <div class="space-y-1.5 mb-3">
@@ -185,11 +188,11 @@ function renderClientForm(id) {
               <input id="cf-due" type="date" value="${escAttr(c?.dueDate || '')}" class="inp" />
             </div>
           </div>
-          ${id ? '' : `<div>
-            <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('cli.open_bal')}</label>
-            <input id="cf-balance" type="number" step="0.01" min="0" value="0" class="inp" />
-            <p class="text-[11px] text-gray-600 mt-1">${T('cli.open_bal_hint')}</p>
-          </div>`}
+          <div>
+            <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${id ? T('cli.balance') : T('cli.open_bal')}</label>
+            <input id="cf-balance" type="number" step="0.01" min="0" value="${escAttr(String(id ? (c?.balance || 0) : 0))}" class="inp" />
+            <p class="text-[11px] text-gray-600 mt-1">${id ? T('cli.balance_hint') : T('cli.open_bal_hint')}</p>
+          </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('cli.address')}</label>
             <input id="cf-address" type="text" maxlength="200" value="${escAttr(c?.address || '')}" class="inp" />
@@ -220,21 +223,27 @@ async function submitClientForm(id, andSale) {
     address: ((document.getElementById('cf-address') || {}).value || '').trim(),
     dueDate: (document.getElementById('cf-due') || {}).value || ''
   };
-  // Opening balance only on create: the client walks in already owing this.
-  // (Editing recorded debt stays a desktop job.)
-  if (!id) {
-    const balEl = document.getElementById('cf-balance');
-    const opening = parseFloat(balEl && balEl.value);
-    body.balance = isFinite(opening) ? Math.max(0, opening) : 0;
-  }
+  // Opening balance on create, or a manual correction on edit. Normal sales
+  // and payments still update the balance automatically.
+  const balEl = document.getElementById('cf-balance');
+  const balance = parseFloat(balEl && balEl.value);
+  body.balance = isFinite(balance) ? Math.max(0, balance) : 0;
   const scEl = document.getElementById('cf-sc');
   const pwdEl = document.getElementById('cf-pwd');
   body.isSC = !!(scEl && scEl.checked);
   body.isPWD = !!(pwdEl && pwdEl.checked);
   let newId = null;
   try {
-    if (id) await apiPost('/api/clients/' + encodeURIComponent(id), body, 'PUT');
-    else { const r = await apiPost('/api/clients', body); newId = r && r.id; }
+    const r = id
+      ? await apiPost('/api/clients/' + encodeURIComponent(id), body, 'PUT')
+      : await apiPost('/api/clients', body);
+    if (r && r.queued) {
+      closeQuick();
+      toast(T('cli.queued'), 'ok');
+      if (currentView === 'clients') renderClients();
+      return;
+    }
+    if (!id) newId = r && r.id;
     closeQuick();
     toast(id ? T('cli.updated') : T('cli.added'), 'ok');
     await refreshAll();

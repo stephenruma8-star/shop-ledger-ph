@@ -209,9 +209,12 @@ async function _apiClients(method, parts, body) {
     if (name.length > 80) throw _apiErr(400, 'Name too long (max 80)');
     const c = await db.get('SELECT * FROM clients WHERE id = ?', [parts[0]]);
     if (!c) throw _apiErr(404, 'Client not found');
-    await db.run('UPDATE clients SET name = ?, phone = ?, address = ?, dueDate = ?, isSC = ?, isPWD = ? WHERE id = ?',
+    const rawBalance = parseFloat(b.balance);
+    const hasBalance = b.balance !== undefined && b.balance !== null && b.balance !== '' && isFinite(rawBalance);
+    const balance = hasBalance ? Math.max(-1e9, Math.min(1e9, rawBalance)) : (c.balance || 0);
+    await db.run('UPDATE clients SET name = ?, phone = ?, address = ?, dueDate = ?, isSC = ?, isPWD = ?, balance = ? WHERE id = ?',
       [name, String(b.phone || '').trim().slice(0, 20), String(b.address || '').trim().slice(0, 200),
-       String(b.dueDate || '').slice(0, 10), b.isSC ? 1 : 0, b.isPWD ? 1 : 0, c.id]);
+       String(b.dueDate || '').slice(0, 10), b.isSC ? 1 : 0, b.isPWD ? 1 : 0, balance, c.id]);
     await _audit('client-edit', 'Updated client ' + name + ' (phone)');
     _bump();
     return { success: true };

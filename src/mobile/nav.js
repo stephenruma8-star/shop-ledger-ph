@@ -57,8 +57,9 @@ function navTap(view) {
     if (navModalOpen || currentView !== 'home') showView('home');
     return;
   }
-  // Fresh tab entry starts a clean sale (no leftover client preset).
-  if (view === 'sale') { try { saleClientPreset = null; saleRateClient = null; if (!cart.length) saleCartClient = ''; } catch (e) {} }
+  // Keep an in-progress cart attached to its client; only a truly empty
+  // sale starts clean.
+  if (view === 'sale') { try { saleRateClient = null; if (!cart.length) { saleClientPreset = null; saleCartClient = ''; } else if (saleCartClient) saleClientPreset = saleCartClient; } catch (e) {} }
   if (navModalOpen && currentView === view) { closeNavModal(); return; }
   showView(view);
 }

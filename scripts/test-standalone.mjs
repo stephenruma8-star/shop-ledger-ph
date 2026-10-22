@@ -48,6 +48,13 @@ const all = await A('GET', '/api/clients');
 ok(Array.isArray(all) && all.length === 2 && all[0].balance === 0, 'clients list raw array');
 await A('POST', '/api/clients/' + c1.id, { name: 'Maria C', phone: '0918' }, 'PUT');
 await throws(404, () => A('POST', '/api/clients/9999', { name: 'X' }, 'PUT'), 'client edit 404');
+const balC = await A('POST', '/api/clients', { name: 'Balance Edit', balance: 50 });
+ok(balC.success && balC.id, 'balance-edit client add');
+await A('POST', '/api/clients/' + balC.id, { name: 'Balance Edit', phone: '', address: '', dueDate: '', balance: 175.25 }, 'PUT');
+let balH = await A('GET', '/api/clients/' + balC.id + '/history');
+ok(balH.client.balance === 175.25, 'client edit updates balance');
+await A('POST', '/api/clients/' + balC.id, { name: 'Balance Edit', balance: 0 }, 'PUT');
+ok((await A('POST', '/api/clients/' + balC.id, {}, 'DELETE')).success, 'balance-edited client cleanup');
 const h0 = await A('GET', '/api/clients/' + c1.id + '/history');
 ok(h0.client && h0.client.name === 'Maria C' && h0.sales.length === 0, 'history empty');
 
@@ -467,7 +474,7 @@ const odH2 = await A('GET', '/api/clients/' + odC.id + '/history');
 ok(odH2.client.balance === 210, 'credit sale adds to opening debt (150 + 60)');
 await throws(400, () => A('POST', '/api/sales', { items: [{ description: 'Oil', qty: 1, unitCost: 30, invId: it2.id }], paymentMethod: 'WeChat' }), 'unknown payment method rejected');
 await A('POST', '/api/clients/' + odC.id, { name: 'Opening Debt', balance: 9999 }, 'PUT');
-ok((await A('GET', '/api/clients/' + odC.id + '/history')).client.balance === 210, 'client edit cannot rewrite balance');
+ok((await A('GET', '/api/clients/' + odC.id + '/history')).client.balance === 9999, 'client edit can correct balance');
 
 console.log(`\nSTANDALONE STORE: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

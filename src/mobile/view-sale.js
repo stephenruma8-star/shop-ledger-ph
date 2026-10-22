@@ -3,7 +3,7 @@
 // New Sale button). Replaces the dead preselectedId reference.
 let saleClientPreset = null;
 let saleRateClient = null; // client key whose rate was last bulk-applied to lines
-let saleCartClient = ''; // who the current cart items are for ('' = walk-in); switching asks first
+let saleCartClient = ''; // who the current cart items are for ('' = walk-in); switching asks whether to keep them
 function renderSale(presetId) {
   if (presetId !== undefined && presetId !== null && presetId !== '') {
     // An explicit "New sale for X" starts fresh: items rung up for a
@@ -191,39 +191,55 @@ function saleRateAll() {
   saleTotals();
 }
 function clientOptions() {
-  return '<option value="">' + T('sale.walkin') + '</option>' + data.clients.map(c => '<option value="' + c.id + '"' + (saleClientPreset != null && String(c.id) === String(saleClientPreset) ? ' selected' : '') + '>' + esc(c.name) + ' — ' + peso(c.balance) + '</option>').join('');
+  const picked = saleClientPreset != null ? saleClientPreset : saleCartClient;
+  return '<option value="">' + T('sale.walkin') + '</option>' + data.clients.map(c => '<option value="' + c.id + '"' + (picked != null && String(c.id) === String(picked) ? ' selected' : '') + '>' + esc(c.name) + ' — ' + peso(c.balance) + '</option>').join('');
 }
-// Manual client switch with items in the cart: the old items were rung up
-// for someone else, so ask before wiping them. Programmatic presets bypass
-// this (renderSale handles those itself).
+// Manual client switch with items in the cart: let the cashier keep those
+// items for the new client or start fresh. Never silently discard work.
 function saleClientChanged() {
   const sel = document.getElementById('sale-client');
   const nid = sel && sel.value ? String(sel.value) : '';
-  if (!cart.length || String(saleCartClient || '') === nid) { applyClientRate(); return; }
+  if (!cart.length || String(saleCartClient || '') === nid) {
+    saleCartClient = nid;
+    saleClientPreset = nid || null;
+    applyClientRate();
+    return;
+  }
   const c = (data.clients || []).find(x => String(x.id) === nid);
   const n = cart.reduce((s, i) => s + (i.qty || 1), 0);
   document.getElementById('modal-root').innerHTML = `
-    <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)keepSwitchClient()">
+    <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)cancelSwitchClient()">
       <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-5 pb-6 slide-up glass-card" style="max-height:94vh;max-height:94dvh;overflow-y:auto" onclick="event.stopPropagation()">
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
         <h3 class="font-bold text-gray-100 text-base mb-2">${T('sale.switch_title')}</h3>
         <p class="text-sm text-gray-400 mb-4">${esc(T('sale.switch_msg', { n, name: c ? c.name : T('sale.walkin') }))}</p>
-        <button onclick="doSwitchClient()" class="btn btn-primary btn-lg mb-2">${T('sale.switch_clear')}</button>
-        <button onclick="keepSwitchClient()" class="btn btn-ghost btn-lg">${T('sale.switch_keep')}</button>
+        <button onclick="keepSwitchClient()" class="btn btn-primary btn-lg mb-2">${T('sale.switch_keep')}</button>
+        <button onclick="doSwitchClient()" class="btn btn-ghost btn-lg mb-2" style="color:#fca5a5;border-color:rgba(239,68,68,.35)">${T('sale.switch_clear')}</button>
+        <button onclick="cancelSwitchClient()" class="btn btn-ghost btn-lg">${T('sale.switch_cancel')}</button>
       </div>
     </div>`;
+}
+function switchSaleClient(nid, clearCart) {
+  cart = clearCart ? [] : cart;
+  if (clearCart) tendered = 0;
+  saleCartClient = nid;
+  saleClientPreset = nid || null;
+  saleRateClient = null;
+  if (clearCart) { try { updateCartUI(); } catch (e) {} }
+  closeQuick();
+  renderSale();
 }
 function doSwitchClient() {
   const sel = document.getElementById('sale-client');
   const nid = sel && sel.value ? String(sel.value) : '';
-  cart = []; tendered = 0;
-  saleCartClient = nid;
-  saleClientPreset = nid || null;
-  try { updateCartUI(); } catch (e) {}
-  closeQuick();
-  renderSale();
+  switchSaleClient(nid, true);
 }
 function keepSwitchClient() {
+  const sel = document.getElementById('sale-client');
+  const nid = sel && sel.value ? String(sel.value) : '';
+  switchSaleClient(nid, false);
+}
+function cancelSwitchClient() {
   const sel = document.getElementById('sale-client');
   if (sel) sel.value = saleCartClient || '';
   closeQuick();

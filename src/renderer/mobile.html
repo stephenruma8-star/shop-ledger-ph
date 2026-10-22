@@ -41,7 +41,7 @@ nowhere, users cannot tell long lists (clients, sales) continue below. */
 .glass-input{background:rgba(30,41,59,.55);border:1px solid rgba(255,255,255,.09)}
 .glass-input:focus{background:rgba(30,41,59,.75);border-color:rgba(96,165,250,.55);box-shadow:0 0 0 3px rgba(59,130,246,.14)}
 .stat-card{background:rgba(30,41,59,.8);border:1px solid rgba(255,255,255,.07)}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;min-height:2.6rem;padding:.25rem .9rem;border-radius:.75rem;font-weight:600;font-size:.875rem;border:1px solid transparent;transition:filter .15s ease,transform .1s ease;flex:none;cursor:pointer}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;min-width:0;max-width:100%;min-height:2.6rem;padding:.25rem .9rem;border-radius:.75rem;font-weight:600;font-size:.875rem;text-align:center;border:1px solid transparent;transition:filter .15s ease,transform .1s ease;flex:none;cursor:pointer}
 .btn:active{transform:scale(.98)}
 .btn-sm{min-height:2.1rem;padding:.15rem .7rem;font-size:.8rem;border-radius:.65rem}
 .btn-lg{min-height:3.25rem;font-size:1rem;border-radius:.9rem}
@@ -49,6 +49,7 @@ nowhere, users cannot tell long lists (clients, sales) continue below. */
 .btn-success{background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;box-shadow:0 6px 16px rgba(22,163,74,.3)}
 .btn-ghost{background:rgba(255,255,255,.07);color:#cbd5e1;border-color:rgba(255,255,255,.08)}
 .btn-ghost:hover{background:rgba(255,255,255,.12)}
+.receipt-paper{display:block;width:max-content;max-width:100%;margin:0 auto .75rem;padding:.85rem;border-radius:.75rem;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.08);color:#e5e7eb;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.5;white-space:pre;overflow-x:auto;box-sizing:border-box}
 .inp{display:block;width:100%;height:2.85rem;padding:0 .85rem;border-radius:.75rem;background:rgba(30,41,59,.55);border:1px solid rgba(255,255,255,.09);color:#f1f5f9;font-size:.9375rem;outline:none}
 .inp:focus{border-color:rgba(96,165,250,.55);box-shadow:0 0 0 3px rgba(59,130,246,.14)}
 select.inp{appearance:none;-webkit-appearance:none;padding-right:2.2rem;background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%2394a3b8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>');background-repeat:no-repeat;background-position:right .8rem center;background-size:.95rem}
@@ -104,6 +105,7 @@ body.day header{background:rgba(255,255,255,.93);border-bottom-color:rgba(15,23,
 body.day .glass,body.day .glass-card,body.day .stat-card{background:#fff;border-color:rgba(15,23,42,.09);box-shadow:0 1px 3px rgba(15,23,42,.08)}
 body.day .glass-input{background:#f1f5f9;border-color:rgba(15,23,42,.12)}
 body.day .btn-ghost{background:rgba(15,23,42,.05);color:#334155;border-color:rgba(15,23,42,.1)}
+body.day .receipt-paper{background:#f8fafc;border-color:rgba(15,23,42,.14);color:#0f172a}
 body.day .inp{background:#f8fafc;border-color:rgba(15,23,42,.14);color:#0f172a}
 body.day select.inp option{background:#fff;color:#0f172a}
 body.day .icon-nav{background:rgba(255,255,255,.96);border-top-color:rgba(15,23,42,.08)}
@@ -1335,8 +1337,9 @@ function navTap(view) {
     if (navModalOpen || currentView !== 'home') showView('home');
     return;
   }
-  // Fresh tab entry starts a clean sale (no leftover client preset).
-  if (view === 'sale') { try { saleClientPreset = null; saleRateClient = null; if (!cart.length) saleCartClient = ''; } catch (e) {} }
+  // Keep an in-progress cart attached to its client; only a truly empty
+  // sale starts clean.
+  if (view === 'sale') { try { saleRateClient = null; if (!cart.length) { saleClientPreset = null; saleCartClient = ''; } else if (saleCartClient) saleClientPreset = saleCartClient; } catch (e) {} }
   if (navModalOpen && currentView === view) { closeNavModal(); return; }
   showView(view);
 }
@@ -1437,8 +1440,8 @@ const LANG_STRINGS = {
     'sale.preview': 'Preview Receipt', 'sale.preview_title': 'Receipt preview',
     'sale.preview_note': 'PREVIEW — not saved yet',
     'sale.preview_ok': 'Looks good — back to sale',
-    'sale.switch_title': 'Switch client?', 'sale.switch_clear': 'Clear & switch', 'sale.switch_keep': 'Keep items',
-    'sale.switch_msg': '{n} item(s) in the cart are for someone else. Clear them and start fresh for {name}?', 'sale.cart_cleared': 'Cart cleared — fresh sale for {name}',
+    'sale.switch_title': 'Switch client?', 'sale.switch_clear': 'Start fresh', 'sale.switch_keep': 'Keep items & switch', 'sale.switch_cancel': 'Cancel',
+    'sale.switch_msg': '{n} item(s) are in the cart. Keep them for {name}, or start fresh?', 'sale.cart_cleared': 'Cart cleared — fresh sale for {name}',
     'sale.tender_title': 'Cash tendered', 'sale.tender_exact': 'Exact', 'sale.tender_clear': 'Clear',
     'sale.tender_custom_ph': 'Or type custom amount…',
     'sale.tendered': 'Tendered', 'sale.change': 'Change due', 'sale.dash': '—',
@@ -1633,11 +1636,15 @@ const LANG_STRINGS = {
     'cli.add': 'Add Client', 'cli.edit': 'Edit', 'cli.save': 'Save Client', 'cli.save_new_sale': 'Save & New Sale',
     'cli.add_title': 'Add Client', 'cli.edit_title': 'Edit Client',
     'cli.name': 'Name', 'cli.phone': 'Phone', 'cli.address': 'Address',
+    'cli.balance': 'Balance',
+    'cli.balance_hint': 'Correct what this client owes. New sales and payments still update it automatically.',
+    'cli.record_payment': 'Record payment',
     'cli.open_bal': 'Opening Balance (₱)',
     'cli.open_bal_hint': 'Debt the client already owes you when added. Leave 0 if none.',
     'cli.due': 'Due date',
     'cli.need_name': 'Enter the client name',
     'cli.added': 'Client added', 'cli.updated': 'Client updated',
+    'cli.queued': 'Client change queued - will sync when online',
     'cli.failed': 'Save failed: {msg}',
     'cli.load_fail': 'Could not load client: {msg}',
     'cli.history_sales': 'Sales', 'cli.history_pay': 'Payments',
@@ -1812,8 +1819,8 @@ const LANG_STRINGS = {
     'sale.preview': 'I-preview ang Resibo', 'sale.preview_title': 'Preview ng resibo',
     'sale.preview_note': 'PREVIEW — hindi pa na-save',
     'sale.preview_ok': 'Tama — bumalik sa benta',
-    'sale.switch_title': 'Palitan ang kliyente?', 'sale.switch_clear': 'Linisin at palitan', 'sale.switch_keep': 'Itago ang mga item',
-    'sale.switch_msg': 'May {n} item sa cart na para sa iba. Linisin at magsimula ng bago para kay {name}?', 'sale.cart_cleared': 'Nilinis ang cart — bagong benta para kay {name}',
+    'sale.switch_title': 'Palitan ang kliyente?', 'sale.switch_clear': 'Magsimula ng bago', 'sale.switch_keep': 'Itago at palitan', 'sale.switch_cancel': 'Kanselahin',
+    'sale.switch_msg': 'May {n} item sa cart. Itago para kay {name}, o magsimula ng bago?', 'sale.cart_cleared': 'Nilinis ang cart — bagong benta para kay {name}',
     'sale.tender_title': 'Iniabot na cash', 'sale.tender_exact': 'Sakto', 'sale.tender_clear': 'Burahin',
     'sale.tender_custom_ph': 'O mag-type ng ibang halaga…',
     'sale.tendered': 'Iniabot', 'sale.change': 'Sukli', 'sale.dash': '—',
@@ -2009,11 +2016,15 @@ const LANG_STRINGS = {
     'cli.add': 'Magdagdag ng Kliyente', 'cli.edit': 'I-edit', 'cli.save': 'I-save ang Kliyente', 'cli.save_new_sale': 'I-save at Bagong Benta',
     'cli.add_title': 'Magdagdag ng Kliyente', 'cli.edit_title': 'I-edit ang Kliyente',
     'cli.name': 'Pangalan', 'cli.phone': 'Phone', 'cli.address': 'Address',
+    'cli.balance': 'Balanse',
+    'cli.balance_hint': 'Itama ang utang ng kliyente. Awtomatiko pa ring nagbabago ito sa benta at bayad.',
+    'cli.record_payment': 'Magbayad',
     'cli.open_bal': 'Opening Balance (₱)',
     'cli.open_bal_hint': 'Utang na mayroon na ang kliyente pagdating. Mag-iwan ng 0 kung wala.',
     'cli.due': 'Takdang petsa',
     'cli.need_name': 'Ilagay ang pangalan ng kliyente',
     'cli.added': 'Nadagdag ang kliyente', 'cli.updated': 'Na-update ang kliyente',
+    'cli.queued': 'Naka-queue ang pagbabago - isi-sync pag online',
     'cli.failed': 'Nabigo ang pag-save: {msg}',
     'cli.load_fail': 'Hindi ma-load ang kliyente: {msg}',
     'cli.history_sales': 'Mga Benta', 'cli.history_pay': 'Mga Bayad',
@@ -2861,12 +2872,15 @@ async function openClientDetail(id) {
       </div>
       <button onclick="closeQuick()" aria-label="Close" class="w-9 h-9 rounded-xl btn-ghost flex items-center justify-center text-gray-400 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
-    <div class="grid grid-cols-3 gap-2 mb-3">
+    <div class="grid grid-cols-2 gap-2 mb-2">
       <button onclick="renderClientForm(${JSON.stringify(c.id)})" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>${T('cli.edit')}</button>
       <button onclick="shareClientStatement()" class="btn btn-ghost btn-sm">📤 ${T('cli.statement')}</button>
-      <button id="redeem-btn" onclick="redeemClientPoints(${JSON.stringify(c.id)})" class="btn btn-sm" style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.5);color:#fbbf24"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>${T('cli.redeem')}</button>
     </div>
-    <button onclick="closeQuick();showView('sale', ${JSON.stringify(c.id)})" class="btn btn-primary w-full mb-3"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>New sale for ${esc(c.name)}</button>
+    ${(c.loyaltyPoints || 0) >= 100 ? `<button id="redeem-btn" onclick="redeemClientPoints(${JSON.stringify(c.id)})" class="btn btn-sm w-full mb-2" style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.5);color:#fbbf24"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>${T('cli.redeem')}</button>` : ''}
+    <div class="grid grid-cols-2 gap-2 mb-3">
+      <button onclick="closeQuick();showView('pay', ${JSON.stringify(c.id)})" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>${T('cli.record_payment')}</button>
+      <button onclick="closeQuick();showView('sale', ${JSON.stringify(c.id)})" class="btn btn-primary btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>${T('sale.new')}</button>
+    </div>
     ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button id="client-del-btn" onclick="deleteClient(${JSON.stringify(c.id)})" class="btn btn-sm w-full mb-3" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);color:#f87171">🗑 Delete client</button>` : ''}
     <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">${T('cli.history_sales')}</h4>
     <div class="space-y-1.5 mb-3">
@@ -2910,11 +2924,11 @@ function renderClientForm(id) {
               <input id="cf-due" type="date" value="${escAttr(c?.dueDate || '')}" class="inp" />
             </div>
           </div>
-          ${id ? '' : `<div>
-            <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('cli.open_bal')}</label>
-            <input id="cf-balance" type="number" step="0.01" min="0" value="0" class="inp" />
-            <p class="text-[11px] text-gray-600 mt-1">${T('cli.open_bal_hint')}</p>
-          </div>`}
+          <div>
+            <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${id ? T('cli.balance') : T('cli.open_bal')}</label>
+            <input id="cf-balance" type="number" step="0.01" min="0" value="${escAttr(String(id ? (c?.balance || 0) : 0))}" class="inp" />
+            <p class="text-[11px] text-gray-600 mt-1">${id ? T('cli.balance_hint') : T('cli.open_bal_hint')}</p>
+          </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('cli.address')}</label>
             <input id="cf-address" type="text" maxlength="200" value="${escAttr(c?.address || '')}" class="inp" />
@@ -2945,21 +2959,27 @@ async function submitClientForm(id, andSale) {
     address: ((document.getElementById('cf-address') || {}).value || '').trim(),
     dueDate: (document.getElementById('cf-due') || {}).value || ''
   };
-  // Opening balance only on create: the client walks in already owing this.
-  // (Editing recorded debt stays a desktop job.)
-  if (!id) {
-    const balEl = document.getElementById('cf-balance');
-    const opening = parseFloat(balEl && balEl.value);
-    body.balance = isFinite(opening) ? Math.max(0, opening) : 0;
-  }
+  // Opening balance on create, or a manual correction on edit. Normal sales
+  // and payments still update the balance automatically.
+  const balEl = document.getElementById('cf-balance');
+  const balance = parseFloat(balEl && balEl.value);
+  body.balance = isFinite(balance) ? Math.max(0, balance) : 0;
   const scEl = document.getElementById('cf-sc');
   const pwdEl = document.getElementById('cf-pwd');
   body.isSC = !!(scEl && scEl.checked);
   body.isPWD = !!(pwdEl && pwdEl.checked);
   let newId = null;
   try {
-    if (id) await apiPost('/api/clients/' + encodeURIComponent(id), body, 'PUT');
-    else { const r = await apiPost('/api/clients', body); newId = r && r.id; }
+    const r = id
+      ? await apiPost('/api/clients/' + encodeURIComponent(id), body, 'PUT')
+      : await apiPost('/api/clients', body);
+    if (r && r.queued) {
+      closeQuick();
+      toast(T('cli.queued'), 'ok');
+      if (currentView === 'clients') renderClients();
+      return;
+    }
+    if (!id) newId = r && r.id;
     closeQuick();
     toast(id ? T('cli.updated') : T('cli.added'), 'ok');
     await refreshAll();
@@ -3214,7 +3234,7 @@ async function quickSell(id) {
 // New Sale button). Replaces the dead preselectedId reference.
 let saleClientPreset = null;
 let saleRateClient = null; // client key whose rate was last bulk-applied to lines
-let saleCartClient = ''; // who the current cart items are for ('' = walk-in); switching asks first
+let saleCartClient = ''; // who the current cart items are for ('' = walk-in); switching asks whether to keep them
 function renderSale(presetId) {
   if (presetId !== undefined && presetId !== null && presetId !== '') {
     // An explicit "New sale for X" starts fresh: items rung up for a
@@ -3402,39 +3422,55 @@ function saleRateAll() {
   saleTotals();
 }
 function clientOptions() {
-  return '<option value="">' + T('sale.walkin') + '</option>' + data.clients.map(c => '<option value="' + c.id + '"' + (saleClientPreset != null && String(c.id) === String(saleClientPreset) ? ' selected' : '') + '>' + esc(c.name) + ' — ' + peso(c.balance) + '</option>').join('');
+  const picked = saleClientPreset != null ? saleClientPreset : saleCartClient;
+  return '<option value="">' + T('sale.walkin') + '</option>' + data.clients.map(c => '<option value="' + c.id + '"' + (picked != null && String(c.id) === String(picked) ? ' selected' : '') + '>' + esc(c.name) + ' — ' + peso(c.balance) + '</option>').join('');
 }
-// Manual client switch with items in the cart: the old items were rung up
-// for someone else, so ask before wiping them. Programmatic presets bypass
-// this (renderSale handles those itself).
+// Manual client switch with items in the cart: let the cashier keep those
+// items for the new client or start fresh. Never silently discard work.
 function saleClientChanged() {
   const sel = document.getElementById('sale-client');
   const nid = sel && sel.value ? String(sel.value) : '';
-  if (!cart.length || String(saleCartClient || '') === nid) { applyClientRate(); return; }
+  if (!cart.length || String(saleCartClient || '') === nid) {
+    saleCartClient = nid;
+    saleClientPreset = nid || null;
+    applyClientRate();
+    return;
+  }
   const c = (data.clients || []).find(x => String(x.id) === nid);
   const n = cart.reduce((s, i) => s + (i.qty || 1), 0);
   document.getElementById('modal-root').innerHTML = `
-    <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)keepSwitchClient()">
+    <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)cancelSwitchClient()">
       <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-5 pb-6 slide-up glass-card" style="max-height:94vh;max-height:94dvh;overflow-y:auto" onclick="event.stopPropagation()">
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
         <h3 class="font-bold text-gray-100 text-base mb-2">${T('sale.switch_title')}</h3>
         <p class="text-sm text-gray-400 mb-4">${esc(T('sale.switch_msg', { n, name: c ? c.name : T('sale.walkin') }))}</p>
-        <button onclick="doSwitchClient()" class="btn btn-primary btn-lg mb-2">${T('sale.switch_clear')}</button>
-        <button onclick="keepSwitchClient()" class="btn btn-ghost btn-lg">${T('sale.switch_keep')}</button>
+        <button onclick="keepSwitchClient()" class="btn btn-primary btn-lg mb-2">${T('sale.switch_keep')}</button>
+        <button onclick="doSwitchClient()" class="btn btn-ghost btn-lg mb-2" style="color:#fca5a5;border-color:rgba(239,68,68,.35)">${T('sale.switch_clear')}</button>
+        <button onclick="cancelSwitchClient()" class="btn btn-ghost btn-lg">${T('sale.switch_cancel')}</button>
       </div>
     </div>`;
+}
+function switchSaleClient(nid, clearCart) {
+  cart = clearCart ? [] : cart;
+  if (clearCart) tendered = 0;
+  saleCartClient = nid;
+  saleClientPreset = nid || null;
+  saleRateClient = null;
+  if (clearCart) { try { updateCartUI(); } catch (e) {} }
+  closeQuick();
+  renderSale();
 }
 function doSwitchClient() {
   const sel = document.getElementById('sale-client');
   const nid = sel && sel.value ? String(sel.value) : '';
-  cart = []; tendered = 0;
-  saleCartClient = nid;
-  saleClientPreset = nid || null;
-  try { updateCartUI(); } catch (e) {}
-  closeQuick();
-  renderSale();
+  switchSaleClient(nid, true);
 }
 function keepSwitchClient() {
+  const sel = document.getElementById('sale-client');
+  const nid = sel && sel.value ? String(sel.value) : '';
+  switchSaleClient(nid, false);
+}
+function cancelSwitchClient() {
   const sel = document.getElementById('sale-client');
   if (sel) sel.value = saleCartClient || '';
   closeQuick();
@@ -4018,7 +4054,7 @@ function invListHTML(items) {
       </div>
       <button onclick="openQuick(${i.id})" class="btn btn-sm ${stock <= 0 ? 'btn-ghost text-gray-500 cursor-not-allowed' : 'btn-primary'}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>${T('home.sell')}</button>
       <button onclick="photoForItem(${JSON.stringify(i.id)})" title="${esc(T('photo.take'))}" class="btn btn-ghost btn-sm px-2">📷</button>
-      <button onclick="renderItemForm(${JSON.stringify(i.id)})" title="${esc(T('inv.edit'))}" class="btn btn-ghost btn-sm px-2">✏️</button>
+      ${phoneRole() === 'cashier' ? '' : `<button onclick="renderItemForm(${JSON.stringify(i.id)})" title="${esc(T('inv.edit'))}" class="btn btn-ghost btn-sm px-2">✏️</button>`}
     </div>`;
   }).join('');
 }
@@ -4095,6 +4131,7 @@ async function loadValuation() {
   } catch (e) {}
 }
 function renderItemForm(id) {
+  if (phoneRole() === 'cashier') return toast(T('nav.owner_only'), 'err');
   const it = id ? (data.inventory || []).find(i => String(i.id) === String(id)) : null;
   const vs = (it && it.variants) || [];
   document.getElementById('modal-root').innerHTML = `
@@ -4516,7 +4553,7 @@ function showReceiptPreview(t, opts) {
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
         <h3 class="font-bold text-gray-100 text-sm mb-3 flex items-center gap-2"><span class="icon-tile bg-blue-500/15 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>${draft ? esc(T('sale.preview_title')) : esc(t.invoiceNo || 'Receipt')}</h3>
         ${draft ? `<p class="text-[11px] font-semibold uppercase tracking-wider text-amber-400 mb-2">${esc(T('sale.preview_note'))}</p>` : ''}
-        <pre class="text-gray-200 rounded-xl p-3 mb-3" style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.5;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.08);overflow-x:auto;white-space:pre">${esc(L.join('\n'))}</pre>
+        <pre class="receipt-paper">${esc(L.join('\n'))}</pre>
         ${draft
           ? `<button onclick="closeQuick()" class="btn btn-primary w-full">${esc(T('sale.preview_ok'))}</button>`
           : `<div class="grid grid-cols-2 gap-2">

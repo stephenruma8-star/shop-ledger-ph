@@ -263,6 +263,18 @@ try {
   const gridHtml = getEl('client-grid').innerHTML;
   ok(gridHtml.includes('Juan Dela Cruz') && !gridHtml.includes('Maria Santos'), 'client search filters');
 
+  // client edit exposes and submits the balance correction
+  gcall(`renderClientForm(1)`);
+  ok(getEl('modal-root').innerHTML.includes('cf-balance'), 'client edit exposes balance field');
+  getEl('cf-name').value = 'Maria Santos';
+  getEl('cf-balance').value = '300.25';
+  const beforeClientPut = posts.length;
+  await gcall(`submitClientForm(1)`);
+  const cliPut = posts.slice(beforeClientPut).find(p => p.path === '/api/clients/1');
+  ok(cliPut && cliPut.body.balance === 300.25, 'client edit submits balance');
+  getEl('cf-name').value = '';
+  getEl('cf-balance').value = '0';
+
   // sale route (empty cart)
   gcall(`showView('sale')`);
   const saleHtml = getEl('view').innerHTML;
@@ -677,7 +689,7 @@ try {
   ok(posts.length === cliBefore + 1 && posts[cliBefore].path === '/api/clients', 'client add posts to the API');
   ok(posts[cliBefore].body.balance === 450, 'opening balance sent with client create');
   gcall(`renderClientForm(1)`);
-  ok(!getEl('modal-root').innerHTML.includes('cf-balance'), 'client edit form hides opening balance (debt edits stay on desktop)');
+  ok(getEl('modal-root').innerHTML.includes('cf-balance'), 'client edit form exposes balance');
   await gcall(`openClientDetail(1)`);
   ok(getEl('client-detail-body').innerHTML.includes('Maria Santos'), 'client detail shows history');
   const redBefore = posts.length;

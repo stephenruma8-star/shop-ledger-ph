@@ -47,7 +47,7 @@ function invListHTML(items) {
       </div>
       <button onclick="openQuick(${i.id})" class="btn btn-sm ${stock <= 0 ? 'btn-ghost text-gray-500 cursor-not-allowed' : 'btn-primary'}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>${T('home.sell')}</button>
       <button onclick="photoForItem(${JSON.stringify(i.id)})" title="${esc(T('photo.take'))}" class="btn btn-ghost btn-sm px-2">📷</button>
-      <button onclick="renderItemForm(${JSON.stringify(i.id)})" title="${esc(T('inv.edit'))}" class="btn btn-ghost btn-sm px-2">✏️</button>
+      ${phoneRole() === 'cashier' ? '' : `<button onclick="renderItemForm(${JSON.stringify(i.id)})" title="${esc(T('inv.edit'))}" class="btn btn-ghost btn-sm px-2">✏️</button>`}
     </div>`;
   }).join('');
 }
@@ -124,6 +124,7 @@ async function loadValuation() {
   } catch (e) {}
 }
 function renderItemForm(id) {
+  if (phoneRole() === 'cashier') return toast(T('nav.owner_only'), 'err');
   const it = id ? (data.inventory || []).find(i => String(i.id) === String(id)) : null;
   const vs = (it && it.variants) || [];
   document.getElementById('modal-root').innerHTML = `

@@ -281,8 +281,8 @@ function createLanApiRouter(deps) {
   }));
 
   // Client add/edit from phones (counter work: names, phones, addresses).
-  // Balance may be set ONCE at creation as the client's opening debt; later
-  // edits still cannot touch it — only the desktop adjusts recorded debt.
+  // Balance is set as opening debt on create and may be corrected on edit;
+  // normal sales/payments remain the automatic source of balance changes.
   router.post('/api/clients', wrap(async (req, res) => {
     const b = req.body || {};
     const name = String(b.name || '').trim();
@@ -309,7 +309,11 @@ function createLanApiRouter(deps) {
     if (!name) return res.status(400).json({ error: 'Client name required' });
     if (name.length > 80) return res.status(400).json({ error: 'Name too long (max 80)' });
     if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
-    const ok = JSON.parse(await deps.rendererExec(`JSON.stringify((async()=>{const c=await dbGet('clients',${JSON.stringify(req.params.id)});if(!c)return false;c.name=${JSON.stringify(name)};c.phone=${JSON.stringify(String(b.phone || '').trim().slice(0, 20))};c.address=${JSON.stringify(String(b.address || '').trim().slice(0, 200))};c.dueDate=${JSON.stringify(String(b.dueDate || '').slice(0, 10))};c.isSC=${!!b.isSC};c.isPWD=${!!b.isPWD};await dbPut('clients',c);return true;})())`));
+    const rawBalance = parseFloat(b.balance);
+    const hasBalance = b.balance !== undefined && b.balance !== null && b.balance !== '' && isFinite(rawBalance);
+    const balance = hasBalance ? Math.max(-1e9, Math.min(1e9, rawBalance)) : null;
+    const setBalance = hasBalance ? `c.balance=${JSON.stringify(balance)};` : '';
+    const ok = JSON.parse(await deps.rendererExec(`JSON.stringify((async()=>{const c=await dbGet('clients',${JSON.stringify(req.params.id)});if(!c)return false;c.name=${JSON.stringify(name)};c.phone=${JSON.stringify(String(b.phone || '').trim().slice(0, 20))};c.address=${JSON.stringify(String(b.address || '').trim().slice(0, 200))};c.dueDate=${JSON.stringify(String(b.dueDate || '').slice(0, 10))};c.isSC=${!!b.isSC};c.isPWD=${!!b.isPWD};${setBalance}await dbPut('clients',c);return true;})())`));
     if (!ok) return res.status(404).json({ error: 'Client not found' });
     try { await deps.rendererExec(`(async()=>{try{await logAudit('client-edit','Updated client ' + ${JSON.stringify(name)} + ${JSON.stringify(devTag(req))});}catch(e){}})()`); } catch (e) {}
     deps.notify({ source: 'api', kind: 'client' });

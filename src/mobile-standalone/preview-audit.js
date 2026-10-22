@@ -45,10 +45,43 @@ async function runStandaloneAudit() {
     await A('render:' + vw, async () => { showView(vw); await new Promise(r => setTimeout(r, 30)); auditViewHasContent(vw); });
   }
   // detail + modal flows
-  await A('client-detail', async () => { await openClientDetail(1); });
+  await A('client-detail', async () => {
+    await openClientDetail(1);
+    const h = (document.getElementById('client-detail-body') || {}).innerHTML || '';
+    if (h.includes('grid-cols-3')) throw new Error('client actions still cramped in 3 columns');
+    if (!h.includes('Record payment') && !h.includes('Magbayad')) throw new Error('no record-payment action');
+  });
   await A('txn-detail', async () => { const t = (data.transactions || [])[0]; await openTxnDetail(t.invoiceNo || t.id); });
-  await A('receipt-preview', async () => { const t = (data.transactions || [])[0]; await previewReceiptTxn(t.invoiceNo || t.id); });
+  await A('receipt-preview', async () => {
+    const t = (data.transactions || [])[0];
+    await previewReceiptTxn(t.invoiceNo || t.id);
+    const pre = document.querySelector('.receipt-paper');
+    if (!pre) throw new Error('receipt paper wrapper missing');
+    const pr = pre.getBoundingClientRect(), hp = pre.parentElement, hr = hp.getBoundingClientRect();
+    const center = hr.left + hp.clientLeft + hp.clientWidth / 2;
+    if (Math.abs((pr.left + pr.right) / 2 - center) > 2) throw new Error('receipt paper is not centered');
+  });
   await A('item-form', async () => { const it = (data.inventory || [])[0]; renderItemForm(it.id); });  await A('client-form', async () => { renderClientForm(null); });
+  await A('client-edit-balance', async () => {
+    const r = await apiPost('/api/clients', { name: 'Audit Edit', balance: 50 });
+    await loadAll();
+    renderClientForm(r.id);
+    const inp = document.getElementById('cf-balance');
+    if (!inp) throw new Error('edit form has no balance field');
+    if (Number(inp.value) !== 50) throw new Error('balance not prefilled, got ' + inp.value);
+    inp.value = '275.50';
+    await submitClientForm(r.id);
+    await new Promise(res => setTimeout(res, 30));
+    const c = (data.clients || []).find(x => String(x.id) === String(r.id));
+    if (!c || Number(c.balance) !== 275.5) throw new Error('edited balance not saved, got ' + (c && c.balance));
+    const detail = (document.getElementById('client-detail-body') || {}).textContent || '';
+    if (!detail.includes('275.50')) throw new Error('edited balance not shown in detail');
+    closeQuick();
+    showView('clients');
+    const grid = (document.getElementById('client-grid') || {}).innerHTML || '';
+    if (!grid.includes('275.50')) throw new Error('edited balance not shown on client card');
+    showView('home');
+  });
   await A('po-sheet', async () => { addPO(); });
   await A('presets-manager', async () => { showView('sale'); managePresets(); });
   await A('debt-form-setup', async () => { showView('debts'); openDebtFormSetup(); });
@@ -139,7 +172,7 @@ async function runStandaloneAudit() {
     showView('clients');
     const h = (document.getElementById('sheet-body') || document.body).innerHTML;
     const addAt = h.indexOf('renderClientForm(null)');
-    const debtsAt = h.indexOf('cli.total_debts');
+    const debtsAt = h.indexOf(T('cli.total_debts'));
     if (addAt < 0 || debtsAt < 0) throw new Error('clients header parts missing');
     if (!(addAt < debtsAt)) throw new Error('add-client must sit above total-debts');
     if (typeof autoPreUpdateBackup !== 'function') throw new Error('no auto-backup fn');
@@ -202,20 +235,35 @@ async function runStandaloneAudit() {
     showView('sale');
     cart.push({ invId: null, name: 'Audit Switch', qty: 1, price: 5 });
     saleCartClient = ids[0];
+    saleClientPreset = ids[0];
     const sel = document.getElementById('sale-client');
     sel.value = ids[1];
     saleClientChanged();
-    if (!document.getElementById('modal-root').innerHTML.includes('doSwitchClient')) throw new Error('no switch confirm');
-    doSwitchClient();
-    if (cart.length !== 0) throw new Error('switch did not clear cart');
-    if (String(document.getElementById('sale-client').value) !== ids[1]) throw new Error('switch lost new client');
-    cart.push({ invId: null, name: 'Audit Keep', qty: 1, price: 7 });
-    saleCartClient = ids[1];
-    document.getElementById('sale-client').value = ids[0];
-    saleClientChanged();
+    const modal = document.getElementById('modal-root').innerHTML;
+    if (!modal.includes('doSwitchClient') || !modal.includes('keepSwitchClient')) throw new Error('no switch choices');
     keepSwitchClient();
     if (cart.length !== 1) throw new Error('keep path dropped items');
-    if (String(document.getElementById('sale-client').value) !== ids[1]) throw new Error('keep path did not revert client');
+    if (String(document.getElementById('sale-client').value) !== ids[1]) throw new Error('keep path lost new client');
+    if (String(saleCartClient) !== ids[1]) throw new Error('keep path did not bind cart to new client');
+    document.getElementById('sale-client').value = ids[0];
+    saleClientChanged();
+    doSwitchClient();
+    if (cart.length !== 0) throw new Error('start-fresh path did not clear cart');
+    if (String(document.getElementById('sale-client').value) !== ids[0]) throw new Error('start-fresh lost new client');
+    cart = [];
+    showView('home');
+  });
+  await A('sale-nav-keeps-items', async () => {
+    const c = (data.clients || [])[0];
+    if (!c) throw new Error('no demo client');
+    showView('sale', c.id);
+    cart.push({ invId: null, name: 'Audit Nav Keep', qty: 1, price: 9 });
+    saleCartClient = String(c.id);
+    showView('home');
+    navTap('sale');
+    if (cart.length !== 1) throw new Error('navigation dropped cart items');
+    const sel = document.getElementById('sale-client');
+    if (!sel || String(sel.value) !== String(c.id)) throw new Error('navigation lost selected client');
     cart = [];
     showView('home');
   });
@@ -267,6 +315,7 @@ async function runStandaloneAudit() {
     const inv = (data.inventory || []).find(i => (i.stock || 0) > 0);
     if (!inv) throw new Error('no stock for settle fixture');
     const s = await apiPost('/api/sales', { clientId: r.id, items: [{ description: 'Audit Settle Item', qty: 1, unitCost: 77, intRate: 0, invId: inv.id }], paymentMethod: 'GCash' });
+    await loadAll();
     await openTxnDetail(s.invoiceNo);
     if (!document.getElementById('txn-detail-body').innerHTML.includes('settleTxnLine')) throw new Error('no settle button');
     settleTxnLine(s.invoiceNo, 0);
@@ -319,16 +368,19 @@ async function runStandaloneAudit() {
     showView('home');
   });
   await A('cashier-gates', async () => {
-    let prev = null;
-    try { prev = localStorage.getItem('slpRole'); localStorage.setItem('slpRole', 'cashier'); } catch (e) {}
-    showView('inventory');
-    if (document.getElementById('view').innerHTML.includes('renderItemForm(')) throw new Error('cashier sees item add');
-    showView('debts');
-    if (document.getElementById('view').innerHTML.includes('openDebtFormSetup(')) throw new Error('cashier sees debt form');
-    showView('suppliers');
-    if (currentView === 'suppliers') throw new Error('cashier reached suppliers');
-    try { if (prev == null) localStorage.removeItem('slpRole'); else localStorage.setItem('slpRole', prev); } catch (e) {}
-    showView('home');
+    const realRole = phoneRole;
+    try {
+      phoneRole = () => 'cashier';
+      showView('inventory');
+      if (document.getElementById('view').innerHTML.includes('renderItemForm(')) throw new Error('cashier sees item add');
+      showView('debts');
+      if (document.getElementById('view').innerHTML.includes('openDebtFormSetup(')) throw new Error('cashier sees debt form');
+      showView('suppliers');
+      if (currentView === 'suppliers') throw new Error('cashier reached suppliers');
+    } finally {
+      phoneRole = realRole;
+      showView('home');
+    }
   });
   await A('quoted-names-roundtrip', async () => {
     const nm = `O'Brien "Jr"`;
@@ -449,7 +501,8 @@ async function runStandaloneAudit() {
       try { await backupDecrypt(enc, 'wrong'); } catch (e) { threw = true; }
       if (!threw) throw new Error('wrong password accepted');
     })();
-    await Promise.race([work, timeout]);
+    const outcome = await Promise.race([work.then(() => 'ok'), timeout.then(() => 'timeout', () => 'timeout')]);
+    if (outcome !== 'ok') return;
   });
   await A('csv-exports', async () => {
     for (const p of ['/api/reports/export.csv', '/api/payments/export.csv', '/api/inventory/export.csv']) {
