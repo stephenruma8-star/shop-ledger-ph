@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.4",
+    "version":  "3.37.5",
     "buildDate":  "2026-10-22T00:00:00.000Z",
-    "notes":  "Desktop fixes: client Edit, Payment, Print, and Statement buttons now open their dialogs and print previews correctly. Modal transitions no longer wipe the next dialog."
+    "notes":  "Phone sale drafts: per-client carts are saved and restored when switching clients or leaving New Sale, with resume/delete controls and merge-on-keep so no cart is silently lost. Includes the 3.37.4 client action and print-preview fixes."
 }
