@@ -505,6 +505,25 @@ try {
   ok(!/Bal: ₱(500|600)\.00/.test(histHtml), 'cash sale does not inflate the running balance');
   eq((histHtml.match(/Bal: ₱100\.00/g) || []).length, 4, 'running balance stays ₱100.00 through the cash sale (both tabs)');
 
+  // client detail actions: closeModal() then open the next dialog in one click
+  win.state.clients = await win.dbAll('clients');
+  win.closeModal();
+  win.openClientModal(histId);
+  await new Promise(r => setTimeout(r, 260));
+  const editHtml = document.getElementById('modal-root').innerHTML;
+  ok(editHtml.includes('Edit Client'), 'client Edit action survives the modal close animation');
+  ok(editHtml.includes('value="History Cash"'), 'client Edit action opens the selected client');
+
+  win.closeModal();
+  await win.recordClientPayment(histId);
+  await new Promise(r => setTimeout(r, 260));
+  ok(document.getElementById('modal-root').innerHTML.includes('Payment — History Cash'), 'client Payment action survives the modal close animation');
+
+  const infoWinsBefore = printWindows.length;
+  await win.printClientInfo(histId);
+  eq(printWindows.length, infoWinsBefore + 1, 'client Print action opens a print window');
+  ok((printWindows[printWindows.length - 1].__html || '').includes('INV-H1'), 'client Print window includes the client history');
+
   // statement print: cash sale row listed, running balance untouched
   win.state.clients = await win.dbAll('clients');
   const stmtWinsBefore = printWindows.length;

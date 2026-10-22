@@ -405,10 +405,7 @@ export function printClientStatement(id) {
 
   function amt(n) { return '₱' + Number(n || 0).toFixed(2); }
 
-  let html = `<!DOCTYPE html><html><head><style>
-    body { font-family: Calibri, 'Segoe UI', Arial, sans-serif; padding: 40px; color: #000; background: #fff; }
-    ${excelTableCss()}
-  </style></head><body>
+  let html = `
     <div class="excel-sheet-head">
       <div class="excel-sheet-title">Client Statement — ${escapeHtml(c.name)}</div>
       <div class="excel-sheet-sub">${escapeHtml(c.phone || '')}</div>
@@ -428,18 +425,13 @@ export function printClientStatement(id) {
   }
 
   html += `<tr class="excel-total"><td colspan="5">Outstanding Balance</td><td class="num">${amt(c.balance || 0)}</td></tr>`;
-  html += `</tbody></table></body></html>`;
+  html += `</tbody></table>`;
 
-  if (window.electronAPI && window.electronAPI.printStatement) {
-    window.electronAPI.printStatement(html);
-  } else {
-    const printWin = window.open('', '_blank', 'width=800,height=600');
-    if (printWin) { printWin.document.write(html); printWin.document.close(); }
-  }
+  openPrintWindow('Client Statement - ' + c.name, 900, 800, html, { extraCss: excelTableCss() });
 }
 
-export async function printClientInfo(id) {
-  const c = await dbGet('clients', id);
+export function printClientInfo(id) {
+  const c = state.clients.find(x => x.id === id);
   if (!c) { toast('Client not found', 'error'); return; }
   const txns = filterByYear(state.transactions.filter(t => t.clientId === id), 'date').sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
   const pays = filterByYear(state.payments.filter(p => p.clientId === id), 'date').sort((a, b) => new Date(a.date || a.createdAt) - new Date(b.date || b.createdAt));

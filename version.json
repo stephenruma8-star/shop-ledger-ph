@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.3",
-    "buildDate":  "2026-10-21T00:00:00.000Z",
-    "notes":  "Phone updater fixes: paired phones now look for mobile releases instead of the desktop release, and standalone update buttons download again."
+    "version":  "3.37.4",
+    "buildDate":  "2026-10-22T00:00:00.000Z",
+    "notes":  "Desktop fixes: client Edit, Payment, Print, and Statement buttons now open their dialogs and print previews correctly. Modal transitions no longer wipe the next dialog."
 }

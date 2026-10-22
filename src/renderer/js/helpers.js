@@ -503,10 +503,12 @@ export function confetti() {
 }
 
 let _lastFocused = null;
+let _modalCloseTimer = null;
 const _focusableSel = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 export function modal(html) {
   const root = document.getElementById('modal-root');
   if (!root) return;
+  if (_modalCloseTimer) { clearTimeout(_modalCloseTimer); _modalCloseTimer = null; }
   try { _lastFocused = document.activeElement; } catch (e) { _lastFocused = null; }
   root.innerHTML = `<div class="fixed inset-0 bg-black/50 z-[400] flex items-start justify-center pt-4 overflow-auto fade-in" onclick="if(event.target===this)closeModal()"><div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-[90vw] mx-4 mb-4 modal-enter max-h-[95vh] overflow-auto glass-strong" onclick="event.stopPropagation()">${html}</div></div>`;
   try {
@@ -543,11 +545,15 @@ export function closeModal() {
   _lastFocused = null;
   const root = document.getElementById('modal-root');
   if (!root) return;
+  if (_modalCloseTimer) { clearTimeout(_modalCloseTimer); _modalCloseTimer = null; }
   const inner = root.querySelector('.modal-enter');
   if (inner) {
     inner.classList.remove('modal-enter');
     inner.classList.add('modal-exit');
-    setTimeout(() => { root.innerHTML = ''; }, 200);
+    _modalCloseTimer = setTimeout(() => {
+      _modalCloseTimer = null;
+      root.innerHTML = '';
+    }, 200);
   } else {
     root.innerHTML = '';
   }
