@@ -4,18 +4,65 @@
 let saleClientPreset = null;
 let saleRateClient = null; // client key whose rate was last bulk-applied to lines
 let saleCartClient = ''; // who the current cart items are for ('' = walk-in); switching asks whether to keep them
+const SALE_DRAFTS_KEY = 'slpSaleDrafts';
+let saleDrafts = {};
+try {
+  const savedDrafts = JSON.parse(localStorage.getItem(SALE_DRAFTS_KEY) || '{}');
+  if (savedDrafts && typeof savedDrafts === 'object' && !Array.isArray(savedDrafts)) saleDrafts = savedDrafts;
+} catch (e) {}
+function saleKey(id) { return id === undefined || id === null ? '' : String(id); }
+function persistSaleDrafts() {
+  try { localStorage.setItem(SALE_DRAFTS_KEY, JSON.stringify(saleDrafts)); } catch (e) {}
+}
+function saveSaleDraft(id) {
+  const key = saleKey(id);
+  if (!cart.length) return;
+  saleDrafts[key] = { cart: cart.map(line => ({ ...line })) };
+  persistSaleDrafts();
+}
+function restoreSaleDraft(id) {
+  const key = saleKey(id);
+  const draft = saleDrafts[key];
+  cart = draft && Array.isArray(draft.cart) ? draft.cart.map(line => ({ ...line })) : [];
+  if (draft) { delete saleDrafts[key]; persistSaleDrafts(); }
+  tendered = 0;
+  return cart.length;
+}
+function clearSaleDraft(id) {
+  delete saleDrafts[saleKey(id)];
+  persistSaleDrafts();
+}
+function saleDraftKeys() {
+  return Object.keys(saleDrafts).filter(key => saleDrafts[key] && Array.isArray(saleDrafts[key].cart) && saleDrafts[key].cart.length);
+}
+function saleDraftName(key) {
+  if (key === '') return T('sale.walkin');
+  const c = (data.clients || []).find(x => String(x.id) === String(key));
+  return c ? c.name : '#' + key;
+}
 function renderSale(presetId) {
   if (presetId !== undefined && presetId !== null && presetId !== '') {
-    // An explicit "New sale for X" starts fresh: items rung up for a
-    // DIFFERENT client must not leak into the new client's sale. Untouched
-    // walk-in drafts are adopted, not wiped.
-    if (cart.length && saleCartClient && String(saleCartClient) !== String(presetId)) {
-      cart = []; tendered = 0;
-      const nc = (data.clients || []).find(x => String(x.id) === String(presetId));
-      try { toast(T('sale.cart_cleared', { name: nc ? nc.name : '' }), 'info'); } catch (e) {}
+    const currentKey = saleKey(saleCartClient);
+    const nextKey = saleKey(presetId);
+    if (currentKey !== nextKey) {
+      const walkInCart = !currentKey && cart.length > 0;
+      if (currentKey) saveSaleDraft(currentKey);
+      saleClientPreset = presetId;
+      saleCartClient = nextKey;
+      if (walkInCart) {
+        const targetDraft = saleDrafts[nextKey];
+        if (targetDraft && Array.isArray(targetDraft.cart) && targetDraft.cart.length) {
+          cart = targetDraft.cart.map(line => ({ ...line })).concat(cart);
+          delete saleDrafts[nextKey];
+          persistSaleDrafts();
+        }
+        tendered = 0;
+      } else {
+        restoreSaleDraft(nextKey);
+      }
+    } else {
+      saleClientPreset = presetId;
     }
-    saleClientPreset = presetId;
-    saleCartClient = String(presetId);
   }
   const v = document.getElementById('view');
   if (!cart.length) tendered = 0;
@@ -48,6 +95,7 @@ function renderSale(presetId) {
       <div id="counter-results" class="grid gap-1.5 mt-1.5"></div>
     </div>
     ${(data.quickItems || []).length ? `<div class="flex gap-1.5 mb-3 fade-in overflow-x-auto" style="scrollbar-width:none">${data.quickItems.slice(0, 12).map((q, qi) => `<button onclick="quickAddItem(${qi})" class="shrink-0 px-3 py-2 rounded-xl text-xs font-semibold" style="background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);color:#93c5fd">${esc(q.name)} · ${peso(q.price)}</button>`).join('')}${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button onclick="managePresets()" class="shrink-0 px-3 py-2 rounded-xl text-xs font-semibold" style="background:rgba(255,255,255,.06);border:1px dashed rgba(255,255,255,.2);color:#94a3b8">⚙️ Presets</button>` : ''}</div>` : ''}
+    ${saleDraftBanner()}
     ${lastFailedSale ? `<button onclick="retrySale()" class="btn w-full mb-3 py-2.5 rounded-xl font-semibold text-sm fade-in" style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.5);color:#fbbf24"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>${T('sale.retry')}</button>` : ''}
     <div class="glass-card rounded-2xl p-2 mb-3 fade-in">
       ${cart.length ? cart.map((i, idx) => {
@@ -190,6 +238,69 @@ function saleRateAll() {
   });
   saleTotals();
 }
+function saleDraftBanner() {
+  const keys = saleDraftKeys();
+  if (!keys.length) return '';
+  const items = keys.reduce((sum, key) => sum + saleDrafts[key].cart.reduce((n, line) => n + (line.qty || 1), 0), 0);
+  return `<button onclick="openSaleDrafts()" class="btn btn-ghost w-full mb-3" style="border-style:dashed"><span>${T('sale.drafts_n', { n: items })}</span><span class="chip chip-amber" style="padding:.05rem .45rem;font-size:.65rem">${keys.length}</span></button>`;
+}
+function openSaleDrafts() {
+  const keys = saleDraftKeys();
+  if (!keys.length) { closeQuick(); return; }
+  document.getElementById('modal-root').innerHTML = `
+    <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
+      <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:94vh;max-height:94dvh;overflow-y:auto" onclick="event.stopPropagation()">
+        <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
+        <h3 class="font-bold text-gray-100 text-base mb-3">${T('sale.drafts_title')}</h3>
+        <div class="space-y-2 mb-3">
+          ${keys.map(key => {
+            const lines = saleDrafts[key].cart;
+            const n = lines.reduce((sum, line) => sum + (line.qty || 1), 0);
+            const total = lines.reduce((sum, line) => sum + (line.qty || 1) * (line.price || 0), 0);
+            return `<div class="glass-card rounded-xl p-3">
+              <div class="flex items-center gap-2">
+                <div class="flex-1 min-w-0">
+                  <div class="font-semibold text-sm text-gray-200 truncate">${esc(saleDraftName(key))}</div>
+                  <div class="text-[11px] text-gray-500">${T('sale.draft_items', { n })} · ${peso(total)}</div>
+                </div>
+                <button onclick="resumeSaleDraft(${JSON.stringify(key)})" class="btn btn-primary btn-sm">${T('sale.draft_resume')}</button>
+                <button onclick="deleteSaleDraft(${JSON.stringify(key)})" class="text-red-400 p-2" title="${esc(T('sale.draft_delete'))}"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+        <button onclick="closeQuick()" class="btn btn-ghost w-full">${T('common.close')}</button>
+      </div>
+    </div>`;
+}
+function resumeSaleDraft(key) {
+  key = saleKey(key);
+  const currentKey = saleKey(saleCartClient);
+  if (currentKey !== key) saveSaleDraft(currentKey);
+  let n;
+  const draft = saleDrafts[key];
+  if (currentKey === key && cart.length && draft && Array.isArray(draft.cart)) {
+    n = draft.cart.reduce((sum, line) => sum + (line.qty || 1), 0);
+    cart = draft.cart.map(line => ({ ...line })).concat(cart);
+    delete saleDrafts[key];
+    persistSaleDrafts();
+    tendered = 0;
+  } else {
+    n = restoreSaleDraft(key);
+  }
+  saleCartClient = key;
+  saleClientPreset = key || null;
+  saleRateClient = null;
+  closeQuick();
+  showView('sale');
+  if (n) toast(T('sale.draft_loaded', { n }), 'ok');
+}
+function deleteSaleDraft(key) {
+  clearSaleDraft(key);
+  if (saleDraftKeys().length) openSaleDrafts();
+  else closeQuick();
+  if (currentView === 'sale') renderSale();
+}
 function clientOptions() {
   const picked = saleClientPreset != null ? saleClientPreset : saleCartClient;
   return '<option value="">' + T('sale.walkin') + '</option>' + data.clients.map(c => '<option value="' + c.id + '"' + (picked != null && String(c.id) === String(picked) ? ' selected' : '') + '>' + esc(c.name) + ' — ' + peso(c.balance) + '</option>').join('');
@@ -199,20 +310,44 @@ function clientOptions() {
 function saleClientChanged() {
   const sel = document.getElementById('sale-client');
   const nid = sel && sel.value ? String(sel.value) : '';
-  if (!cart.length || String(saleCartClient || '') === nid) {
-    saleCartClient = nid;
+  const fromKey = saleKey(saleCartClient);
+  const toKey = saleKey(nid);
+  if (!cart.length) {
+    if (fromKey !== toKey) {
+      if (fromKey) saveSaleDraft(fromKey);
+      saleCartClient = toKey;
+      saleClientPreset = nid || null;
+      saleRateClient = null;
+      const restored = restoreSaleDraft(toKey);
+      if (restored) {
+        renderSale();
+        toast(T('sale.draft_loaded', { n: restored }), 'ok');
+        return;
+      }
+    } else {
+      saleClientPreset = nid || null;
+    }
+    applyClientRate();
+    return;
+  }
+  if (fromKey === toKey) {
     saleClientPreset = nid || null;
     applyClientRate();
     return;
   }
   const c = (data.clients || []).find(x => String(x.id) === nid);
   const n = cart.reduce((s, i) => s + (i.qty || 1), 0);
+  const targetDraft = saleDrafts[toKey];
+  const saved = targetDraft && Array.isArray(targetDraft.cart) ? targetDraft.cart.reduce((s, i) => s + (i.qty || 1), 0) : 0;
+  const msg = saved
+    ? T('sale.switch_msg_saved', { n, name: c ? c.name : T('sale.walkin'), saved })
+    : T('sale.switch_msg', { n, name: c ? c.name : T('sale.walkin') });
   document.getElementById('modal-root').innerHTML = `
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)cancelSwitchClient()">
       <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-5 pb-6 slide-up glass-card" style="max-height:94vh;max-height:94dvh;overflow-y:auto" onclick="event.stopPropagation()">
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
         <h3 class="font-bold text-gray-100 text-base mb-2">${T('sale.switch_title')}</h3>
-        <p class="text-sm text-gray-400 mb-4">${esc(T('sale.switch_msg', { n, name: c ? c.name : T('sale.walkin') }))}</p>
+        <p class="text-sm text-gray-400 mb-4">${esc(msg)}</p>
         <button onclick="keepSwitchClient()" class="btn btn-primary btn-lg mb-2">${T('sale.switch_keep')}</button>
         <button onclick="doSwitchClient()" class="btn btn-ghost btn-lg mb-2" style="color:#fca5a5;border-color:rgba(239,68,68,.35)">${T('sale.switch_clear')}</button>
         <button onclick="cancelSwitchClient()" class="btn btn-ghost btn-lg">${T('sale.switch_cancel')}</button>
@@ -220,12 +355,25 @@ function saleClientChanged() {
     </div>`;
 }
 function switchSaleClient(nid, clearCart) {
-  cart = clearCart ? [] : cart;
-  if (clearCart) tendered = 0;
-  saleCartClient = nid;
+  const fromKey = saleKey(saleCartClient);
+  const toKey = saleKey(nid);
+  if (fromKey !== toKey) {
+    saveSaleDraft(fromKey);
+    delete saleDrafts[fromKey];
+    if (!clearCart) {
+      const targetDraft = saleDrafts[toKey];
+      if (targetDraft && Array.isArray(targetDraft.cart) && targetDraft.cart.length) {
+        cart = targetDraft.cart.map(line => ({ ...line })).concat(cart);
+        delete saleDrafts[toKey];
+      }
+    }
+    persistSaleDrafts();
+    tendered = 0;
+  }
+  if (clearCart) cart = [];
+  saleCartClient = toKey;
   saleClientPreset = nid || null;
   saleRateClient = null;
-  if (clearCart) { try { updateCartUI(); } catch (e) {} }
   closeQuick();
   renderSale();
 }
@@ -433,8 +581,9 @@ async function submitSale() {
   const body = { clientId, items, paymentMethod, discount: disc };
   try {
     const r = await apiPost('/api/sales', body);
-    if (r.queued) { lastFailedSale = null; tendered = 0; try { saleClientPreset = null; saleRateClient = null; saleCartClient = ''; } catch (e) {} toast(T('sale.queued'), 'ok'); cart = []; updateCartUI(); showView('home'); await refreshAll(); return; }
+    if (r.queued) { lastFailedSale = null; tendered = 0; clearSaleDraft(clientId); try { saleClientPreset = null; saleRateClient = null; saleCartClient = ''; } catch (e) {} toast(T('sale.queued'), 'ok'); cart = []; updateCartUI(); showView('home'); await refreshAll(); return; }
     lastFailedSale = null; tendered = 0;
+    clearSaleDraft(clientId);
     try { saleClientPreset = null; saleRateClient = null; saleCartClient = ''; } catch (e) {}
     saleSuccessSheet(r.invoiceNo);
     announceClientBalance(clientId);
@@ -453,8 +602,9 @@ async function retrySale() {
   toast(T('sale.retrying'), 'info');
   try {
     const r = await apiPost('/api/sales', lastFailedSale);
-    if (r.queued) { lastFailedSale = null; tendered = 0; toast(T('sale.queued'), 'ok'); cart = []; updateCartUI(); showView('home'); await refreshAll(); return; }
+    if (r.queued) { lastFailedSale = null; tendered = 0; clearSaleDraft(rcid); toast(T('sale.queued'), 'ok'); cart = []; updateCartUI(); showView('home'); await refreshAll(); return; }
     lastFailedSale = null; tendered = 0;
+    clearSaleDraft(rcid);
     saleSuccessSheet(r.invoiceNo);
     announceClientBalance(rcid);
   } catch (e) { feelErr(); toast(T('sale.still_failing', { msg: e.message }), 'err'); }
