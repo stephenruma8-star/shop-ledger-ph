@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.5",
-    "buildDate":  "2026-10-22T00:00:00.000Z",
-    "notes":  "Phone sale drafts: per-client carts are saved and restored when switching clients or leaving New Sale, with resume/delete controls and merge-on-keep so no cart is silently lost. Includes the 3.37.4 client action and print-preview fixes."
+    "version":  "3.37.6",
+    "buildDate":  "2026-10-26T00:00:00.000Z",
+    "notes":  "Interest is now prorated by days/30 (min 1 day) everywhere it is charged: desktop daily interest, LAN/mobile sales, and the standalone phone. A one-time migration rescales already-inflated desktop interest rows and corrects the affected client balances. Mobile client details now list the purchased items, and both desktop and phone receipt previews offer explicit Bond paper and Thermal paper options."
 }
