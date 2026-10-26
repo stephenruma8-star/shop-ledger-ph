@@ -136,7 +136,7 @@ export function openQuickSaleModal(id) {
         <div><label class="text-xs text-gray-500 block">Discount (₱)</label><input id="qs-discount" type="number" value="0" min="0" step="0.01" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm" oninput="qsUpd()" /></div>
         <div><label class="text-xs text-gray-500 block">Receipt Paper</label>
           <select id="qs-rpsize" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm">
-            <option value="80mm">80mm (Thermal)</option><option value="58mm">58mm (Thermal)</option><option value="letter">Letter (A4)</option>
+            <option value="80mm">Thermal paper (80mm)</option><option value="58mm">Thermal paper (58mm)</option><option value="letter">Bond paper (A4)</option>
           </select>
         </div>
         <div class="flex items-end pb-1"><label class="flex items-center gap-1 text-sm"><input type="checkbox" id="qs-sc" onchange="qsUpd()" /> SC/PWD 20% Discount</label></div>
@@ -300,7 +300,7 @@ export function renderCartPanel() {
         <div><label class="text-xs text-gray-500 block">Discount (₱)</label><input id="qs-cart-discount" type="number" value="0" min="0" step="0.01" class="w-full px-2 py-1.5 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-xs" oninput="qsCartTotals()" /></div>
         <div><label class="text-xs text-gray-500 block">Receipt Paper</label>
           <select id="qs-cart-rpsize" class="w-full px-2 py-1.5 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-xs">
-            <option value="80mm">80mm (Thermal)</option><option value="58mm">58mm (Thermal)</option><option value="letter">Letter (A4)</option>
+            <option value="80mm">Thermal paper (80mm)</option><option value="58mm">Thermal paper (58mm)</option><option value="letter">Bond paper (A4)</option>
           </select>
         </div>
         <div class="flex items-end pb-1"><label class="flex items-center gap-1 text-xs"><input type="checkbox" id="qs-cart-sc" onchange="qsCartTotals()" /> SC/PWD 20%</label></div>

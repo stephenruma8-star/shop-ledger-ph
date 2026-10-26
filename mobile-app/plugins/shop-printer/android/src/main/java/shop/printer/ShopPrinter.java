@@ -6,7 +6,14 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
+import android.app.Activity;
+import android.content.Context;
+import android.print.PrintAttributes;
+import android.print.PrintDocumentAdapter;
+import android.print.PrintManager;
 import android.util.Base64;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -42,5 +49,35 @@ public class ShopPrinter extends Plugin {
                 call.reject(e.getMessage() != null ? e.getMessage() : "Print failed");
             }
         }).start();
+    }
+
+    @PluginMethod
+    public void printHtml(PluginCall call) {
+        String html = call.getString("html");
+        if (html == null || html.isEmpty()) {
+            call.reject("html required");
+            return;
+        }
+        String jobName = call.getString("jobName", "Shop Ledger Receipt");
+        Activity activity = (Activity) getContext();
+        activity.runOnUiThread(() -> {
+            WebView webView = new WebView(getContext());
+            webView.setWebViewClient(new WebViewClient() {
+                @Override
+                public void onPageFinished(WebView view, String url) {
+                    try {
+                        PrintManager printManager = (PrintManager) getContext().getSystemService(Context.PRINT_SERVICE);
+                        PrintDocumentAdapter adapter = view.createPrintDocumentAdapter(jobName);
+                        printManager.print(jobName, adapter, new PrintAttributes.Builder().build());
+                        JSObject ret = new JSObject();
+                        ret.put("success", true);
+                        call.resolve(ret);
+                    } catch (Exception e) {
+                        call.reject(e.getMessage() != null ? e.getMessage() : "Print failed");
+                    }
+                }
+            });
+            webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null);
+        });
     }
 }

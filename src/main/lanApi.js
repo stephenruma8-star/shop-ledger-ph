@@ -9,6 +9,15 @@ const path = require('path');
 
 const EXPENSE_CATS = ['Purchases','Utilities','Rent','Supplies','Transportation','Salaries','Marketing','Maintenance','Food','Other'];
 
+// Rate is % per MONTH, prorated over whole days (min 1), matching desktop/mobile.
+function lineInterest(sub, intRate, dateStr, todayStr) {
+  const rate = parseFloat(intRate) || 0;
+  if (sub <= 0 || rate <= 0) return 0;
+  let days = Math.floor((new Date(todayStr) - new Date(dateStr || todayStr)) / 86400000);
+  if (!isFinite(days) || days < 1) days = 1;
+  return Math.round(sub * (rate / 100) * (days / 30) * 100) / 100;
+}
+
 const _offlineQueue = [];
 function getOfflineQueue() { return _offlineQueue.slice(); }
 function clearOfflineQueue() { _offlineQueue.length = 0; return { ok: true }; }
@@ -330,7 +339,14 @@ function createLanApiRouter(deps) {
       .filter(t => String(t.clientId) === String(c.id))
       .sort((a, b) => String(b.date || b.createdAt || '').localeCompare(String(a.date || a.createdAt || '')))
       .slice(0, 100)
-      .map(t => ({ id: t.id, invoiceNo: t.invoiceNo, date: t.date, grandTotal: t.grandTotal, paymentMethod: t.paymentMethod, status: t.status }));
+      .map(t => ({
+        id: t.id, invoiceNo: t.invoiceNo, date: t.date, grandTotal: t.grandTotal, paymentMethod: t.paymentMethod, status: t.status,
+        items: (t.items || []).map(i => ({
+          description: i.description || i.name || 'Item', qty: i.qty || 1,
+          unitCost: i.unitCost || 0, amount: i.amount || 0,
+          intRate: i.intRate || 0, variantName: i.variantName || null
+        }))
+      }));
     const pays = (dump.payments || [])
       .filter(p => String(p.clientId) === String(c.id))
       .sort((a, b) => String(b.date || b.createdAt || '').localeCompare(String(a.date || a.createdAt || '')))
@@ -1008,13 +1024,13 @@ function createLanApiRouter(deps) {
       const nextNo = invNos.length > 0 ? Math.max(...invNos) + 1 : 1;
       const invoiceNo = 'INV-' + String(nextNo).padStart(5,'0');
       const subtotal = items.reduce((s, i) => s + ((i.qty||1) * (i.unitCost || 0)), 0);
-      const totalInterest = items.reduce((s, i) => s + ((i.qty||1) * (i.unitCost || 0)) * ((i.intRate||0)/100), 0);
+      const totalInterest = Math.round(items.reduce((s, i) => s + lineInterest((i.qty||1) * (i.unitCost || 0), i.intRate, i.date, todayStr()), 0) * 100) / 100;
       const d = parseFloat(discount) || 0;
       const grandTotal = Math.max(0, subtotal + totalInterest - d);
       const clientData = clientId ? JSON.parse(await deps.rendererExec(`JSON.stringify(await dbGet('clients', ${JSON.stringify(clientId)}))`)) : null;
       const clientName = clientData ? clientData.name : 'Walk-in';
       const payMethod = paymentMethod || 'Cash';
-      const txnData = JSON.stringify({ invoiceNo, clientId: clientId || null, clientName, date: todayStr(), createdAt: new Date().toISOString(), items: items.map(i => ({ ...i, amount: ((i.qty||1) * (i.unitCost || 0)) + ((i.qty||1) * (i.unitCost || 0)) * ((i.intRate||0)/100) })), subtotal, totalInterest, discount: d, scDiscount: 0, grandTotal, paymentMethod: payMethod, status: grandTotal <= 0 ? 'paid' : 'pending', balanceAdded: !!(clientId && payMethod !== 'Cash') });
+      const txnData = JSON.stringify({ invoiceNo, clientId: clientId || null, clientName, date: todayStr(), createdAt: new Date().toISOString(), items: items.map(i => { const sub = (i.qty||1) * (i.unitCost || 0); return { ...i, amount: Math.round((sub + lineInterest(sub, i.intRate, i.date, todayStr())) * 100) / 100 }; }), subtotal, totalInterest, discount: d, scDiscount: 0, grandTotal, paymentMethod: payMethod, status: grandTotal <= 0 ? 'paid' : 'pending', balanceAdded: !!(clientId && payMethod !== 'Cash') });
       await deps.rendererExec(`dbAdd('transactions', ${txnData})`);
       await deps.rendererExec(`(async()=>{try{await logAudit('sale','Mobile sale ${invoiceNo} - ₱${grandTotal.toFixed(2)}${devTag(req)}');}catch(e){}})()`);
       for (const item of items) {
@@ -1130,13 +1146,13 @@ function createLanApiRouter(deps) {
           const nextNo = invNos.length > 0 ? Math.max(...invNos) + 1 : 1;
           const invoiceNo = 'INV-' + String(nextNo).padStart(5,'0');
           const subtotal = items.reduce((s, i) => s + ((i.qty||1) * (i.unitCost || 0)), 0);
-          const totalInterest = items.reduce((s, i) => s + ((i.qty||1) * (i.unitCost || 0)) * ((i.intRate||0)/100), 0);
+          const totalInterest = Math.round(items.reduce((s, i) => s + lineInterest((i.qty||1) * (i.unitCost || 0), i.intRate, i.date, todayStr()), 0) * 100) / 100;
           const d = parseFloat(discount) || 0;
           const grandTotal = Math.max(0, subtotal + totalInterest - d);
           const clientData = clientId ? JSON.parse(await deps.rendererExec(`JSON.stringify(await dbGet('clients', ${JSON.stringify(clientId)}))`)) : null;
           const clientName = clientData ? clientData.name : 'Walk-in';
           const payMethod = paymentMethod || 'Cash';
-          const txnData = JSON.stringify({ invoiceNo, clientId: clientId || null, clientName, date: todayStr(), createdAt: new Date().toISOString(), items: items.map(i => ({ ...i, amount: ((i.qty||1) * (i.unitCost || 0)) + ((i.qty||1) * (i.unitCost || 0)) * ((i.intRate||0)/100) })), subtotal, totalInterest, discount: d, scDiscount: 0, grandTotal, paymentMethod: payMethod, status: grandTotal <= 0 ? 'paid' : 'pending', balanceAdded: !!(clientId && payMethod !== 'Cash') });
+          const txnData = JSON.stringify({ invoiceNo, clientId: clientId || null, clientName, date: todayStr(), createdAt: new Date().toISOString(), items: items.map(i => { const sub = (i.qty||1) * (i.unitCost || 0); return { ...i, amount: Math.round((sub + lineInterest(sub, i.intRate, i.date, todayStr())) * 100) / 100 }; }), subtotal, totalInterest, discount: d, scDiscount: 0, grandTotal, paymentMethod: payMethod, status: grandTotal <= 0 ? 'paid' : 'pending', balanceAdded: !!(clientId && payMethod !== 'Cash') });
           await deps.rendererExec(`dbAdd('transactions', ${txnData})`);
           for (const item of items) {
             let invId = item.invId;
@@ -1452,4 +1468,4 @@ function createLanApiRouter(deps) {
   return router;
 }
 
-module.exports = { createLanApiRouter, getOfflineQueue, clearOfflineQueue, getAccessControl, addToWhitelist, removeFromWhitelist, addToBlacklist, removeFromBlacklist };
+module.exports = { createLanApiRouter, lineInterest, getOfflineQueue, clearOfflineQueue, getAccessControl, addToWhitelist, removeFromWhitelist, addToBlacklist, removeFromBlacklist };

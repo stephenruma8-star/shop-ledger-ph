@@ -1710,6 +1710,8 @@ const LANG_STRINGS = {
     'upd.body': 'Version {tag} is ready. Download it, then tap the file to install — your pairing and settings stay.',
     'upd.download': 'Download update', 'upd.later': 'Later',
     'txn.print': '🖨️ Print', 'txn.share': '📤 Share', 'txn.preview': '👁 Preview', 'txn.back_detail': '← Back to receipt',
+    'receipt.paper': 'Paper type', 'receipt.thermal': 'Thermal paper', 'receipt.bond': 'Bond paper',
+    'receipt.bond_open': 'Opening system print for bond paper...',
     'txn.credit': 'Credit', 'txn.paid': 'Paid', 'txn.returned_chip': 'Returned',
     'txn.total': 'Total', 'txn.return': '↩ Return this sale',
     'txn.return_confirm': 'Tap again to confirm return',
@@ -2095,6 +2097,8 @@ const LANG_STRINGS = {
     'upd.body': 'Handa na ang bersyong {tag}. I-download ito, tapos pindutin ang file para i-install — mananatili ang pairing at settings.',
     'upd.download': 'I-download ang update', 'upd.later': 'Mamaya',
     'txn.print': '🖨️ I-print', 'txn.share': '📤 I-share', 'txn.preview': '👁 Silipin', 'txn.back_detail': '← Bumalik sa resibo',
+    'receipt.paper': 'Uri ng papel', 'receipt.thermal': 'Thermal paper', 'receipt.bond': 'Bond paper',
+    'receipt.bond_open': 'Binubuksan ang system print para sa bond paper...',
     'txn.credit': 'Utang', 'txn.paid': 'Bayad', 'txn.returned_chip': 'Naibalik',
     'txn.total': 'Kabuuan', 'txn.return': '↩ Ibalik ang bentang ito',
     'txn.return_confirm': 'Pindutin muli para kumpirmahin ang pagbalik',
@@ -2895,9 +2899,16 @@ async function openClientDetail(id) {
     <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">${T('cli.history_sales')}</h4>
     <div class="space-y-1.5 mb-3">
       ${(h.sales || []).slice(0, 20).map(t => `
-        <div class="flex justify-between items-center text-sm gap-2 rounded-xl px-2 -mx-2 py-1 card-hover" onclick='openTxnDetail(${JSON.stringify(t.invoiceNo || t.id)})' style="cursor:pointer">
-          <span class="text-gray-200 truncate">${esc(t.invoiceNo || '')} <span class="text-gray-500">· ${fmtDate(t.date)}</span></span>
-          <span class="flex items-center gap-1 shrink-0"><span class="num ${Number(t.grandTotal) < 0 ? 'text-red-400' : ''}">${peso(t.grandTotal)}</span><span class="text-gray-600">›</span></span>
+        <div class="rounded-xl px-2 -mx-2 py-1 card-hover" onclick='openTxnDetail(${JSON.stringify(t.invoiceNo || t.id)})' style="cursor:pointer">
+          <div class="flex justify-between items-center text-sm gap-2">
+            <span class="text-gray-200 truncate">${esc(t.invoiceNo || '')} <span class="text-gray-500">A� ${fmtDate(t.date)}</span></span>
+            <span class="flex items-center gap-1 shrink-0"><span class="num ${Number(t.grandTotal) < 0 ? 'text-red-400' : ''}">${peso(t.grandTotal)}</span><span class="text-gray-600">�?�</span></span>
+          </div>
+          ${(t.items || []).length ? `<div class="mt-1 mb-0.5 pl-2 border-l border-white/10 space-y-0.5">${(t.items || []).map(i => `
+            <div class="flex justify-between gap-2 text-[11px] text-gray-500">
+              <span class="truncate">${esc(i.description || i.name || '')}${i.variantName ? ' (${esc(i.variantName)})' : ''} <span class="text-gray-600">x${i.qty || 1}</span>${(i.intRate || 0) > 0 ? ` <span class="text-amber-500">+${i.intRate}%</span>` : ''}</span>
+              <span class="num shrink-0">${peso(i.amount || ((i.qty || 1) * (i.unitCost || 0)))}</span>
+            </div>`).join('')}</div>` : ''}
         </div>`).join('') || `<p class="text-[11px] text-gray-500">${T('cli.no_history')}</p>`}
     </div>
     <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">${T('cli.history_pay')}</h4>
@@ -4700,24 +4711,106 @@ function receiptLines(t) {
   L.push(center(s.receiptFooter || 'Thank you for your patronage!'));
   return L;
 }
+function bondReceiptCss() {
+  return `.bond-receipt{background:#fff;color:#111;border-radius:.75rem;padding:1rem;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.35}
+.bond-receipt .bond-head{text-align:center;border-bottom:2px solid #111;padding-bottom:.6rem;margin-bottom:.6rem}
+.bond-receipt .bond-shop{font-size:1.05rem;font-weight:700;letter-spacing:.2px}
+.bond-receipt .bond-muted{color:#475569;font-size:.72rem;margin-top:.1rem}
+.bond-receipt .bond-meta{display:flex;justify-content:space-between;gap:.75rem;font-size:.72rem;margin-bottom:.4rem}
+.bond-receipt .bond-table{width:100%;border-collapse:collapse;margin:.35rem 0}
+.bond-receipt .bond-table th{border-bottom:1px solid #111;padding:.3rem .2rem;font-size:.65rem;text-transform:uppercase;text-align:left}
+.bond-receipt .bond-table td{padding:.32rem .2rem;border-bottom:1px dotted #cbd5e1;vertical-align:top}
+.bond-receipt .bond-table .num{text-align:right;white-space:nowrap}
+.bond-receipt .bond-totals{width:100%;margin-top:.45rem}
+.bond-receipt .bond-totals td{padding:.2rem}
+.bond-receipt .bond-totals .grand{font-weight:700;font-size:1.02rem;border-top:2px solid #111}
+.bond-receipt .bond-foot{text-align:center;border-top:1px solid #cbd5e1;margin-top:.7rem;padding-top:.5rem;font-size:.72rem;color:#475569}`;
+}
+function bondReceiptHtml(t) {
+  const s = (typeof data !== 'undefined' && data.settings) || {};
+  const hasInt = (t.items || []).some(i => (Number(i.intRate) || 0) > 0);
+  const money = (n) => peso(n);
+  const rows = (t.items || []).map(i => {
+    const qty = Number(i.qty) || 1;
+    const unit = Number(i.unitCost ?? i.price) || 0;
+    const amt = Number(i.amount) || qty * unit + lineIntCalc(qty * unit, i.intRate, i.date);
+    return `<tr><td>${esc(i.description || i.name || 'Item')}${i.variantName ? ' - ' + esc(i.variantName) : ''}</td><td class="num">${qty}</td><td class="num">${money(unit)}</td>${hasInt ? `<td class="num">${Number(i.intRate) || 0}%</td>` : ''}<td class="num">${money(amt)}</td></tr>`;
+  }).join('');
+  return `<div class="bond-receipt">
+    <div class="bond-head">
+      <div class="bond-shop">${esc(s.shopName || 'Shop Ledger PH')}</div>
+      ${s.shopAddress ? `<div class="bond-muted">${esc(s.shopAddress)}</div>` : ''}
+      ${s.shopContact ? `<div class="bond-muted">${esc(s.shopContact)}</div>` : ''}
+      ${s.receiptHeaderText ? `<div class="bond-muted">${esc(s.receiptHeaderText)}</div>` : ''}
+      <div class="bond-muted" style="font-weight:700;margin-top:.35rem">OFFICIAL RECEIPT</div>
+    </div>
+    <div class="bond-meta"><span>Invoice: <b>${esc(t.invoiceNo || 'N/A')}</b></span><span>${esc(t.createdAt || t.date || '')}</span></div>
+    ${t.clientName && t.clientName !== 'Walk-in' ? `<div class="bond-meta"><span>Client: ${esc(t.clientName)}</span><span>${esc(t.paymentMethod || 'Cash')}</span></div>` : ''}
+    <table class="bond-table"><thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Price</th>${hasInt ? '<th class="num">Int</th>' : ''}<th class="num">Amount</th></tr></thead><tbody>${rows}</tbody></table>
+    <table class="bond-totals">
+      <tr><td>Subtotal</td><td class="num">${money(t.subtotal)}</td></tr>
+      ${Number(t.totalInterest) > 0 ? `<tr><td>Interest</td><td class="num">${money(t.totalInterest)}</td></tr>` : ''}
+      ${Number(t.discount) > 0 ? `<tr><td>Discount</td><td class="num">-${money(t.discount)}</td></tr>` : ''}
+      <tr class="grand"><td>TOTAL</td><td class="num">${money(t.grandTotal)}</td></tr>
+    </table>
+    <div class="bond-foot">${esc(s.receiptFooter || 'Thank you for your patronage!')}</div>
+  </div>`;
+}
+function bondPrintDocument(t) {
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Receipt ${esc(t.invoiceNo || '')}</title><style>@page{size:A4;margin:12mm}body{margin:0;background:#fff}${bondReceiptCss()}</style></head><body>${bondReceiptHtml(t)}</body></html>`;
+}
+let receiptPreviewState = { t: null, draft: false, paper: 'thermal' };
+function setReceiptPaper(paper) {
+  if (!receiptPreviewState.t) return;
+  showReceiptPreview(receiptPreviewState.t, { draft: receiptPreviewState.draft, paper });
+}
+function printPreviewReceipt() {
+  const st = receiptPreviewState;
+  if (!st.t) return;
+  if (st.paper === 'bond') printBondReceipt(st.t);
+  else printSaleReceipt(st.t.invoiceNo || st.t.id);
+}
+function printBondReceipt(t) {
+  const html = bondPrintDocument(t);
+  const plugin = typeof nativePlugin === 'function' ? nativePlugin('ShopPrinter') : null;
+  if (plugin && typeof plugin.printHtml === 'function') {
+    toast(T('receipt.bond_open'), 'info');
+    plugin.printHtml({ html, jobName: 'Receipt ' + (t.invoiceNo || '') }).catch(e => toast(T('sale.print_failed', { msg: e.message }), 'err'));
+    return;
+  }
+  const frame = document.createElement('iframe');
+  frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+  frame.onload = () => {
+    try { frame.contentWindow.focus(); frame.contentWindow.print(); }
+    catch (e) { toast(T('sale.print_failed', { msg: e.message }), 'err'); }
+    setTimeout(() => { try { frame.remove(); } catch (e) {} }, 60000);
+  };
+  frame.srcdoc = html;
+  document.body.appendChild(frame);
+}
 // Modal shell for a receipt preview. opts.draft = unsaved sale: shows a
-// not-saved banner and only a "back to sale" action (no print/share yet —
+// not-saved banner and only a "back to sale" action (no print/share yet �?"
 // there is no invoice to print until the sale is saved).
 function showReceiptPreview(t, opts) {
   const o = opts || {};
   const draft = !!o.draft;
+  const paper = o.paper || 'thermal';
+  receiptPreviewState = { t, draft, paper };
   const L = receiptLines(t);
+  const tab = (val, label) => `<button onclick="setReceiptPaper('${val}')" class="flex-1 py-1.5 rounded-lg text-xs font-semibold" style="${paper === val ? 'background:rgba(59,130,246,.9);color:#fff' : 'background:transparent;color:#94a3b8'}">${esc(label)}</button>`;
   document.getElementById('modal-root').innerHTML = `
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
       <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:94vh;max-height:94dvh;overflow-y:auto" onclick="event.stopPropagation()">
+        <style>${bondReceiptCss()}</style>
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
         <h3 class="font-bold text-gray-100 text-sm mb-3 flex items-center gap-2"><span class="icon-tile bg-blue-500/15 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>${draft ? esc(T('sale.preview_title')) : esc(t.invoiceNo || 'Receipt')}</h3>
         ${draft ? `<p class="text-[11px] font-semibold uppercase tracking-wider text-amber-400 mb-2">${esc(T('sale.preview_note'))}</p>` : ''}
-        <pre class="receipt-paper">${esc(L.join('\n'))}</pre>
+        <div class="mb-2"><div class="text-[10px] uppercase tracking-wider text-gray-500 mb-1">${esc(T('receipt.paper'))}</div><div class="flex gap-1 p-1 rounded-xl" style="background:rgba(255,255,255,.05)">${tab('thermal', T('receipt.thermal'))}${tab('bond', T('receipt.bond'))}</div></div>
+        ${paper === 'bond' ? bondReceiptHtml(t) : `<pre class="receipt-paper">${esc(L.join('\n'))}</pre>`}
         ${draft
           ? `<button onclick="closeQuick()" class="btn btn-primary w-full">${esc(T('sale.preview_ok'))}</button>`
           : `<div class="grid grid-cols-2 gap-2">
-          <button onclick="printSaleReceipt(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-primary btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>${T('txn.print')}</button>
+          <button onclick="printPreviewReceipt()" class="btn btn-primary btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>${T('txn.print')}</button>
           <button onclick="shareReceiptTxn(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>${T('txn.share')}</button>
         </div>
         <button onclick="openTxnDetail(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-ghost w-full mt-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>${T('txn.back_detail')}</button>`}

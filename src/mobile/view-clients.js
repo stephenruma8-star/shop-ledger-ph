@@ -149,9 +149,16 @@ async function openClientDetail(id) {
     <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">${T('cli.history_sales')}</h4>
     <div class="space-y-1.5 mb-3">
       ${(h.sales || []).slice(0, 20).map(t => `
-        <div class="flex justify-between items-center text-sm gap-2 rounded-xl px-2 -mx-2 py-1 card-hover" onclick='openTxnDetail(${JSON.stringify(t.invoiceNo || t.id)})' style="cursor:pointer">
-          <span class="text-gray-200 truncate">${esc(t.invoiceNo || '')} <span class="text-gray-500">· ${fmtDate(t.date)}</span></span>
-          <span class="flex items-center gap-1 shrink-0"><span class="num ${Number(t.grandTotal) < 0 ? 'text-red-400' : ''}">${peso(t.grandTotal)}</span><span class="text-gray-600">›</span></span>
+        <div class="rounded-xl px-2 -mx-2 py-1 card-hover" onclick='openTxnDetail(${JSON.stringify(t.invoiceNo || t.id)})' style="cursor:pointer">
+          <div class="flex justify-between items-center text-sm gap-2">
+            <span class="text-gray-200 truncate">${esc(t.invoiceNo || '')} <span class="text-gray-500">A� ${fmtDate(t.date)}</span></span>
+            <span class="flex items-center gap-1 shrink-0"><span class="num ${Number(t.grandTotal) < 0 ? 'text-red-400' : ''}">${peso(t.grandTotal)}</span><span class="text-gray-600">�?�</span></span>
+          </div>
+          ${(t.items || []).length ? `<div class="mt-1 mb-0.5 pl-2 border-l border-white/10 space-y-0.5">${(t.items || []).map(i => `
+            <div class="flex justify-between gap-2 text-[11px] text-gray-500">
+              <span class="truncate">${esc(i.description || i.name || '')}${i.variantName ? ' (${esc(i.variantName)})' : ''} <span class="text-gray-600">x${i.qty || 1}</span>${(i.intRate || 0) > 0 ? ` <span class="text-amber-500">+${i.intRate}%</span>` : ''}</span>
+              <span class="num shrink-0">${peso(i.amount || ((i.qty || 1) * (i.unitCost || 0)))}</span>
+            </div>`).join('')}</div>` : ''}
         </div>`).join('') || `<p class="text-[11px] text-gray-500">${T('cli.no_history')}</p>`}
     </div>
     <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">${T('cli.history_pay')}</h4>

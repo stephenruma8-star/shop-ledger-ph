@@ -1,13 +1,47 @@
 export const DB_NAME = 'ShopLedgerPH';
 export const DB_VERSION = 5;
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 export let db = null;
 export let sqlite = null;
 
 const STORES = ['clients','transactions','payments','inventory','quickItems','settings','auditLogs','users','expenses','suppliers','purchaseOrders','supplierPayments','notifications','balanceSnapshots'];
 
-const MIGRATIONS = [
+const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+
+export const MIGRATIONS = [
   { version: 1, name: 'initial schema', up: async (dbApi) => { /* tables created on init */ } },
+  {
+    // The pre-3.37.6 applyDailyInterest charged a full monthly rate every run
+    // instead of prorating by days/30, inflating stored interest rows and the
+    // client balances they created. Divide each legacy interest row by 30,
+    // shrink the borrower's balance by the removed amount, and stamp the row
+    // so this runs exactly once. New rows are written correctly and never need
+    // the stamp.
+    version: 2, name: 'repair monthly interest proration',
+    up: async (dbApi) => {
+      let txns = [];
+      let clients = [];
+      try { txns = await dbApi.all('transactions'); clients = await dbApi.all('clients'); } catch (e) { return; }
+      const perClient = {};
+      for (const t of txns) {
+        if (!t || t.status !== 'interest' || t.interestVersion === 2) continue;
+        const old = round2(t.grandTotal);
+        const fixed = round2(old / 30);
+        const delta = round2(old - fixed);
+        if (t.clientId != null && delta) perClient[t.clientId] = round2((perClient[t.clientId] || 0) + delta);
+        t.grandTotal = fixed;
+        t.totalInterest = fixed;
+        t.interestVersion = 2;
+        await dbApi.put('transactions', t);
+      }
+      for (const c of clients) {
+        const delta = perClient[c.id];
+        if (!delta) continue;
+        c.balance = round2(Math.max(0, (Number(c.balance) || 0) - delta));
+        await dbApi.put('clients', c);
+      }
+    }
+  },
 ];
 
 export async function runMigrations(dbApi) {

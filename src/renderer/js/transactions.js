@@ -362,9 +362,7 @@ export function previewSaleDraft() {
     subtotal, totalInterest, discount, scDiscount, grandTotal,
     paymentMethod, status: 'preview'
   };
-  openPrintWindow('Receipt Preview (not saved)', 420, 680, receiptContentHtml(draft, '80mm'), {
-    extraCss: '.print-preview{padding:16px;background:#fff}.print-header,.print-footer{display:none}'
-  });
+  openPrintWindow('Receipt Preview (not saved)', 420, 680, receiptContentHtml(draft, '80mm'), receiptPreviewOpts('80mm'));
 }
 
 export async function resolveInvIds(items) {
@@ -967,6 +965,41 @@ export function editTransaction(id) {
   renderTransactionModal(t);
 }
 
+function receiptPaperCss() {
+  return `
+body.paper-bond .receipt{max-width:640px!important;font-family:'Segoe UI',Arial,sans-serif!important;font-size:12px!important}
+body.paper-bond h1{font-size:20px!important}
+body.paper-bond .shop-info,body.paper-bond th,body.paper-bond .footer{font-size:11px!important}
+body.paper-thermal80 .receipt{max-width:300px!important;font-size:11px!important}
+body.paper-thermal58 .receipt{max-width:220px!important;font-size:9px!important}
+body.paper-thermal58 h1{font-size:14px!important}
+body.paper-thermal58 .shop-info,body.paper-thermal58 th,body.paper-thermal58 .footer{font-size:9px!important}`;
+}
+function receiptPaperToolbar(active) {
+  const btn = (p, label) => `<button class="sz-btn paper-btn${active === p ? ' active' : ''}" data-paper="${p}" onclick="setReceiptPrintPaper('${p}')">${label}</button>`;
+  return `<div class="print-toolbar">
+    <span style="font-size:13px;color:#64748b">Paper:</span>
+    ${btn('bond', 'Bond paper (A4)')}
+    ${btn('thermal80', 'Thermal 80mm')}
+    ${btn('thermal58', 'Thermal 58mm')}
+    <span class="sep"></span>
+    <button class="print-btn" onclick="window.print()">Print / Save PDF</button>
+  </div>`;
+}
+function receiptPaperScript() {
+  return `function setReceiptPrintPaper(p){document.body.classList.remove('paper-bond','paper-thermal80','paper-thermal58');document.body.classList.add('paper-'+p);document.querySelectorAll('.paper-btn').forEach(function(b){b.classList.toggle('active',b.dataset.paper===p)});var s=document.getElementById('page-size')||document.createElement('style');s.id='page-size';s.textContent='@page{margin:15mm 12mm;size:'+(p==='bond'?'A4':p==='thermal80'?'80mm auto':'58mm auto')+'}';document.head.appendChild(s);}`;
+}
+function receiptPreviewOpts(size) {
+  const paper = size === 'letter' ? 'bond' : size === '58mm' ? 'thermal58' : 'thermal80';
+  return {
+    size: 'A4',
+    bodyClass: 'paper-' + paper,
+    toolbarHtml: receiptPaperToolbar(paper),
+    extraCss: '.print-preview{padding:16px;background:#fff}.print-header,.print-footer{display:none}' + receiptPaperCss(),
+    extraScript: receiptPaperScript()
+  };
+}
+
 export async function printReceipt(id) {
   const t = await dbGet('transactions', id);
   if (!t) { toast('Transaction not found', 'error'); return; }
@@ -976,9 +1009,13 @@ export async function printReceipt(id) {
       <div class="space-y-3">
         <div><label class="text-xs text-gray-500 block">Paper Size</label>
           <select id="rp-size" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800">
-            <option value="80mm">80mm (Thermal)</option>
-            <option value="58mm">58mm (Thermal)</option>
-            <option value="letter">Letter (A4)</option>
+            <optgroup label="Thermal paper">
+              <option value="80mm">Thermal paper (80mm)</option>
+              <option value="58mm">Thermal paper (58mm)</option>
+            </optgroup>
+            <optgroup label="Bond paper">
+              <option value="letter">Bond paper (A4)</option>
+            </optgroup>
           </select>
         </div>
         <button onclick="doPrintReceipt(${id}, false)" class="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Preview & Print</button>
@@ -1001,9 +1038,7 @@ export async function doPrintReceipt(id, direct) {
     await window.electronAPI.printReceipt({ html: content, width: paperWidth });
     toast('Receipt sent to printer', 'success');
   } else {
-    openPrintWindow('Receipt - ' + (t.invoiceNo || ''), isWide ? 600 : 380, 600, content, {
-      extraCss: '.print-preview{padding:16px;background:#fff}.print-header,.print-footer{display:none}'
-    });
+    openPrintWindow('Receipt - ' + (t.invoiceNo || ''), isWide ? 600 : 380, 600, content, receiptPreviewOpts(size));
   }
 }
 

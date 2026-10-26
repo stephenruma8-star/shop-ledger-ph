@@ -106,6 +106,7 @@ const invAfter = await A('GET', '/api/inventory');
 ok(invAfter.find(i => i.name === 'Rice').stock === 98, 'stock decremented');
 const h1 = await A('GET', '/api/clients/' + c1.id + '/history');
 ok(h1.client.balance === 194 && h1.client.loyaltyPoints === 194 && h1.sales.length === 1, 'balance + loyalty + history');
+ok(h1.sales[0].items.length === 2 && h1.sales[0].items[1].description === 'Oil', 'history includes purchased items');
 // cash sale with same-day rated item: accrues rate/30 (desktop parity)
 const cs = await A('POST', '/api/sales', { items: [{ description: 'Oil', qty: 1, unitCost: 30, intRate: 10, invId: it2.id }], paymentMethod: 'Cash' });
 ok(cs.invoiceNo === 'INV-00002', 'cash sale invoice');
@@ -306,7 +307,7 @@ await A('POST', '/api/sales', {
 const intRun = await A('POST', '/api/interest/apply', {});
 const intAfter = (await A('GET', '/api/clients/' + intC.id + '/history')).client;
 ok(intRun.applied >= 1 && intRun.days === 4, 'interest accrues over ' + intRun.days + ' days, ' + intRun.applied + ' client(s)');
-ok(Math.abs(intAfter.balance - (66 + Math.round(66 * 0.10 * 4 * 100) / 100)) < 1e-9, 'interest math matches desktop formula');
+ok(Math.abs(intAfter.balance - (66 + Math.round(66 * 0.10 * (4 / 30) * 100) / 100)) < 1e-9, 'interest math matches desktop formula');
 
 // void/return reasons stored + returned
 const rvSale = await A('POST', '/api/sales', { items: [{ description: 'Oil', qty: 1, unitCost: 30, invId: it2.id }], paymentMethod: 'Cash' });

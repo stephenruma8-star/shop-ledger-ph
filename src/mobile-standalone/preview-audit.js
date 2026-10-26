@@ -60,6 +60,10 @@ async function runStandaloneAudit() {
     const pr = pre.getBoundingClientRect(), hp = pre.parentElement, hr = hp.getBoundingClientRect();
     const center = hr.left + hp.clientLeft + hp.clientWidth / 2;
     if (Math.abs((pr.left + pr.right) / 2 - center) > 2) throw new Error('receipt paper is not centered');
+    setReceiptPaper('bond');
+    if (!document.querySelector('.bond-receipt')) throw new Error('bond paper preview missing');
+    setReceiptPaper('thermal');
+    if (!document.querySelector('.receipt-paper')) throw new Error('thermal preview did not restore');
   });
   await A('item-form', async () => { const it = (data.inventory || [])[0]; renderItemForm(it.id); });  await A('client-form', async () => { renderClientForm(null); });
   await A('client-edit-balance', async () => {

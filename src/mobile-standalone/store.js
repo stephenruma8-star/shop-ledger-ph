@@ -175,7 +175,14 @@ async function _apiClients(method, parts, body) {
     const byDate = (a, b) => String(b.date || b.createdAt || '').localeCompare(String(a.date || a.createdAt || ''));
     return {
       client: { id: c.id, name: c.name, phone: c.phone, address: c.address, balance: c.balance || 0, loyaltyPoints: c.loyaltyPoints || 0, isSC: !!c.isSC, isPWD: !!c.isPWD },
-      sales: txns.sort(byDate).slice(0, 100).map(t => ({ id: t.id, invoiceNo: t.invoiceNo, date: t.date, grandTotal: t.grandTotal, paymentMethod: t.paymentMethod, status: t.status })),
+      sales: txns.sort(byDate).slice(0, 100).map(t => ({
+        id: t.id, invoiceNo: t.invoiceNo, date: t.date, grandTotal: t.grandTotal, paymentMethod: t.paymentMethod, status: t.status,
+        items: _parseJson(t.items, []).map(i => ({
+          description: i.description || i.name || 'Item', qty: i.qty || 1,
+          unitCost: i.unitCost || 0, amount: i.amount || 0,
+          intRate: i.intRate || 0, variantName: i.variantName || null
+        }))
+      })),
       payments: pays.sort(byDate).slice(0, 100).map(p => ({ id: p.id, date: p.date, amount: p.amount, type: p.type, referenceNo: p.referenceNo || '' }))
     };
   }
@@ -277,7 +284,7 @@ async function _apiInterestApply() {
     for (const c of clients) {
       const rate = await _clientRate(c.id);
       if (!(rate > 0)) continue;
-      const interest = Math.round((c.balance || 0) * (rate / 100) * days * 100) / 100;
+      const interest = Math.round((c.balance || 0) * (rate / 100) * (days / 30) * 100) / 100;
       if (!(interest > 0)) continue;
       await db.run('UPDATE clients SET balance = ? WHERE id = ?', [_r2((c.balance || 0) + interest), c.id]);
       applied++;

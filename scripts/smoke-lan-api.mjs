@@ -8,7 +8,7 @@ import { join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const { registerDbIpc, closeDb } = require('../src/main/db.js');
-const { createLanApiRouter } = require('../src/main/lanApi.js');
+const { createLanApiRouter, lineInterest } = require('../src/main/lanApi.js');
 const express = require('express');
 
 let passed = 0, failed = 0;
@@ -24,11 +24,16 @@ await invoke('db-open');
 // hours where UTC and PH dates differ (00:00-07:59 local).
 const _d = new Date();
 const TODAY = _d.getFullYear() + '-' + String(_d.getMonth() + 1).padStart(2, '0') + '-' + String(_d.getDate()).padStart(2, '0');
+const _m = new Date(_d.getTime() - 30 * 86400000);
+const MONTH_AGO = _m.getFullYear() + '-' + String(_m.getMonth() + 1).padStart(2, '0') + '-' + String(_m.getDate()).padStart(2, '0');
+ok(lineInterest(30, 10, TODAY, TODAY) === 0.1, 'LAN sale interest is monthly-prorated (same day)');
+ok(lineInterest(100, 10, MONTH_AGO, TODAY) === 10, 'LAN sale interest prorates over 30 days');
+ok(lineInterest(100, 0, MONTH_AGO, TODAY) === 0, 'LAN sale interest ignores zero rate');
 await invoke('db-migrate', { dump: {
   clients: [{ id: 1, name: 'Aling Nena', balance: 125.5 }, { id: 2, name: 'Mang Jose', balance: 10 }],
   inventory: [{ id: 1, name: 'Coke', stock: 3, lowStock: 5, sellPrice: 30, createdAt: '2026-01-01' }, { id: 2, name: 'Bread', stock: 10, lowStock: 2, price: 25, createdAt: '2026-01-01' }],
   transactions: [
-    { id: 1, invoiceNo: 'INV-00001', clientName: 'Aling Nena', date: TODAY, createdAt: TODAY + 'T10:00:00.000Z', status: 'paid', paymentMethod: 'Cash', grandTotal: 100, subtotal: 100, totalInterest: 0, discount: 0, scDiscount: 0, items: [{ description: 'Coke', qty: 1, unitCost: 30, amount: 30 }] },
+    { id: 1, invoiceNo: 'INV-00001', clientId: 1, clientName: 'Aling Nena', date: TODAY, createdAt: TODAY + 'T10:00:00.000Z', status: 'paid', paymentMethod: 'Cash', grandTotal: 100, subtotal: 100, totalInterest: 0, discount: 0, scDiscount: 0, items: [{ description: 'Coke', qty: 1, unitCost: 30, amount: 30 }] },
     { id: 2, invoiceNo: 'INV-00002', clientName: 'Walk-in', date: TODAY, createdAt: TODAY + 'T11:00:00.000Z', status: 'pending', paymentMethod: 'GCash', grandTotal: 50, subtotal: 50, totalInterest: 0, discount: 0, scDiscount: 0, items: [{ description: 'Bread', qty: 5, unitCost: 20, amount: 100 }, { description: 'Water', qty: 1, unitCost: 10, amount: 10 }] },
     { id: 3, invoiceNo: 'INV-00003', clientName: 'X', date: '2026-01-01', createdAt: '2026-01-01T00:00:00.000Z', status: 'voided', paymentMethod: 'Cash', grandTotal: 999, subtotal: 999, totalInterest: 0, discount: 0, scDiscount: 0, items: [] },
     { id: 4, invoiceNo: 'INV-00004-R', clientName: 'Aling Nena', date: TODAY, createdAt: TODAY + 'T12:00:00.000Z', status: 'return', paymentMethod: 'Cash', grandTotal: -30, subtotal: -30, totalInterest: 0, discount: 0, scDiscount: 0, refId: 1, items: [{ description: 'Coke', qty: -1, unitCost: 30, amount: -30 }] }
@@ -131,6 +136,7 @@ const server = app.listen(0, '127.0.0.1', async () => {
     ok(cliH404.status === 404, 'GET /api/clients/:id/history 404s cleanly');
     const cliH = await json('/api/clients/1/history');
     ok(cliH.status === 200 && cliH.body.client && cliH.body.client.name === 'Aling Nena' && Array.isArray(cliH.body.sales) && Array.isArray(cliH.body.payments), 'GET /api/clients/:id/history serves profile + sales + payments');
+    ok(cliH.body.sales.some(s => Array.isArray(s.items) && s.items.length > 0 && s.items[0].description === 'Coke'), 'GET /api/clients/:id/history includes purchased items');
     const cliRedeem = await json('/api/clients/1/redeem', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
     ok(cliRedeem.status === 503, 'POST /api/clients/:id/redeem requires the renderer (503 in harness)');
 

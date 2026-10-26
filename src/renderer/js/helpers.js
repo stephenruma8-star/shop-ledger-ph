@@ -891,7 +891,7 @@ export async function applyDailyInterest() {
     if (rate <= 0) continue;
     snapshots.push({ id: c.id, balance: c.balance });
     try {
-      const interest = parseFloat((c.balance * (rate / 100) * days).toFixed(2));
+      const interest = calcInterest(c.balance, rate, days);
       if (interest <= 0) continue;
       c.balance = parseFloat((c.balance + interest).toFixed(2));
       await dbPut('clients', c);

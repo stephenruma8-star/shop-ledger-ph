@@ -135,9 +135,11 @@ export function openPrintWindow(title, w, h, contentHtml, opts) {
   const o = opts || {};
   const size = o.size || 'A4';
   const win = window.open('', '_blank', `width=${w},height=${h},scrollbars=yes`);
-  if (!win) { toast('Popup blocked — allow popups for this site to print', 'error'); return null; }
-  const doc = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${escHtml(title)}</title><style>${printCss(size)}${o.extraCss||''}</style></head><body>
-${printToolbar(size)}
+  if (!win) { toast('Popup blocked �?" allow popups for this site to print', 'error'); return null; }
+  const toolbar = o.toolbarHtml === undefined ? printToolbar(size) : o.toolbarHtml;
+  const bodyClass = o.bodyClass ? ` class="${escHtml(o.bodyClass)}"` : '';
+  const doc = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${escHtml(title)}</title><style>${printCss(size)}${o.extraCss||''}</style></head><body${bodyClass}>
+${toolbar}
 <div class="print-preview">${printHeader()}${contentHtml}${printFooter()}</div>
 <script>${printScript()}${o.extraScript||''}</script></body></html>`;
   win.document.write(doc);
