@@ -598,6 +598,7 @@ async function _apiSales(method, parts, body, query) {
   const db = _db();
   if (method === 'POST' && parts.length === 0) return _applySale(body || {});
   if (method === 'POST' && parts.length === 1 && parts[0] === 'settle-item') return _apiSettleItem(body || {});
+  if (method === 'PUT' && parts.length === 1) return _apiSetPayment(parts[0], body || {});
   if (method === 'GET' && parts.length === 0) {
     const limit = Math.min(parseInt(query.limit) || 200, 500);
     // SQL-level cap: years of sales must never all land in memory at once.
@@ -619,6 +620,29 @@ async function _apiSales(method, parts, body, query) {
     };
   }
   throw _apiErr(404, 'Not found');
+}
+async function _apiSetPayment(ref, body) {
+  // Change a recorded sale's payment method. Flipping to/from Cash moves the
+  // client's debt by the sale total, so a mis-keyed Cash sale becomes utang.
+  const db = _db();
+  const pm = body && body.paymentMethod;
+  if (!PAY_METHODS.includes(pm)) throw _apiErr(400, 'Invalid payment method');
+  const t = await db.get('SELECT * FROM transactions WHERE invoiceNo = ? OR id = ?', [String(ref), String(ref)]);
+  if (!t) throw _apiErr(404, 'Transaction not found');
+  if (t.status === 'voided' || t.status === 'return' || t.status === 'interest') throw _apiErr(400, 'Sale is closed');
+  const oldAdded = !!(t.balanceAdded !== undefined ? t.balanceAdded : (t.clientId && t.paymentMethod !== 'Cash'));
+  const newAdded = !!(t.clientId && pm !== 'Cash');
+  if (oldAdded !== newAdded && t.clientId) {
+    const c = await db.get('SELECT * FROM clients WHERE id = ?', [t.clientId]);
+    if (c) {
+      const delta = newAdded ? (t.grandTotal || 0) : -(t.grandTotal || 0);
+      await db.run('UPDATE clients SET balance = ? WHERE id = ?', [_r2(Math.max(0, (c.balance || 0) + delta)), c.id]);
+    }
+  }
+  await db.run('UPDATE transactions SET paymentMethod = ?, balanceAdded = ?, editedAt = ? WHERE id = ?', [pm, newAdded ? 1 : 0, new Date().toISOString(), t.id]);
+  await _audit('sale-edit', 'Payment method -> ' + pm + ' (' + t.invoiceNo + ') (phone)');
+  _bump();
+  return { success: true, paymentMethod: pm, balanceAdded: newAdded };
 }
 async function _apiSettleItem(body) {
   // Pay off ONE sale line (including its sale-time interest) without touching

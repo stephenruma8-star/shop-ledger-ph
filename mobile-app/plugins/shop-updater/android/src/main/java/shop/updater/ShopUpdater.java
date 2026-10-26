@@ -2,6 +2,7 @@ package shop.updater;
 
 import android.app.DownloadManager;
 import android.content.BroadcastReceiver;
+import android.content.ClipData;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -59,7 +60,11 @@ public class ShopUpdater extends Plugin {
             req.setTitle("Shop Ledger update");
             req.setDescription("Downloading new version…");
             req.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-            req.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
+            // Save into the app's OWN external files dir. Scoped storage (API 29+)
+            // can make a public Downloads file unreadable to the installer via
+            // FileProvider, which is the usual cause of "update offered but
+            // install fails". An app-owned file is always shareable.
+            req.setDestinationInExternalFilesDir(ctx, Environment.DIRECTORY_DOWNLOADS, fileName);
             req.setMimeType("application/vnd.android.package-archive");
             final DownloadManager fdm = dm;
             final String fName = fileName;
@@ -92,11 +97,14 @@ public class ShopUpdater extends Plugin {
                     } catch (Exception ignored) {}
                     if (ok) {
                         try {
-                            File apk = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), fName);
+                            File apk = new File(c.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), fName);
                             Uri uri = FileProvider.getUriForFile(c, c.getPackageName() + ".fileprovider", apk);
                             Intent ins = new Intent(Intent.ACTION_VIEW);
                             ins.setDataAndType(uri, "application/vnd.android.package-archive");
                             ins.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+                            // Some Android versions only grant the URI through
+                            // the intent's clip data, not the data field.
+                            ins.setClipData(ClipData.newRawUri("", uri));
                             c.startActivity(ins);
                             return;
                         } catch (Exception ignored) {}

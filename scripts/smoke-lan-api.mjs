@@ -189,6 +189,13 @@ const server = app.listen(0, '127.0.0.1', async () => {
     ok(td.status === 200 && td.body.invoiceNo === 'INV-00001', 'GET /api/transactions/:id serves the sale');
     const td404 = await json('/api/transactions/9999');
     ok(td404.status === 404, 'GET /api/transactions/:id 404s cleanly');
+    // payment-method edit: validation first, renderer for the real thing
+    const tpBad = await json('/api/transactions/1', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paymentMethod: 'Bitcoin' }) });
+    ok(tpBad.status === 400, 'PUT /api/transactions/:id rejects an unknown payment method (400)');
+    const tpNoRenderer = await json('/api/transactions/1', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paymentMethod: 'Credit (Utang)' }) });
+    ok(tpNoRenderer.status === 503, 'PUT /api/transactions/:id requires the renderer (503 in harness)');
+    const tpCashier = await fetch(base + '/api/transactions/1?token=dev_cash-1', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paymentMethod: 'Credit (Utang)' }) });
+    ok(tpCashier.status === 403, 'cashier blocked from editing a sale payment method (403)');
 
     // returns: validation first, renderer needed for the real thing
     const retBad = await json('/api/returns', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });

@@ -477,5 +477,19 @@ await throws(400, () => A('POST', '/api/sales', { items: [{ description: 'Oil', 
 await A('POST', '/api/clients/' + odC.id, { name: 'Opening Debt', balance: 9999 }, 'PUT');
 ok((await A('GET', '/api/clients/' + odC.id + '/history')).client.balance === 9999, 'client edit can correct balance');
 
+// editing a sale's payment method rebalances the client (Cash -> Credit -> Cash).
+// Runs last: it creates a sale, and invoice numbering is asserted earlier.
+const pmC = await A('POST', '/api/clients', { name: 'PM Client' });
+const pmSale = await A('POST', '/api/sales', { clientId: pmC.id, items: [{ description: 'Oil', qty: 1, unitCost: 40, invId: it2.id }], paymentMethod: 'Cash' });
+ok((await A('GET', '/api/clients/' + pmC.id + '/history')).client.balance === 0, 'cash sale leaves the client at zero');
+const pmUp = await A('PUT', '/api/transactions/' + pmSale.invoiceNo, { paymentMethod: 'Credit (Utang)' });
+ok(pmUp.success === true && pmUp.paymentMethod === 'Credit (Utang)', 'PUT accepts Credit for a recorded sale');
+ok((await A('GET', '/api/clients/' + pmC.id + '/history')).client.balance === 40, 'Cash -> Credit adds the sale to the balance');
+ok((await A('GET', '/api/transactions/' + pmSale.invoiceNo)).paymentMethod === 'Credit (Utang)', 'sale detail shows the new payment method');
+const pmBack = await A('PUT', '/api/transactions/' + pmSale.invoiceNo, { paymentMethod: 'Cash' });
+ok(pmBack.success === true, 'PUT accepts Cash again');
+ok((await A('GET', '/api/clients/' + pmC.id + '/history')).client.balance === 0, 'Credit -> Cash removes the debt again');
+await throws(400, () => A('PUT', '/api/transactions/' + pmSale.invoiceNo, { paymentMethod: 'Nope' }), 'PUT rejects an unknown payment method');
+
 console.log(`\nSTANDALONE STORE: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

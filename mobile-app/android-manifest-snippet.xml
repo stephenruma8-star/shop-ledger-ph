@@ -9,5 +9,21 @@
 <application android:usesCleartextTraffic="true" ...>
   <!-- ML Kit model download for the barcode scanner -->
   <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="barcode_ui" />
-  ...
+  <!-- FileProvider for handing the downloaded update APK to the system installer -->
+  <provider
+      android:name="androidx.core.content.FileProvider"
+      android:authorities="${applicationId}.fileprovider"
+      android:exported="false"
+      android:grantUriPermissions="true">
+      <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
+  </provider>
 </application>
+
+<!-- android/app/src/main/res/xml/file_paths.xml must map the app-owned update dir:
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <external-files-path name="ext_files" path="." />
+    <external-path name="my_images" path="." />
+    <cache-path name="my_cache_images" path="." />
+</paths>
+ShopUpdater downloads the APK into getExternalFilesDir(DIRECTORY_DOWNLOADS);
+external-files-path is what the installer can read under scoped storage. -->

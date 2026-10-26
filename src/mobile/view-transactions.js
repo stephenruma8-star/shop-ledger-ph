@@ -117,11 +117,47 @@ async function openTxnDetail(id) {
     <div class="grid grid-cols-2 gap-2">
       <button onclick="printSaleReceipt('${esc(t.invoiceNo || '')}')" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>${T('txn.print')}</button>
       ${(canReturn || (owner && t.status !== 'voided' && t.status !== 'return')) ? `<input id="txn-reason" type="text" maxlength="200" placeholder="Reason (optional)" autocomplete="off" class="inp col-span-2" style="height:2.4rem" />` : ''}
+      ${owner && t.status !== 'voided' && t.status !== 'return' ? `<button onclick="closeQuick();editTxnPayment(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-ghost btn-sm col-span-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>${esc(T('txn.change_payment'))}: ${esc(t.paymentMethod || 'Cash')}</button>` : ''}
       <button onclick="previewReceiptTxn(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>${T('txn.preview')}</button>
       <button onclick="shareReceiptTxn(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-ghost btn-sm col-span-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>${T('txn.share')}</button>
       ${canReturn ? `<button id="return-btn" onclick="returnTxn(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-sm col-span-2" style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);color:#f87171"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>${T('txn.return')}</button>` : ''}
       ${owner && t.status !== 'voided' && t.status !== 'return' ? `<button id="void-btn" onclick="voidTxn(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-sm col-span-2" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);color:#94a3b8"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="12" cy="12" r="10"/><line x1="4.9" y1="4.9" x2="19.1" y2="19.1"/></svg>${T('txn.void')}</button>` : ''}
     </div>`;
+}
+async function editTxnPayment(id) {
+  let t = (detailTxn && (String(detailTxn.id) === String(id) || detailTxn.invoiceNo === String(id))) ? detailTxn : null;
+  if (!t) {
+    try { t = await apiGet('/api/transactions/' + encodeURIComponent(id)); }
+    catch (e) { toast(T('txn.load_fail', { msg: e.message }), 'err'); return; }
+  }
+  const opts = ['Cash', 'GCash', 'Maya', 'Bank Transfer', 'Credit (Utang)']
+    .map(m => `<option${t.paymentMethod === m ? ' selected' : ''}>${esc(m)}</option>`).join('');
+  document.getElementById('modal-root').innerHTML = `
+    <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
+      <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-5 pb-6 slide-up glass-card" onclick="event.stopPropagation()">
+        <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
+        <h3 class="font-bold text-gray-100 text-sm mb-1">${esc(T('txn.payment_title'))}</h3>
+        <p class="text-[11px] text-gray-500 mb-3">${esc(t.invoiceNo || '')} · ${esc(t.clientName || 'Walk-in')}</p>
+        <label class="text-[11px] text-gray-500 block mb-1">${esc(T('txn.payment_method'))}</label>
+        <select id="tp-payment" class="inp mb-3">${opts}</select>
+        <button onclick="submitTxnPayment(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-primary btn-lg mb-2">${esc(T('cli.save'))}</button>
+        <button onclick="closeQuick()" class="btn btn-ghost btn-lg">Cancel</button>
+      </div>
+    </div>`;
+}
+async function submitTxnPayment(id) {
+  const pm = (document.getElementById('tp-payment') || {}).value;
+  if (!pm) return;
+  if (!takeSubmitLock('txnpay')) return;
+  try {
+    await apiPost('/api/transactions/' + encodeURIComponent(id), { paymentMethod: pm }, 'PUT');
+    feelOk();
+    toast(T('txn.payment_saved'), 'ok');
+    closeQuick();
+    await refreshAll();
+    openTxnDetail(id);
+  } catch (e) { feelErr(); toast(T('txn.save_failed', { msg: e.message }), 'err'); }
+  finally { releaseSubmitLock('txnpay'); }
 }
 async function toggleReturnLine(idx) {
   try {

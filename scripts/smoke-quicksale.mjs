@@ -363,6 +363,40 @@ try {
   await win.undoSale(await win.dbGet('transactions', 1));
   eq((await win.dbGet('clients', cliId)).balance, 0, 'undo GCash sale reverses the added balance');
 
+  // --- editing a sale's payment method re-computes the client balance ---
+  // txCash (INV-00007) is linked to cliId but was paid Cash (balanceAdded false).
+  // Changing it to Credit must add the debt; changing it back must remove it.
+  const balBeforeEdit = (await win.dbGet('clients', cliId)).balance;
+  function loadEdit(id) {
+    win.txEditingId = id;
+    win.txCart = (txEditRow.items || []).map(i => ({ date: i.date || '', description: i.description || '', name: i.name || '1', unitCost: i.unitCost || 0, intRate: i.intRate || 0, invId: i.invId }));
+  }
+  const txEditRow = await win.dbGet('transactions', txCash.id);
+  loadEdit(txCash.id);
+  getEl('tm-client').options = [{ value: String(cliId), text: 'Maria Santos' }];
+  getEl('tm-client').value = String(cliId); getEl('tm-client').selectedIndex = 0;
+  getEl('tm-payment').value = 'Credit (Utang)';
+  getEl('tm-sc').checked = false;
+  getEl('tm-discount').value = '0';
+  backdateStateTx();
+  await win.doSaveTransaction();
+  const editedCredit = await win.dbGet('transactions', txCash.id);
+  eq(editedCredit.paymentMethod, 'Credit (Utang)', 'edited sale payment method saved as Credit');
+  eq(editedCredit.balanceAdded, true, 'edited sale flagged balanceAdded');
+  eq((await win.dbGet('clients', cliId)).balance, parseFloat((balBeforeEdit + 100).toFixed(2)), 'editing Cash -> Credit adds the sale to the balance');
+  loadEdit(txCash.id);
+  getEl('tm-client').options = [{ value: String(cliId), text: 'Maria Santos' }];
+  getEl('tm-client').value = String(cliId); getEl('tm-client').selectedIndex = 0;
+  getEl('tm-payment').value = 'Cash';
+  getEl('tm-sc').checked = false;
+  getEl('tm-discount').value = '0';
+  backdateStateTx();
+  await win.doSaveTransaction();
+  const editedCash = await win.dbGet('transactions', txCash.id);
+  eq(editedCash.paymentMethod, 'Cash', 'edited sale payment method saved back to Cash');
+  eq(editedCash.balanceAdded, false, 'edited sale balanceAdded cleared for Cash');
+  eq((await win.dbGet('clients', cliId)).balance, balBeforeEdit, 'editing Credit -> Cash removes the debt again');
+
   // --- New Sale modal: Credit (Utang) option + pre-save receipt preview ---
   win.openTransactionModal();
   ok(document.getElementById('modal-root').innerHTML.includes('Credit (Utang)'), 'New Sale modal offers Credit (Utang) payment option');
@@ -502,6 +536,7 @@ try {
   await win.viewClientHistory(histId);
   const histHtml = document.getElementById('modal-root').innerHTML;
   ok(histHtml.includes('INV-H2') && histHtml.includes('INV-H1'), 'cash sale is listed in client history');
+  ok(histHtml.includes('editTransaction('), 'client history offers per-sale edit to fix payment method');
   ok(!/Bal: ₱(500|600)\.00/.test(histHtml), 'cash sale does not inflate the running balance');
   eq((histHtml.match(/Bal: ₱100\.00/g) || []).length, 4, 'running balance stays ₱100.00 through the cash sale (both tabs)');
 

@@ -206,6 +206,7 @@ function createLanApiRouter(deps) {
       if ((req.method === 'PUT' || req.method === 'DELETE') && (
         req.path.startsWith('/api/payments/') ||
         req.path.startsWith('/api/expenses/') ||
+        req.path.startsWith('/api/transactions/') ||
         req.path === '/api/settings'
       )) {
         return res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
@@ -1229,6 +1230,37 @@ function createLanApiRouter(deps) {
       grandTotal: t.grandTotal, subtotal: t.subtotal, totalInterest: t.totalInterest,
       discount: t.discount, scDiscount: t.scDiscount, status: t.status, items: t.items || []
     });
+  }));
+
+  // Change a recorded sale's payment method (e.g. Cash -> Credit). When the
+  // credit flag flips, the client's debt moves by the sale total, so a mis-keyed
+  // Cash entry becomes a real utang balance. Owner-only: it rewrites money.
+  router.put('/api/transactions/:id', wrap(async (req, res) => {
+    const pm = req.body && req.body.paymentMethod;
+    if (!['Cash','GCash','Maya','Bank Transfer','Credit (Utang)'].includes(pm)) {
+      return res.status(400).json({ error: 'Invalid payment method' });
+    }
+    if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
+    const r = JSON.parse(await deps.rendererExec(`JSON.stringify((async()=>{
+      const list=await dbAll('transactions');
+      const t=list.find(x=>x.invoiceNo===${JSON.stringify(String(req.params.id))}||String(x.id)===${JSON.stringify(String(req.params.id))});
+      if(!t)return {ok:false,error:'not found'};
+      if(t.status==='voided'||t.status==='return'||t.status==='interest')return {ok:false,error:'closed'};
+      const pm=${JSON.stringify(pm)};
+      const oldAdded=!!(t.balanceAdded!==undefined?t.balanceAdded:(t.clientId&&t.paymentMethod!=='Cash'));
+      const newAdded=!!(t.clientId&&pm!=='Cash');
+      if(oldAdded!==newAdded&&t.clientId){
+        const c=await dbGet('clients',t.clientId);
+        if(c){const delta=newAdded?(t.grandTotal||0):-(t.grandTotal||0);c.balance=Math.max(0,(c.balance||0)+delta);await dbPut('clients',c);}
+      }
+      t.paymentMethod=pm;t.balanceAdded=newAdded;t.editedAt=new Date().toISOString();
+      await dbPut('transactions',t);
+      return {ok:true,invoiceNo:t.invoiceNo};
+    })())`));
+    if (!r || !r.ok) return res.status(r && r.error === 'not found' ? 404 : 400).json({ success: false, error: (r && r.error) || 'Update failed' });
+    try { await deps.rendererExec(`(async()=>{try{await logAudit('sale-edit','Payment -> ' + ${JSON.stringify(pm)} + ' ' + ${JSON.stringify(String(r.invoiceNo || req.params.id))} + ${JSON.stringify(devTag(req))});}catch(e){}})()`); } catch (e) {}
+    deps.notify({ source: 'api', kind: 'sale-edit' });
+    res.json({ success: true, paymentMethod: pm });
   }));
 
   // Void a sale: reverses stock and any added credit balance, marks voided.
