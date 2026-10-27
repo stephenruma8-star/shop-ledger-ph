@@ -22,7 +22,19 @@ const _offlineQueue = [];
 function getOfflineQueue() { return _offlineQueue.slice(); }
 function clearOfflineQueue() { _offlineQueue.length = 0; return { ok: true }; }
 
+// Invoice-number allocation is serialized so two concurrent mobile sales can never
+// mint the same INV- number. Two rules keep it safe:
+//   1. `job` is the rejection handler too, so a failed sale still runs the next job.
+//   2. the shared chain is reset to a resolved promise, so one failure can never
+//      poison every later sale (previously the chain stayed rejected forever and
+//      every subsequent mobile sale/return failed until the app restarted).
+// The job's own rejection is still delivered to its caller.
 let _invoiceMutex = Promise.resolve();
+function enqueueInvoiceJob(job) {
+  const run = _invoiceMutex.then(job, job);
+  _invoiceMutex = run.then(() => {}, () => {});
+  return run;
+}
 
 const _ipWhitelist = new Set();
 const _ipBlacklist = new Set();
@@ -57,10 +69,16 @@ function removeFromBlacklist(ip) {
 }
 
 const _rateBuckets = new Map();
+let _rateSweep = 0;
 function rateLimit(maxPerMin = 60) {
   return (req, res, next) => {
     const key = req.ip + req.path;
     const now = Date.now();
+    // Opportunistic sweep: buckets are keyed per IP+path and were never removed, so
+    // on a long-lived shop server every new caller leaked an entry forever.
+    if (++_rateSweep % 500 === 0) {
+      for (const [k, b] of _rateBuckets) if (now - b.start > 60000) _rateBuckets.delete(k);
+    }
     const bucket = _rateBuckets.get(key);
     if (!bucket || now - bucket.start > 60000) {
       _rateBuckets.set(key, { start: now, count: 1 });
@@ -74,9 +92,23 @@ function rateLimit(maxPerMin = 60) {
   };
 }
 
+// Free-text fields are stored verbatim. They used to be HTML-entity encoded on the
+// way in, which permanently mangled real data ("LPG & rice" was stored as
+// "LPG &amp; rice", and every later edit re-escaped it again). Angle brackets and
+// control characters are still stripped so a stored value can never form markup;
+// the rendererExec call sites below are already injection-safe because every value
+// goes through JSON.stringify, and the UI escapes at render time.
 function sanitize(str) {
   if (typeof str !== 'string') return '';
-  return str.replace(/[<>"'&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c])).trim().slice(0, 500);
+  // Walk the string instead of using a control-character regex class: angle
+  // brackets are dropped so no tag can form, other control codes become spaces.
+  let out = '';
+  for (const ch of str) {
+    if (ch === '<' || ch === '>') continue;
+    const code = ch.charCodeAt(0);
+    out += (code < 32 || code === 127) ? ' ' : ch;
+  }
+  return out.trim().slice(0, 500);
 }
 
 function validateAmount(v) {
@@ -624,7 +656,7 @@ function createLanApiRouter(deps) {
     await deps.rendererExec(`
       (async () => {
         await dbAdd('expenses', { date: ${JSON.stringify(safeDate)}, category: ${JSON.stringify(cat)}, description: ${JSON.stringify(safeDesc)}, amount: ${amountNum}, payee: ${JSON.stringify(safePayee)}, createdAt: new Date().toISOString() });
-        try { await logAudit('expense-add', ${JSON.stringify(cat)} + ': ₱' + ${amountNum}.toFixed(2) + ' - ' + ${JSON.stringify(safeDesc)} + ${JSON.stringify(devTag(req))}); } catch (e) {}
+        try { await logAudit('expense-add', ${JSON.stringify(cat)} + ': ₱' + (${amountNum}).toFixed(2) + ' - ' + ${JSON.stringify(safeDesc)} + ${JSON.stringify(devTag(req))}); } catch (e) {}
       })()
     `);
     bump({ source: 'api', kind: 'expense' });
@@ -956,7 +988,7 @@ function createLanApiRouter(deps) {
     if (!s) return res.status(404).json({ error: 'Supplier not found' });
     const pm = ['Cash', 'GCash', 'Maya', 'Bank Transfer'].includes(paymentMethod) ? paymentMethod : 'Cash';
     await deps.rendererExec(`dbAdd('supplierPayments', ${JSON.stringify({ supplierId: s.id, supplierName: s.name || '', amount: amtNum, date: todayStr(), notes: sanitize(notes), paymentMethod: pm, createdAt: new Date().toISOString() })})`);
-    try { await deps.rendererExec(`(async()=>{try{await logAudit('supplier-payment','Paid ' + ${JSON.stringify(s.name || '')} + ' - ₱' + ${amtNum}.toFixed(2) + ${JSON.stringify(devTag(req))});}catch(e){}})()`); } catch (e) {}
+    try { await deps.rendererExec(`(async()=>{try{await logAudit('supplier-payment','Paid ' + ${JSON.stringify(s.name || '')} + ' - ₱' + (${amtNum}).toFixed(2) + ${JSON.stringify(devTag(req))});}catch(e){}})()`); } catch (e) {}
     bump({ source: 'api', kind: 'supplier-payment' });
     res.json({ success: true });
   }));
@@ -975,15 +1007,16 @@ function createLanApiRouter(deps) {
     const cId = JSON.stringify(clientId);
     const amt = JSON.stringify(amtNum);
     const payType = JSON.stringify(amtNum > 0 ? (type === 'Full' || type === 'Partial' ? type : null) : null);
+    const referenceNo = String((req.body && req.body.referenceNo) || '').trim().slice(0, 40);
     const safeDate = sanitize(date) || new Date().toISOString().split('T')[0];
     await deps.rendererExec(`
       (async () => {
         const c = await dbGet('clients', ${cId});
         const balBefore = c ? (c.balance || 0) : 0;
         const pt = ${payType} || (${amt} >= balBefore ? 'Full' : 'Partial');
-        await dbAdd('payments', { clientId: ${cId}, amount: ${amt}, type: pt, date: ${JSON.stringify(safeDate)}, notes: ${JSON.stringify('')}, createdAt: new Date().toISOString() });
+        await dbAdd('payments', { clientId: ${cId}, amount: ${amt}, type: pt, date: ${JSON.stringify(safeDate)}, notes: ${JSON.stringify('')}, referenceNo: ${JSON.stringify(referenceNo)}, createdAt: new Date().toISOString() });
         if (c) await dbPut('clients', { ...c, balance: Math.max(0, balBefore - ${amt}) });
-        try { await logAudit('payment', 'Mobile payment ' + (c ? c.name : 'client') + ' - ₱' + ${amt}.toFixed(2) + ${JSON.stringify(devTag(req))}); } catch (e) {}
+        try { await logAudit('payment', 'Mobile payment ' + (c ? c.name : 'client') + ' - ₱' + (Number(${amt})).toFixed(2) + ${JSON.stringify(devTag(req))}); } catch (e) {}
         return { success: true };
       })()
     `);
@@ -1020,7 +1053,7 @@ function createLanApiRouter(deps) {
     }
     if (discount && !validateAmount(discount)) return res.status(400).json({ error: 'Invalid discount' });
     if (paymentMethod && !['Cash','GCash','Maya','Bank Transfer','Credit (Utang)'].includes(paymentMethod)) return res.status(400).json({ error: 'Invalid payment method' });
-    _invoiceMutex = _invoiceMutex.then(async () => {
+    const result = await enqueueInvoiceJob(async () => {
       const invNos = JSON.parse(await deps.rendererExec(`JSON.stringify(state.transactions.filter(t=>t.invoiceNo?.startsWith('INV-')).map(t=>parseInt(t.invoiceNo.replace('INV-',''))||0))`));
       const nextNo = invNos.length > 0 ? Math.max(...invNos) + 1 : 1;
       const invoiceNo = 'INV-' + String(nextNo).padStart(5,'0');
@@ -1032,8 +1065,11 @@ function createLanApiRouter(deps) {
       const clientName = clientData ? clientData.name : 'Walk-in';
       const payMethod = paymentMethod || 'Cash';
       const txnData = JSON.stringify({ invoiceNo, clientId: clientId || null, clientName, date: todayStr(), createdAt: new Date().toISOString(), items: items.map(i => { const sub = (i.qty||1) * (i.unitCost || 0); return { ...i, amount: Math.round((sub + lineInterest(sub, i.intRate, i.date, todayStr())) * 100) / 100 }; }), subtotal, totalInterest, discount: d, scDiscount: 0, grandTotal, paymentMethod: payMethod, status: grandTotal <= 0 ? 'paid' : 'pending', balanceAdded: !!(clientId && payMethod !== 'Cash') });
-      await deps.rendererExec(`dbAdd('transactions', ${txnData})`);
-      await deps.rendererExec(`(async()=>{try{await logAudit('sale','Mobile sale ${invoiceNo} - ₱${grandTotal.toFixed(2)}${devTag(req)}');}catch(e){}})()`);
+      const txnId = JSON.parse(await deps.rendererExec(`JSON.stringify(await dbAdd('transactions', ${txnData}))`));
+      const stockUndo = [];
+      let balanceUndo = false;
+      try {
+        await deps.rendererExec(`(async()=>{try{await logAudit('sale','Mobile sale ${invoiceNo} - ₱${grandTotal.toFixed(2)}${devTag(req)}');}catch(e){}})()`);
       for (const item of items) {
         let invId = item.invId;
         if (!invId && item.description) {
@@ -1052,9 +1088,15 @@ function createLanApiRouter(deps) {
           })()`);
           item.invId = invId;
         }
-        if (invId) await deps.rendererExec(`(async()=>{const i=await dbGet('inventory',${JSON.stringify(invId)});if(i){i.stock=(i.stock||0)-${parseInt(item.qty)||1};const vn=${JSON.stringify(item.variantName || null)};if(vn&&i.variants){const v=i.variants.find(x=>x.name===vn);if(v)v.stock=(v.stock||0)-${parseInt(item.qty)||1};}await dbPut('inventory',i);}})()`);
+        if (invId) {
+          await deps.rendererExec(`(async()=>{const i=await dbGet('inventory',${JSON.stringify(invId)});if(i){i.stock=(i.stock||0)-${parseInt(item.qty)||1};const vn=${JSON.stringify(item.variantName || null)};if(vn&&i.variants){const v=i.variants.find(x=>x.name===vn);if(v)v.stock=(v.stock||0)-${parseInt(item.qty)||1};}await dbPut('inventory',i);}})()`);
+          stockUndo.push({ invId, qty: parseInt(item.qty) || 1, variantName: item.variantName || null });
+        }
       }
-      if (clientId) await deps.rendererExec(`(async()=>{const c=await dbGet('clients',${JSON.stringify(clientId)});if(c && ${JSON.stringify(payMethod)} !== 'Cash'){c.balance=(c.balance||0)+${grandTotal};await dbPut('clients',c);}})()`);
+      if (clientId && payMethod !== 'Cash') {
+        await deps.rendererExec(`(async()=>{const c=await dbGet('clients',${JSON.stringify(clientId)});if(c){c.balance=(c.balance||0)+${grandTotal};await dbPut('clients',c);}})()`);
+        balanceUndo = true;
+      }
       // Loyalty earn mirrors the desktop: floor(grandTotal × pointsPerPeso)
       // setting (default 1) plus lifetime spend tracking.
       if (clientId) {
@@ -1062,11 +1104,26 @@ function createLanApiRouter(deps) {
         const earned = Math.floor((Number(grandTotal) || 0) * ppp);
         if (earned > 0) await deps.rendererExec(`(async()=>{const c=await dbGet('clients',${JSON.stringify(clientId)});if(c){c.loyaltyPoints=(c.loyaltyPoints||0)+${earned};c.totalSpent=(c.totalSpent||0)+${grandTotal};await dbPut('clients',c);}})()`);
       }
+      } catch (err) {
+        // A part-applied sale must not survive: undo stock and balance moves, then
+        // drop the transaction row (the desktop does the same on its sale path).
+        for (const u of stockUndo) {
+          try {
+            await deps.rendererExec(`(async()=>{const i=await dbGet('inventory',${JSON.stringify(u.invId)});if(i){i.stock=(i.stock||0)+${u.qty};const vn=${JSON.stringify(u.variantName)};if(vn&&i.variants){const v=i.variants.find(x=>x.name===vn);if(v)v.stock=(v.stock||0)+${u.qty};}await dbPut('inventory',i);}})()`);
+          } catch (e) {}
+        }
+        if (balanceUndo) {
+          try { await deps.rendererExec(`(async()=>{const c=await dbGet('clients',${JSON.stringify(clientId)});if(c){c.balance=Math.max(0,(c.balance||0)-${grandTotal});await dbPut('clients',c);}})()`); } catch (e) {}
+        }
+        if (txnId !== null) {
+          try { await deps.rendererExec(`dbDel('transactions', ${JSON.stringify(txnId)})`); } catch (e) {}
+        }
+        throw err;
+      }
       bump({ source: 'api', kind: 'sale' });
       return { success: true, invoiceNo };
     });
-    await _invoiceMutex;
-    res.json(_invoiceMutex.__result || { success: true });
+    res.json(result);
   }));
 
   router.get('/api/sqlite-status', async (req, res) => {
@@ -1293,11 +1350,13 @@ function createLanApiRouter(deps) {
     const amt = parseFloat(req.body && req.body.amount);
     if (!validateAmount(amt) || amt <= 0) return res.status(400).json({ error: 'Valid amount required' });
     if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
+    const ref = req.body && req.body.referenceNo !== undefined ? String(req.body.referenceNo || '').trim().slice(0, 40) : null;
     const ok = JSON.parse(await deps.rendererExec(`JSON.stringify((async()=>{
       const p=await dbGet('payments',${JSON.stringify(req.params.id)});
       if(!p)return false;
       const diff=${Math.round(amt * 100) / 100}-(p.amount||0);
       p.amount=${Math.round(amt * 100) / 100};
+      ${ref !== null ? `p.referenceNo=${JSON.stringify(ref)};` : ''}
       await dbPut('payments',p);
       if(p.clientId){const c=await dbGet('clients',p.clientId);if(c){c.balance=Math.max(0,(c.balance||0)-diff);await dbPut('clients',c);}}
       return true;
@@ -1379,7 +1438,7 @@ function createLanApiRouter(deps) {
       }
       if (!requested.length) return res.status(400).json({ error: 'That sale was already fully returned' });
     }
-    _invoiceMutex = _invoiceMutex.then(async () => {
+    const result = await enqueueInvoiceJob(async () => {
       const invNos = JSON.parse(await deps.rendererExec(`JSON.stringify(state.transactions.filter(t=>t.invoiceNo?.startsWith('INV-')).map(t=>parseInt(t.invoiceNo.replace('INV-',''))||0))`));
       const nextNo = invNos.length > 0 ? Math.max(...invNos) + 1 : 1;
       const invoiceNo = 'INV-' + String(nextNo).padStart(5, '0');
@@ -1412,12 +1471,11 @@ function createLanApiRouter(deps) {
         if (item.invId) await deps.rendererExec(`(async()=>{const i=await dbGet('inventory',${JSON.stringify(item.invId)});if(i){i.stock=(i.stock||0)+${Math.abs(parseInt(item.qty) || 1)};await dbPut('inventory',i);}})()`);
       }
       if (orig.clientId) await deps.rendererExec(`(async()=>{const c=await dbGet('clients',${JSON.stringify(orig.clientId)});if(c && ${JSON.stringify(orig.paymentMethod || 'Cash')} !== 'Cash'){c.balance=Math.max(0,(c.balance||0)-${absTotal});await dbPut('clients',c);}})()`);
-      await deps.rendererExec(`(async()=>{try{await logAudit('return','Mobile return ' + ${JSON.stringify(orig.invoiceNo || '')} + ' → ' + ${JSON.stringify(invoiceNo)} + ' - ₱' + ${absTotal}.toFixed(2) + ${partial ? ' (partial)' : ''} + ${JSON.stringify(devTag(req))});}catch(e){}})()`);
+      await deps.rendererExec(`(async()=>{try{await logAudit('return','Mobile return ' + ${JSON.stringify(orig.invoiceNo || '')} + ' → ' + ${JSON.stringify(invoiceNo)} + ' - ₱' + (${absTotal}).toFixed(2) + ${partial ? ' (partial)' : ''} + ${JSON.stringify(devTag(req))});}catch(e){}})()`);
       bump({ source: 'api', kind: 'return' });
       return { success: true, invoiceNo };
     });
-    await _invoiceMutex;
-    res.json(_invoiceMutex.__result || { success: true });
+    res.json(result);
   }));
 
   // Product photo from a phone camera. Owner-only (catalog data); images are

@@ -51,10 +51,10 @@ async function submitPay() {
   const amount = parseFloat(amtEl.value);
   const type = typeEl.value;
   const referenceNo = ((document.getElementById('pay-ref') || {}).value || '').trim().slice(0, 40);
-  if (!clientId || !amount) return toast(T('pay.fill'), 'err');
+  if (!clientId || !(amount > 0)) return toast(T('pay.fill'), 'err');
   if (!takeSubmitLock('pay')) return;
   try {
-    const r = await apiPost('/api/payments', { clientId, amount, type, referenceNo, date: new Date().toISOString().split('T')[0] });
+    const r = await apiPost('/api/payments', { clientId, amount, type, referenceNo, date: phoneToday() });
     if (r.queued) toast(T('pay.queued'), 'ok');
     else toast(T('pay.ok'), 'ok');
     showView('home'); await refreshAll();

@@ -112,6 +112,7 @@ export async function showSupplierPaymentHistory(supplierId) {
       <td class="p-2 text-gray-500">${escapeHtml(p.referenceNo || '')}</td>
       <td class="p-2 text-gray-500">${escapeHtml(p.notes || '')}</td>
       <td class="p-2 font-medium ${runningBalance > 0 ? 'text-red-600' : 'text-green-600'}">${peso(runningBalance)}</td>
+      <td class="p-2 text-center"><button onclick="deleteSupplierPayment(${p.id})" class="text-red-500 hover:text-red-700 text-xs" title="Delete payment">✕</button></td>
     </tr>`;
   }).join('');
   modal(`
@@ -123,7 +124,7 @@ export async function showSupplierPaymentHistory(supplierId) {
         <div class="bg-gray-50 dark:bg-gray-700 p-2 rounded-lg text-center"><p class="text-xs text-gray-500">Remaining</p><p class="font-bold ${runningBalance > 0 ? 'text-red-600' : 'text-green-600'}">${peso(Math.max(0, runningBalance))}</p></div>
       </div>
       <div class="max-h-64 overflow-auto border dark:border-gray-700 rounded-lg">
-        ${payments.length === 0 ? '<p class="text-gray-400 text-xs text-center py-4">No payments recorded</p>' : `<table class="w-full text-xs"><thead><tr class="bg-gray-50 dark:bg-gray-700 sticky top-0"><th class="p-2 text-left">Date</th><th class="p-2 text-left">Amount</th><th class="p-2 text-left">Method</th><th class="p-2 text-left">Ref No</th><th class="p-2 text-left">Notes</th><th class="p-2 text-left">Balance</th></tr></thead><tbody>${rows}</tbody></table>`}
+        ${payments.length === 0 ? '<p class="text-gray-400 text-xs text-center py-4">No payments recorded</p>' : `<table class="w-full text-xs"><thead><tr class="bg-gray-50 dark:bg-gray-700 sticky top-0"><th class="p-2 text-left">Date</th><th class="p-2 text-left">Amount</th><th class="p-2 text-left">Method</th><th class="p-2 text-left">Ref No</th><th class="p-2 text-left">Notes</th><th class="p-2 text-left">Balance</th><th class="p-2"></th></tr></thead><tbody>${rows}</tbody></table>`}
       </div>
     </div>`);
 }
@@ -169,7 +170,14 @@ export async function saveSup(id) {
     category: cgEl.value.trim(),
     address: adEl.value.trim()
   };
-  if (id) { const existing = await dbGet('suppliers', id); if (existing) obj.createdAt = existing.createdAt; obj.id = id; await dbPut('suppliers', obj); await logAudit('supplier-edit', `Updated supplier ${name}`); toast('Supplier updated'); }
+  if (id) {
+    const existing = await dbGet('suppliers', id) || {};
+    // Merge to preserve priceHistory (recorded on PO receive) which this form
+    // does not edit.
+    await dbPut('suppliers', { ...existing, ...obj, id, createdAt: existing.createdAt || now() });
+    await logAudit('supplier-edit', `Updated supplier ${name}`);
+    toast('Supplier updated');
+  }
   else { obj.createdAt = now(); await dbAdd('suppliers', obj); await logAudit('supplier-add', `Added supplier ${name}`); toast('Supplier added'); }
   closeModal();
   state.suppliers = await dbAll('suppliers');
@@ -244,6 +252,24 @@ export async function showSupplierPriceHistory(supplierId) {
 }
 
 
+export async function deleteSupplierPayment(paymentId) {
+  const p = await dbGet('supplierPayments', paymentId);
+  if (!p) { toast('Payment not found', 'error'); return; }
+  if (!await confirmModal('Delete this supplier payment?')) return;
+  pushUndo({
+    description: `Deleted supplier payment ${peso(p.amount || 0)}`,
+    undo: async () => { await dbAdd('supplierPayments', p); state.supplierPayments = await dbAll('supplierPayments'); renderSupTable(); },
+    redo: async () => { await dbDel('supplierPayments', p.id); state.supplierPayments = await dbAll('supplierPayments'); renderSupTable(); }
+  });
+  await dbDel('supplierPayments', paymentId);
+  await logAudit('supplier-payment', `Deleted supplier payment ${peso(p.amount || 0)}`);
+  state.supplierPayments = await dbAll('supplierPayments');
+  renderSupTable();
+  toast('Supplier payment deleted');
+  if (p.supplierId != null) showSupplierPaymentHistory(p.supplierId);
+}
+
+
 // expose top-level bindings as globals (inline onclick handlers and legacy code paths rely on them)
 Object.defineProperties(window, {
   viewSuppliers: { get: () => viewSuppliers, configurable: true },
@@ -254,6 +280,7 @@ Object.defineProperties(window, {
   deleteSup: { get: () => deleteSup, configurable: true },
   openSupplierPayModal: { get: () => openSupplierPayModal, configurable: true },
   saveSupplierPayment: { get: () => saveSupplierPayment, configurable: true },
+  deleteSupplierPayment: { get: () => deleteSupplierPayment, configurable: true },
   showSupplierPriceHistory: { get: () => showSupplierPriceHistory, configurable: true },
   showSupplierPaymentHistory: { get: () => showSupplierPaymentHistory, configurable: true }
 });

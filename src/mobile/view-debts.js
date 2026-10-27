@@ -2,7 +2,7 @@
 async function renderDebts() {
   const v = document.getElementById('view');
   if (!data.clients.length) { v.innerHTML = skeleton(T('common.loading')); await loadAll(); }
-  const today = new Date().toISOString().split('T')[0];
+  const today = phoneToday();
   const debtors = (data.clients || [])
     .filter(c => (c.balance || 0) > 0)
     .map(c => {

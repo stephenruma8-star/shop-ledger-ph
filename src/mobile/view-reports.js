@@ -72,7 +72,7 @@ async function renderReports() {
 }
 // Debt aging buckets + per-client sales, computed on-device from cached data.
 function arAgingHTML() {
-  const today = new Date().toISOString().split('T')[0];
+  const today = phoneToday();
   const buckets = [
     { key: 'rep.ar_current', total: 0 },
     { key: 'rep.ar_30', total: 0 },

@@ -85,7 +85,14 @@ export async function saveExpense(id) {
     description: descEl.value.trim(),
     amount, payee: payeeEl.value.trim()
   };
-  if (id) { const existing = await dbGet('expenses', id); if (existing) obj.createdAt = existing.createdAt; obj.id = id; await dbPut('expenses', obj); await logAudit('expense-edit', `${obj.category}: ${peso(obj.amount)} - ${obj.description || ''}`.trim()); toast('Expense updated'); }
+  if (id) {
+    const existing = await dbGet('expenses', id) || {};
+    // Merge, never replace: an expense can carry type/refType/refId (petty cash,
+    // PO linkage) that this form does not edit and must not drop.
+    await dbPut('expenses', { ...existing, ...obj, id, createdAt: existing.createdAt || now() });
+    await logAudit('expense-edit', `${obj.category}: ${peso(obj.amount)} - ${obj.description || ''}`.trim());
+    toast('Expense updated');
+  }
   else { obj.createdAt = now(); await dbAdd('expenses', obj); await logAudit('expense-add', `${obj.category}: ${peso(obj.amount)} - ${obj.description || ''}`.trim()); toast('Expense recorded ✓'); }
   closeModal();
   state.expenses = await dbAll('expenses');

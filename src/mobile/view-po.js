@@ -139,7 +139,7 @@ async function submitPO() {
       poItems = []; editingPoId = null;
       toast('Order updated', 'ok');
     } else {
-      const r = await apiPost('/api/purchase-orders', { supplierId, items: poItems.map(i => ({ invId: i.invId, name: i.name, price: i.price, qty: i.qty })), date: new Date().toISOString().split('T')[0] });
+      const r = await apiPost('/api/purchase-orders', { supplierId, items: poItems.map(i => ({ invId: i.invId, name: i.name, price: i.price, qty: i.qty })), date: phoneToday() });
       closeQuick();
       poItems = [];
       if (r.queued) toast(T('po.queued'), 'ok');

@@ -79,7 +79,14 @@ export async function applyStockTake() {
       if (inv.variants && inv.variants.length) {
         if (d.sys > 0) {
           const factor = d.phys / d.sys;
-          inv.variants = inv.variants.map(v => ({ ...v, stock: Math.round(v.stock * factor) }));
+          const scaled = inv.variants.map(v => ({ ...v, stock: Math.max(0, Math.round(v.stock * factor)) }));
+          // Rounding each variant can drift from the physical total; absorb the
+          // remainder into the last variant so the sum always equals d.phys.
+          if (scaled.length) {
+            const drift = d.phys - scaled.reduce((s, v) => s + v.stock, 0);
+            scaled[scaled.length - 1].stock = Math.max(0, scaled[scaled.length - 1].stock + drift);
+          }
+          inv.variants = scaled;
         } else if (d.phys > 0) {
           const base = Math.floor(d.phys / inv.variants.length);
           let rem = d.phys - base * inv.variants.length;

@@ -575,6 +575,38 @@ try {
   const histRow = (overviewHtml.match(/<tr[^>]*>(?:(?!<\/tr>).)*History Cash(?:(?!<\/tr>).)*<\/tr>/s) || [''])[0];
   ok(histRow.includes('₱100.00') && !histRow.includes('₱600.00'), 'overview Charged column ignores cash sales');
 
+  // --- discount consistency: receipt + sale detail must not double-count SC/PWD ---
+  const scTxn = await win.dbGet('transactions', tx.id);
+  const scRcpt = win.receiptContentHtml(scTxn, '80mm');
+  ok(scRcpt.includes('SC/PWD'), 'receipt shows the SC/PWD line');
+  ok(!scRcpt.includes('Discount:'), 'receipt does not list the SC discount twice as Discount');
+  win.state.transactions = await win.dbAll('transactions');
+  win.viewTransactionDetail(tx.id);
+  const scDetail = document.getElementById('modal-root').innerHTML;
+  ok(scDetail.includes('282.33') && !scDetail.includes('212.33'), 'sale detail total is not double-discounted');
+
+  // --- edits must not drop fields the UI does not expose ---
+  const dayStr = new Date().toISOString().slice(0, 10);
+  const poExpId = await win.dbAdd('expenses', { date: dayStr, category: 'Purchases', description: 'PO link', amount: 500, payee: 'Sup', refType: 'po', refId: 42, createdAt: new Date().toISOString() });
+  getEl('ef-date').value = dayStr; getEl('ef-category').value = 'Purchases'; getEl('ef-desc').value = 'PO link edited'; getEl('ef-amount').value = '600'; getEl('ef-payee').value = 'Sup';
+  await win.saveExpense(poExpId);
+  const poExpAfter = await win.dbGet('expenses', poExpId);
+  ok(poExpAfter.refType === 'po' && poExpAfter.refId === 42 && poExpAfter.amount === 600, 'expense edit keeps PO link and updates the amount');
+
+  const supEditId = await win.dbAdd('suppliers', { name: 'Sup Edit', priceHistory: [{ itemName: 'X', price: 5, qty: 1, date: '2026-01-01' }], createdAt: new Date().toISOString() });
+  getEl('sf-name').value = 'Sup Edit'; getEl('sf-email').value = ''; getEl('sf-contact').value = ''; getEl('sf-category').value = ''; getEl('sf-address').value = '';
+  await win.saveSup(supEditId);
+  const supEditAfter = await win.dbGet('suppliers', supEditId);
+  ok(Array.isArray(supEditAfter.priceHistory) && supEditAfter.priceHistory.length === 1, 'supplier edit keeps price history');
+
+  const refPayId = await win.dbAdd('payments', { clientId: cliId, clientName: 'Maria Santos', amount: 50, date: dayStr, type: 'Partial', notes: '', referenceNo: 'REF-9', createdAt: new Date().toISOString() });
+  getEl('pf-client').options = [{ value: String(cliId), text: 'Maria Santos' }];
+  getEl('pf-client').value = String(cliId); getEl('pf-client').selectedIndex = 0;
+  getEl('pf-date').value = dayStr; getEl('pf-amount').value = '60'; getEl('pf-type').value = 'Partial'; getEl('pf-notes').value = '';
+  await win.savePayment(refPayId);
+  const refPayAfter = await win.dbGet('payments', refPayId);
+  ok(refPayAfter.referenceNo === 'REF-9' && refPayAfter.amount === 60, 'payment edit keeps reference number and updates the amount');
+
   if (failures === 0) {
     console.log('QUICK CART FLOW OK: single sale + multi-item cart + SC/PWD + interest + paper sizes + client balance + stock + print all verified');
     process.exit(0);

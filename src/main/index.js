@@ -448,7 +448,7 @@ function stopMdns() {
 function startLANServer() {
   const expressApp = express();
   expressApp.use(cors());
-  expressApp.use(express.json({ limit: '100mb' }));
+  expressApp.use(express.json({ limit: '16mb' }));
   expressApp.use((req, res, next) => {
     if (req.path === '/api/health' || req.path === '/' || req.path === '/manifest.webmanifest' || req.path === '/mobile-sw.js' || req.path.startsWith('/assets/')) return next();
     const token = req.headers['x-auth-token'] || req.query.token;
@@ -984,6 +984,10 @@ ipcMain.handle('open-external', async (event, url) => {
 });
 ipcMain.handle('rebuild-app', async () => {
   try {
+    // Developer-only tool (Settings → Rebuild). A packaged install has no npm and no
+    // source tree, and shelling out on a renderer's say-so would be a renderer→shell
+    // escape hatch, so refuse there instead of failing confusingly.
+    if (app.isPackaged) return { success: false, error: 'Rebuild is only available when running from source (npm run dev).' };
     const { execSync } = require('child_process');
     const result = execSync('npm run build:win', { cwd: app.getAppPath(), timeout: 300000, windowsHide: true });
     return { success: true, output: result.toString().trim() };
@@ -994,7 +998,8 @@ ipcMain.handle('rebuild-app', async () => {
 ipcMain.on('exit-confirmed', () => { isQuitting = true; app.quit(); });
 ipcMain.handle('save-encrypted-backup-to-path', async (event, { data, password, filename, folder }) => {
   try {
-    const filePath = path.join(folder, filename);
+    // basename() so a caller-supplied filename can never traverse out of `folder`.
+    const filePath = path.join(folder, path.basename(String(filename || 'backup-encrypted-' + Date.now() + '.enc')));
     const encrypted = encryptData(JSON.stringify(data), password);
     fs.writeFileSync(filePath, JSON.stringify(encrypted));
     return { success: true, path: filePath };

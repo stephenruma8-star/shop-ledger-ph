@@ -76,8 +76,80 @@ const router = createLanApiRouter({
   notify: () => {}
 });
 
+// The read router above asserts rendererExec is never called (reads must come from
+// SQLite). The write router below is the mirror image: a live renderer, backed by a
+// vm sandbox with real in-memory stores, so the actual sale scripts execute.
+const vm = require('node:vm');
+const rstores = {};
+const rid = (store) => { if (!rstores[store]) rstores[store] = []; return rstores[store]; };
+let rId = 1000;
+const rendererFaults = { on: false, step: '', afterN: 1, seen: 0 };
+const clone = (v) => (v == null ? v : structuredClone(v));
+const rAudits = [];
+const rctx = {
+  state: { transactions: [] },
+  logAudit: async (action, details) => { rAudits.push({ action, details }); },
+  // IndexedDB hands out structured clones, never live references: the scripts
+  // mutate their own copy and persist it with dbPut, so the fake must too.
+  dbAll: async (s) => rid(s).map(clone),
+  dbGet: async (s, id) => clone(rid(s).find(x => String(x.id) === String(id)) || null),
+  dbAdd: async (s, o) => {
+    const rec = { ...clone(o), id: o.id != null ? o.id : ++rId };
+    rid(s).push(rec);
+    if (s === 'transactions') rctx.state.transactions.push(clone(rec));
+    return rec.id;
+  },
+  dbPut: async (s, o) => {
+    if (rendererFaults.on && rendererFaults.step === 'dbPut:' + s) {
+      rendererFaults.seen++;
+      if (rendererFaults.seen >= rendererFaults.afterN) { rendererFaults.on = false; throw new Error('induced ' + s + ' failure'); }
+    }
+    const arr = rid(s);
+    const i = arr.findIndex(x => String(x.id) === String(o.id));
+    if (i >= 0) arr[i] = clone(o); else arr.push(clone(o));
+    if (s === 'transactions') {
+      const j = rctx.state.transactions.findIndex(x => String(x.id) === String(o.id));
+      if (j >= 0) rctx.state.transactions[j] = clone(o);
+    }
+    return o.id;
+  },
+  dbDel: async (s, id) => {
+    const arr = rid(s);
+    const i = arr.findIndex(x => String(x.id) === String(id));
+    if (i >= 0) arr.splice(i, 1);
+    if (s === 'transactions') {
+      const j = rctx.state.transactions.findIndex(x => String(x.id) === String(id));
+      if (j >= 0) rctx.state.transactions.splice(j, 1);
+    }
+  }
+};
+vm.createContext(rctx);
+const writeRouter = createLanApiRouter({
+  db: require('../src/main/db.js'),
+  userDataPath: () => userData,
+  rendererReady: () => true,
+  getRendererDump: () => { throw new Error('getRendererDump must not be called on the SQLite path'); },
+  // Electron's executeJavaScript allows top-level await; plain vm scripts do not.
+  // Retry only those (a SyntaxError) inside an async IIFE so production semantics
+  // — where `JSON.stringify(await dbGet(...))` is a valid script — are reproduced.
+  rendererExec: (js) => {
+    try { return vm.runInContext(js, rctx); }
+    catch (e) {
+      // (vm SyntaxErrors come from another realm, so match on name, not instanceof)
+      if (!(e && e.name === 'SyntaxError')) throw e;
+      return vm.runInContext('(async () => (' + js + '))()', rctx);
+    }
+  },
+  setSetting: async () => ({ success: true }),
+  lanToken: 'test-token-123',
+  wsPort: 3458,
+  verifyToken: (t) => (t === 'test-token-123' ? { ok: true, master: true, device: null } : { ok: false }),
+  notify: () => {}
+});
+
 const app = express();
 app.use(express.json());
+app.use('/w', writeRouter);
 app.use(router);
 const server = app.listen(0, '127.0.0.1', async () => {
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -330,6 +402,62 @@ const server = app.listen(0, '127.0.0.1', async () => {
 
     r = await json('/api/settings/cashier', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: 'Nena' }) });
     ok(r.status === 200 && r.body.success === true && setCalls.some(c => c[0] === 'currentCashier' && c[1] === 'Nena'), 'POST /api/settings/cashier persists via setSetting');
+
+    // --- write path: a real sale through a live (vm-backed) renderer --------------
+    rstores.clients = [{ id: 1, name: 'Nena', balance: 0 }];
+    rstores.inventory = [{ id: 11, name: 'Coke', stock: 5, sellPrice: 30, variants: [] }];
+    rctx.state.transactions = [];
+
+    const sale = await json('/w/api/sales', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId: 1, paymentMethod: 'Credit (Utang)', items: [{ description: 'Coke', qty: 2, unitCost: 30, invId: 11 }] }) });
+    ok(sale.status === 200 && sale.body.success === true, 'POST /api/sales writes through a live renderer (200)');
+    ok(sale.body.invoiceNo === 'INV-00001', 'POST /api/sales returns the new invoiceNo (regression: the response used to drop it)');
+    ok(rstores.inventory[0].stock === 3, 'POST /api/sales decrements stock');
+    ok(rstores.clients[0].balance === 60, 'POST /api/sales adds the utang balance for credit sales');
+    ok(rstores.transactions.length === 1 && rstores.transactions[0].items[0].amount === 60 && rstores.transactions[0].status === 'pending', 'POST /api/sales records the transaction with line totals');
+
+    // A sale that fails halfway must roll back AND must not poison later sales.
+    const stockBefore = rstores.inventory[0].stock;
+    rendererFaults.step = 'dbPut:clients';
+    rendererFaults.afterN = 1;
+    rendererFaults.seen = 0;
+    rendererFaults.on = true;
+    const badSale = await json('/w/api/sales', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId: 1, paymentMethod: 'Credit (Utang)', items: [{ description: 'Coke', qty: 1, unitCost: 30, invId: 11 }] }) });
+    ok(badSale.status === 500, 'POST /api/sales surfaces a mid-sale failure (500)');
+    ok(rendererFaults.on === false, 'the induced fault fired exactly once');
+    ok(rstores.inventory[0].stock === stockBefore, 'a failed sale rolls the stock move back');
+    ok(rstores.clients[0].balance === 60, 'a failed sale leaves the utang balance untouched');
+    ok(rstores.transactions.length === 1, 'a failed sale leaves no transaction row behind');
+
+    // Same, but the failure lands after the balance already moved (loyalty step):
+    // the rollback has to undo a real balance change.
+    rendererFaults.afterN = 2;
+    rendererFaults.seen = 0;
+    rendererFaults.on = true;
+    const badSale2 = await json('/w/api/sales', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId: 1, paymentMethod: 'Credit (Utang)', items: [{ description: 'Coke', qty: 1, unitCost: 30, invId: 11 }] }) });
+    ok(badSale2.status === 500, 'a failure after the balance move still fails loudly (500)');
+    ok(rstores.clients[0].balance === 60, 'the rollback undoes a balance that had already been applied');
+    ok(rstores.inventory[0].stock === stockBefore, 'the rollback also restores stock for that sale');
+    ok(rstores.transactions.length === 1, 'no transaction row survives the second failure');
+
+    const recovered = await json('/w/api/sales', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: [{ description: 'Bread', qty: 1, unitCost: 25 }], paymentMethod: 'Cash' }) });
+    ok(recovered.status === 200 && recovered.body.success === true && /^INV-\d{5}$/.test(recovered.body.invoiceNo || ''), 'a sale right after a failure still succeeds (regression: the invoice mutex used to stay rejected forever)');
+    ok(rstores.transactions.length === 2, 'the recovered sale is recorded');
+    ok(rstores.inventory.some(i => i.name === 'Bread' && i.stock === 0), 'an unknown item is auto-created from the sale line');
+
+    // Free-text handling: stored verbatim (no HTML-entity mangling), markup stripped.
+    const exp = await json('/w/api/expenses', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ description: 'LPG & rice', amount: 250, category: 'Purchases', payee: "Maria's Store" }) });
+    ok(exp.status === 200 && exp.body.success === true, 'POST /api/expenses writes through a live renderer (200)');
+    ok(rstores.expenses[0].description === 'LPG & rice' && rstores.expenses[0].payee === "Maria's Store", 'expense text is stored verbatim (regression: values used to be HTML-entity encoded on the way in)');
+    const exp2 = await json('/w/api/expenses', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ description: '<img src=x onerror=1>ok', amount: 5, category: 'Other' }) });
+    ok(exp2.status === 200 && rstores.expenses[1].description === 'img src=x onerror=1ok', 'angle brackets are stripped from stored free text');
+    ok(rAudits.some(a => a.action === 'expense-add' && String(a.details).includes('₱250.00')), 'the expense audit line carries a formatted amount (regression: a whole-number amount generated invalid JS and failed the whole write)');
+
+    // Integer amounts on the payment path used to build "250".toFixed(2), which threw
+    // inside the generated script and silently dropped the audit entry.
+    const pay = await json('/w/api/payments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId: 1, amount: 30, type: 'Partial' }) });
+    ok(pay.status === 200 && pay.body.success === true, 'POST /api/payments writes through a live renderer (200)');
+    ok(rstores.payments && rstores.payments.length === 1 && rstores.payments[0].amount === 30, 'the payment row is stored');
+    ok(rAudits.some(a => a.action === 'payment' && String(a.details).includes('₱30.00')), 'the payment audit line survives an integer amount');
   } catch (e) {
     console.error('FAIL harness: ' + e.message);
     failed++;

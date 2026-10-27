@@ -644,7 +644,7 @@ export function getProfitData() {
     if (t.status === 'voided' || t.status === 'interest') continue;
     const itms = t.items || [];
     const tot = itms.reduce((s, i) => s + (Number(i.amount) || 0), 0);
-    const disc = (t.discount || 0) + (t.scDiscount || 0);
+    const disc = (t.discount || 0);
     const ym = ymKey(t.date);
     const mp = monthProfit.get(ym) || { rev: 0, cogs: 0, disc: 0 };
     const isToday = t.date === todayStr;

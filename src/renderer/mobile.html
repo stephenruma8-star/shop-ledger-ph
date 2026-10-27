@@ -4170,10 +4170,10 @@ async function submitPay() {
   const amount = parseFloat(amtEl.value);
   const type = typeEl.value;
   const referenceNo = ((document.getElementById('pay-ref') || {}).value || '').trim().slice(0, 40);
-  if (!clientId || !amount) return toast(T('pay.fill'), 'err');
+  if (!clientId || !(amount > 0)) return toast(T('pay.fill'), 'err');
   if (!takeSubmitLock('pay')) return;
   try {
-    const r = await apiPost('/api/payments', { clientId, amount, type, referenceNo, date: new Date().toISOString().split('T')[0] });
+    const r = await apiPost('/api/payments', { clientId, amount, type, referenceNo, date: phoneToday() });
     if (r.queued) toast(T('pay.queued'), 'ok');
     else toast(T('pay.ok'), 'ok');
     showView('home'); await refreshAll();
@@ -5396,7 +5396,7 @@ async function submitPO() {
       poItems = []; editingPoId = null;
       toast('Order updated', 'ok');
     } else {
-      const r = await apiPost('/api/purchase-orders', { supplierId, items: poItems.map(i => ({ invId: i.invId, name: i.name, price: i.price, qty: i.qty })), date: new Date().toISOString().split('T')[0] });
+      const r = await apiPost('/api/purchase-orders', { supplierId, items: poItems.map(i => ({ invId: i.invId, name: i.name, price: i.price, qty: i.qty })), date: phoneToday() });
       closeQuick();
       poItems = [];
       if (r.queued) toast(T('po.queued'), 'ok');
@@ -5506,7 +5506,7 @@ async function renderReports() {
 }
 // Debt aging buckets + per-client sales, computed on-device from cached data.
 function arAgingHTML() {
-  const today = new Date().toISOString().split('T')[0];
+  const today = phoneToday();
   const buckets = [
     { key: 'rep.ar_current', total: 0 },
     { key: 'rep.ar_30', total: 0 },
@@ -5993,7 +5993,7 @@ async function renderHelp() {
 async function renderDebts() {
   const v = document.getElementById('view');
   if (!data.clients.length) { v.innerHTML = skeleton(T('common.loading')); await loadAll(); }
-  const today = new Date().toISOString().split('T')[0];
+  const today = phoneToday();
   const debtors = (data.clients || [])
     .filter(c => (c.balance || 0) > 0)
     .map(c => {

@@ -331,7 +331,7 @@ export async function saveTransaction() {
     if (txEditingId) { await doSaveTransaction(); return; }
     if (!await confirmModal(`Review Sale:
     Subtotal: ${peso(subtotal)}
-    ${totalInterest > 0 ? 'Interest: ' + peso(totalInterest) + '\n  ' : ''}${scDiscount > 0 ? 'SC/PWD: -' + peso(scDiscount) + '\n  ' : ''}${discount > 0 ? 'Discount: -' + peso(discount) + '\n  ' : ''}→ Total: ${peso(grandTotal)}
+    ${totalInterest > 0 ? 'Interest: ' + peso(totalInterest) + '\n  ' : ''}${scDiscount > 0 ? 'SC/PWD: -' + peso(scDiscount) + '\n  ' : ''}${(discount - scDiscount) > 0 ? 'Discount: -' + peso(discount - scDiscount) + '\n  ' : ''}→ Total: ${peso(grandTotal)}
     ${commissionRate > 0 ? 'Commission (' + commissionRate + '%): ' + peso(commissionAmount) + '\n' : ''}
     Proceed with this sale? (Save the sale?)`)) return;
     await doSaveTransaction();
@@ -600,8 +600,9 @@ export function buildReceiptHTML(t) {
   lines.push('-'.repeat(32));
   lines.push(`Subtotal:         ${peso(t.subtotal)}`);
   if (t.totalInterest > 0) lines.push(`Interest:         ${peso(t.totalInterest)}`);
+  const extraDiscount = Math.max(0, (t.discount || 0) - (t.scDiscount || 0));
   if (t.scDiscount > 0) lines.push(`SC/PWD 20%:       -${peso(t.scDiscount)}`);
-  if (t.discount > 0) lines.push(`Discount:         -${peso(t.discount)}`);
+  if (extraDiscount > 0) lines.push(`Discount:         -${peso(extraDiscount)}`);
   lines.push(`TOTAL:            ${peso(t.grandTotal)}`);
   lines.push('='.repeat(32));
   lines.push('Payment: ' + (t.paymentMethod || 'Cash'));
@@ -641,8 +642,9 @@ export async function printThermalReceipt(id) {
   lines.push({ t: 'divider' });
   lines.push({ text: 'Subtotal:             ' + peso(t.subtotal) });
   if (t.totalInterest > 0) lines.push({ text: 'Interest:             ' + peso(t.totalInterest) });
+  const extraDiscount = Math.max(0, (t.discount || 0) - (t.scDiscount || 0));
   if (t.scDiscount > 0) lines.push({ text: 'SC/PWD 20%:           -' + peso(t.scDiscount) });
-  if (t.discount > 0) lines.push({ text: 'Discount:             -' + peso(t.discount) });
+  if (extraDiscount > 0) lines.push({ text: 'Discount:             -' + peso(extraDiscount) });
   lines.push({ bold: true, text: 'TOTAL:                ' + peso(t.grandTotal) });
   lines.push({ t: 'divider' });
   lines.push({ text: 'Payment: ' + (t.paymentMethod || 'Cash') });
@@ -660,7 +662,8 @@ export function viewTransactionDetail(id) {
   const dynItems = (t.items||[]).map(item => ({ ...item, _amt: lineAmt(item) }));
   const dynSub = dynItems.reduce((s, i) => s + lineSub(i), 0);
   const dynInt = dynItems.reduce((s, i) => s + lineInt(i), 0);
-  const dynTotal = dynSub + dynInt - t.scDiscount - t.discount;
+  const dynExtraDiscount = Math.max(0, (t.discount || 0) - (t.scDiscount || 0));
+  const dynTotal = dynSub + dynInt - (t.discount || 0);
   modal(`
     <div class="p-6">
       <div class="flex justify-between items-center mb-4">
@@ -675,7 +678,7 @@ export function viewTransactionDetail(id) {
         <div class="flex justify-between"><span>Subtotal</span><span>${peso(dynSub)}</span></div>
         ${dynInt > 0 ? `<div class="flex justify-between text-amber-600"><span>Interest (current)</span><span>${peso(dynInt)}</span></div>` : ''}
         ${t.scDiscount > 0 ? `<div class="flex justify-between text-green-600"><span>SC/PWD 20%</span><span>-${peso(t.scDiscount)}</span></div>` : ''}
-        ${t.discount > 0 ? `<div class="flex justify-between text-orange-600"><span>Discount</span><span>-${peso(t.discount)}</span></div>` : ''}
+        ${dynExtraDiscount > 0 ? `<div class="flex justify-between text-orange-600"><span>Discount</span><span>-${peso(dynExtraDiscount)}</span></div>` : ''}
         <div class="flex justify-between font-bold text-lg border-t dark:border-gray-700 pt-1"><span>Total</span><span class="text-green-600">${peso(dynTotal)}</span></div>
         ${t.commissionRate > 0 ? `<div class="flex justify-between text-purple-600"><span>Commission (${t.commissionRate}%)</span><span>${peso(t.commissionAmount || 0)}</span></div>` : ''}
       </div>
@@ -1106,7 +1109,7 @@ export function receiptContentHtml(t, size) {
       <table class="totals"><tr><td style="text-align:right">Subtotal:</td><td style="text-align:right;width:80px">${peso(t.subtotal)}</td></tr>
       ${t.totalInterest>0?`<tr><td style="text-align:right">Interest:</td><td style="text-align:right">${peso(t.totalInterest)}</td></tr>`:''}
       ${t.scDiscount>0?`<tr><td style="text-align:right">SC/PWD:</td><td style="text-align:right">-${peso(t.scDiscount)}</td></tr>`:''}
-      ${t.discount>0?`<tr><td style="text-align:right">Discount:</td><td style="text-align:right">-${peso(t.discount)}</td></tr>`:''}
+      ${Math.max(0,(t.discount||0)-(t.scDiscount||0))>0?`<tr><td style="text-align:right">Discount:</td><td style="text-align:right">-${peso(Math.max(0,(t.discount||0)-(t.scDiscount||0)))}</td></tr>`:''}
       <tr style="font-weight:700"><td style="text-align:right">TOTAL:</td><td style="text-align:right">${peso(t.grandTotal)}</td></tr></table>
       <div class="payment">Payment: ${escapeHtml(t.paymentMethod||'Cash')}</div>
       <div class="footer">${escapeHtml(footerMsg)}</div>

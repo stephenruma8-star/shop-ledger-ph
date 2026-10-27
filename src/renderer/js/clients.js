@@ -351,7 +351,7 @@ export async function viewClientHistory(id) {
               const canSettle = t.status === 'pending' && t.clientId && !i.settled && (c.balance || 0) > 0;
               return `<tr class="border-b dark:border-gray-700 last:border-0"><td class="p-1">${escHtml(i.description||'')}</td><td class="p-1 text-center">${escHtml(i.name||'1')}</td><td class="p-1 text-right">${peso(i.unitCost||0)}</td><td class="p-1 text-right">${i.intRate?i.intRate+'%':'-'}</td><td class="p-1 text-right font-medium">${peso((getQty(i.name||i.qty||1)*(i.unitCost||0)))}</td><td class="p-1 text-right">${i.settled ? '<span class="text-green-600 font-medium">✓ Settled</span>' : (canSettle ? `<button onclick="event.stopPropagation();settleClientItem('${t.invoiceNo}',${ii})" class="text-blue-600 hover:text-blue-800 underline whitespace-nowrap" title="Pay off this item only">Settle ${peso(payoff)}</button>` : '')}</td></tr>`;
             }).join('')}
-            ${t.totalInterest > 0 || t.discount > 0 || t.scDiscount > 0 ? `<tr class="font-semibold"><td colspan="5" class="p-1 text-right text-xs">${t.totalInterest>0?'Interest: '+peso(t.totalInterest)+' ':''}${t.scDiscount>0?'SC/PWD: -'+peso(t.scDiscount)+' ':''}${t.discount>0?'Discount: -'+peso(t.discount):''}</td><td class="p-1 text-right font-bold">${peso(t.grandTotal)}</td></tr>` : ''}
+            ${t.totalInterest > 0 || t.discount > 0 || t.scDiscount > 0 ? `<tr class="font-semibold"><td colspan="5" class="p-1 text-right text-xs">${t.totalInterest>0?'Interest: '+peso(t.totalInterest)+' ':''}${t.scDiscount>0?'SC/PWD: -'+peso(t.scDiscount)+' ':''}${Math.max(0,(t.discount||0)-(t.scDiscount||0))>0?'Discount: -'+peso(Math.max(0,(t.discount||0)-(t.scDiscount||0))):''}</td><td class="p-1 text-right font-bold">${peso(t.grandTotal)}</td></tr>` : ''}
             </tbody></table>
             <div class="flex gap-3 mt-1"><button onclick="closeModal();editTransaction(${t.id})" class="text-xs text-blue-600 hover:text-blue-800">Edit this sale</button><button onclick="deleteClientSale(${t.id},${c.id})" class="text-xs text-red-500 hover:text-red-700">Delete this sale</button></div>
           </div>
@@ -465,9 +465,10 @@ export function printClientInfo(id) {
       html += `</tbody></table>`;
       if (t.totalInterest > 0 || t.discount > 0 || t.scDiscount > 0) {
         html += `<div style="font-size:10px;text-align:right;padding:2px 0">`;
+        const extraDisc = Math.max(0, (t.discount || 0) - (t.scDiscount || 0));
         if (t.totalInterest > 0) html += `<div>Interest: ₱${amt(t.totalInterest)}</div>`;
         if (t.scDiscount > 0) html += `<div>SC/PWD: -₱${amt(t.scDiscount)}</div>`;
-        if (t.discount > 0) html += `<div>Discount: -₱${amt(t.discount)}</div>`;
+        if (extraDisc > 0) html += `<div>Discount: -₱${amt(extraDisc)}</div>`;
         html += `</div>`;
       }
       html += `</div>`;

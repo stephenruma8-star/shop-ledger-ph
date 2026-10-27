@@ -594,7 +594,7 @@ export function importInventoryCSV() {
         category: row.category || '',
         price: parseFloat(row.price) || 0,
         sellPrice: parseFloat(row.sellprice || row.price) || 0,
-        cost: parseFloat(row.cost) || 0,
+        costPrice: parseFloat(row.costprice || row.cost) || 0,
         stock: parseInt(row.stock) || 0,
         minStock: parseInt(row.minstock || row.min_stock) || 5,
         unit: row.unit || 'pcs',

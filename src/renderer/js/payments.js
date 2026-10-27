@@ -107,6 +107,7 @@ export async function savePayment(id) {
   const notes = ntEl.value.trim();
   if (id) {
     const oldPay = await dbGet('payments', id);
+    if (!oldPay) { toast('Payment not found', 'error'); return; }
     if (oldPay.clientId !== clientId) {
       const oldClient = await dbGet('clients', oldPay.clientId);
       if (oldClient) { oldClient.balance = (oldClient.balance || 0) + (oldPay.amount || 0); await dbPut('clients', oldClient); }
@@ -115,7 +116,9 @@ export async function savePayment(id) {
       c.balance = Math.max(0, (c.balance || 0) + (oldPay.amount || 0) - amount);
     }
     await dbPut('clients', c);
-    const pay = { id, clientId, clientName: c.name, amount, date, type, notes, updatedAt: now() };
+    // Merge so fields this form does not edit (referenceNo, appliedAmount…)
+    // survive an update.
+    const pay = { ...oldPay, id, clientId, clientName: c.name, amount, date, type, notes, updatedAt: now() };
     if (oldPay) pay.createdAt = oldPay.createdAt;
     await dbPut('payments', pay);
     toast('Payment updated');
