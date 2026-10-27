@@ -3262,6 +3262,7 @@ async function quickSell(id) {
 let saleClientPreset = null;
 let saleRateClient = null; // client key whose rate was last bulk-applied to lines
 let saleCartClient = ''; // who the current cart items are for ('' = walk-in); switching asks whether to keep them
+let editingSaleInvoice = null; // invoiceNo being edited in-place (null = new sale)
 const SALE_DRAFTS_KEY = 'slpSaleDrafts';
 let saleDrafts = {};
 try {
@@ -3353,6 +3354,7 @@ function renderSale(presetId) {
       <div id="counter-results" class="grid gap-1.5 mt-1.5"></div>
     </div>
     ${(data.quickItems || []).length ? `<div class="flex gap-1.5 mb-3 fade-in overflow-x-auto" style="scrollbar-width:none">${data.quickItems.slice(0, 12).map((q, qi) => `<button onclick="quickAddItem(${qi})" class="shrink-0 px-3 py-2 rounded-xl text-xs font-semibold" style="background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);color:#93c5fd">${esc(q.name)} · ${peso(q.price)}</button>`).join('')}${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button onclick="managePresets()" class="shrink-0 px-3 py-2 rounded-xl text-xs font-semibold" style="background:rgba(255,255,255,.06);border:1px dashed rgba(255,255,255,.2);color:#94a3b8">⚙️ Presets</button>` : ''}</div>` : ''}
+    ${editingSaleInvoice ? `<div class="glass-card rounded-2xl p-3 mb-3 flex items-center justify-between gap-2 fade-in" style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4)"><span class="text-xs font-semibold text-amber-300">Editing ${esc(editingSaleInvoice)}</span><button onclick="cancelSaleEdit()" class="btn btn-ghost btn-sm">Cancel</button></div>` : ''}
     ${saleDraftBanner()}
     ${lastFailedSale ? `<button onclick="retrySale()" class="btn w-full mb-3 py-2.5 rounded-xl font-semibold text-sm fade-in" style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.5);color:#fbbf24"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>${T('sale.retry')}</button>` : ''}
     <div class="glass-card rounded-2xl p-2 mb-3 fade-in">
@@ -3433,7 +3435,7 @@ function renderSale(presetId) {
       </div>
       <div class="flex gap-2">
         <button onclick="previewSaleDraft()" class="btn btn-ghost" id="sale-preview-btn" style="flex:0 0 auto"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>${T('sale.preview')}</button>
-        <button onclick="submitSale()" class="btn btn-primary btn-lg flex-1" id="sale-btn"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>${T('sale.save')}</button>
+        <button onclick="submitSale()" class="btn btn-primary btn-lg flex-1" id="sale-btn"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>${editingSaleInvoice ? 'Update sale' : T('sale.save')}</button>
       </div>
     </div>
     <div style="height:9rem"></div>`;
@@ -3814,6 +3816,43 @@ function addManualItem() {
   toast(T('sale.added_cart', { name }), 'ok');
   if (currentView === 'sale') renderSale();
 }
+function cancelSaleEdit() {
+  editingSaleInvoice = null;
+  cart = [];
+  try { saleClientPreset = null; saleRateClient = null; saleCartClient = ''; } catch (e) {}
+  updateCartUI();
+  showView('transactions');
+}
+// Load a recorded sale into the sale cart so its items/qty/price/discount/payment
+// can be edited in place, then saved with the same interface.
+async function editSaleFromDetail(invoiceNo) {
+  let t = null;
+  try { t = await apiGet('/api/transactions/' + encodeURIComponent(invoiceNo)); }
+  catch (e) { toast(T('txn.load_fail', { msg: e.message }), 'err'); return; }
+  if (!t) return;
+  if (t.status === 'voided' || t.status === 'return') { toast('This sale cannot be edited', 'err'); return; }
+  editingSaleInvoice = t.invoiceNo || invoiceNo;
+  const cid = t.clientId != null ? String(t.clientId) : '';
+  const c = cid ? (data.clients || []).find(x => String(x.id) === String(cid)) : null;
+  cart = (t.items || []).map(it => ({
+    invId: it.invId, name: it.description || it.name || 'Item',
+    qty: parseFloat(it.qty) || 1, price: it.unitCost || it.price || 0,
+    intRate: it.intRate || 0, date: it.date || t.date
+  }));
+  tendered = 0;
+  saleClientPreset = cid || null;
+  saleCartClient = cid;
+  // Pin the client-rate key so renderSale does not overwrite the saved per-line rates.
+  saleRateClient = cid + ':' + String((c && parseFloat(c.lastRate)) || 0);
+  closeQuick();
+  showView('sale');
+  try {
+    const ps = document.getElementById('sale-payment'); if (ps) ps.value = t.paymentMethod || 'Cash';
+    const de = document.getElementById('sale-discount'); if (de) de.value = String(Math.max(0, Math.round(((t.discount || 0) - (t.scDiscount || 0)) * 100) / 100));
+    const sx = document.getElementById('sale-sc'); if (sx) sx.checked = (t.scDiscount || 0) > 0;
+  } catch (e) {}
+  renderSale();
+}
 async function submitSale() {
   if (!cart.length) return toast(T('sale.need_items'), 'err');
   const clientSel = document.getElementById('sale-client');
@@ -3837,7 +3876,20 @@ async function submitSale() {
   // The picked client is ALWAYS linked (cash sales show in their history
   // with no balance effect); only non-cash methods add to the balance.
   const body = { clientId, items, paymentMethod, discount: disc };
+  const editing = editingSaleInvoice;
   try {
+    if (editing) {
+      await apiPost('/api/sales/' + encodeURIComponent(editing), body, 'PUT');
+      editingSaleInvoice = null;
+      lastFailedSale = null; tendered = 0;
+      clearSaleDraft(clientId);
+      try { saleClientPreset = null; saleRateClient = null; saleCartClient = ''; } catch (e) {}
+      cart = []; updateCartUI();
+      toast('Sale updated', 'ok');
+      await refreshAll();
+      openTxnDetail(editing);
+      return;
+    }
     const r = await apiPost('/api/sales', body);
     if (r.queued) { lastFailedSale = null; tendered = 0; clearSaleDraft(clientId); try { saleClientPreset = null; saleRateClient = null; saleCartClient = ''; } catch (e) {} toast(T('sale.queued'), 'ok'); cart = []; updateCartUI(); showView('home'); await refreshAll(); return; }
     lastFailedSale = null; tendered = 0;
@@ -4606,6 +4658,7 @@ async function openTxnDetail(id) {
       <button onclick="printSaleReceipt('${esc(t.invoiceNo || '')}')" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>${T('txn.print')}</button>
       ${(canReturn || (owner && t.status !== 'voided' && t.status !== 'return')) ? `<input id="txn-reason" type="text" maxlength="200" placeholder="Reason (optional)" autocomplete="off" class="inp col-span-2" style="height:2.4rem" />` : ''}
       ${owner && t.status !== 'voided' && t.status !== 'return' ? `<button onclick="closeQuick();editTxnPayment(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-ghost btn-sm col-span-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>${esc(T('txn.change_payment'))}: ${esc(t.paymentMethod || 'Cash')}</button>` : ''}
+      ${owner && t.status !== 'voided' && t.status !== 'return' ? `<button onclick="closeQuick();editSaleFromDetail(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-ghost btn-sm col-span-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>Edit items</button>` : ''}
       <button onclick="previewReceiptTxn(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>${T('txn.preview')}</button>
       <button onclick="shareReceiptTxn(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-ghost btn-sm col-span-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>${T('txn.share')}</button>
       ${canReturn ? `<button id="return-btn" onclick="returnTxn(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-sm col-span-2" style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);color:#f87171"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>${T('txn.return')}</button>` : ''}
@@ -5225,10 +5278,10 @@ async function renderSupplierPay(id) {
           <div>
             <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">${T('sup.history')}</h4>
             <div class="space-y-1.5">
-              ${hist.payments.slice(0, 5).map(p => `
-              <div class="flex justify-between text-sm gap-2">
+              ${hist.payments.slice(0, 10).map(p => `
+              <div class="flex justify-between text-sm gap-2 items-center">
                 <span class="text-gray-200">${fmtDate(p.date)}${p.paymentMethod ? ' <span class="text-gray-500">· ' + esc(p.paymentMethod) + '</span>' : ''}</span>
-                <span class="text-green-400 num shrink-0">-${peso(p.amount)}</span>
+                <span class="flex items-center gap-1.5 shrink-0"><span class="text-green-400 num">-${peso(p.amount)}</span>${phoneRole() === 'cashier' ? '' : `<button onclick="editSupplierPaymentMobile(${JSON.stringify(p.id)})" class="text-blue-400 px-1" title="Edit">&#9998;</button><button onclick="deleteSupplierPaymentMobile(${JSON.stringify(p.id)})" class="text-red-400 px-1" title="Delete">&#10005;</button>`}</span>
               </div>`).join('')}
             </div>
           </div>` : (hist ? `<p class="text-[11px] text-gray-500">${T('sup.no_history')}</p>` : '')}
@@ -5252,6 +5305,64 @@ async function submitSupplierPay() {
     await refreshAll();
   } catch (e) { feelErr(); toast(T('sup.pay_failed', { msg: e.message }), 'err'); }
   finally { releaseSubmitLock('suppay'); }
+}
+
+async function editSupplierPaymentMobile(id) {
+  if (!supplierPayId) return;
+  let p = null;
+  try { const hist = await apiGet('/api/suppliers/' + encodeURIComponent(supplierPayId) + '/payments'); p = (hist.payments || []).find(x => String(x.id) === String(id)); } catch (e) {}
+  if (!p) { toast('Payment not found', 'err'); return; }
+  const methods = ['Cash', 'GCash', 'Maya', 'Bank Transfer'];
+  document.getElementById('modal-root').innerHTML = `
+    <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
+      <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-5 pb-6 slide-up glass-card" onclick="event.stopPropagation()">
+        <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
+        <h3 class="font-bold text-gray-100 text-sm mb-3">Edit supplier payment</h3>
+        <label class="text-[11px] text-gray-500 block mb-1">${T('sup.amount')}</label>
+        <input id="spe-amount" type="number" min="0" step="0.01" value="${p.amount || 0}" class="inp mb-3" />
+        <label class="text-[11px] text-gray-500 block mb-1">${T('sup.method')}</label>
+        <select id="spe-method" class="inp mb-3">${methods.map(m => `<option${p.paymentMethod === m ? ' selected' : ''}>${m}</option>`).join('')}</select>
+        <label class="text-[11px] text-gray-500 block mb-1">Notes</label>
+        <input id="spe-notes" type="text" maxlength="200" value="${escAttr(p.notes || '')}" class="inp mb-3" />
+        <button onclick="submitSupplierPaymentEditMobile(${JSON.stringify(p.id)})" class="btn btn-primary btn-lg mb-2">Save</button>
+        <button onclick="renderSupplierPay(${JSON.stringify(supplierPayId)})" class="btn btn-ghost btn-lg">Cancel</button>
+      </div>
+    </div>`;
+}
+
+async function submitSupplierPaymentEditMobile(id) {
+  const amount = parseFloat((document.getElementById('spe-amount') || {}).value);
+  const method = (document.getElementById('spe-method') || {}).value || 'Cash';
+  const notes = ((document.getElementById('spe-notes') || {}).value || '').trim().slice(0, 200);
+  if (!(amount > 0)) { toast(T('sup.need_amount'), 'err'); return; }
+  if (!takeSubmitLock('suppayedit')) return;
+  try {
+    await apiPost('/api/supplier-payments/' + encodeURIComponent(id), { amount, paymentMethod: method, notes }, 'PUT');
+    toast('Payment updated', 'ok');
+    closeQuick();
+    await refreshAll();
+    renderSupplierPay(supplierPayId);
+  } catch (e) { toast(T('sup.pay_failed', { msg: e.message }), 'err'); }
+  finally { releaseSubmitLock('suppayedit'); }
+}
+
+let supplierPayDeleteArmed = null;
+async function deleteSupplierPaymentMobile(id) {
+  if (supplierPayDeleteArmed !== id) {
+    supplierPayDeleteArmed = id;
+    toast('Tap again to delete', 'info');
+    setTimeout(() => { if (supplierPayDeleteArmed === id) supplierPayDeleteArmed = null; }, 5000);
+    return;
+  }
+  supplierPayDeleteArmed = null;
+  if (!takeSubmitLock('suppaydel')) return;
+  try {
+    await apiPost('/api/supplier-payments/' + encodeURIComponent(id), {}, 'DELETE');
+    toast('Payment deleted', 'ok');
+    await refreshAll();
+    renderSupplierPay(supplierPayId);
+  } catch (e) { toast(T('sup.pay_failed', { msg: e.message }), 'err'); }
+  finally { releaseSubmitLock('suppaydel'); }
 }
 
 // ===== src/mobile/view-po.js =====

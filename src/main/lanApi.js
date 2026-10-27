@@ -239,6 +239,8 @@ function createLanApiRouter(deps) {
         req.path.startsWith('/api/payments/') ||
         req.path.startsWith('/api/expenses/') ||
         req.path.startsWith('/api/transactions/') ||
+        req.path.startsWith('/api/sales/') ||
+        req.path.startsWith('/api/supplier-payments/') ||
         req.path === '/api/settings'
       )) {
         return res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
@@ -993,6 +995,39 @@ function createLanApiRouter(deps) {
     res.json({ success: true });
   }));
 
+  // Edit a supplier payment (money-out record; owner-only via the role gate).
+  router.put('/api/supplier-payments/:id', wrap(async (req, res) => {
+    const { amount, paymentMethod, notes, date } = req.body || {};
+    if (!validateAmount(amount)) return res.status(400).json({ error: 'Valid amount required' });
+    const amtNum = Math.round((parseFloat(amount) || 0) * 100) / 100;
+    if (amtNum <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' });
+    if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
+    const ok = JSON.parse(await deps.rendererExec(`JSON.stringify((async()=>{
+      const p=await dbGet('supplierPayments',${JSON.stringify(req.params.id)});
+      if(!p)return false;
+      p.amount=${amtNum};
+      p.paymentMethod=${JSON.stringify(['Cash','GCash','Maya','Bank Transfer'].includes(paymentMethod) ? paymentMethod : (undefined))} || p.paymentMethod || 'Cash';
+      ${date ? `p.date=${JSON.stringify(sanitize(date))};` : ''}
+      ${notes !== undefined ? `p.notes=${JSON.stringify(sanitize(notes))};` : ''}
+      await dbPut('supplierPayments',p);return true;
+    })())`));
+    if (!ok) return res.status(404).json({ error: 'Payment not found' });
+    bump({ source: 'api', kind: 'supplier-payment' });
+    res.json({ success: true });
+  }));
+
+  router.delete('/api/supplier-payments/:id', wrap(async (req, res) => {
+    if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
+    const ok = JSON.parse(await deps.rendererExec(`JSON.stringify((async()=>{
+      const p=await dbGet('supplierPayments',${JSON.stringify(req.params.id)});
+      if(!p)return false;
+      await dbDel('supplierPayments',p.id);return true;
+    })())`));
+    if (!ok) return res.status(404).json({ error: 'Payment not found' });
+    bump({ source: 'api', kind: 'supplier-payment' });
+    res.json({ success: true });
+  }));
+
   router.post('/api/payments', wrap(async (req, res) => {
     if (req.query.offline === 'true') {
       _offlineQueue.push({ type: 'payment', body: req.body, timestamp: Date.now() });
@@ -1035,6 +1070,55 @@ function createLanApiRouter(deps) {
     try { await deps.rendererExec(`(async()=>{try{await logAudit('settle','Mobile item settlement ' + ${JSON.stringify(invoiceNo)} + ${JSON.stringify(devTag(req))});}catch(e){}})()`); } catch (e) {}
     bump({ source: 'api', kind: 'settle' });
     res.json({ success: true, amount: out.amount, paymentId: out.paymentId, allSettled: !!out.allSettled });
+  }));
+
+  // Edit a recorded sale's items/discount/payment method, reconciling stock and
+  // the client's balance. Owner-only via the role gate. Same validation and
+  // per-line interest math as POST /api/sales.
+  router.put('/api/sales/:invoiceNo', wrap(async (req, res) => {
+    const ref = String(req.params.invoiceNo || '');
+    const { clientId, items, paymentMethod, discount } = req.body || {};
+    if (!items || !Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'At least one item required' });
+    if (items.length > 100) return res.status(400).json({ error: 'Too many items (max 100)' });
+    for (const item of items) {
+      if (!item.description || typeof item.description !== 'string') return res.status(400).json({ error: 'Each item must have a description' });
+      if (!validateAmount(item.unitCost)) return res.status(400).json({ error: 'Invalid item price' });
+      if (item.qty && (isNaN(parseInt(item.qty)) || parseInt(item.qty) < 1)) return res.status(400).json({ error: 'Invalid item quantity' });
+    }
+    if (discount && !validateAmount(discount)) return res.status(400).json({ error: 'Invalid discount' });
+    if (paymentMethod && !['Cash','GCash','Maya','Bank Transfer','Credit (Utang)'].includes(paymentMethod)) return res.status(400).json({ error: 'Invalid payment method' });
+    if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
+    const subtotal = Math.round(items.reduce((s, i) => s + ((i.qty||1) * (i.unitCost || 0)), 0) * 100) / 100;
+    const totalInterest = Math.round(items.reduce((s, i) => s + lineInterest((i.qty||1) * (i.unitCost || 0), i.intRate, i.date, todayStr()), 0) * 100) / 100;
+    const d = parseFloat(discount) || 0;
+    const grandTotal = Math.max(0, Math.round((subtotal + totalInterest - d) * 100) / 100);
+    const clientData = clientId ? JSON.parse(await deps.rendererExec(`JSON.stringify(await dbGet('clients', ${JSON.stringify(clientId)}))`)) : null;
+    const clientName = clientData ? clientData.name : 'Walk-in';
+    const payMethod = paymentMethod || 'Cash';
+    const cId = clientId ? JSON.stringify(clientId) : 'null';
+    const newItems = JSON.stringify(items.map(i => { const sub = (i.qty||1) * (i.unitCost || 0); return { ...i, amount: Math.round((sub + lineInterest(sub, i.intRate, i.date, todayStr())) * 100) / 100 }; }));
+    const r = JSON.parse(await deps.rendererExec(`JSON.stringify((async()=>{
+      const list=await dbAll('transactions');
+      const t=list.find(x=>x.invoiceNo===${JSON.stringify(ref)}||String(x.id)===${JSON.stringify(ref)});
+      if(!t)return {ok:false,error:'not found'};
+      if(t.status==='voided'||t.status==='return'||t.status==='interest')return {ok:false,error:'closed'};
+      for(const it of (t.items||[])){if(it.invId){const i=await dbGet('inventory',it.invId);if(i){i.stock=(i.stock||0)+(parseInt(it.qty)||1);const vn=it.variantName;if(vn&&i.variants){const v=i.variants.find(x=>x.name===vn);if(v)v.stock=(v.stock||0)+(parseInt(it.qty)||1);}await dbPut('inventory',i);}}}
+      const oldAdded=!!(t.balanceAdded!==undefined?t.balanceAdded:(t.clientId&&t.paymentMethod!=='Cash'));
+      if(oldAdded&&t.clientId){const c=await dbGet('clients',t.clientId);if(c){c.balance=Math.max(0,(c.balance||0)-(t.grandTotal||0));await dbPut('clients',c);}}
+      const newItems=${newItems};
+      for(const it of newItems){if(it.invId){const i=await dbGet('inventory',it.invId);if(i){i.stock=(i.stock||0)-(parseInt(it.qty)||1);const vn=it.variantName;if(vn&&i.variants){const v=i.variants.find(x=>x.name===vn);if(v)v.stock=(v.stock||0)-(parseInt(it.qty)||1);}await dbPut('inventory',i);}}}
+      const newAdded=!!(${cId} && ${JSON.stringify(payMethod)}!=='Cash');
+      if(newAdded&&${cId}){const c=await dbGet('clients',${cId});if(c){c.balance=(c.balance||0)+${grandTotal};await dbPut('clients',c);}}
+      t.items=newItems;t.subtotal=${subtotal};t.totalInterest=${totalInterest};t.discount=${d};t.scDiscount=0;t.grandTotal=${grandTotal};
+      t.clientId=${cId};t.clientName=${JSON.stringify(clientName)};t.paymentMethod=${JSON.stringify(payMethod)};t.balanceAdded=newAdded;
+      t.status=${grandTotal}<=0?'paid':'pending';t.editedAt=new Date().toISOString();
+      await dbPut('transactions',t);
+      return {ok:true,invoiceNo:t.invoiceNo};
+    })())`));
+    if (!r || !r.ok) return res.status(r && r.error === 'not found' ? 404 : 400).json({ success: false, error: (r && r.error) || 'Update failed' });
+    try { await deps.rendererExec(`(async()=>{try{await logAudit('sale-edit','Mobile sale ${r.invoiceNo} - ₱${grandTotal.toFixed(2)}${devTag(req)}');}catch(e){}})()`); } catch (e) {}
+    bump({ source: 'api', kind: 'sale-edit' });
+    res.json({ success: true, invoiceNo: r.invoiceNo });
   }));
 
   router.post('/api/sales', wrap(async (req, res) => {

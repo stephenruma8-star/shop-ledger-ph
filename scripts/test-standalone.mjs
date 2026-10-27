@@ -491,5 +491,33 @@ ok(pmBack.success === true, 'PUT accepts Cash again');
 ok((await A('GET', '/api/clients/' + pmC.id + '/history')).client.balance === 0, 'Credit -> Cash removes the debt again');
 await throws(400, () => A('PUT', '/api/transactions/' + pmSale.invoiceNo, { paymentMethod: 'Nope' }), 'PUT rejects an unknown payment method');
 
+// full sale edit: replace items and reconcile stock + balance
+const edC = await A('POST', '/api/clients', { name: 'Edit Client' });
+const edSale = await A('POST', '/api/sales', { clientId: edC.id, items: [{ description: 'Oil', qty: 2, unitCost: 30, invId: it2.id }], paymentMethod: 'Credit (Utang)' });
+const edStock0 = (await A('GET', '/api/inventory')).find(i => i.id === it2.id).stock;
+ok((await A('GET', '/api/clients/' + edC.id + '/history')).client.balance === 60, 'edit-test sale opens a 60 debt');
+const edUpd = await A('PUT', '/api/sales/' + edSale.invoiceNo, { clientId: edC.id, items: [{ description: 'Oil', qty: 1, unitCost: 30, invId: it2.id }], paymentMethod: 'Credit (Utang)' });
+ok(edUpd.success && edUpd.invoiceNo === edSale.invoiceNo, 'sale edit returns the same invoice');
+ok((await A('GET', '/api/inventory')).find(i => i.id === it2.id).stock === edStock0 + 1, 'sale edit restores the dropped unit');
+ok((await A('GET', '/api/clients/' + edC.id + '/history')).client.balance === 30, 'sale edit recomputes the balance (60 -> 30)');
+const edDet = await A('GET', '/api/transactions/' + edSale.invoiceNo);
+ok(edDet.items.length === 1 && edDet.items[0].amount === 30 && edDet.grandTotal === 30, 'sale edit rewrites lines and totals');
+await A('PUT', '/api/sales/' + edSale.invoiceNo, { clientId: edC.id, items: [{ description: 'Oil', qty: 1, unitCost: 30, invId: it2.id }], paymentMethod: 'Cash' });
+ok((await A('GET', '/api/clients/' + edC.id + '/history')).client.balance === 0, 'sale edit Credit -> Cash clears the debt');
+await throws(400, () => A('PUT', '/api/sales/' + edSale.invoiceNo, { items: [] }), 'sale edit needs items');
+await throws(404, () => A('PUT', '/api/sales/INV-99999', { items: [{ description: 'x', qty: 1, unitCost: 1 }] }), 'sale edit 404s on an unknown invoice');
+
+// supplier payment edit + delete
+const supEP = await A('POST', '/api/suppliers', { name: 'Edit Sup' });
+await A('POST', '/api/supplier-payments', { supplierId: supEP.id, amount: 100, paymentMethod: 'Cash' });
+const spId = (await A('GET', '/api/suppliers/' + supEP.id + '/payments')).payments[0].id;
+await A('PUT', '/api/supplier-payments/' + spId, { amount: 150, paymentMethod: 'GCash', notes: 'x' });
+const supHist2 = await A('GET', '/api/suppliers/' + supEP.id + '/payments');
+ok(supHist2.payments[0].amount === 150 && supHist2.payments[0].paymentMethod === 'GCash', 'supplier payment edit updates amount and method');
+await throws(400, () => A('PUT', '/api/supplier-payments/' + spId, { amount: -1 }), 'supplier payment edit rejects a bad amount');
+await A('DELETE', '/api/supplier-payments/' + spId);
+ok((await A('GET', '/api/suppliers/' + supEP.id + '/payments')).payments.length === 0, 'supplier payment delete removes it');
+await throws(404, () => A('PUT', '/api/supplier-payments/999999', { amount: 5 }), 'supplier payment edit 404s on unknown id');
+
 console.log(`\nSTANDALONE STORE: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

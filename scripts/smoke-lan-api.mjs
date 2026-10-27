@@ -268,6 +268,22 @@ const server = app.listen(0, '127.0.0.1', async () => {
     ok(tpNoRenderer.status === 503, 'PUT /api/transactions/:id requires the renderer (503 in harness)');
     const tpCashier = await fetch(base + '/api/transactions/1?token=dev_cash-1', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paymentMethod: 'Credit (Utang)' }) });
     ok(tpCashier.status === 403, 'cashier blocked from editing a sale payment method (403)');
+    // full sale edit: validation, renderer requirement, cashier block
+    const seBad = await json('/api/sales/INV-00001', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: [] }) });
+    ok(seBad.status === 400, 'PUT /api/sales/:invoiceNo rejects empty items (400)');
+    const seNoR = await json('/api/sales/INV-00001', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: [{ description: 'x', qty: 1, unitCost: 1 }] }) });
+    ok(seNoR.status === 503, 'PUT /api/sales/:invoiceNo requires the renderer (503 in harness)');
+    const seCash = await fetch(base + '/api/sales/INV-00001?token=dev_cash-1', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: [{ description: 'x', qty: 1, unitCost: 1 }] }) });
+    ok(seCash.status === 403, 'cashier blocked from editing a sale (403)');
+    // supplier payment edit/delete: validation, gating
+    const speBad = await json('/api/supplier-payments/1', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: -5 }) });
+    ok(speBad.status === 400, 'PUT /api/supplier-payments/:id rejects a bad amount (400)');
+    const speNoR = await json('/api/supplier-payments/1', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: 5 }) });
+    ok(speNoR.status === 503, 'PUT /api/supplier-payments/:id requires the renderer (503 in harness)');
+    const speCash = await fetch(base + '/api/supplier-payments/1?token=dev_cash-1', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: 5 }) });
+    ok(speCash.status === 403, 'cashier blocked from editing supplier payments (403)');
+    const speDelCash = await fetch(base + '/api/supplier-payments/1?token=dev_cash-1', { method: 'DELETE' });
+    ok(speDelCash.status === 403, 'cashier blocked from deleting supplier payments (403)');
 
     // returns: validation first, renderer needed for the real thing
     const retBad = await json('/api/returns', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });

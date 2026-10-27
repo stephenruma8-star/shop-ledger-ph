@@ -143,10 +143,10 @@ async function renderSupplierPay(id) {
           <div>
             <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">${T('sup.history')}</h4>
             <div class="space-y-1.5">
-              ${hist.payments.slice(0, 5).map(p => `
-              <div class="flex justify-between text-sm gap-2">
+              ${hist.payments.slice(0, 10).map(p => `
+              <div class="flex justify-between text-sm gap-2 items-center">
                 <span class="text-gray-200">${fmtDate(p.date)}${p.paymentMethod ? ' <span class="text-gray-500">· ' + esc(p.paymentMethod) + '</span>' : ''}</span>
-                <span class="text-green-400 num shrink-0">-${peso(p.amount)}</span>
+                <span class="flex items-center gap-1.5 shrink-0"><span class="text-green-400 num">-${peso(p.amount)}</span>${phoneRole() === 'cashier' ? '' : `<button onclick="editSupplierPaymentMobile(${JSON.stringify(p.id)})" class="text-blue-400 px-1" title="Edit">&#9998;</button><button onclick="deleteSupplierPaymentMobile(${JSON.stringify(p.id)})" class="text-red-400 px-1" title="Delete">&#10005;</button>`}</span>
               </div>`).join('')}
             </div>
           </div>` : (hist ? `<p class="text-[11px] text-gray-500">${T('sup.no_history')}</p>` : '')}
@@ -170,5 +170,63 @@ async function submitSupplierPay() {
     await refreshAll();
   } catch (e) { feelErr(); toast(T('sup.pay_failed', { msg: e.message }), 'err'); }
   finally { releaseSubmitLock('suppay'); }
+}
+
+async function editSupplierPaymentMobile(id) {
+  if (!supplierPayId) return;
+  let p = null;
+  try { const hist = await apiGet('/api/suppliers/' + encodeURIComponent(supplierPayId) + '/payments'); p = (hist.payments || []).find(x => String(x.id) === String(id)); } catch (e) {}
+  if (!p) { toast('Payment not found', 'err'); return; }
+  const methods = ['Cash', 'GCash', 'Maya', 'Bank Transfer'];
+  document.getElementById('modal-root').innerHTML = `
+    <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
+      <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-5 pb-6 slide-up glass-card" onclick="event.stopPropagation()">
+        <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
+        <h3 class="font-bold text-gray-100 text-sm mb-3">Edit supplier payment</h3>
+        <label class="text-[11px] text-gray-500 block mb-1">${T('sup.amount')}</label>
+        <input id="spe-amount" type="number" min="0" step="0.01" value="${p.amount || 0}" class="inp mb-3" />
+        <label class="text-[11px] text-gray-500 block mb-1">${T('sup.method')}</label>
+        <select id="spe-method" class="inp mb-3">${methods.map(m => `<option${p.paymentMethod === m ? ' selected' : ''}>${m}</option>`).join('')}</select>
+        <label class="text-[11px] text-gray-500 block mb-1">Notes</label>
+        <input id="spe-notes" type="text" maxlength="200" value="${escAttr(p.notes || '')}" class="inp mb-3" />
+        <button onclick="submitSupplierPaymentEditMobile(${JSON.stringify(p.id)})" class="btn btn-primary btn-lg mb-2">Save</button>
+        <button onclick="renderSupplierPay(${JSON.stringify(supplierPayId)})" class="btn btn-ghost btn-lg">Cancel</button>
+      </div>
+    </div>`;
+}
+
+async function submitSupplierPaymentEditMobile(id) {
+  const amount = parseFloat((document.getElementById('spe-amount') || {}).value);
+  const method = (document.getElementById('spe-method') || {}).value || 'Cash';
+  const notes = ((document.getElementById('spe-notes') || {}).value || '').trim().slice(0, 200);
+  if (!(amount > 0)) { toast(T('sup.need_amount'), 'err'); return; }
+  if (!takeSubmitLock('suppayedit')) return;
+  try {
+    await apiPost('/api/supplier-payments/' + encodeURIComponent(id), { amount, paymentMethod: method, notes }, 'PUT');
+    toast('Payment updated', 'ok');
+    closeQuick();
+    await refreshAll();
+    renderSupplierPay(supplierPayId);
+  } catch (e) { toast(T('sup.pay_failed', { msg: e.message }), 'err'); }
+  finally { releaseSubmitLock('suppayedit'); }
+}
+
+let supplierPayDeleteArmed = null;
+async function deleteSupplierPaymentMobile(id) {
+  if (supplierPayDeleteArmed !== id) {
+    supplierPayDeleteArmed = id;
+    toast('Tap again to delete', 'info');
+    setTimeout(() => { if (supplierPayDeleteArmed === id) supplierPayDeleteArmed = null; }, 5000);
+    return;
+  }
+  supplierPayDeleteArmed = null;
+  if (!takeSubmitLock('suppaydel')) return;
+  try {
+    await apiPost('/api/supplier-payments/' + encodeURIComponent(id), {}, 'DELETE');
+    toast('Payment deleted', 'ok');
+    await refreshAll();
+    renderSupplierPay(supplierPayId);
+  } catch (e) { toast(T('sup.pay_failed', { msg: e.message }), 'err'); }
+  finally { releaseSubmitLock('suppaydel'); }
 }
 

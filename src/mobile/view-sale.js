@@ -4,6 +4,7 @@
 let saleClientPreset = null;
 let saleRateClient = null; // client key whose rate was last bulk-applied to lines
 let saleCartClient = ''; // who the current cart items are for ('' = walk-in); switching asks whether to keep them
+let editingSaleInvoice = null; // invoiceNo being edited in-place (null = new sale)
 const SALE_DRAFTS_KEY = 'slpSaleDrafts';
 let saleDrafts = {};
 try {
@@ -95,6 +96,7 @@ function renderSale(presetId) {
       <div id="counter-results" class="grid gap-1.5 mt-1.5"></div>
     </div>
     ${(data.quickItems || []).length ? `<div class="flex gap-1.5 mb-3 fade-in overflow-x-auto" style="scrollbar-width:none">${data.quickItems.slice(0, 12).map((q, qi) => `<button onclick="quickAddItem(${qi})" class="shrink-0 px-3 py-2 rounded-xl text-xs font-semibold" style="background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);color:#93c5fd">${esc(q.name)} · ${peso(q.price)}</button>`).join('')}${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button onclick="managePresets()" class="shrink-0 px-3 py-2 rounded-xl text-xs font-semibold" style="background:rgba(255,255,255,.06);border:1px dashed rgba(255,255,255,.2);color:#94a3b8">⚙️ Presets</button>` : ''}</div>` : ''}
+    ${editingSaleInvoice ? `<div class="glass-card rounded-2xl p-3 mb-3 flex items-center justify-between gap-2 fade-in" style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4)"><span class="text-xs font-semibold text-amber-300">Editing ${esc(editingSaleInvoice)}</span><button onclick="cancelSaleEdit()" class="btn btn-ghost btn-sm">Cancel</button></div>` : ''}
     ${saleDraftBanner()}
     ${lastFailedSale ? `<button onclick="retrySale()" class="btn w-full mb-3 py-2.5 rounded-xl font-semibold text-sm fade-in" style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.5);color:#fbbf24"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>${T('sale.retry')}</button>` : ''}
     <div class="glass-card rounded-2xl p-2 mb-3 fade-in">
@@ -175,7 +177,7 @@ function renderSale(presetId) {
       </div>
       <div class="flex gap-2">
         <button onclick="previewSaleDraft()" class="btn btn-ghost" id="sale-preview-btn" style="flex:0 0 auto"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>${T('sale.preview')}</button>
-        <button onclick="submitSale()" class="btn btn-primary btn-lg flex-1" id="sale-btn"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>${T('sale.save')}</button>
+        <button onclick="submitSale()" class="btn btn-primary btn-lg flex-1" id="sale-btn"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>${editingSaleInvoice ? 'Update sale' : T('sale.save')}</button>
       </div>
     </div>
     <div style="height:9rem"></div>`;
@@ -556,6 +558,43 @@ function addManualItem() {
   toast(T('sale.added_cart', { name }), 'ok');
   if (currentView === 'sale') renderSale();
 }
+function cancelSaleEdit() {
+  editingSaleInvoice = null;
+  cart = [];
+  try { saleClientPreset = null; saleRateClient = null; saleCartClient = ''; } catch (e) {}
+  updateCartUI();
+  showView('transactions');
+}
+// Load a recorded sale into the sale cart so its items/qty/price/discount/payment
+// can be edited in place, then saved with the same interface.
+async function editSaleFromDetail(invoiceNo) {
+  let t = null;
+  try { t = await apiGet('/api/transactions/' + encodeURIComponent(invoiceNo)); }
+  catch (e) { toast(T('txn.load_fail', { msg: e.message }), 'err'); return; }
+  if (!t) return;
+  if (t.status === 'voided' || t.status === 'return') { toast('This sale cannot be edited', 'err'); return; }
+  editingSaleInvoice = t.invoiceNo || invoiceNo;
+  const cid = t.clientId != null ? String(t.clientId) : '';
+  const c = cid ? (data.clients || []).find(x => String(x.id) === String(cid)) : null;
+  cart = (t.items || []).map(it => ({
+    invId: it.invId, name: it.description || it.name || 'Item',
+    qty: parseFloat(it.qty) || 1, price: it.unitCost || it.price || 0,
+    intRate: it.intRate || 0, date: it.date || t.date
+  }));
+  tendered = 0;
+  saleClientPreset = cid || null;
+  saleCartClient = cid;
+  // Pin the client-rate key so renderSale does not overwrite the saved per-line rates.
+  saleRateClient = cid + ':' + String((c && parseFloat(c.lastRate)) || 0);
+  closeQuick();
+  showView('sale');
+  try {
+    const ps = document.getElementById('sale-payment'); if (ps) ps.value = t.paymentMethod || 'Cash';
+    const de = document.getElementById('sale-discount'); if (de) de.value = String(Math.max(0, Math.round(((t.discount || 0) - (t.scDiscount || 0)) * 100) / 100));
+    const sx = document.getElementById('sale-sc'); if (sx) sx.checked = (t.scDiscount || 0) > 0;
+  } catch (e) {}
+  renderSale();
+}
 async function submitSale() {
   if (!cart.length) return toast(T('sale.need_items'), 'err');
   const clientSel = document.getElementById('sale-client');
@@ -579,7 +618,20 @@ async function submitSale() {
   // The picked client is ALWAYS linked (cash sales show in their history
   // with no balance effect); only non-cash methods add to the balance.
   const body = { clientId, items, paymentMethod, discount: disc };
+  const editing = editingSaleInvoice;
   try {
+    if (editing) {
+      await apiPost('/api/sales/' + encodeURIComponent(editing), body, 'PUT');
+      editingSaleInvoice = null;
+      lastFailedSale = null; tendered = 0;
+      clearSaleDraft(clientId);
+      try { saleClientPreset = null; saleRateClient = null; saleCartClient = ''; } catch (e) {}
+      cart = []; updateCartUI();
+      toast('Sale updated', 'ok');
+      await refreshAll();
+      openTxnDetail(editing);
+      return;
+    }
     const r = await apiPost('/api/sales', body);
     if (r.queued) { lastFailedSale = null; tendered = 0; clearSaleDraft(clientId); try { saleClientPreset = null; saleRateClient = null; saleCartClient = ''; } catch (e) {} toast(T('sale.queued'), 'ok'); cart = []; updateCartUI(); showView('home'); await refreshAll(); return; }
     lastFailedSale = null; tendered = 0;

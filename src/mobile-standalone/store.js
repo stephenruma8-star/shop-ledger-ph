@@ -598,7 +598,10 @@ async function _apiSales(method, parts, body, query) {
   const db = _db();
   if (method === 'POST' && parts.length === 0) return _applySale(body || {});
   if (method === 'POST' && parts.length === 1 && parts[0] === 'settle-item') return _apiSettleItem(body || {});
-  if (method === 'PUT' && parts.length === 1) return _apiSetPayment(parts[0], body || {});
+  if (method === 'PUT' && parts.length === 1) {
+    if (body && Array.isArray(body.items)) return _apiSaleEdit(parts[0], body);
+    return _apiSetPayment(parts[0], body || {});
+  }
   if (method === 'GET' && parts.length === 0) {
     const limit = Math.min(parseInt(query.limit) || 200, 500);
     // SQL-level cap: years of sales must never all land in memory at once.
@@ -643,6 +646,78 @@ async function _apiSetPayment(ref, body) {
   await _audit('sale-edit', 'Payment method -> ' + pm + ' (' + t.invoiceNo + ') (phone)');
   _bump();
   return { success: true, paymentMethod: pm, balanceAdded: newAdded };
+}
+async function _apiSaleEdit(ref, body) {
+  // Full edit of a recorded sale: replace items/totals and reconcile stock and
+  // the client's utang balance. Same interest math as _applySale.
+  const db = _db();
+  const { clientId, items, paymentMethod, discount } = body || {};
+  if (!items || !Array.isArray(items) || items.length === 0) throw _apiErr(400, 'At least one item required');
+  if (items.length > 100) throw _apiErr(400, 'Too many items (max 100)');
+  for (const item of items) {
+    if (!item.description || typeof item.description !== 'string') throw _apiErr(400, 'Each item must have a description');
+    if (!_validateAmount(item.unitCost)) throw _apiErr(400, 'Invalid item price');
+    if (item.qty !== undefined && item.qty !== null && (isNaN(parseInt(item.qty)) || parseInt(item.qty) < 1)) throw _apiErr(400, 'Invalid item quantity');
+  }
+  if (discount && !_validateAmount(discount)) throw _apiErr(400, 'Invalid discount');
+  if (paymentMethod && !PAY_METHODS.includes(paymentMethod)) throw _apiErr(400, 'Invalid payment method');
+  const t = await db.get('SELECT * FROM transactions WHERE invoiceNo = ? OR id = ?', [String(ref), String(ref)]);
+  if (!t) throw _apiErr(404, 'Transaction not found');
+  if (t.status === 'voided' || t.status === 'return' || t.status === 'interest') throw _apiErr(400, 'Sale is closed');
+  const today = _todayStr();
+  const lineSub = (i) => ((i.qty || 1) * (i.unitCost || 0));
+  const lineInt = (i) => {
+    const rate = parseFloat(i.intRate) || 0;
+    if (!rate || !lineSub(i)) return 0;
+    const dstr = String(i.date || today).slice(0, 10);
+    let days = Math.floor((new Date(today) - new Date(dstr)) / 86400000);
+    if (isNaN(days)) days = 1;
+    days = Math.max(1, days);
+    return _r2(lineSub(i) * (rate / 100) * (days / 30));
+  };
+  const subtotal = _r2(items.reduce((s, i) => s + lineSub(i), 0));
+  const totalInterest = _r2(items.reduce((s, i) => s + lineInt(i), 0));
+  const d = parseFloat(discount) || 0;
+  const grandTotal = Math.max(0, _r2(subtotal + totalInterest - d));
+  const payMethod = paymentMethod || 'Cash';
+  let clientName = 'Walk-in';
+  if (clientId) { const cd = await db.get('SELECT * FROM clients WHERE id = ?', [clientId]); if (cd) clientName = cd.name; }
+  const oldItems = _parseJson(t.items, []);
+  const oldAdded = !!(t.balanceAdded ? t.balanceAdded : (t.clientId && t.paymentMethod !== 'Cash'));
+  const newAdded = !!(clientId && payMethod !== 'Cash');
+  const adjustStock = async (invId, variantName, delta) => {
+    if (!invId) return;
+    const inv = await db.get('SELECT * FROM inventory WHERE id = ?', [invId]);
+    if (!inv) return;
+    let variants = _parseJson(inv.variants, []);
+    if (variantName && Array.isArray(variants)) {
+      variants = variants.map(v => v.name === variantName ? Object.assign({}, v, { stock: (v.stock || 0) + delta }) : v);
+    }
+    await db.run('UPDATE inventory SET stock = ?, variants = ? WHERE id = ?', [(inv.stock || 0) + delta, JSON.stringify(variants), inv.id]);
+  };
+  await db.exec('BEGIN');
+  try {
+    for (const it of oldItems) await adjustStock(it.invId, it.variantName, (parseInt(it.qty) || 1));
+    if (oldAdded && t.clientId) {
+      const c = await db.get('SELECT * FROM clients WHERE id = ?', [t.clientId]);
+      if (c) await db.run('UPDATE clients SET balance = ? WHERE id = ?', [Math.max(0, _r2((c.balance || 0) - (t.grandTotal || 0))), c.id]);
+    }
+    for (const it of items) await adjustStock(it.invId, it.variantName, -((parseInt(it.qty) || 1)));
+    if (newAdded && clientId) {
+      const c = await db.get('SELECT * FROM clients WHERE id = ?', [clientId]);
+      if (c) await db.run('UPDATE clients SET balance = ? WHERE id = ?', [_r2((c.balance || 0) + grandTotal), c.id]);
+    }
+    const storedItems = items.map(i => Object.assign({}, i, { amount: _r2(lineSub(i) + lineInt(i)) }));
+    await db.run('UPDATE transactions SET clientId = ?, clientName = ?, items = ?, subtotal = ?, totalInterest = ?, discount = ?, scDiscount = 0, grandTotal = ?, paymentMethod = ?, status = ?, balanceAdded = ?, editedAt = ? WHERE id = ?',
+      [clientId || null, clientName, JSON.stringify(storedItems), subtotal, totalInterest, d, grandTotal, payMethod, grandTotal <= 0 ? 'paid' : 'pending', newAdded ? 1 : 0, new Date().toISOString(), t.id]);
+    await db.exec('COMMIT');
+  } catch (e) {
+    try { await db.exec('ROLLBACK'); } catch (_) {}
+    throw _apiErr(400, 'Sale update failed');
+  }
+  await _audit('sale-edit', 'Mobile sale ' + t.invoiceNo + ' updated - ₱' + grandTotal.toFixed(2) + ' (phone)');
+  _bump();
+  return { success: true, invoiceNo: t.invoiceNo };
 }
 async function _apiSettleItem(body) {
   // Pay off ONE sale line (including its sale-time interest) without touching
@@ -1042,6 +1117,30 @@ async function _apiSupplierPayments(body) {
   await db.run('INSERT INTO supplier_payments (supplierId, supplierName, amount, date, notes, paymentMethod, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
     [s.id, s.name || '', amtNum, _todayStr(), _sanitize(notes), pm, new Date().toISOString()]);
   await _audit('supplier-payment', 'Paid ' + (s.name || '') + ' - ₱' + amtNum.toFixed(2) + ' (phone)');
+  _bump();
+  return { success: true };
+}
+async function _apiSupplierPaymentUpdate(id, body) {
+  const db = _db();
+  const { amount, paymentMethod, notes, date } = body || {};
+  if (!_validateAmount(amount)) throw _apiErr(400, 'Valid amount required');
+  const amtNum = _r2(amount);
+  if (amtNum <= 0) throw _apiErr(400, 'Amount must be greater than 0');
+  const p = await db.get('SELECT * FROM supplier_payments WHERE id = ?', [String(id)]);
+  if (!p) throw _apiErr(404, 'Payment not found');
+  const pm = ['Cash', 'GCash', 'Maya', 'Bank Transfer'].includes(paymentMethod) ? paymentMethod : (p.paymentMethod || 'Cash');
+  await db.run('UPDATE supplier_payments SET amount = ?, paymentMethod = ?, notes = ?, date = ? WHERE id = ?',
+    [amtNum, pm, notes !== undefined ? _sanitize(notes) : (p.notes || ''), (date && String(date).slice(0, 10)) || p.date, p.id]);
+  await _audit('supplier-payment', 'Edited supplier payment ₱' + amtNum.toFixed(2) + ' (phone)');
+  _bump();
+  return { success: true };
+}
+async function _apiSupplierPaymentDelete(id) {
+  const db = _db();
+  const p = await db.get('SELECT * FROM supplier_payments WHERE id = ?', [String(id)]);
+  if (!p) throw _apiErr(404, 'Payment not found');
+  await db.run('DELETE FROM supplier_payments WHERE id = ?', [p.id]);
+  await _audit('supplier-payment', 'Deleted supplier payment ₱' + (Number(p.amount) || 0).toFixed(2) + ' (phone)');
   _bump();
   return { success: true };
 }
@@ -1446,6 +1545,8 @@ async function localApi(method, rawPath, body) {
   if (head === 'petty-cash') return _apiPetty(m, body);
   if (head === 'suppliers') return _apiSuppliers(m, parts.slice(1), body);
   if (head === 'supplier-payments' && m === 'POST') return _apiSupplierPayments(body);
+  if (head === 'supplier-payments' && m === 'PUT' && parts[1]) return _apiSupplierPaymentUpdate(parts[1], body);
+  if (head === 'supplier-payments' && m === 'DELETE' && parts[1]) return _apiSupplierPaymentDelete(parts[1]);
   if (head === 'purchase-orders') return _apiPOs(m, parts.slice(1), body);
   if (head === 'stats' && m === 'GET') return _apiStats();
   if (head === 'reports' && m === 'GET' && parts[1] === 'export.csv') return _apiCsv(query);
