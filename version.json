@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.9",
+    "version":  "3.37.10",
     "buildDate":  "2026-10-26T00:00:00.000Z",
-    "notes":  "Correctness pass. Desktop: SC/PWD discounts are no longer counted twice in profit and receipts; editing an expense, payment, or supplier keeps the fields the form does not show (PO links, reference numbers, price history); inventory CSV import stores cost price; stocktake variant counts always add up; supplier payments can be deleted. Phone: reference numbers on payments are saved when paired to the desktop, payment amounts must be positive, and dates use the local calendar day."
+    "notes":  "Follow-up editing fixes. Editing an inventory item keeps the fields the form does not show, and supplier payments can now be edited (amount, date, method, reference, notes) in addition to being deleted."
 }
