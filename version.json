@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.11",
+    "version":  "3.37.12",
     "buildDate":  "2026-10-26T00:00:00.000Z",
-    "notes":  "Settings > Database adds a Legacy interest audit: it finds credit sales recorded by older phone/LAN versions that charged a full month's interest instead of a day's worth, previews the affected sales and the balance reduction, and only rewrites records when you confirm."
+    "notes":  "The phone can now edit a recorded sale's items, quantities, prices, discount, and payment method (Edit items on the sale screen), with stock and the client balance reconciled automatically. Supplier payments can also be edited or deleted from the phone. Both are owner-only when paired to the desktop."
 }
