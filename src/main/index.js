@@ -401,29 +401,24 @@ function checkForUpdates(silentNet = false) {
     mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-not-available');
     return;
   }
-  const https = require('https');
   const CHECK_RETRIES = 3;
   const CHECK_WAIT_MS = [4000, 12000, 30000];
+  // Let electron-updater talk to GitHub directly. It reads the releases Atom feed
+  // and the /releases/latest redirect, which are NOT subject to the API's
+  // unauthenticated rate limit. (A manual api.github.com pre-check used to gate
+  // this; on a 403 rate-limit response it skipped the real check and reported
+  // "You are up to date" even when a newer version existed.)
   // DNS blips on shop networks often clear within seconds: retry network failures
   // a few times before admitting defeat. Non-network outcomes settle immediately.
   function attemptCheck(n) {
-    https.get('https://api.github.com/repos/stephenruma8-star/shop-ledger-ph/releases/latest', { headers: { 'User-Agent': 'shop-ledger-ph' } }, (res) => {
-      if (res.statusCode === 200) autoUpdater.checkForUpdates().catch((err) => {
-        logger.error('Auto-update check failed: ' + err.message);
-        mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-error', isUpdateNetError(err) ? NET_MSG : 'Update check failed: ' + err.message);
-      });
-      else {
-        logger.info('GitHub returned ' + res.statusCode + ', skipping update check');
-        mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-not-available');
-      }
-    }).on('error', (err) => {
-      logger.error('Update check network error (attempt ' + n + '): ' + err.message);
+    autoUpdater.checkForUpdates().catch((err) => {
+      logger.error('Auto-update check failed (attempt ' + n + '): ' + err.message);
       if (isUpdateNetError(err) && n < CHECK_RETRIES) {
         setTimeout(() => attemptCheck(n + 1), CHECK_WAIT_MS[n - 1] || 30000);
         return;
       }
       if (silentNet && isUpdateNetError(err)) return;
-      mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-error', isUpdateNetError(err) ? NET_MSG : 'Could not reach GitHub: ' + err.message);
+      mainWindow?.isDestroyed() || mainWindow?.webContents.send('update-error', isUpdateNetError(err) ? NET_MSG : 'Update check failed: ' + err.message);
     });
   }
   attemptCheck(1);

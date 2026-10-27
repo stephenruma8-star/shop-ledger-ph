@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.12",
+    "version":  "3.37.13",
     "buildDate":  "2026-10-26T00:00:00.000Z",
-    "notes":  "The phone can now edit a recorded sale's items, quantities, prices, discount, and payment method (Edit items on the sale screen), with stock and the client balance reconciled automatically. Supplier payments can also be edited or deleted from the phone. Both are owner-only when paired to the desktop."
+    "notes":  "Fixed update checking: the app no longer pre-checks GitHub's rate-limited API (which could make it report \"up to date\" when a newer version existed). It now asks the updater directly, which uses the non-rate-limited releases feed."
 }
