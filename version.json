@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.7",
+    "version":  "3.37.8",
     "buildDate":  "2026-10-26T00:00:00.000Z",
-    "notes":  "Fix a mis-keyed sale's payment method from the client card: open the sale in the client history and use Edit this sale to switch it from Cash to Credit, and the balance updates. The phone can change a recorded sale's payment method from the sale detail too (owner only). The phone updater now installs the downloaded APK reliably (app-owned download dir + installer URI grant), fixing updates that were offered but failed to install."
+    "notes":  "The desktop app now uses the phone app's icon for the window, tray, taskbar, and installer, so both apps share one logo."
 }
