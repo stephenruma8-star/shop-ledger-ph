@@ -1,7 +1,7 @@
 import { logAudit } from './auth.js'
 import { renderClientGrid } from './clients.js'
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
-import { calcInterest, closeModal, confirmModal, dbLoad, debounce, escapeHtml, filterByYear, itemThumbHtml, modal, paginate, pushUndo, renderPagination, searchData, showUndoToast, toast, updateLowStockBadge } from './helpers.js'
+import { calcInterest, closeModal, confirmModal, dbLoad, debounce, escapeHtml, filterByYear, intRateOptions, itemThumbHtml, modal, paginate, pushUndo, renderPagination, searchData, showUndoToast, toast, updateLowStockBadge } from './helpers.js'
 import { openPrintWindow } from './printLayout.js'
 import { fmtDate, fmtDateTime, now, peso, round2, state, today, VAT_RATE } from './state.js'
 

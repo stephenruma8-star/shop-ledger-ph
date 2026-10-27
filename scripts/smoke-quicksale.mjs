@@ -607,6 +607,18 @@ try {
   const refPayAfter = await win.dbGet('payments', refPayId);
   ok(refPayAfter.referenceNo === 'REF-9' && refPayAfter.amount === 60, 'payment edit keeps reference number and updates the amount');
 
+  const invXtraId = await win.dbAdd('inventory', { name: 'Xtra Item', sellPrice: 10, costPrice: 4, stock: 5, minStock: 2, customTag: 'keepme', createdAt: new Date().toISOString() });
+  getEl('if-name').value = 'Xtra Item'; getEl('if-sku').value = ''; getEl('if-barcode').value = ''; getEl('if-category').value = ''; getEl('if-price').value = '12'; getEl('if-cost').value = '4'; getEl('if-stock').value = '5'; getEl('if-min').value = '2'; getEl('if-unit').value = 'pcs'; getEl('inv-expiry').value = ''; getEl('if-hasVariants').checked = false;
+  await win.saveInv(invXtraId);
+  const invXtraAfter = await win.dbGet('inventory', invXtraId);
+  ok(invXtraAfter.customTag === 'keepme' && invXtraAfter.sellPrice === 12, 'inventory edit keeps extra fields and updates the price');
+
+  const spEditId = await win.dbAdd('supplierPayments', { supplierId: 7, supplierName: 'Sup', amount: 100, date: dayStr, paymentMethod: 'Cash', referenceNo: 'R1', notes: 'n', createdAt: new Date().toISOString() });
+  getEl('spe-amount').value = '150'; getEl('spe-date').value = dayStr; getEl('spe-method').value = 'GCash'; getEl('spe-ref').value = 'R2'; getEl('spe-notes').value = 'm';
+  await win.saveSupplierPaymentEdit(spEditId);
+  const spEditAfter = await win.dbGet('supplierPayments', spEditId);
+  ok(spEditAfter.amount === 150 && spEditAfter.supplierId === 7 && spEditAfter.supplierName === 'Sup' && spEditAfter.referenceNo === 'R2' && spEditAfter.paymentMethod === 'GCash', 'supplier payment edit keeps the supplier link and updates fields');
+
   if (failures === 0) {
     console.log('QUICK CART FLOW OK: single sale + multi-item cart + SC/PWD + interest + paper sizes + client balance + stock + print all verified');
     process.exit(0);

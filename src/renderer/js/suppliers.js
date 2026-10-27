@@ -1,7 +1,7 @@
 import { logAudit } from './auth.js'
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
 import { closeModal, confirmModal, dbLoad, debounce, escapeHtml, modal, pushUndo, requireFields, searchData, toast } from './helpers.js'
-import { now, peso, state, today } from './state.js'
+import { now, peso, round2, state, today } from './state.js'
 
 export async function viewSuppliers(root) {
   await Promise.all([dbLoad('suppliers'), dbLoad('purchaseOrders'), dbLoad('supplierPayments')]);
@@ -112,7 +112,7 @@ export async function showSupplierPaymentHistory(supplierId) {
       <td class="p-2 text-gray-500">${escapeHtml(p.referenceNo || '')}</td>
       <td class="p-2 text-gray-500">${escapeHtml(p.notes || '')}</td>
       <td class="p-2 font-medium ${runningBalance > 0 ? 'text-red-600' : 'text-green-600'}">${peso(runningBalance)}</td>
-      <td class="p-2 text-center"><button onclick="deleteSupplierPayment(${p.id})" class="text-red-500 hover:text-red-700 text-xs" title="Delete payment">✕</button></td>
+      <td class="p-2 text-center whitespace-nowrap"><button onclick="editSupplierPayment(${p.id})" class="text-blue-500 hover:text-blue-700 text-xs mr-1" title="Edit payment">✎</button><button onclick="deleteSupplierPayment(${p.id})" class="text-red-500 hover:text-red-700 text-xs" title="Delete payment">✕</button></td>
     </tr>`;
   }).join('');
   modal(`
@@ -252,6 +252,54 @@ export async function showSupplierPriceHistory(supplierId) {
 }
 
 
+export function editSupplierPayment(paymentId) {
+  const p = state.supplierPayments.find(x => x.id === paymentId) || null;
+  if (!p) { toast('Payment not found', 'error'); return; }
+  const methods = ['Cash', 'Bank Transfer', 'GCash', 'Maya'];
+  modal(`
+    <div class="p-6">
+      <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">Edit Supplier Payment</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+      <div class="space-y-3">
+        <div><label class="text-xs text-gray-500 block">Date</label><input id="spe-date" type="date" value="${escapeHtml(p.date || today())}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
+        <div><label class="text-xs text-gray-500 block">Amount (₱) *</label><input id="spe-amount" type="number" step="0.01" min="0" value="${p.amount || 0}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="text-xs text-gray-500 block">Payment Method</label><select id="spe-method" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm">${methods.map(m => `<option ${p.paymentMethod === m ? 'selected' : ''}>${m}</option>`).join('')}</select></div>
+          <div><label class="text-xs text-gray-500 block">Reference No.</label><input id="spe-ref" type="text" value="${escapeHtml(p.referenceNo || '')}" placeholder="Optional" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
+        </div>
+        <div><label class="text-xs text-gray-500 block">Notes</label><input id="spe-notes" type="text" value="${escapeHtml(p.notes || '')}" placeholder="Optional" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
+        <div class="flex gap-2 pt-2">
+          <button onclick="saveSupplierPaymentEdit(${p.id})" class="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><polyline points="20 6 9 17 4 12"/></svg>Update</button>
+          <button onclick="closeModal()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg">Cancel</button>
+        </div>
+      </div>
+    </div>`);
+}
+
+export async function saveSupplierPaymentEdit(paymentId) {
+  const amtEl = document.getElementById('spe-amount');
+  const dtEl = document.getElementById('spe-date');
+  if (!amtEl || !dtEl) { toast('Form not ready', 'error'); return; }
+  const amount = round2(parseFloat(amtEl.value));
+  if (!(amount > 0)) { toast('Valid amount required', 'error'); return; }
+  const existing = await dbGet('supplierPayments', paymentId) || {};
+  const methodEl = document.getElementById('spe-method');
+  const refEl = document.getElementById('spe-ref');
+  const notesEl = document.getElementById('spe-notes');
+  await dbPut('supplierPayments', {
+    ...existing, id: paymentId, amount,
+    date: dtEl.value || today(),
+    paymentMethod: methodEl ? methodEl.value : (existing.paymentMethod || 'Cash'),
+    referenceNo: refEl ? refEl.value.trim() : (existing.referenceNo || ''),
+    notes: notesEl ? notesEl.value.trim() : (existing.notes || '')
+  });
+  await logAudit('supplier-payment', `Edited supplier payment ${peso(amount)}`);
+  state.supplierPayments = await dbAll('supplierPayments');
+  closeModal();
+  renderSupTable();
+  toast('Supplier payment updated');
+  if (existing.supplierId != null) showSupplierPaymentHistory(existing.supplierId);
+}
+
 export async function deleteSupplierPayment(paymentId) {
   const p = await dbGet('supplierPayments', paymentId);
   if (!p) { toast('Payment not found', 'error'); return; }
@@ -280,6 +328,8 @@ Object.defineProperties(window, {
   deleteSup: { get: () => deleteSup, configurable: true },
   openSupplierPayModal: { get: () => openSupplierPayModal, configurable: true },
   saveSupplierPayment: { get: () => saveSupplierPayment, configurable: true },
+  editSupplierPayment: { get: () => editSupplierPayment, configurable: true },
+  saveSupplierPaymentEdit: { get: () => saveSupplierPaymentEdit, configurable: true },
   deleteSupplierPayment: { get: () => deleteSupplierPayment, configurable: true },
   showSupplierPriceHistory: { get: () => showSupplierPriceHistory, configurable: true },
   showSupplierPaymentHistory: { get: () => showSupplierPaymentHistory, configurable: true }

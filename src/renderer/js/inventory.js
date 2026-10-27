@@ -1,6 +1,6 @@
 import { logAudit } from './auth.js'
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
-import { closeModal, confirmModal, dbLoad, debounce, escapeHtml, itemThumbHtml, modal, pushUndo, searchData, showUndoToast, toast, updateLowStockBadge } from './helpers.js'
+import { closeModal, confirmModal, dbLoad, debounce, escapeHtml, itemThumbHtml, modal, pushUndo, requireFields, searchData, showUndoToast, toast, updateLowStockBadge } from './helpers.js'
 import { escHtml } from './printLayout.js'
 import { now, peso, state } from './state.js'
 import { getQty } from './transactions.js'
@@ -241,14 +241,14 @@ export async function saveInv(id) {
     expiryDate
   };
   if (id) {
-    const existing = await dbGet('inventory', id);
-    if (existing) {
-      obj.createdAt = existing.createdAt;
-      const oldStock = existing.stock || 0;
-      const newStock = obj.stock || 0;
-      if (oldStock !== newStock) await logAudit('inventory', `${existing.name}: stock ${oldStock} → ${newStock} (adj: ${newStock - oldStock})`);
-    }
-    obj.id = id; await dbPut('inventory', obj); toast('Item updated');
+    const existing = await dbGet('inventory', id) || {};
+    // Merge so fields this form does not edit (import extras, status…) survive.
+    const merged = { ...existing, ...obj, id, createdAt: existing.createdAt || now() };
+    const oldStock = existing.stock || 0;
+    const newStock = merged.stock || 0;
+    if (oldStock !== newStock) await logAudit('inventory', `${merged.name}: stock ${oldStock} → ${newStock} (adj: ${newStock - oldStock})`);
+    await dbPut('inventory', merged);
+    toast('Item updated');
   } else { obj.createdAt = now(); await dbAdd('inventory', obj); await logAudit('inventory', `New item: ${obj.name}`); toast('Item added'); }
   closeModal();
   state.inventory = await dbAll('inventory');
