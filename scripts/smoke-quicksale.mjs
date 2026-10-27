@@ -619,6 +619,15 @@ try {
   const spEditAfter = await win.dbGet('supplierPayments', spEditId);
   ok(spEditAfter.amount === 150 && spEditAfter.supplierId === 7 && spEditAfter.supplierName === 'Sup' && spEditAfter.referenceNo === 'R2' && spEditAfter.paymentMethod === 'GCash', 'supplier payment edit keeps the supplier link and updates fields');
 
+  // --- legacy interest detector: flags flat (LAN) interest, leaves prorated alone ---
+  const dayS = new Date().toISOString().slice(0, 10);
+  const lanTxn = { id: 8001, status: 'pending', clientId: cliId, date: dayS, paymentMethod: 'Credit (Utang)', balanceAdded: true, discount: 0, totalInterest: 10, grandTotal: 110, items: [{ description: 'Oil', name: '1', unitCost: 100, intRate: 10, amount: 110 }] };
+  const deskTxn = { id: 8002, status: 'pending', clientId: cliId, date: dayS, paymentMethod: 'Credit (Utang)', balanceAdded: true, discount: 0, totalInterest: 0.33, grandTotal: 100.33, items: [{ description: 'Rice', name: '1', unitCost: 100, intRate: 10, date: dayS, amount: 100.33 }] };
+  const legacy = win.computeLegacyInterestCorrections([lanTxn, deskTxn]);
+  ok(legacy.rows.length === 1 && legacy.rows[0].t.id === 8001, 'legacy interest detector flags only the flat-interest sale');
+  ok(Math.abs(legacy.rows[0].newGT - 100.33) < 0.001 && legacy.rows[0].newItems[0].amount === 100.33, 'legacy correction re-prorates line and total');
+  ok(legacy.perClient.get(cliId) === -9.67, 'legacy correction reports the balance delta');
+
   if (failures === 0) {
     console.log('QUICK CART FLOW OK: single sale + multi-item cart + SC/PWD + interest + paper sizes + client balance + stock + print all verified');
     process.exit(0);

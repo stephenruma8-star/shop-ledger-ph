@@ -1,6 +1,7 @@
+import { logAudit } from './auth.js'
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
-import { closeModal, dbLoad, escapeHtml, hashPassword, modal, runCloudBackup, sendOverdueReminders, toast } from './helpers.js'
-import { state, VAT_RATE } from './state.js'
+import { calcInterest, closeModal, confirmModal, dbLoad, escapeHtml, hashPassword, modal, runCloudBackup, sendOverdueReminders, toast } from './helpers.js'
+import { peso, round2, state, VAT_RATE } from './state.js'
 
 export async function viewSettings(root) {
   await Promise.all([dbLoad('settings'), dbLoad('users')]);
@@ -162,6 +163,16 @@ export async function viewSettings(root) {
           <div id="db-health-status" class="text-xs text-gray-400">Loading…</div>
         </div>
         <div class="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 mt-3">
+          <div class="flex items-center justify-between mb-2">
+            <div>
+              <p class="text-sm font-semibold">Legacy interest audit</p>
+              <p class="text-xs text-gray-400">Finds sales recorded by older phone/LAN versions that charged a whole month's interest instead of a day's worth, then corrects the lines and the affected client balances. Preview first, apply after.</p>
+            </div>
+            <button onclick="scanLegacyInterest()" class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 whitespace-nowrap">Scan</button>
+          </div>
+          <div id="interest-audit-status" class="text-xs text-gray-400"></div>
+        </div>
+        <div class="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 mt-3">
           <div class="mb-2">
             <p class="text-sm font-semibold">At-Rest Encryption</p>
             <p class="text-xs text-gray-400">Encrypts the database file on disk. You will enter the password each time the app starts. <span class="text-red-500 font-semibold">If you forget it, your data cannot be recovered.</span> The password is never stored anywhere.</p>
@@ -321,6 +332,93 @@ export async function openUpdateDistFolder() {
   if (!window.electronAPI?.openUpdateDistFolder) { toast('Desktop app only', 'warning'); return; }
   const r = await window.electronAPI.openUpdateDistFolder();
   if (!r || !r.success) toast('Folder not available: ' + ((r && r.error) || 'unknown'), 'error');
+}
+
+// Pure detector for the pre-3.37.6 bug where LAN/phone sales charged a whole
+// month's interest (sub * rate/100) instead of prorating by days/30. Desktop
+// sales always stored the prorated amount, so a line whose stored amount equals
+// sub + the flat month's interest (and whose date is not exactly 30 days back,
+// where the two coincide) is a legacy LAN line. Returns the corrected lines,
+// totals, per-client balance deltas, and whether anything matched.
+export function computeLegacyInterestCorrections(txns) {
+  const rows = [];
+  const perClient = new Map();
+  for (const t of (txns || [])) {
+    if (!t || t.status === 'voided' || t.status === 'return' || t.status === 'interest' || t.legacyInterestRepaired) continue;
+    if (!(parseFloat(t.totalInterest) > 0)) continue;
+    const tDate = t.date || (t.createdAt || '').slice(0, 10);
+    let newSub = 0, newInt = 0, changed = false;
+    const newItems = (t.items || []).map(it => {
+      const qty = parseFloat(String(it.name || it.qty || '1').match(/-?[\d.]+/)?.[0]) || 1;
+      const sub = qty * (it.unitCost || it.price || 0);
+      newSub += sub;
+      const rate = parseFloat(it.intRate) || 0;
+      if (!(rate > 0) || !(sub > 0)) return it;
+      const days = Math.max(1, Math.floor((new Date(tDate) - new Date(it.date || tDate)) / 86400000) || 1);
+      const flat = round2(sub * (rate / 100));
+      const prorated = calcInterest(sub, rate, days);
+      newInt += prorated;
+      const stored = parseFloat(it.amount) || 0;
+      if (days !== 30 && Math.abs(stored - (sub + flat)) < 0.02 && Math.abs(flat - prorated) > 0.005) {
+        changed = true;
+        return { ...it, amount: round2(sub + prorated) };
+      }
+      return it;
+    });
+    if (!changed) continue;
+    const disc = parseFloat(t.discount) || 0;
+    const newGT = round2(newSub + newInt - disc);
+    const delta = round2(newGT - (parseFloat(t.grandTotal) || 0));
+    rows.push({ t, newItems, newSub, newInt, newGT, delta });
+    const added = t.balanceAdded !== undefined ? !!t.balanceAdded : (t.clientId && (t.paymentMethod || 'Cash') !== 'Cash');
+    if (t.clientId != null && added) perClient.set(t.clientId, round2((perClient.get(t.clientId) || 0) + delta));
+  }
+  return { rows, perClient };
+}
+
+let _legacyInterestRows = [];
+let _legacyInterestPerClient = new Map();
+
+export function scanLegacyInterest() {
+  const status = document.getElementById('interest-audit-status');
+  const { rows, perClient } = computeLegacyInterestCorrections(state.transactions);
+  _legacyInterestRows = rows;
+  _legacyInterestPerClient = perClient;
+  if (!status) return;
+  if (!rows.length) {
+    status.innerHTML = '<p class="text-green-600">No legacy interest found — nothing to correct.</p>';
+    return;
+  }
+  const total = [...perClient.values()].reduce((s, v) => s + v, 0);
+  status.innerHTML = `<p class="text-amber-600 font-semibold">${rows.length} sale(s) affected across ${perClient.size} client(s). Affected balances will drop by about ${peso(-total)}.</p>
+    <button onclick="applyLegacyInterestRepair()" class="mt-2 px-3 py-1.5 bg-amber-600 text-white rounded-lg text-sm hover:bg-amber-700">Apply correction</button>`;
+}
+
+export async function applyLegacyInterestRepair() {
+  if (!_legacyInterestRows.length) { toast('Scan first', 'warning'); return; }
+  if (!await confirmModal('Correct these sales and reduce the affected client balances? This rewrites financial history.', 'Apply correction')) return;
+  for (const r of _legacyInterestRows) {
+    const t = await dbGet('transactions', r.t.id);
+    if (!t) continue;
+    t.items = r.newItems;
+    t.subtotal = r.newSub;
+    t.totalInterest = r.newInt;
+    t.grandTotal = r.newGT;
+    t.legacyInterestRepaired = true;
+    t.editedAt = new Date().toISOString();
+    await dbPut('transactions', t);
+  }
+  for (const [clientId, delta] of _legacyInterestPerClient) {
+    const c = await dbGet('clients', clientId);
+    if (c) { c.balance = round2(Math.max(0, (c.balance || 0) + delta)); await dbPut('clients', c); }
+  }
+  await logAudit('interest-repair', `Corrected ${_legacyInterestRows.length} legacy interest sale(s)`);
+  state.transactions = await dbAll('transactions');
+  state.clients = await dbAll('clients');
+  toast('Corrections applied');
+  _legacyInterestRows = [];
+  _legacyInterestPerClient = new Map();
+  scanLegacyInterest();
 }
 
 export async function dbMaintenance(action) {
@@ -699,6 +797,9 @@ Object.defineProperties(window, {
   openUserModal: { get: () => openUserModal, configurable: true },
   saveUser: { get: () => saveUser, configurable: true },
   dbMaintenance: { get: () => dbMaintenance, configurable: true },
+  computeLegacyInterestCorrections: { get: () => computeLegacyInterestCorrections, configurable: true },
+  scanLegacyInterest: { get: () => scanLegacyInterest, configurable: true },
+  applyLegacyInterestRepair: { get: () => applyLegacyInterestRepair, configurable: true },
   protectStoredSecrets: { get: () => protectStoredSecrets, configurable: true },
   loadDbEncryptionStatus: { get: () => loadDbEncryptionStatus, configurable: true },
   dbEncryptionFlow: { get: () => dbEncryptionFlow, configurable: true },
