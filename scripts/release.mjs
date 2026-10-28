@@ -9,7 +9,7 @@
 // from build/desktop/ : Setup exe, portable exe, latest.yml and the Setup
 // blockmap (differential updates). Requires `gh` authenticated.
 import { execFileSync } from 'node:child_process';
-import { existsSync, statSync, readFileSync } from 'node:fs';
+import { copyFileSync, existsSync, statSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname ?? process.cwd(), '..');
@@ -110,3 +110,14 @@ if (bad.length) {
   process.exit(1);
 }
 console.log(`release ${tag} verified: ${files.length}/${files.length} assets present`);
+
+// Keep a local fallback installer in the repo's releases/ folder (same idea as
+// the phone APK): always the latest Setup, overwritten each release. Commit it
+// separately so a copy survives even if the GitHub release is gone.
+try {
+  const dest = resolve(root, 'releases', 'Shop-Ledger-PH-Setup.exe');
+  copyFileSync(dist(`Shop-Ledger-PH-Setup-${version}.exe`), dest);
+  console.log('releases/Shop-Ledger-PH-Setup.exe updated (commit it separately)');
+} catch (e) {
+  console.error('could not copy installer to releases/: ' + (e && e.message ? e.message : e));
+}
