@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.13",
+    "version":  "3.37.14",
     "buildDate":  "2026-10-26T00:00:00.000Z",
-    "notes":  "Fixed update checking: the app no longer pre-checks GitHub's rate-limited API (which could make it report \"up to date\" when a newer version existed). It now asks the updater directly, which uses the non-rate-limited releases feed."
+    "notes":  "Phone: fixed action buttons on a sale that did nothing when tapped (Client Payment, Edit Items, Preview, Share, Return, Void, and the per-line Settle), plus the client-payment edit and sale-draft buttons. A quote-escaping bug was truncating their tap handlers."
 }
