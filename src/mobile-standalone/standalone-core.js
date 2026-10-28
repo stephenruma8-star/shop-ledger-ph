@@ -18,6 +18,10 @@ function esc(s) { const d = document.createElement('div'); d.textContent = s == 
 // " raw), so it is unsafe inside attribute values and quoted JS strings.
 // Use this for value="...", placeholder="...", data-* and similar spots.
 function escAttr(s) { return esc(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+// jsArg: a JS literal safe to embed inside a double-quoted onclick attribute.
+// JSON.stringify's own double quotes would otherwise close the attribute early,
+// truncating the handler into a silently dead button.
+function jsArg(x) { const s = JSON.stringify(x); return (s === undefined ? 'null' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 // Local YYYY-MM-DD (matches the store _todayStr; toISOString would be UTC
 // and can disagree near midnight).
 function phoneToday() {

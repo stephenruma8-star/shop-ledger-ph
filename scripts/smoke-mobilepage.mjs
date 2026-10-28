@@ -803,6 +803,13 @@ try {
   // txn-detail-body stub instead of inside modal-root — assert there)
   await gcall(`openTxnDetail(1)`);
   ok(getEl('txn-detail-body').innerHTML.includes('INV-00001'), 'receipt detail shows the invoice');
+  // Regression: inline handlers must be syntactically valid. JSON.stringify's
+  // double quotes used to truncate the onclick attribute, leaving dead buttons.
+  const decodeAttr = (s) => s.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  const detailHandlers = [...getEl('txn-detail-body').innerHTML.matchAll(/onclick="([^"]*)"/g)].map(m => decodeAttr(m[1]));
+  const brokenHandler = detailHandlers.find(code => { try { new Function(code); return false; } catch (e) { return true; } });
+  ok(detailHandlers.length >= 5, 'sale detail renders its inline action buttons');
+  ok(!brokenHandler, 'every sale-detail inline handler is valid JS' + (brokenHandler ? ' (broken: ' + brokenHandler + ')' : ''));
   const postsBeforeReturn = posts.length;
   await gcall(`returnTxn('INV-00001')`);
   ok(getEl('return-btn').textContent.includes('confirm'), 'first tap arms the return');

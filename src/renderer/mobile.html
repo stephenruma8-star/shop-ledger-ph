@@ -266,6 +266,10 @@ function esc(s) { const d = document.createElement('div'); d.textContent = s == 
 // " raw), so it is unsafe inside attribute values and quoted JS strings.
 // Use this for value="...", placeholder="...", data-* and similar spots.
 function escAttr(s) { return esc(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+// jsArg: a JS literal safe to embed inside a double-quoted onclick attribute.
+// JSON.stringify's own double quotes would otherwise close the attribute early,
+// truncating the handler into a silently dead button.
+function jsArg(x) { const s = JSON.stringify(x); return (s === undefined ? 'null' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 // Local YYYY-MM-DD (matches the desktop today() and the store _todayStr;
 // toISOString would be UTC and can disagree near midnight).
 function phoneToday() {
@@ -2924,7 +2928,7 @@ async function openClientDetail(id) {
           <span class="text-gray-200">${fmtDate(p.date)} <span class="text-gray-500">· ${esc(p.type || '')}${p.referenceNo ? ' · #' + esc(p.referenceNo) : ''}</span></span>
           <span class="flex items-center gap-1.5">
             <span class="text-green-400 num shrink-0">-${peso(p.amount)}</span>
-            ${phoneRole() === 'cashier' ? '' : `<button onclick="renderPaymentEdit(${JSON.stringify(p.id)}, ${p.amount || 0}, ${JSON.stringify(p.referenceNo || '')})" class="text-[11px] text-blue-400 px-1.5">✏️</button><button onclick="deletePayment(${JSON.stringify(p.id)})" class="text-[11px] text-red-400 px-1.5">✕</button>`}
+            ${phoneRole() === 'cashier' ? '' : `<button onclick="renderPaymentEdit(${jsArg(p.id)}, ${jsArg(p.amount || 0)}, ${jsArg(p.referenceNo || '')})" class="text-[11px] text-blue-400 px-1.5">✏️</button><button onclick="deletePayment(${jsArg(p.id)})" class="text-[11px] text-red-400 px-1.5">✕</button>`}
           </span>
         </div>`).join('') || `<p class="text-[11px] text-gray-500">${T('cli.no_history')}</p>`}
     </div>`;
@@ -3523,8 +3527,8 @@ function openSaleDrafts() {
                   <div class="font-semibold text-sm text-gray-200 truncate">${esc(saleDraftName(key))}</div>
                   <div class="text-[11px] text-gray-500">${T('sale.draft_items', { n })} · ${peso(total)}</div>
                 </div>
-                <button onclick="resumeSaleDraft(${JSON.stringify(key)})" class="btn btn-primary btn-sm">${T('sale.draft_resume')}</button>
-                <button onclick="deleteSaleDraft(${JSON.stringify(key)})" class="text-red-400 p-2" title="${esc(T('sale.draft_delete'))}"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+                <button onclick="resumeSaleDraft(${jsArg(key)})" class="btn btn-primary btn-sm">${T('sale.draft_resume')}</button>
+                <button onclick="deleteSaleDraft(${jsArg(key)})" class="text-red-400 p-2" title="${esc(T('sale.draft_delete'))}"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
               </div>
             </div>`;
           }).join('')}
@@ -4557,7 +4561,7 @@ async function renderTransactions() {
 function txnListHTML(items) {
   if (!(items || []).length) return `<div class="text-center text-gray-500 py-10 fade-in md:col-span-2"><svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><p class="text-sm">No sales found.</p></div>`;
   return items.map(t => `
-        <div class="glass-card rounded-2xl p-3 row card-hover" onclick='openTxnDetail(${JSON.stringify(t.invoiceNo || t.id)})' style="cursor:pointer">
+        <div class="glass-card rounded-2xl p-3 row card-hover" onclick='openTxnDetail(${jsArg(t.invoiceNo || t.id)})' style="cursor:pointer">
           <div class="flex-1 min-w-0">
             <div class="font-semibold text-sm text-gray-200 truncate">${esc(t.clientName || 'Walk-in')}</div>
             <div class="text-[11px] text-gray-500 truncate">${esc(t.invoiceNo || '')} · ${fmtDate(t.date)} · ${esc(t.paymentMethod || 'Cash')}${t.items ? ' · ' + t.items + ' ' + (t.items === 1 ? T('cat.item') : T('cat.items')) : ''}</div>
@@ -4644,7 +4648,7 @@ async function openTxnDetail(id) {
           <span class="num shrink-0">${peso((parseFloat(it.qty) || 1) * (it.unitCost || it.price || 0))}</span>
         </div>
         ${it.settled ? `<div class="text-[11px] text-green-400 font-semibold mt-0.5">${esc(T('txn.settled_chip', { amt: peso(it.settled.amount), date: it.settled.date || '' }))}</div>`
-          : (canSettle ? `<button id="settle-btn-${idx}" onclick="event.stopPropagation();settleTxnLine(${JSON.stringify(t.invoiceNo || t.id)}, ${idx})" class="btn btn-sm mt-1 w-full" style="background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);color:#93c5fd">${esc(T('txn.settle_item', { amt: peso(payoff) }))}</button>` : '')}
+          : (canSettle ? `<button id="settle-btn-${idx}" onclick="event.stopPropagation();settleTxnLine(${jsArg(t.invoiceNo || t.id)}, ${idx})" class="btn btn-sm mt-1 w-full" style="background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);color:#93c5fd">${esc(T('txn.settle_item', { amt: peso(payoff) }))}</button>` : '')}
         </div>`;
       }).join('') || `<p class="text-xs text-gray-500">${T('txn.no_lines')}</p>`}
     </div>
@@ -4657,12 +4661,12 @@ async function openTxnDetail(id) {
     <div class="grid grid-cols-2 gap-2">
       <button onclick="printSaleReceipt('${esc(t.invoiceNo || '')}')" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>${T('txn.print')}</button>
       ${(canReturn || (owner && t.status !== 'voided' && t.status !== 'return')) ? `<input id="txn-reason" type="text" maxlength="200" placeholder="Reason (optional)" autocomplete="off" class="inp col-span-2" style="height:2.4rem" />` : ''}
-      ${owner && t.status !== 'voided' && t.status !== 'return' ? `<button onclick="closeQuick();editTxnPayment(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-ghost btn-sm col-span-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>${esc(T('txn.change_payment'))}: ${esc(t.paymentMethod || 'Cash')}</button>` : ''}
-      ${owner && t.status !== 'voided' && t.status !== 'return' ? `<button onclick="closeQuick();editSaleFromDetail(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-ghost btn-sm col-span-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>Edit items</button>` : ''}
-      <button onclick="previewReceiptTxn(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>${T('txn.preview')}</button>
-      <button onclick="shareReceiptTxn(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-ghost btn-sm col-span-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>${T('txn.share')}</button>
-      ${canReturn ? `<button id="return-btn" onclick="returnTxn(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-sm col-span-2" style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);color:#f87171"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>${T('txn.return')}</button>` : ''}
-      ${owner && t.status !== 'voided' && t.status !== 'return' ? `<button id="void-btn" onclick="voidTxn(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-sm col-span-2" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);color:#94a3b8"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="12" cy="12" r="10"/><line x1="4.9" y1="4.9" x2="19.1" y2="19.1"/></svg>${T('txn.void')}</button>` : ''}
+      ${owner && t.status !== 'voided' && t.status !== 'return' ? `<button onclick="closeQuick();editTxnPayment(${jsArg(t.invoiceNo || t.id)})" class="btn btn-ghost btn-sm col-span-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>${esc(T('txn.change_payment'))}: ${esc(t.paymentMethod || 'Cash')}</button>` : ''}
+      ${owner && t.status !== 'voided' && t.status !== 'return' ? `<button onclick="closeQuick();editSaleFromDetail(${jsArg(t.invoiceNo || t.id)})" class="btn btn-ghost btn-sm col-span-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>Edit items</button>` : ''}
+      <button onclick="previewReceiptTxn(${jsArg(t.invoiceNo || t.id)})" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>${T('txn.preview')}</button>
+      <button onclick="shareReceiptTxn(${jsArg(t.invoiceNo || t.id)})" class="btn btn-ghost btn-sm col-span-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>${T('txn.share')}</button>
+      ${canReturn ? `<button id="return-btn" onclick="returnTxn(${jsArg(t.invoiceNo || t.id)})" class="btn btn-sm col-span-2" style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);color:#f87171"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>${T('txn.return')}</button>` : ''}
+      ${owner && t.status !== 'voided' && t.status !== 'return' ? `<button id="void-btn" onclick="voidTxn(${jsArg(t.invoiceNo || t.id)})" class="btn btn-sm col-span-2" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);color:#94a3b8"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="12" cy="12" r="10"/><line x1="4.9" y1="4.9" x2="19.1" y2="19.1"/></svg>${T('txn.void')}</button>` : ''}
     </div>`;
 }
 async function editTxnPayment(id) {
@@ -4681,7 +4685,7 @@ async function editTxnPayment(id) {
         <p class="text-[11px] text-gray-500 mb-3">${esc(t.invoiceNo || '')} · ${esc(t.clientName || 'Walk-in')}</p>
         <label class="text-[11px] text-gray-500 block mb-1">${esc(T('txn.payment_method'))}</label>
         <select id="tp-payment" class="inp mb-3">${opts}</select>
-        <button onclick="submitTxnPayment(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-primary btn-lg mb-2">${esc(T('cli.save'))}</button>
+        <button onclick="submitTxnPayment(${jsArg(t.invoiceNo || t.id)})" class="btn btn-primary btn-lg mb-2">${esc(T('cli.save'))}</button>
         <button onclick="closeQuick()" class="btn btn-ghost btn-lg">Cancel</button>
       </div>
     </div>`;
@@ -4906,9 +4910,9 @@ function showReceiptPreview(t, opts) {
           ? `<button onclick="closeQuick()" class="btn btn-primary w-full">${esc(T('sale.preview_ok'))}</button>`
           : `<div class="grid grid-cols-2 gap-2">
           <button onclick="printPreviewReceipt()" class="btn btn-primary btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>${T('txn.print')}</button>
-          <button onclick="shareReceiptTxn(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>${T('txn.share')}</button>
+          <button onclick="shareReceiptTxn(${jsArg(t.invoiceNo || t.id)})" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>${T('txn.share')}</button>
         </div>
-        <button onclick="openTxnDetail(${JSON.stringify(t.invoiceNo || t.id)})" class="btn btn-ghost w-full mt-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>${T('txn.back_detail')}</button>`}
+        <button onclick="openTxnDetail(${jsArg(t.invoiceNo || t.id)})" class="btn btn-ghost w-full mt-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>${T('txn.back_detail')}</button>`}
       </div>
     </div>`;
 }
