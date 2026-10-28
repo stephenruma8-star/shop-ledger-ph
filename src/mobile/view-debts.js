@@ -30,7 +30,7 @@ async function renderDebts() {
     </div>
     <div class="grid gap-2.5 fade-in">
       ${debtors.map(c => `
-      <div class="glass-card rounded-2xl p-3 row card-hover" onclick='openClientDetail(${JSON.stringify(c.id)})' style="cursor:pointer">
+      <div class="glass-card rounded-2xl p-3 row card-hover" onclick='openClientDetail(${jsArg(c.id)})' style="cursor:pointer">
         <span class="w-10 h-10 rounded-full bg-orange-600/20 text-orange-300 border border-orange-500/30 font-bold text-sm flex items-center justify-center shrink-0">${esc(((c.name || '?').trim().charAt(0) || '?').toUpperCase())}</span>
         <div class="flex-1 min-w-0">
           <div class="font-semibold text-sm text-gray-200 truncate">${esc(c.name)}</div>

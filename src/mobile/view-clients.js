@@ -32,7 +32,7 @@ async function renderClients() {
 function clientListHTML(clients) {
   if (!(clients || []).length) return `<div class="text-center text-gray-500 py-10 fade-in sm:col-span-2"><svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><p class="text-sm">No clients found.</p></div>`;
   return clients.map(c => `
-    <div class="glass-card rounded-2xl p-3 row card-hover" onclick='openClientDetail(${JSON.stringify(c.id)})' style="cursor:pointer">
+    <div class="glass-card rounded-2xl p-3 row card-hover" onclick='openClientDetail(${jsArg(c.id)})' style="cursor:pointer">
       <span class="w-10 h-10 rounded-full bg-blue-600/20 text-blue-300 border border-blue-500/30 font-bold text-sm flex items-center justify-center shrink-0">${esc(((c.name || '?').trim().charAt(0) || '?').toUpperCase())}</span>
       <div class="flex-1 min-w-0">
         <div class="font-semibold text-sm text-gray-200 truncate">${esc(c.name)}</div>
@@ -41,7 +41,7 @@ function clientListHTML(clients) {
       <div class="text-right shrink-0">
         <div class="font-bold text-sm num ${(c.balance || 0) <= 0 ? 'text-green-400' : 'text-orange-400'}">${peso(c.balance)}</div>
       </div>
-      <button onclick="event.stopPropagation();showView('pay', ${JSON.stringify(c.id)})" class="btn btn-success btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>${T('cli.pay')}</button>
+      <button onclick="event.stopPropagation();showView('pay', ${jsArg(c.id)})" class="btn btn-success btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>${T('cli.pay')}</button>
     </div>`).join('');
 }
 function filterClients(q) {
@@ -137,19 +137,19 @@ async function openClientDetail(id) {
       <button onclick="closeQuick()" aria-label="Close" class="w-9 h-9 rounded-xl btn-ghost flex items-center justify-center text-gray-400 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
     <div class="grid grid-cols-2 gap-2 mb-2">
-      <button onclick="renderClientForm(${JSON.stringify(c.id)})" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>${T('cli.edit')}</button>
+      <button onclick="renderClientForm(${jsArg(c.id)})" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>${T('cli.edit')}</button>
       <button onclick="shareClientStatement()" class="btn btn-ghost btn-sm">📤 ${T('cli.statement')}</button>
     </div>
-    ${(c.loyaltyPoints || 0) >= 100 ? `<button id="redeem-btn" onclick="redeemClientPoints(${JSON.stringify(c.id)})" class="btn btn-sm w-full mb-2" style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.5);color:#fbbf24"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>${T('cli.redeem')}</button>` : ''}
+    ${(c.loyaltyPoints || 0) >= 100 ? `<button id="redeem-btn" onclick="redeemClientPoints(${jsArg(c.id)})" class="btn btn-sm w-full mb-2" style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.5);color:#fbbf24"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>${T('cli.redeem')}</button>` : ''}
     <div class="grid grid-cols-2 gap-2 mb-3">
-      <button onclick="closeQuick();showView('pay', ${JSON.stringify(c.id)})" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>${T('cli.record_payment')}</button>
-      <button onclick="closeQuick();showView('sale', ${JSON.stringify(c.id)})" class="btn btn-primary btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>${T('sale.new')}</button>
+      <button onclick="closeQuick();showView('pay', ${jsArg(c.id)})" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>${T('cli.record_payment')}</button>
+      <button onclick="closeQuick();showView('sale', ${jsArg(c.id)})" class="btn btn-primary btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>${T('sale.new')}</button>
     </div>
-    ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button id="client-del-btn" onclick="deleteClient(${JSON.stringify(c.id)})" class="btn btn-sm w-full mb-3" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);color:#f87171">🗑 Delete client</button>` : ''}
+    ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button id="client-del-btn" onclick="deleteClient(${jsArg(c.id)})" class="btn btn-sm w-full mb-3" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);color:#f87171">🗑 Delete client</button>` : ''}
     <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">${T('cli.history_sales')}</h4>
     <div class="space-y-1.5 mb-3">
       ${(h.sales || []).slice(0, 20).map(t => `
-        <div class="rounded-xl px-2 -mx-2 py-1 card-hover" onclick='openTxnDetail(${JSON.stringify(t.invoiceNo || t.id)})' style="cursor:pointer">
+        <div class="rounded-xl px-2 -mx-2 py-1 card-hover" onclick='openTxnDetail(${jsArg(t.invoiceNo || t.id)})' style="cursor:pointer">
           <div class="flex justify-between items-center text-sm gap-2">
             <span class="text-gray-200 truncate">${esc(t.invoiceNo || '')} <span class="text-gray-500">A� ${fmtDate(t.date)}</span></span>
             <span class="flex items-center gap-1 shrink-0"><span class="num ${Number(t.grandTotal) < 0 ? 'text-red-400' : ''}">${peso(t.grandTotal)}</span><span class="text-gray-600">�?�</span></span>
@@ -214,7 +214,7 @@ function renderClientForm(id) {
               <span class="text-sm text-gray-300">PWD</span>
             </label>
           </div>
-          <button onclick="submitClientForm(${id ? JSON.stringify(id) : 'null'})" class="btn ${id ? 'btn-primary btn-lg' : 'btn-primary'}"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('cli.save')}</button>
+          <button onclick="submitClientForm(${id ? jsArg(id) : 'null'})" class="btn ${id ? 'btn-primary btn-lg' : 'btn-primary'}"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('cli.save')}</button>
           ${id ? '' : `<button onclick="submitClientForm(null, true)" class="btn btn-lg" style="background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.5);color:#4ade80"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>${T('cli.save_new_sale')}</button>`}
         </div>
       </div>
@@ -321,7 +321,7 @@ function renderPaymentEdit(id, amount, referenceNo) {
         <div class="flex items-center justify-between gap-2 mb-3"><h3 class="font-bold text-gray-100 text-sm flex items-center gap-2"><span class="icon-tile bg-green-500/15 text-green-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>${T('pay.edit_title')}</h3><button onclick="closeQuick()" aria-label="Close" class="w-9 h-9 rounded-xl btn-ghost flex items-center justify-center text-gray-400 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
         <input id="pe-amount" type="number" min="0" step="0.01" value="${amount || ''}" class="inp mb-3" />
         <input id="pe-ref" type="text" maxlength="40" value="${escAttr(referenceNo || '')}" placeholder="Reference # (optional)" autocomplete="off" class="inp mb-3" />
-        <button onclick="submitPaymentEdit(${JSON.stringify(id)})" class="btn btn-primary btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('pay.save_edit')}</button>
+        <button onclick="submitPaymentEdit(${jsArg(id)})" class="btn btn-primary btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('pay.save_edit')}</button>
       </div>
     </div>`;
 }

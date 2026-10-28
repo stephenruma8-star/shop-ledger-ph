@@ -1,6 +1,6 @@
 import { logAudit } from './auth.js'
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
-import { calcInterest, closeModal, confetti, confirmModal, debounce, escapeHtml, filterByYear, modal, parseCSVLine, playSound, requireFields, searchData, toast, validatePhone } from './helpers.js'
+import { calcInterest, closeModal, confetti, confirmModal, debounce, escapeHtml, filterByYear, jsArg, modal, parseCSVLine, playSound, requireFields, searchData, toast, validatePhone } from './helpers.js'
 import { escHtml, excelTableCss, openPrintWindow } from './printLayout.js'
 import { fmtDate, fmtDateTime, now, peso, state, today } from './state.js'
 import { adjustStock, getQty, lineAmt, receiptContentHtml, resolveInvIds, undoSale, wasBalanceAdded } from './transactions.js'
@@ -349,7 +349,7 @@ export async function viewClientHistory(id) {
             ${(t.items||[]).map((i, ii) => {
               const payoff = (parseFloat(i.amount) || 0) > 0 ? parseFloat(i.amount) : lineAmt(i);
               const canSettle = t.status === 'pending' && t.clientId && !i.settled && (c.balance || 0) > 0;
-              return `<tr class="border-b dark:border-gray-700 last:border-0"><td class="p-1">${escHtml(i.description||'')}</td><td class="p-1 text-center">${escHtml(i.name||'1')}</td><td class="p-1 text-right">${peso(i.unitCost||0)}</td><td class="p-1 text-right">${i.intRate?i.intRate+'%':'-'}</td><td class="p-1 text-right font-medium">${peso((getQty(i.name||i.qty||1)*(i.unitCost||0)))}</td><td class="p-1 text-right">${i.settled ? '<span class="text-green-600 font-medium">✓ Settled</span>' : (canSettle ? `<button onclick="event.stopPropagation();settleClientItem('${t.invoiceNo}',${ii})" class="text-blue-600 hover:text-blue-800 underline whitespace-nowrap" title="Pay off this item only">Settle ${peso(payoff)}</button>` : '')}</td></tr>`;
+              return `<tr class="border-b dark:border-gray-700 last:border-0"><td class="p-1">${escHtml(i.description||'')}</td><td class="p-1 text-center">${escHtml(i.name||'1')}</td><td class="p-1 text-right">${peso(i.unitCost||0)}</td><td class="p-1 text-right">${i.intRate?i.intRate+'%':'-'}</td><td class="p-1 text-right font-medium">${peso((getQty(i.name||i.qty||1)*(i.unitCost||0)))}</td><td class="p-1 text-right">${i.settled ? '<span class="text-green-600 font-medium">✓ Settled</span>' : (canSettle ? `<button onclick="event.stopPropagation();settleClientItem(${jsArg(t.invoiceNo)},${ii})" class="text-blue-600 hover:text-blue-800 underline whitespace-nowrap" title="Pay off this item only">Settle ${peso(payoff)}</button>` : '')}</td></tr>`;
             }).join('')}
             ${t.totalInterest > 0 || t.discount > 0 || t.scDiscount > 0 ? `<tr class="font-semibold"><td colspan="5" class="p-1 text-right text-xs">${t.totalInterest>0?'Interest: '+peso(t.totalInterest)+' ':''}${t.scDiscount>0?'SC/PWD: -'+peso(t.scDiscount)+' ':''}${Math.max(0,(t.discount||0)-(t.scDiscount||0))>0?'Discount: -'+peso(Math.max(0,(t.discount||0)-(t.scDiscount||0))):''}</td><td class="p-1 text-right font-bold">${peso(t.grandTotal)}</td></tr>` : ''}
             </tbody></table>

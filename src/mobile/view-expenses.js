@@ -40,7 +40,7 @@ function expenseListHTML(items) {
       </div>
       <div class="text-right shrink-0">
         <div class="font-bold text-sm text-red-400 num">${peso(e.amount)}</div>
-        ${owner && e.id ? `<div class="flex gap-1 justify-end mt-1"><button onclick="renderExpenseEdit(${JSON.stringify(e.id)})" class="text-[11px] text-blue-400 px-1">✏️</button><button onclick="deleteExpense(${JSON.stringify(e.id)})" class="text-[11px] text-red-400 px-1">✕</button></div>` : ''}
+        ${owner && e.id ? `<div class="flex gap-1 justify-end mt-1"><button onclick="renderExpenseEdit(${jsArg(e.id)})" class="text-[11px] text-blue-400 px-1">✏️</button><button onclick="deleteExpense(${jsArg(e.id)})" class="text-[11px] text-red-400 px-1">✕</button></div>` : ''}
       </div>
     </div>`).join('');
 }
@@ -128,7 +128,7 @@ function renderExpenseEdit(id) {
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('exp.amount')}</label>
             <input id="ee-amount" type="number" min="0" step="0.01" value="${e.amount || ''}" class="inp" />
           </div>
-          <button onclick="submitExpenseEdit(${JSON.stringify(id)})" class="btn btn-primary btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('exp.save')}</button>
+          <button onclick="submitExpenseEdit(${jsArg(id)})" class="btn btn-primary btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('exp.save')}</button>
         </div>
       </div>
     </div>`;

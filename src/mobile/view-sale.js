@@ -727,7 +727,7 @@ function counterSearch(q) {
   if (q.length < 2) { box.innerHTML = ''; return; }
   const hits = (data.inventory || []).filter(i => ((i.name || '') + ' ' + (i.sku || '') + ' ' + (i.barcode || '')).toLowerCase().includes(q) && (i.stock || 0) > 0).slice(0, 6);
   box.innerHTML = hits.length ? hits.map(h => `
-    <button onclick='counterAdd(${JSON.stringify(h.id)})' class="w-full text-left glass-card rounded-xl px-3 py-2.5 flex items-center gap-2">
+    <button onclick='counterAdd(${jsArg(h.id)})' class="w-full text-left glass-card rounded-xl px-3 py-2.5 flex items-center gap-2">
       <span class="flex-1 min-w-0"><span class="block text-sm font-medium truncate text-gray-200">${esc(h.name)}</span>
       <span class="block text-[11px] text-gray-500">${peso(h.price)} · ${h.stock} left</span></span>
       <span class="text-blue-400 font-bold text-lg shrink-0">+</span>

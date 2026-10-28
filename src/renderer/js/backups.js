@@ -1,6 +1,6 @@
 // Backups modal, Quick Items modal and cloud sync actions.
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
-import { closeModal, confirmModal, escapeHtml, modal, toast } from './helpers.js'
+import { closeModal, confirmModal, escapeHtml, jsArg, modal, toast } from './helpers.js'
 import { state } from './state.js'
 
 function formatBytes(n) {
@@ -18,9 +18,9 @@ function statusBadge(b) {
 }
 
 function actionCell(b) {
-  const name = escapeHtml(b.name);
-  const retry = `<button onclick="retryLocalBackup('${name}')" class="px-2 py-1 bg-amber-500 text-white rounded text-xs hover:bg-amber-600">Retry</button>`;
-  const restore = `<button onclick="restoreLocalBackup('${name}')" class="px-2 py-1 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700">Restore</button>`;
+  const name = jsArg(b.name);
+  const retry = `<button onclick="retryLocalBackup(${name})" class="px-2 py-1 bg-amber-500 text-white rounded text-xs hover:bg-amber-600">Retry</button>`;
+  const restore = `<button onclick="restoreLocalBackup(${name})" class="px-2 py-1 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700">Restore</button>`;
   const dash = '<span class="text-gray-300 text-xs">—</span>';
   return b.status === 'failed' ? retry : b.status === 'ok' ? restore : dash;
 }

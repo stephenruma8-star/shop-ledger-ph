@@ -716,6 +716,10 @@ export function validatePhone(v) { return /^(\+63|0)?\d{10,11}$/.test(String(v).
 export function debounce(fn, ms = 250) { let timer; return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); }; }
 
 export function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+// jsArg: a JS literal safe inside a double-quoted inline handler attribute.
+// escapeHtml does NOT escape quotes, so raw JSON.stringify (or a bare string)
+// would close the attribute early and the button silently dies.
+export function jsArg(x) { const s = JSON.stringify(x); return (s === undefined ? 'null' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 export function dbLoad(store) {
   if (state[store] && state[store].length > 0) return Promise.resolve(state[store]);
   return dbAll(store).then(data => { state[store] = data; return data; });
@@ -1301,6 +1305,7 @@ Object.defineProperties(window, {
   validatePhone: { get: () => validatePhone, configurable: true },
   debounce: { get: () => debounce, configurable: true },
   escapeHtml: { get: () => escapeHtml, configurable: true },
+  jsArg: { get: () => jsArg, configurable: true },
   dbLoad: { get: () => dbLoad, configurable: true },
   hashPassword: { get: () => hashPassword, configurable: true },
   verifyPassword: { get: () => verifyPassword, configurable: true },

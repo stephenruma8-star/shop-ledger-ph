@@ -838,6 +838,16 @@ try {
 
   for (const t of timerIds) clearTimeout(t);
 
+  // Dead-button guard: every rendered view's inline handlers must be valid JS
+  // (a truncated handler, e.g. from unescaped quotes, silently does nothing).
+  const decodeH = (s) => s.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  for (const vw of ['home', 'sale', 'catalog', 'pay', 'inventory', 'transactions', 'expenses', 'suppliers', 'purchase-orders', 'reports', 'settings', 'stocktake', 'audit', 'help', 'debts', 'clients']) {
+    await gcall(`showView(${JSON.stringify(vw)})`);
+    const vhtml = getEl('view').innerHTML;
+    const deadH = [...vhtml.matchAll(/onclick="([^"]*)"/g)].map(m => decodeH(m[1])).find(code => { try { new Function(code); return false; } catch (e) { return true; } });
+    ok(!deadH, 'view ' + vw + ' inline handlers valid' + (deadH ? ' (dead: ' + deadH + ')' : ''));
+  }
+
   if (failures === 0) {
     console.log('MOBILE PAGE OK: boots via 8 /api endpoints, 11 views render, cart sale + quick sell + out-of-stock guard + Bayad + expenses + PO + reports + settings + offline queue/Sync-now all verified');
     process.exit(0);

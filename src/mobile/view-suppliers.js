@@ -35,9 +35,9 @@ function supplierListHTML(items) {
       <div class="flex gap-1.5 mt-2 items-center">
         <span class="chip chip-blue">${T('sup.bought', { amt: peso(s.purchased) })}</span>
         <span class="chip chip-green">${T('sup.paid', { amt: peso(s.paid) })}</span>
-        ${(s.owed || 0) > 0 && phoneRole() !== 'cashier' ? `<button onclick="renderSupplierPay(${JSON.stringify(s.id)})" class="btn btn-ghost btn-sm shrink-0">Pay</button>` : ''}
-        ${phoneRole() !== 'cashier' ? `<button onclick="renderSupplierForm(${JSON.stringify(s.id)})" title="${esc(T('sup.edit'))}" class="btn btn-ghost btn-sm px-2 shrink-0">✏️</button>` : ''}
-        ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button onclick="deleteSupplier(${JSON.stringify(s.id)})" id="sup-del-${s.id}" class="ml-auto text-[11px] text-red-400 px-2 py-1 rounded-lg shrink-0" style="background:rgba(239,68,68,.1)">🗑</button>` : ''}
+        ${(s.owed || 0) > 0 && phoneRole() !== 'cashier' ? `<button onclick="renderSupplierPay(${jsArg(s.id)})" class="btn btn-ghost btn-sm shrink-0">Pay</button>` : ''}
+        ${phoneRole() !== 'cashier' ? `<button onclick="renderSupplierForm(${jsArg(s.id)})" title="${esc(T('sup.edit'))}" class="btn btn-ghost btn-sm px-2 shrink-0">✏️</button>` : ''}
+        ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button onclick="deleteSupplier(${jsArg(s.id)})" id="sup-del-${s.id}" class="ml-auto text-[11px] text-red-400 px-2 py-1 rounded-lg shrink-0" style="background:rgba(239,68,68,.1)">🗑</button>` : ''}
       </div>
     </div>`).join('');
 }
@@ -92,7 +92,7 @@ function renderSupplierForm(id) {
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sup.address')}</label>
             <input id="sp-address" type="text" maxlength="200" class="inp" value="${s ? escAttr(s.address || '') : ''}" />
           </div>
-          <button onclick="submitSupplierForm(${s ? JSON.stringify(s.id) : 'null'})" class="btn btn-primary btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('sup.save')}</button>
+          <button onclick="submitSupplierForm(${s ? jsArg(s.id) : 'null'})" class="btn btn-primary btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('sup.save')}</button>
         </div>
       </div>
     </div>`;
@@ -146,7 +146,7 @@ async function renderSupplierPay(id) {
               ${hist.payments.slice(0, 10).map(p => `
               <div class="flex justify-between text-sm gap-2 items-center">
                 <span class="text-gray-200">${fmtDate(p.date)}${p.paymentMethod ? ' <span class="text-gray-500">· ' + esc(p.paymentMethod) + '</span>' : ''}</span>
-                <span class="flex items-center gap-1.5 shrink-0"><span class="text-green-400 num">-${peso(p.amount)}</span>${phoneRole() === 'cashier' ? '' : `<button onclick="editSupplierPaymentMobile(${JSON.stringify(p.id)})" class="text-blue-400 px-1" title="Edit">&#9998;</button><button onclick="deleteSupplierPaymentMobile(${JSON.stringify(p.id)})" class="text-red-400 px-1" title="Delete">&#10005;</button>`}</span>
+                <span class="flex items-center gap-1.5 shrink-0"><span class="text-green-400 num">-${peso(p.amount)}</span>${phoneRole() === 'cashier' ? '' : `<button onclick="editSupplierPaymentMobile(${jsArg(p.id)})" class="text-blue-400 px-1" title="Edit">&#9998;</button><button onclick="deleteSupplierPaymentMobile(${jsArg(p.id)})" class="text-red-400 px-1" title="Delete">&#10005;</button>`}</span>
               </div>`).join('')}
             </div>
           </div>` : (hist ? `<p class="text-[11px] text-gray-500">${T('sup.no_history')}</p>` : '')}
@@ -189,8 +189,8 @@ async function editSupplierPaymentMobile(id) {
         <select id="spe-method" class="inp mb-3">${methods.map(m => `<option${p.paymentMethod === m ? ' selected' : ''}>${m}</option>`).join('')}</select>
         <label class="text-[11px] text-gray-500 block mb-1">Notes</label>
         <input id="spe-notes" type="text" maxlength="200" value="${escAttr(p.notes || '')}" class="inp mb-3" />
-        <button onclick="submitSupplierPaymentEditMobile(${JSON.stringify(p.id)})" class="btn btn-primary btn-lg mb-2">Save</button>
-        <button onclick="renderSupplierPay(${JSON.stringify(supplierPayId)})" class="btn btn-ghost btn-lg">Cancel</button>
+        <button onclick="submitSupplierPaymentEditMobile(${jsArg(p.id)})" class="btn btn-primary btn-lg mb-2">Save</button>
+        <button onclick="renderSupplierPay(${jsArg(supplierPayId)})" class="btn btn-ghost btn-lg">Cancel</button>
       </div>
     </div>`;
 }
