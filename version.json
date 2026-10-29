@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.16",
+    "version":  "3.37.17",
     "buildDate":  "2026-10-26T00:00:00.000Z",
-    "notes":  "Phone clients: Delete now appears for owners on paired phones too and, after a second tap to confirm, removes the client along with their sales and payments. Each client detail also gains Print preview and Print buttons (a statement of account), matching the Recent Sales screen."
+    "notes":  "Phone Settings adds a Test print button so the thermal printer can be checked before relying on it (paired phones use the desktop printer; the standalone app uses the phone's own). Plus the earlier 4.8.29 fix so a failed update check reports a failure instead of falsely saying 'up to date'."
 }
