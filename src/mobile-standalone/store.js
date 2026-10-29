@@ -198,15 +198,21 @@ async function _apiClients(method, parts, body) {
     _bump();
     return { success: true, points: pointsToRedeem, discount: discountAmount, remaining: pts - pointsToRedeem };
   }
-  if (parts.length === 1 && method === 'DELETE') {    const c = await db.get('SELECT * FROM clients WHERE id = ?', [parts[0]]);
+  if (parts.length === 1 && method === 'DELETE') {
+    const c = await db.get('SELECT * FROM clients WHERE id = ?', [parts[0]]);
     if (!c) throw _apiErr(404, 'Client not found');
-    if ((c.balance || 0) !== 0) throw _apiErr(400, 'Cannot delete: client still has a balance of ₱' + (Number(c.balance) || 0).toFixed(2));
-    const txns = await db.all('SELECT id FROM transactions WHERE clientId = ? LIMIT 1', [c.id]);
-    if (txns.length) throw _apiErr(400, 'Cannot delete: client has recorded sales');
-    const pays = await db.all('SELECT id FROM payments WHERE clientId = ? LIMIT 1', [c.id]);
-    if (pays.length) throw _apiErr(400, 'Cannot delete: client has recorded payments');
+    const force = !!(body && body.force);
+    const txns = await db.all('SELECT id FROM transactions WHERE clientId = ?', [c.id]);
+    const pays = await db.all('SELECT id FROM payments WHERE clientId = ?', [c.id]);
+    if (!force && (txns.length || pays.length || (c.balance || 0) !== 0)) {
+      throw _apiErr(400, 'Client has a balance or history');
+    }
     await db.run('DELETE FROM clients WHERE id = ?', [c.id]);
-    await _audit('client-delete', 'Deleted client ' + (c.name || '') + ' (phone)');
+    if (force) {
+      await db.run('DELETE FROM transactions WHERE clientId = ?', [c.id]);
+      await db.run('DELETE FROM payments WHERE clientId = ?', [c.id]);
+    }
+    await _audit('client-delete', 'Deleted client ' + (c.name || '') + (force ? ' + history' : '') + ' (phone)');
     _bump();
     return { success: true };
   }
@@ -1394,17 +1400,33 @@ async function _apiAudit(query) {
 }
 async function _apiPrint(body) {
   const b = body || {};
-  const id = b.transactionId ?? b.id;
-  if (id === undefined || id === null || id === '') {
-    const e = _apiErr(400, 'transactionId required'); e.json = { success: false, error: 'transactionId required' }; throw e;
-  }
   const db = _db();
-  const rows = await db.all('SELECT * FROM transactions WHERE invoiceNo = ? OR id = ?', [String(id), String(id)]);
-  const t = rows.find(x => String(x.id) === String(id) || x.invoiceNo === String(id));
-  if (!t) { const e = _apiErr(404, 'Transaction not found'); e.json = { success: false, error: 'Transaction not found' }; throw e; }
   const s = await _settingsMap();
   const peso = (n) => '₱' + (Number(n) || 0).toFixed(2);
   const lines = [];
+  let t = null;
+  // A caller may send a ready document (e.g. a client statement) as `lines`,
+  // otherwise `transactionId` reprints a saved sale.
+  if (Array.isArray(b.lines)) {
+    for (const l of b.lines.slice(0, 400)) {
+      if (!l || typeof l.text !== 'string') continue;
+      const line = { text: String(l.text).slice(0, 200) };
+      if (l.t) line.t = String(l.t).slice(0, 8);
+      if (l.bold) line.bold = true;
+      if (l.size) line.size = String(l.size).slice(0, 8);
+      lines.push(line);
+    }
+    if (!lines.length) { const e = _apiErr(400, 'lines required'); e.json = { success: false, error: 'lines required' }; throw e; }
+  } else {
+    const id = b.transactionId ?? b.id;
+    if (id === undefined || id === null || id === '') {
+      const e = _apiErr(400, 'transactionId required'); e.json = { success: false, error: 'transactionId required' }; throw e;
+    }
+    const rows = await db.all('SELECT * FROM transactions WHERE invoiceNo = ? OR id = ?', [String(id), String(id)]);
+    t = rows.find(x => String(x.id) === String(id) || x.invoiceNo === String(id));
+    if (!t) { const e = _apiErr(404, 'Transaction not found'); e.json = { success: false, error: 'Transaction not found' }; throw e; }
+  }
+  if (t) {
   if (s.receiptHeaderText) lines.push({ t: 'center', text: s.receiptHeaderText });
   lines.push({ t: 'center', bold: true, size: 'double', text: s.shopName || 'Shop Ledger PH' });
   if (s.shopAddress) lines.push({ t: 'center', text: s.shopAddress });
@@ -1431,12 +1453,13 @@ async function _apiPrint(body) {
   lines.push({ t: 'spacer' });
   lines.push({ t: 'center', text: s.receiptFooter || 'Thank you for your patronage!' });
   lines.push({ t: 'spacer' });
+  }
   if (typeof _printerFn !== 'function') {
     const e = _apiErr(502, 'Printer not configured on this phone'); e.json = { success: false, error: 'Printer not configured on this phone' }; throw e;
   }
   const r = await _printerFn(lines, s.thermalHost || '', s.thermalPort || '9100');
   if (!r || !r.success) { const e = _apiErr(502, (r && r.error) || 'Print failed'); e.json = { success: false, error: (r && r.error) || 'Print failed' }; throw e; }
-  await _audit('print', 'Mobile reprint ' + (t.invoiceNo || '') + ' (phone)');
+  await _audit('print', 'Mobile print ' + (t ? (t.invoiceNo || '') : 'statement') + ' (phone)');
   return { success: true };
 }
 async function _apiSms() {

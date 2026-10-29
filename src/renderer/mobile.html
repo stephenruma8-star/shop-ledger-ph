@@ -2865,8 +2865,10 @@ async function importClientsCsv() {
   inp.click();
 }
 let detailClientId = null;
+let detailClientHistory = null;
 async function openClientDetail(id) {
   detailClientId = id;
+  detailClientHistory = null;
   document.getElementById('modal-root').innerHTML = `
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
       <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:94vh;max-height:94dvh;overflow-y:auto" onclick="event.stopPropagation()">
@@ -2881,6 +2883,7 @@ async function openClientDetail(id) {
   if (detailClientId !== id) return;
   const box = document.getElementById('client-detail-body');
   if (!box || !h || !h.client) return;
+  detailClientHistory = h;
   const c = h.client;
   box.innerHTML = `
     <div class="flex items-center gap-3 mb-3">
@@ -2899,13 +2902,15 @@ async function openClientDetail(id) {
     <div class="grid grid-cols-2 gap-2 mb-2">
       <button onclick="renderClientForm(${jsArg(c.id)})" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>${T('cli.edit')}</button>
       <button onclick="shareClientStatement()" class="btn btn-ghost btn-sm">📤 ${T('cli.statement')}</button>
+      <button onclick="previewClientStatement()" class="btn btn-ghost btn-sm">🧾 Preview</button>
+      <button onclick="printClientStatement()" class="btn btn-ghost btn-sm">🖨 Print</button>
     </div>
     ${(c.loyaltyPoints || 0) >= 100 ? `<button id="redeem-btn" onclick="redeemClientPoints(${jsArg(c.id)})" class="btn btn-sm w-full mb-2" style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.5);color:#fbbf24"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>${T('cli.redeem')}</button>` : ''}
     <div class="grid grid-cols-2 gap-2 mb-3">
       <button onclick="closeQuick();showView('pay', ${jsArg(c.id)})" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>${T('cli.record_payment')}</button>
       <button onclick="closeQuick();showView('sale', ${jsArg(c.id)})" class="btn btn-primary btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>${T('sale.new')}</button>
     </div>
-    ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button id="client-del-btn" onclick="deleteClient(${jsArg(c.id)})" class="btn btn-sm w-full mb-3" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);color:#f87171">🗑 Delete client</button>` : ''}
+    ${phoneRole() === 'cashier' ? '' : `<button id="client-del-btn" onclick="deleteClient(${jsArg(c.id)})" class="btn btn-sm w-full mb-3" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);color:#f87171">🗑 Delete client</button>`}
     <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">${T('cli.history_sales')}</h4>
     <div class="space-y-1.5 mb-3">
       ${(h.sales || []).slice(0, 20).map(t => `
@@ -3045,20 +3050,25 @@ async function redeemClientPoints(id) {
   } catch (e) { feelErr(); toast(T('cli.failed', { msg: e.message }), 'err'); }
   finally { releaseSubmitLock('redeem'); }
 }
-// Standalone-only: delete a client with no balance and no history.
+// Delete a client. Empty clients delete outright; clients with history ask again
+// (two taps) and then remove their sales and payments too, like the desktop.
 let clientDeleteArmed = null;
+function clientHasHistory() {
+  return !!(detailClientHistory && ((detailClientHistory.sales || []).length || (detailClientHistory.payments || []).length));
+}
 async function deleteClient(id) {
+  const withHistory = clientHasHistory();
   if (clientDeleteArmed !== id) {
     clientDeleteArmed = id;
     const btn = document.getElementById('client-del-btn');
-    if (btn) btn.textContent = 'Tap again to delete this client';
+    if (btn) btn.textContent = withHistory ? 'Tap again to delete client + all history' : 'Tap again to delete this client';
     setTimeout(() => { if (clientDeleteArmed === id) { clientDeleteArmed = null; const b = document.getElementById('client-del-btn'); if (b) b.textContent = '🗑 Delete client'; } }, 5000);
     return;
   }
   clientDeleteArmed = null;
   if (!takeSubmitLock('clientdel')) return;
   try {
-    await apiPost('/api/clients/' + encodeURIComponent(id), {}, 'DELETE');
+    await apiPost('/api/clients/' + encodeURIComponent(id), { force: withHistory }, 'DELETE');
     closeQuick();
     feelOk();
     toast('Client deleted', 'ok');
@@ -3068,10 +3078,88 @@ async function deleteClient(id) {
 }
 async function shareClientStatement() {
   if (!detailClientId) return;
-  let h = null;
-  try { h = await apiGet('/api/clients/' + encodeURIComponent(detailClientId) + '/history'); }
-  catch (e) { toast(T('cli.load_fail', { msg: e.message }), 'err'); return; }
+  let h = detailClientHistory || null;
+  if (!h) { try { h = await apiGet('/api/clients/' + encodeURIComponent(detailClientId) + '/history'); } catch (e) { toast(T('cli.load_fail', { msg: e.message }), 'err'); return; } }
   await shareText((h.client.name || '') + ' — statement', buildStatementText(h.client, h.sales || [], h.payments || []));
+}
+// Client statement as printer lines (shared by preview and print).
+function clientStatementParts(h) {
+  const s = data.settings || {};
+  const c = (h && h.client) || {};
+  const L = [];
+  if (s.receiptHeaderText) L.push({ t: 'center', text: s.receiptHeaderText });
+  L.push({ t: 'center', bold: true, size: 'double', text: s.shopName || 'Shop Ledger PH' });
+  if (s.shopAddress) L.push({ t: 'center', text: s.shopAddress });
+  if (s.shopContact) L.push({ t: 'center', text: 'Contact: ' + s.shopContact });
+  L.push({ t: 'divider' });
+  L.push({ t: 'center', bold: true, text: 'STATEMENT OF ACCOUNT' });
+  L.push({ text: 'Client: ' + (c.name || '') });
+  if (c.phone) L.push({ text: 'Phone: ' + c.phone });
+  L.push({ text: 'Date: ' + phoneToday() });
+  L.push({ t: 'divider' });
+  const sales = (h && h.sales) || [];
+  if (sales.length) {
+    L.push({ bold: true, text: 'Sales' });
+    sales.slice(0, 30).forEach((t) => L.push({ text: (t.invoiceNo || '') + '  ' + (t.date || '') + '  ' + peso(t.grandTotal) }));
+  }
+  const pays = (h && h.payments) || [];
+  if (pays.length) {
+    L.push({ t: 'divider' });
+    L.push({ bold: true, text: 'Payments' });
+    pays.slice(0, 30).forEach((p) => L.push({ text: (p.date || '') + '  ' + (p.type || '') + '  -' + peso(p.amount) }));
+  }
+  L.push({ t: 'divider' });
+  L.push({ bold: true, size: 'double', text: 'BALANCE: ' + peso(c.balance) });
+  L.push({ t: 'spacer' });
+  L.push({ t: 'center', text: 'Please settle your balance. Thank you!' });
+  L.push({ t: 'spacer' });
+  return L;
+}
+function statementLinesToText(L, W) {
+  W = W || 32;
+  const center = (x) => { x = String(x).slice(0, W); return ' '.repeat(Math.max(0, Math.floor((W - x.length) / 2))) + x; };
+  return L.map((l) => {
+    const text = l.text || '';
+    if (l.t === 'divider') return '-'.repeat(W);
+    if (l.t === 'spacer') return '';
+    if (l.t === 'center') return center(text);
+    return text.slice(0, W);
+  }).join('\n');
+}
+async function loadDetailHistory() {
+  if (!detailClientId) return null;
+  if (detailClientHistory) return detailClientHistory;
+  try { detailClientHistory = await apiGet('/api/clients/' + encodeURIComponent(detailClientId) + '/history'); }
+  catch (e) { toast(T('cli.load_fail', { msg: e.message }), 'err'); return null; }
+  return detailClientHistory;
+}
+async function previewClientStatement() {
+  const h = await loadDetailHistory();
+  if (!h) return;
+  const text = statementLinesToText(clientStatementParts(h));
+  document.getElementById('modal-root').innerHTML = `
+    <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
+      <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:94vh;max-height:94dvh;overflow-y:auto" onclick="event.stopPropagation()">
+        <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
+        <h3 class="font-bold text-gray-100 text-sm mb-3">${esc((h.client && h.client.name) || '')} — statement</h3>
+        <pre class="receipt-paper">${esc(text)}</pre>
+        <div class="grid grid-cols-2 gap-2">
+          <button onclick="printClientStatement()" class="btn btn-primary btn-sm">🖨 Print</button>
+          <button onclick="shareClientStatement()" class="btn btn-ghost btn-sm">📤 Share</button>
+        </div>
+        <button onclick="openClientDetail(${jsArg(detailClientId)})" class="btn btn-ghost w-full mt-2">Back to client</button>
+      </div>
+    </div>`;
+}
+async function printClientStatement() {
+  const h = await loadDetailHistory();
+  if (!h) return;
+  toast(T('sale.sending_print'), 'info');
+  try {
+    await apiPostRaw('/api/print-thermal', { lines: clientStatementParts(h) });
+    feelOk();
+    toast(T('sale.printed_ok'), 'ok');
+  } catch (e) { feelErr(); toast(T('sale.print_failed', { msg: e.message }), 'err'); }
 }
 function renderPaymentEdit(id, amount, referenceNo) {
   document.getElementById('modal-root').innerHTML = `

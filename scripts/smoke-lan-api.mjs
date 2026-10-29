@@ -211,6 +211,10 @@ const server = app.listen(0, '127.0.0.1', async () => {
     ok(cliH.body.sales.some(s => Array.isArray(s.items) && s.items.length > 0 && s.items[0].description === 'Coke'), 'GET /api/clients/:id/history includes purchased items');
     const cliRedeem = await json('/api/clients/1/redeem', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
     ok(cliRedeem.status === 503, 'POST /api/clients/:id/redeem requires the renderer (503 in harness)');
+    const cliDel = await json('/api/clients/1', { method: 'DELETE' });
+    ok(cliDel.status === 503, 'DELETE /api/clients/:id requires the renderer (503 in harness)');
+    const cliDelCash = await fetch(base + '/api/clients/1?token=dev_cash-1', { method: 'DELETE' });
+    ok(cliDelCash.status === 403, 'cashier blocked from deleting a client (403)');
 
     // inventory valuation + item add/edit (dup checks run without renderer)
     const val = await json('/api/inventory/valuation');
@@ -352,6 +356,11 @@ const server = app.listen(0, '127.0.0.1', async () => {
     const pr1 = await json('/api/print-thermal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ transactionId: 1 }) });
     ok(pr1.status === 200 && pr1.body.success === true, 'POST /api/print-thermal reprints a sale');
     ok(printedThermal.length === 1 && printedThermal[0].host === '127.0.0.1' && printedThermal[0].lines.some(l => String(l.text || '').includes('TOTAL')) && printedThermal[0].lines.some(l => String(l.text || '').includes('INV-00001')), 'thermal lines carry the receipt with invoice + TOTAL');
+    // a caller may print a ready document (client statement) by sending `lines`
+    const prLines = await json('/api/print-thermal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lines: [{ t: 'center', text: 'STATEMENT' }, { text: 'Balance: 10.00' }] }) });
+    ok(prLines.status === 200 && prLines.body.success === true && printedThermal[printedThermal.length - 1].lines.some(l => l.text === 'STATEMENT'), 'POST /api/print-thermal prints supplied lines');
+    const prEmpty = await json('/api/print-thermal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lines: [] }) });
+    ok(prEmpty.status === 400, 'POST /api/print-thermal rejects empty lines');
 
     // clients
     let r = await json('/api/clients');

@@ -233,6 +233,10 @@ function createLanApiRouter(deps) {
       if (req.method === 'GET' && req.path === '/api/mobile-diag') {
         return res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
       }
+      // Deleting a client wipes their sales/payments: owner-only.
+      if (req.method === 'DELETE' && req.path.startsWith('/api/clients/')) {
+        return res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
+      }
       // Record-rewriting and money-out writes: owner-only. Everyday counter
       // writes (sales, payments, stocktake, photos, client add) stay open.
       if ((req.method === 'PUT' || req.method === 'DELETE') && (
@@ -360,6 +364,33 @@ function createLanApiRouter(deps) {
     const ok = JSON.parse(await deps.rendererExec(`JSON.stringify((async()=>{const c=await dbGet('clients',${JSON.stringify(req.params.id)});if(!c)return false;c.name=${JSON.stringify(name)};c.phone=${JSON.stringify(String(b.phone || '').trim().slice(0, 20))};c.address=${JSON.stringify(String(b.address || '').trim().slice(0, 200))};c.dueDate=${JSON.stringify(String(b.dueDate || '').slice(0, 10))};c.isSC=${!!b.isSC};c.isPWD=${!!b.isPWD};${setBalance}await dbPut('clients',c);return true;})())`));
     if (!ok) return res.status(404).json({ error: 'Client not found' });
     try { await deps.rendererExec(`(async()=>{try{await logAudit('client-edit','Updated client ' + ${JSON.stringify(name)} + ${JSON.stringify(devTag(req))});}catch(e){}})()`); } catch (e) {}
+    deps.notify({ source: 'api', kind: 'client' });
+    res.json({ success: true });
+  }));
+
+  // Delete a client. Without ?force it refuses clients that still have a balance
+  // or history; with force (the phone asks first) it also removes their sales and
+  // payments, mirroring desktop "Delete client".
+  router.delete('/api/clients/:id', wrap(async (req, res) => {
+    if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
+    const force = !!(req.body && req.body.force);
+    const r = JSON.parse(await deps.rendererExec(`JSON.stringify((async()=>{
+      const c=await dbGet('clients',${JSON.stringify(req.params.id)});
+      if(!c)return {ok:false,error:'Client not found',code:404};
+      const txns=await dbAll('transactions');
+      const pays=await dbAll('payments');
+      const hasTx=txns.some(t=>String(t.clientId)===String(c.id));
+      const hasPay=pays.some(p=>String(p.clientId)===String(c.id));
+      if(!${force}&&(hasTx||hasPay||(c.balance||0)!==0))return {ok:false,error:'Client has a balance or history',code:400};
+      await dbDel('clients',c.id);
+      if(${force}){
+        for(const t of txns){if(String(t.clientId)===String(c.id))await dbDel('transactions',t.id);}
+        for(const p of pays){if(String(p.clientId)===String(c.id))await dbDel('payments',p.id);}
+      }
+      return {ok:true};
+    })())`));
+    if (!r || !r.ok) return res.status((r && r.code) || 400).json({ success: false, error: (r && r.error) || 'Delete failed' });
+    try { await deps.rendererExec(`(async()=>{try{await logAudit('client-delete','Mobile client delete' + ${JSON.stringify(devTag(req))});}catch(e){}})()`); } catch (e) {}
     deps.notify({ source: 'api', kind: 'client' });
     res.json({ success: true });
   }));
@@ -1318,16 +1349,32 @@ function createLanApiRouter(deps) {
   router.post('/api/print-thermal', wrap(async (req, res) => {
     try {
       if (typeof deps.printThermal !== 'function') return res.status(503).json({ success: false, error: 'Printing not available' });
-      const id = req.body && (req.body.transactionId ?? req.body.id);
-      if (id === undefined || id === null || id === '') return res.status(400).json({ success: false, error: 'transactionId required' });
       const dump = await load('transactions', 'settings');
-      const t = (dump.transactions || []).find(x => String(x.id) === String(id) || x.invoiceNo === String(id));
-      if (!t) return res.status(404).json({ success: false, error: 'Transaction not found' });
       const s = {};
       (dump.settings || []).forEach(x => { s[x.key] = x.value; });
       if (!s.thermalHost) return res.status(400).json({ success: false, error: 'Set the Thermal Printer IP in desktop Settings first' });
       const peso = (n) => '₱' + (Number(n) || 0).toFixed(2);
       const lines = [];
+      let t = null;
+      // A caller may send a ready document (e.g. a client statement) as `lines`,
+      // otherwise `transactionId` reprints a saved sale.
+      if (req.body && Array.isArray(req.body.lines)) {
+        for (const l of req.body.lines.slice(0, 400)) {
+          if (!l || typeof l.text !== 'string') continue;
+          const line = { text: String(l.text).slice(0, 200) };
+          if (l.t) line.t = String(l.t).slice(0, 8);
+          if (l.bold) line.bold = true;
+          if (l.size) line.size = String(l.size).slice(0, 8);
+          lines.push(line);
+        }
+        if (!lines.length) return res.status(400).json({ success: false, error: 'lines required' });
+      } else {
+        const id = req.body && (req.body.transactionId ?? req.body.id);
+        if (id === undefined || id === null || id === '') return res.status(400).json({ success: false, error: 'transactionId required' });
+        t = (dump.transactions || []).find(x => String(x.id) === String(id) || x.invoiceNo === String(id));
+        if (!t) return res.status(404).json({ success: false, error: 'Transaction not found' });
+      }
+      if (t) {
       lines.push({ t: 'center', bold: true, size: 'double', text: s.shopName || 'Shop Ledger PH' });
       if (s.shopAddress) lines.push({ t: 'center', text: s.shopAddress });
       if (s.shopContact) lines.push({ t: 'center', text: 'Contact: ' + s.shopContact });
@@ -1353,9 +1400,10 @@ function createLanApiRouter(deps) {
       lines.push({ t: 'spacer' });
       lines.push({ t: 'center', text: s.receiptFooter || 'Thank you for your patronage!' });
       lines.push({ t: 'spacer' });
+      }
       const r = await deps.printThermal({ host: s.thermalHost, port: s.thermalPort || '9100', lines });
       if (!r || !r.success) return res.status(502).json({ success: false, error: (r && r.error) || 'Print failed' });
-      try { await deps.rendererExec(`(async()=>{try{await logAudit('print','Mobile reprint ' + ${JSON.stringify(t.invoiceNo || '')} + ${JSON.stringify(devTag(req))});}catch(e){}})()`); } catch (e) {}
+      try { await deps.rendererExec(`(async()=>{try{await logAudit('print','Mobile print ' + ${JSON.stringify(t ? (t.invoiceNo || '') : 'statement')} + ${JSON.stringify(devTag(req))});}catch(e){}})()`); } catch (e) {}
       res.json({ success: true });
     } catch (err) { res.status(500).json({ success: false, error: 'Print failed' }); }
   }));

@@ -692,6 +692,15 @@ try {
   ok(getEl('modal-root').innerHTML.includes('cf-balance'), 'client edit form exposes balance');
   await gcall(`openClientDetail(1)`);
   ok(getEl('client-detail-body').innerHTML.includes('Maria Santos'), 'client detail shows history');
+  {
+    const dh = (s) => s.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+    const cdHandlers = [...getEl('client-detail-body').innerHTML.matchAll(/onclick="([^"]*)"/g)].map(m => dh(m[1]));
+    ok(cdHandlers.some(c => c.includes('previewClientStatement')), 'client detail offers Print preview');
+    ok(cdHandlers.some(c => c.includes('printClientStatement')), 'client detail offers Print');
+    ok(cdHandlers.some(c => c.includes('deleteClient')), 'client detail offers Delete for the owner');
+    const cdDead = cdHandlers.find(code => { try { new Function(code); return false; } catch (e) { return true; } });
+    ok(!cdDead, 'client detail inline handlers valid' + (cdDead ? ' (dead: ' + cdDead + ')' : ''));
+  }
   const redBefore = posts.length;
   await gcall(`redeemClientPoints(1)`);
   await gcall(`redeemClientPoints(1)`);

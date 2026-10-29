@@ -519,5 +519,16 @@ await A('DELETE', '/api/supplier-payments/' + spId);
 ok((await A('GET', '/api/suppliers/' + supEP.id + '/payments')).payments.length === 0, 'supplier payment delete removes it');
 await throws(404, () => A('PUT', '/api/supplier-payments/999999', { amount: 5 }), 'supplier payment edit 404s on unknown id');
 
+// client deletion: refuses a client with history unless forced; force wipes it
+const delC = await A('POST', '/api/clients', { name: 'Del Client' });
+await A('POST', '/api/sales', { clientId: delC.id, items: [{ description: 'Oil', qty: 1, unitCost: 30, invId: it2.id }], paymentMethod: 'Credit (Utang)' });
+ok((await A('GET', '/api/clients/' + delC.id + '/history')).sales.length === 1, 'delete-test client has a sale');
+await throws(400, () => A('DELETE', '/api/clients/' + delC.id), 'client delete refuses a client with history');
+const delRes = await A('DELETE', '/api/clients/' + delC.id, { force: true });
+ok(delRes.success === true, 'force delete removes the client');
+ok(!(await A('GET', '/api/clients')).some(c => String(c.id) === String(delC.id)), 'deleted client is gone');
+ok(!(await A('GET', '/api/transactions?limit=500')).some(t => String(t.clientId) === String(delC.id)), 'force delete removes the client sales');
+await throws(404, () => A('DELETE', '/api/clients/999999'), 'client delete 404s on an unknown id');
+
 console.log(`\nSTANDALONE STORE: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
