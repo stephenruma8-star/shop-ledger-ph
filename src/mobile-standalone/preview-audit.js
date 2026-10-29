@@ -140,6 +140,19 @@ async function runStandaloneAudit() {
     if (!host) { host = document.createElement('div'); host.id = 'update-row'; document.body.appendChild(host); made = true; }
     updateUpdateRow();
     if (!host.innerHTML.includes('checkStandaloneUpdate(true)')) throw new Error('no check-for-updates button');
+    {
+      // A rate-limited / failed feed must report a failure, never "up to date".
+      const updSlot = document.getElementById('upd-check');
+      const realFetch = window.fetch;
+      window.fetch = async () => ({ ok: false, status: 403, json: async () => ({ message: 'rate limited' }) });
+      try { await checkStandaloneUpdate(true); } finally { window.fetch = realFetch; }
+      if (updSlot && /Up to date/.test(updSlot.innerHTML)) throw new Error('rate-limited update check reported up to date');
+      if (!updSlot || !/Check failed/.test(updSlot.innerHTML)) throw new Error('rate-limited update check did not report failure');
+      // A good feed with a newer APK must still offer it.
+      window.fetch = async () => ({ ok: true, status: 200, json: async () => ([{ tag_name: 'mobile-v9.9.9', name: 'Phone 9.9.9', assets: [{ name: 'Shop-Ledger-Mobile-9.9.9-standalone.apk', browser_download_url: 'https://example.com/Shop-Ledger-Mobile-9.9.9-standalone.apk' }] }]) });
+      try { await checkStandaloneUpdate(true); } finally { window.fetch = realFetch; }
+      if (!updSlot || !/New version 9.9.9/.test(updSlot.innerHTML)) throw new Error('newer release not offered');
+    }
     if (typeof pollStandaloneDownload !== 'function') throw new Error('no poll fn');
     pollStandaloneDownload(null, null, 'x'); // no native in audit env: must no-op, not throw
     host.innerHTML = '';

@@ -438,17 +438,26 @@ async function checkStandaloneUpdate(manual) {
   const say = (html) => { if (slot) slot.innerHTML = html; };
   if (manual) say('<p class="text-[11px] text-gray-500 mb-2">Checking…</p>');
   try {
-    const r = await (await fetch('https://api.github.com/repos/stephenruma8-star/shop-ledger-ph/releases?per_page=20', { headers: { Accept: 'application/vnd.github+json' } })).json();
-    const mobile = (Array.isArray(r) ? r : [])
+    const res = await fetch('https://api.github.com/repos/stephenruma8-star/shop-ledger-ph/releases?per_page=20', { headers: { Accept: 'application/vnd.github+json' }, cache: 'no-store' });
+    // A 403 (unauthenticated rate limit) or any error returns a JSON object, not
+    // an array. Treating that as "no releases" used to make the app claim it was
+    // up to date when it had not actually checked.
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const r = await res.json();
+    if (!Array.isArray(r)) throw new Error('bad release feed');
+    const mobile = r
       .filter(x => x && /^mobile-v\d+\.\d+\.\d+$/.test(x.tag_name || ''))
       .map(x => {
-        const url = (x.assets || []).map(a => a.browser_download_url).find(u => /standalone\.apk$/i.test(u || '')) || x.html_url;
-        return { tag: x.tag_name.slice('mobile-v'.length), url, file: String(url || '').split('/').pop() || 'Shop-Ledger-Mobile-update.apk', name: x.name || x.tag_name };
-      });
+        const apk = (x.assets || []).find(a => /standalone\.apk$/i.test(a.name || a.browser_download_url || ''));
+        if (!apk || !apk.browser_download_url) return null;
+        return { tag: x.tag_name.slice('mobile-v'.length), url: apk.browser_download_url, file: String(apk.name || 'Shop-Ledger-Mobile-update.apk'), name: x.name || x.tag_name };
+      })
+      .filter(Boolean);
+    if (!mobile.length) throw new Error('no mobile release found');
     mobile.sort((x, y) => _cmpVersions(y.tag, x.tag));
     const best = mobile[0];
     try { localStorage.setItem('slpUpdCheck', new Date().toISOString()); } catch (e) {}
-    if (!best || _cmpVersions(best.tag, STANDALONE_VERSION) <= 0) {
+    if (_cmpVersions(best.tag, STANDALONE_VERSION) <= 0) {
       if (manual) say('<p class="text-[11px] text-green-400 mb-2">Up to date (v' + STANDALONE_VERSION + ').</p>');
       else if (slot) slot.innerHTML = '';
       return false;
