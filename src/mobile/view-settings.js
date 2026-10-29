@@ -114,6 +114,7 @@ function renderShopEdit() {
             <input id="se-thermal" type="text" maxlength="40" placeholder="192.168.1.50" value="${escAttr(s.thermalHost || '')}" class="inp" />
           </div>` : ''}
           <button onclick="submitShopEdit()" class="btn btn-primary btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('set.save_shop')}</button>
+          <button onclick="printTestReceipt()" class="btn btn-ghost btn-lg">🖨 Test print</button>
         </div>
       </div>
     </div>`;
@@ -147,5 +148,29 @@ async function submitShopEdit() {
     await refreshAll();
   } catch (e) { toast(T('set.save_failed', { msg: e.message }), 'err'); }
   finally { releaseSubmitLock('shopedit'); }
+}
+// Print a short test receipt to the configured thermal printer, so the printer
+// can be verified without doing a real sale. On a paired phone this uses the
+// desktop's printer; on the standalone app it uses the phone's own printer.
+async function printTestReceipt() {
+  const s = data.settings || {};
+  toast(T('sale.sending_print'), 'info');
+  try {
+    await apiPostRaw('/api/print-thermal', {
+      lines: [
+        { t: 'center', bold: true, size: 'double', text: s.shopName || 'Shop Ledger PH' },
+        { t: 'center', text: 'TEST PRINT' },
+        { t: 'divider' },
+        { text: 'Date: ' + phoneToday() },
+        { text: 'Printer: ' + (s.thermalHost || '(desktop default)') + ':' + (s.thermalPort || '9100') },
+        { t: 'divider' },
+        { t: 'center', text: 'If you can read this, printing works.' },
+        { t: 'spacer' },
+        { t: 'spacer' }
+      ]
+    });
+    feelOk();
+    toast(T('sale.printed_ok'), 'ok');
+  } catch (e) { feelErr(); toast(T('sale.print_failed', { msg: e.message }), 'err'); }
 }
 
