@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.15",
+    "version":  "3.37.16",
     "buildDate":  "2026-10-26T00:00:00.000Z",
-    "notes":  "Every button that builds its argument from data now escapes it correctly, so no tap is silently swallowed (the phone's Client Payment, Edit Items, Preview, Share, Return, Void, Settle, payment-edit and sale-draft buttons and the desktop Retry/Restore backup and Settle buttons). A new automated check fails the build if a handler is ever written unsafely again."
+    "notes":  "Phone clients: Delete now appears for owners on paired phones too and, after a second tap to confirm, removes the client along with their sales and payments. Each client detail also gains Print preview and Print buttons (a statement of account), matching the Recent Sales screen."
 }
