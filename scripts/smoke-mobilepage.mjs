@@ -856,6 +856,13 @@ try {
   await gcall(`startNewSale()`);
   ok(!getEl('view').innerHTML.includes('Update sale') && !getEl('view').innerHTML.includes('Editing'), 'New Sale clears a pending edit');
 
+  // Manual item date: typeable text field + a transparent native date input
+  // over the calendar icon, so a real tap opens the system picker.
+  await gcall(`manualItem()`);
+  const manualHtml = getEl('modal-root').innerHTML;
+  ok(manualHtml.includes('id="m-date"') && manualHtml.includes('type="date"'), 'manual item date has a native picker overlay');
+  await gcall(`closeQuick()`);
+
   // Dead-button guard: every rendered view's inline handlers must be valid JS
   // (a truncated handler, e.g. from unescaped quotes, silently does nothing).
   const decodeH = (s) => s.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');

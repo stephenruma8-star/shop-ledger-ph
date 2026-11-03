@@ -3,7 +3,7 @@
 // names and response shapes as the LAN client, so every shared view works
 // unchanged. No imports/exports: concatenated. Requires store.js first.
 const IS_STANDALONE = true;
-const STANDALONE_VERSION = '4.8.35';
+const STANDALONE_VERSION = '4.8.36';
 function isNativeApp() {
   try { return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); } catch (e) { return false; }
 }
@@ -49,34 +49,17 @@ function validDateStr(s) {
 function dateTypedAttrs() {
   return 'type="text" inputmode="numeric" maxlength="10" autocomplete="off" placeholder="YYYY-MM-DD" oninput="onDateInput(this)"';
 }
-// Calendar button beside a typeable date: opens the native date picker and
-// writes the chosen day back into the text field, so you can type OR pick.
+// Calendar affordance beside a typeable date. A transparent native
+// <input type="date"> sits over the icon, so a REAL tap opens the system
+// picker (programmatic showPicker/click is unreliable in Android WebView);
+// the chosen day is written back into the text field. Typing AND picking work.
 function datePickBtn(targetId) {
   const id = String(targetId).replace(/'/g, "\\'");
-  return `<button type="button" onclick="openDatePicker('${id}')" aria-label="Pick a date" class="shrink-0 px-2.5 rounded-lg border border-white/10 text-gray-300" style="background:rgba(30,41,59,.6)">📅</button>`;
-}
-function openDatePicker(targetId) {
-  try {
-    const target = document.getElementById(targetId);
-    if (!target) return;
-    const picker = document.createElement('input');
-    picker.type = 'date';
-    picker.value = validDateStr(target.value) || phoneToday();
-    picker.style.cssText = 'position:fixed;left:50%;top:50%;width:1px;height:1px;opacity:0;z-index:9999';
-    const done = () => { try { picker.remove(); } catch (e) {} };
-    picker.addEventListener('change', () => {
-      if (picker.value) {
-        target.value = picker.value;
-        try { target.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {}
-      }
-      done();
-    });
-    picker.addEventListener('blur', () => setTimeout(done, 300));
-    document.body.appendChild(picker);
-    let shown = false;
-    try { if (typeof picker.showPicker === 'function') { picker.showPicker(); shown = true; } } catch (e) { shown = false; }
-    if (!shown) { try { picker.click(); } catch (e) {} }
-  } catch (e) {}
+  const onchange = "if(this.value){var t=document.getElementById('" + id + "');if(t){t.value=this.value;try{t.dispatchEvent(new Event('change',{bubbles:true}));}catch(e){}}}";
+  return '<span class="relative inline-flex shrink-0" style="width:2.9rem;min-height:2.2rem;align-self:stretch">'
+    + '<span class="absolute inset-0 flex items-center justify-center rounded-lg border border-white/10 text-gray-300" style="background:rgba(30,41,59,.6);pointer-events:none">📅</span>'
+    + '<input type="date" aria-label="Pick a date" onchange="' + onchange + '" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer" />'
+    + '</span>';
 }
 // Line interest: rate is %/YEAR, compounded daily from the line date to today
 // (min 1 day): sub * ((1 + rate/100/365)^days - 1). Matches the loan document
