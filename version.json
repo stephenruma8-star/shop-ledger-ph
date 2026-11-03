@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.20",
+    "version":  "3.37.21",
     "buildDate":  "2026-11-03T00:00:00.000Z",
-    "notes":  "Interest is now an ANNUAL rate compounded daily everywhere (desktop, LAN API and phone), matching loan-document terms: 3%/yr for 160 days on 20,000 = 264.74. Rate labels now say %/yr. Also ships the phone fixes: reliable sale edit and daily interest (SQLite transaction handling) and typeable date fields."
+    "notes":  "Ships the updated phone UI served to paired phones: Word-style 'Find printer' (system printer selection) on receipts, scrollable sections that reach the last row, and date fields that support both typing and the native picker. Interest stays annual-compounded-daily."
 }
