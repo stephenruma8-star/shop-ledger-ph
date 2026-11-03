@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.17",
+    "version":  "3.37.18",
     "buildDate":  "2026-10-26T00:00:00.000Z",
-    "notes":  "Phone Settings adds a Test print button so the thermal printer can be checked before relying on it (paired phones use the desktop printer; the standalone app uses the phone's own). Plus the earlier 4.8.29 fix so a failed update check reports a failure instead of falsely saying 'up to date'."
+    "notes":  "Fixed mobile sale edit, payment-method change and client delete over LAN (the routes returned a spurious failure). Phone: New Sale no longer keeps a stale edit, the sale screen has a Manual item button, and bond receipts offer A4 / Letter / Legal."
 }
