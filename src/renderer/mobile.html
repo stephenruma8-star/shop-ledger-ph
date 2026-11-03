@@ -297,6 +297,35 @@ function validDateStr(s) {
 function dateTypedAttrs() {
   return 'type="text" inputmode="numeric" maxlength="10" autocomplete="off" placeholder="YYYY-MM-DD" oninput="onDateInput(this)"';
 }
+// Calendar button beside a typeable date: opens the native date picker and
+// writes the chosen day back into the text field, so you can type OR pick.
+function datePickBtn(targetId) {
+  const id = String(targetId).replace(/'/g, "\\'");
+  return `<button type="button" onclick="openDatePicker('${id}')" aria-label="Pick a date" class="shrink-0 px-2.5 rounded-lg border border-white/10 text-gray-300" style="background:rgba(30,41,59,.6)">📅</button>`;
+}
+function openDatePicker(targetId) {
+  try {
+    const target = document.getElementById(targetId);
+    if (!target) return;
+    const picker = document.createElement('input');
+    picker.type = 'date';
+    picker.value = validDateStr(target.value) || phoneToday();
+    picker.style.cssText = 'position:fixed;left:50%;top:50%;width:1px;height:1px;opacity:0;z-index:9999';
+    const done = () => { try { picker.remove(); } catch (e) {} };
+    picker.addEventListener('change', () => {
+      if (picker.value) {
+        target.value = picker.value;
+        try { target.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {}
+      }
+      done();
+    });
+    picker.addEventListener('blur', () => setTimeout(done, 300));
+    document.body.appendChild(picker);
+    let shown = false;
+    try { if (typeof picker.showPicker === 'function') { picker.showPicker(); shown = true; } } catch (e) { shown = false; }
+    if (!shown) { try { picker.click(); } catch (e) {} }
+  } catch (e) {}
+}
 // Line interest: rate is %/YEAR, compounded daily from the line date to today
 // (min 1 day): sub * ((1 + rate/100/365)^days - 1). Matches the loan document
 // convention (e.g. 3%/yr compound for 160 days on 20,000 = 264.74).
@@ -2978,7 +3007,7 @@ function renderClientForm(id) {
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('cli.due')}</label>
-              <input id="cf-due" ${dateTypedAttrs()} value="${escAttr(c?.dueDate || '')}" class="inp" />
+              <div class="flex gap-1.5"><input id="cf-due" ${dateTypedAttrs()} value="${escAttr(c?.dueDate || '')}" class="inp flex-1" />${datePickBtn('cf-due')}</div>
             </div>
           </div>
           <div>
@@ -3493,7 +3522,7 @@ function renderSale(presetId) {
             <button onclick="cartRemove(${idx})" class="text-red-400 hover:text-red-300 p-1.5 shrink-0" title="Remove"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
           </div>
           <div class="flex gap-1.5 mt-1.5 pl-[3.25rem]">
-            <input ${dateTypedAttrs()} value="${escAttr(i.date || phoneToday())}" onchange="cartLineDate(${idx},this.value)" class="w-[6.8rem] text-[11px] px-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 outline-none shrink-0" title="Item date — interest counts from here" />
+            <input id="sale-date-${idx}" ${dateTypedAttrs()} value="${escAttr(i.date || phoneToday())}" onchange="cartLineDate(${idx},this.value)" class="w-[6.8rem] text-[11px] px-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 outline-none shrink-0" title="Item date — interest counts from here" />${datePickBtn('sale-date-' + idx)}
             ${variants.length ? `<select onchange="cartLineVariant(${idx},this.value)" class="flex-1 min-w-0 text-[11px] px-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 outline-none">${variants.map(v => '<option value="' + escAttr(v.name) + '"' + ((i.variantName || variants[0].name) === v.name ? ' selected' : '') + '>' + esc(v.name) + '</option>').join('')}</select>` : ''}
             <select id="sale-rate-${idx}" onchange="cartLineRate(${idx},this.value)" class="w-20 text-[11px] px-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 outline-none shrink-0" title="Interest">${intRateOptions(rate)}</select>
           </div>
@@ -3888,7 +3917,7 @@ function manualItem() {
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('manual.date')}</label>
-            <input id="m-date" ${dateTypedAttrs()} value="${escAttr(phoneToday())}" class="inp" />
+            <div class="flex gap-1.5"><input id="m-date" ${dateTypedAttrs()} value="${escAttr(phoneToday())}" class="inp flex-1" />${datePickBtn('m-date')}</div>
           </div>
           <div class="grid grid-cols-2 gap-2.5">
             <div>
@@ -4540,7 +4569,7 @@ function renderItemForm(id) {
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('inv.expiry')}</label>
-            <input id="if-expiry" ${dateTypedAttrs()} value="${escAttr(it?.expiryDate || '')}" class="inp" />
+            <div class="flex gap-1.5"><input id="if-expiry" ${dateTypedAttrs()} value="${escAttr(it?.expiryDate || '')}" class="inp flex-1" />${datePickBtn('if-expiry')}</div>
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('inv.variants')}</label>
@@ -5139,7 +5168,7 @@ function addExpense() {
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('exp.date')}</label>
-              <input id="ex-date" ${dateTypedAttrs()} value="${escAttr(phoneToday())}" class="inp" />
+              <div class="flex gap-1.5"><input id="ex-date" ${dateTypedAttrs()} value="${escAttr(phoneToday())}" class="inp flex-1" />${datePickBtn('ex-date')}</div>
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('exp.payee')}</label>

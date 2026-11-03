@@ -29,7 +29,8 @@ async function throwsJson(status, fn, name) {
   catch (e) { ok(e && e.status === status && e.json && e.json.success === false, name); }
 }
 
-await initStore(makeNodeDriver());
+const driver = makeNodeDriver();
+await initStore(driver);
 const A = (m, p, b, over) => localApi(over || m, p, b);
 
 // settings
@@ -529,6 +530,30 @@ ok(delRes.success === true, 'force delete removes the client');
 ok(!(await A('GET', '/api/clients')).some(c => String(c.id) === String(delC.id)), 'deleted client is gone');
 ok(!(await A('GET', '/api/transactions?limit=500')).some(t => String(t.clientId) === String(delC.id)), 'force delete removes the client sales');
 await throws(404, () => A('DELETE', '/api/clients/999999'), 'client delete 404s on an unknown id');
+
+// annual-interest migration: rewrite a legacy monthly sale + lower the balance
+{
+  const mC = await A('POST', '/api/clients', { name: 'Migrate Client' });
+  const mSale = await A('POST', '/api/sales', {
+    clientId: mC.id,
+    items: [{ description: 'Old', qty: 1, unitCost: 100, intRate: 10, invId: it2.id, date: monthAgo }],
+    paymentMethod: 'Credit (Utang)'
+  });
+  const raw = await driver.get('SELECT * FROM transactions WHERE invoiceNo = ?', [mSale.invoiceNo]);
+  const oldItems = JSON.parse(raw.items).map(i => Object.assign(i, { amount: 110 }));
+  await driver.run('UPDATE transactions SET items = ?, totalInterest = 10, grandTotal = 110 WHERE id = ?', [JSON.stringify(oldItems), raw.id]);
+  await driver.run('UPDATE clients SET balance = 110 WHERE id = ?', [mC.id]);
+  await driver.run("DELETE FROM settings WHERE key = 'interestModelVersion'", []);
+  const mig = await A('POST', '/api/interest/migrate', {});
+  const afterTx = await A('GET', '/api/transactions/' + mSale.invoiceNo);
+  const after = (await A('GET', '/api/clients/' + mC.id + '/history')).client.balance;
+  const expInt = Math.round(100 * (Math.pow(1 + 0.10 / 365, 30) - 1) * 100) / 100;
+  ok(mig.corrected >= 1, 'interest migration corrects the legacy sale');
+  ok(Math.abs(afterTx.totalInterest - expInt) < 1e-9, 'migration rewrites interest to annual-compound');
+  ok(Math.abs(after - Math.round((110 + (expInt - 10)) * 100) / 100) < 1e-9, 'migration lowers the client balance by the overcharge');
+  const again = await A('POST', '/api/interest/migrate', {});
+  ok(again.corrected === 0 && again.already === true, 'interest migration is idempotent');
+}
 
 console.log(`\nSTANDALONE STORE: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

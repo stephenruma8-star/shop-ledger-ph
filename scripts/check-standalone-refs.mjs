@@ -90,7 +90,7 @@ const KNOWN = new Set(('document window navigator localStorage sessionStorage fe
   'console JSON Math Date String Number Boolean parseInt parseFloat isNaN isFinite ' +
   'Array Object Promise TextEncoder TextDecoder btoa atob URL URLSearchParams Blob ' +
   'FileReader AbortController AudioContext alert confirm Intl RegExp Error Map Set WeakMap ' +
-  'Uint8Array unescape BarcodeDetector ' +
+  'Uint8Array unescape BarcodeDetector Event ' +
   'encodeURIComponent decodeURIComponent Capacitor Intl NumberFormat').split(' '));
 const called = new Set();
 // JS calls not preceded by a dot (method calls resolve on objects, skip those)

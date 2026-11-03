@@ -50,6 +50,35 @@ function validDateStr(s) {
 function dateTypedAttrs() {
   return 'type="text" inputmode="numeric" maxlength="10" autocomplete="off" placeholder="YYYY-MM-DD" oninput="onDateInput(this)"';
 }
+// Calendar button beside a typeable date: opens the native date picker and
+// writes the chosen day back into the text field, so you can type OR pick.
+function datePickBtn(targetId) {
+  const id = String(targetId).replace(/'/g, "\\'");
+  return `<button type="button" onclick="openDatePicker('${id}')" aria-label="Pick a date" class="shrink-0 px-2.5 rounded-lg border border-white/10 text-gray-300" style="background:rgba(30,41,59,.6)">📅</button>`;
+}
+function openDatePicker(targetId) {
+  try {
+    const target = document.getElementById(targetId);
+    if (!target) return;
+    const picker = document.createElement('input');
+    picker.type = 'date';
+    picker.value = validDateStr(target.value) || phoneToday();
+    picker.style.cssText = 'position:fixed;left:50%;top:50%;width:1px;height:1px;opacity:0;z-index:9999';
+    const done = () => { try { picker.remove(); } catch (e) {} };
+    picker.addEventListener('change', () => {
+      if (picker.value) {
+        target.value = picker.value;
+        try { target.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {}
+      }
+      done();
+    });
+    picker.addEventListener('blur', () => setTimeout(done, 300));
+    document.body.appendChild(picker);
+    let shown = false;
+    try { if (typeof picker.showPicker === 'function') { picker.showPicker(); shown = true; } } catch (e) { shown = false; }
+    if (!shown) { try { picker.click(); } catch (e) {} }
+  } catch (e) {}
+}
 // Line interest: rate is %/YEAR, compounded daily from the line date to today
 // (min 1 day): sub * ((1 + rate/100/365)^days - 1). Matches the loan document
 // convention (e.g. 3%/yr compound for 160 days on 20,000 = 264.74).

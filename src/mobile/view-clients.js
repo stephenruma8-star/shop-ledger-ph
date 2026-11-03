@@ -197,7 +197,7 @@ function renderClientForm(id) {
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('cli.due')}</label>
-              <input id="cf-due" ${dateTypedAttrs()} value="${escAttr(c?.dueDate || '')}" class="inp" />
+              <div class="flex gap-1.5"><input id="cf-due" ${dateTypedAttrs()} value="${escAttr(c?.dueDate || '')}" class="inp flex-1" />${datePickBtn('cf-due')}</div>
             </div>
           </div>
           <div>

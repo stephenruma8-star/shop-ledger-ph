@@ -11,6 +11,9 @@ async function startStandalone() {
     if (ls) ls.classList.add('hidden');
     return;
   }
+  // One-time: correct pre-update debts from the old monthly interest model to
+  // the current annual-compound model (idempotent; only ever lowers a debt).
+  try { await apiPost('/api/interest/migrate', {}); } catch (e) {}
   // Daily interest accrues like the desktop, before the first paint so the
   // numbers are already fresh. Silent, once per day max.
   try { await apiPost('/api/interest/apply', {}); } catch (e) {}

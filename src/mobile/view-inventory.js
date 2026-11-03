@@ -173,7 +173,7 @@ function renderItemForm(id) {
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('inv.expiry')}</label>
-            <input id="if-expiry" ${dateTypedAttrs()} value="${escAttr(it?.expiryDate || '')}" class="inp" />
+            <div class="flex gap-1.5"><input id="if-expiry" ${dateTypedAttrs()} value="${escAttr(it?.expiryDate || '')}" class="inp flex-1" />${datePickBtn('if-expiry')}</div>
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('inv.variants')}</label>

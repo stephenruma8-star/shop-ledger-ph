@@ -122,7 +122,7 @@ function renderSale(presetId) {
             <button onclick="cartRemove(${idx})" class="text-red-400 hover:text-red-300 p-1.5 shrink-0" title="Remove"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
           </div>
           <div class="flex gap-1.5 mt-1.5 pl-[3.25rem]">
-            <input ${dateTypedAttrs()} value="${escAttr(i.date || phoneToday())}" onchange="cartLineDate(${idx},this.value)" class="w-[6.8rem] text-[11px] px-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 outline-none shrink-0" title="Item date — interest counts from here" />
+            <input id="sale-date-${idx}" ${dateTypedAttrs()} value="${escAttr(i.date || phoneToday())}" onchange="cartLineDate(${idx},this.value)" class="w-[6.8rem] text-[11px] px-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 outline-none shrink-0" title="Item date — interest counts from here" />${datePickBtn('sale-date-' + idx)}
             ${variants.length ? `<select onchange="cartLineVariant(${idx},this.value)" class="flex-1 min-w-0 text-[11px] px-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 outline-none">${variants.map(v => '<option value="' + escAttr(v.name) + '"' + ((i.variantName || variants[0].name) === v.name ? ' selected' : '') + '>' + esc(v.name) + '</option>').join('')}</select>` : ''}
             <select id="sale-rate-${idx}" onchange="cartLineRate(${idx},this.value)" class="w-20 text-[11px] px-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 outline-none shrink-0" title="Interest">${intRateOptions(rate)}</select>
           </div>
@@ -517,7 +517,7 @@ function manualItem() {
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('manual.date')}</label>
-            <input id="m-date" ${dateTypedAttrs()} value="${escAttr(phoneToday())}" class="inp" />
+            <div class="flex gap-1.5"><input id="m-date" ${dateTypedAttrs()} value="${escAttr(phoneToday())}" class="inp flex-1" />${datePickBtn('m-date')}</div>
           </div>
           <div class="grid grid-cols-2 gap-2.5">
             <div>

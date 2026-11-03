@@ -77,7 +77,7 @@ function addExpense() {
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('exp.date')}</label>
-              <input id="ex-date" ${dateTypedAttrs()} value="${escAttr(phoneToday())}" class="inp" />
+              <div class="flex gap-1.5"><input id="ex-date" ${dateTypedAttrs()} value="${escAttr(phoneToday())}" class="inp flex-1" />${datePickBtn('ex-date')}</div>
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('exp.payee')}</label>
