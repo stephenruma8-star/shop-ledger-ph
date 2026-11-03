@@ -331,22 +331,30 @@ function printPreviewReceipt() {
   else printSaleReceipt(st.t.invoiceNo || st.t.id);
 }
 function printBondReceipt(t) {
-  const html = bondPrintDocument(t);
-  const plugin = typeof nativePlugin === 'function' ? nativePlugin('ShopPrinter') : null;
-  if (plugin && typeof plugin.printHtml === 'function') {
-    toast(T('receipt.bond_open'), 'info');
-    plugin.printHtml({ html, jobName: 'Receipt ' + (t.invoiceNo || '') }).catch(e => toast(T('sale.print_failed', { msg: e.message }), 'err'));
-    return;
+  systemPrintHtml(bondPrintDocument(t), 'Receipt ' + (t.invoiceNo || ''));
+}
+// 32-column receipt rendered as a printable page for the system print dialog.
+function thermalPrintDocument(t) {
+  const L = receiptLines(t);
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Receipt ${esc(t.invoiceNo || '')}</title><style>@page{size:A4;margin:12mm}body{margin:0;background:#fff;color:#111;font-family:"Courier New",Consolas,monospace;font-size:12px;white-space:pre-wrap}</style></head><body>${esc(L.join('\n'))}</body></html>`;
+}
+// Opens the OS printer selection/search for the receipt currently previewed.
+function findPrinterForReceipt() {
+  const st = receiptPreviewState;
+  if (!st || !st.t) return;
+  const html = st.paper === 'bond' ? bondPrintDocument(st.t) : thermalPrintDocument(st.t);
+  systemPrintHtml(html, 'Receipt ' + (st.t.invoiceNo || ''));
+}
+// Open the OS printer chooser for a saved sale (used from the success sheet).
+async function openSystemPrintForSale(invoiceNo) {
+  if (!invoiceNo) return;
+  let t = (receiptPreviewState.t && (String(receiptPreviewState.t.invoiceNo) === String(invoiceNo) || String(receiptPreviewState.t.id) === String(invoiceNo))) ? receiptPreviewState.t : null;
+  if (!t) {
+    try { t = await apiGet('/api/transactions/' + encodeURIComponent(invoiceNo)); }
+    catch (e) { toast(T('txn.load_fail', { msg: e.message }), 'err'); return; }
   }
-  const frame = document.createElement('iframe');
-  frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
-  frame.onload = () => {
-    try { frame.contentWindow.focus(); frame.contentWindow.print(); }
-    catch (e) { toast(T('sale.print_failed', { msg: e.message }), 'err'); }
-    setTimeout(() => { try { frame.remove(); } catch (e) {} }, 60000);
-  };
-  frame.srcdoc = html;
-  document.body.appendChild(frame);
+  if (!t) return;
+  systemPrintHtml(bondPrintDocument(t), 'Receipt ' + (t.invoiceNo || ''));
 }
 // Modal shell for a receipt preview. opts.draft = unsaved sale: shows a
 // not-saved banner and only a "back to sale" action (no print/share yet �?"
@@ -375,6 +383,7 @@ function showReceiptPreview(t, opts) {
           <button onclick="printPreviewReceipt()" class="btn btn-primary btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>${T('txn.print')}</button>
           <button onclick="shareReceiptTxn(${jsArg(t.invoiceNo || t.id)})" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>${T('txn.share')}</button>
         </div>
+        <button onclick="findPrinterForReceipt()" class="btn btn-ghost w-full mt-2">${T('receipt.find_printer')}</button>
         <button onclick="openTxnDetail(${jsArg(t.invoiceNo || t.id)})" class="btn btn-ghost w-full mt-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>${T('txn.back_detail')}</button>`}
       </div>
     </div>`;

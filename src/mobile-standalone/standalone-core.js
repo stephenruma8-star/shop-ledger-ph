@@ -3,7 +3,7 @@
 // names and response shapes as the LAN client, so every shared view works
 // unchanged. No imports/exports: concatenated. Requires store.js first.
 const IS_STANDALONE = true;
-const STANDALONE_VERSION = '4.8.37';
+const STANDALONE_VERSION = '4.8.38';
 function isNativeApp() {
   try { return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); } catch (e) { return false; }
 }
@@ -284,6 +284,31 @@ function takeSubmitLock(key) {
 }
 function releaseSubmitLock(key) {
   try { submitLocks[key] = false; } catch (e) {}
+}
+// Open the OS print dialog (printer selection / "search for printer", like
+// Word) for an HTML document. Uses the native ShopPrinter bridge when present;
+// otherwise a hidden iframe + browser print as a fallback.
+function systemPrintHtml(html, jobName) {
+  try {
+    const S = nativePlugin('ShopPrinter');
+    if (S && typeof S.printHtml === 'function') {
+      toast(T('receipt.search_printers'), 'info');
+      S.printHtml({ html, jobName: jobName || 'Receipt' }).catch(e => toast(T('sale.print_failed', { msg: e.message }), 'err'));
+      return true;
+    }
+  } catch (e) {}
+  try {
+    const frame = document.createElement('iframe');
+    frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+    frame.onload = () => {
+      try { frame.contentWindow.focus(); frame.contentWindow.print(); }
+      catch (e) { toast(T('sale.print_failed', { msg: e.message }), 'err'); }
+      setTimeout(() => { try { frame.remove(); } catch (e) {} }, 60000);
+    };
+    frame.srcdoc = html;
+    document.body.appendChild(frame);
+    return true;
+  } catch (e) { toast(T('sale.print_failed', { msg: e.message }), 'err'); return false; }
 }
 async function shareText(title, text) {
   try {

@@ -873,6 +873,14 @@ try {
     ok(!deadH, 'view ' + vw + ' inline handlers valid' + (deadH ? ' (dead: ' + deadH + ')' : ''));
   }
 
+  // Word-style "Find printer": the receipt preview and the post-sale sheet open
+  // the OS printer chooser (system print), alongside the direct thermal print.
+  await gcall(`showReceiptPreview({ invoiceNo: 'INV-00001', items: [], subtotal: 0, grandTotal: 0, paymentMethod: 'Cash' })`);
+  ok(getEl('modal-root').innerHTML.includes('findPrinterForReceipt'), 'receipt preview offers Find printer');
+  await gcall(`closeQuick()`);
+  await gcall(`saleSuccessSheet('INV-00001')`);
+  ok(getEl('view').innerHTML.includes('openSystemPrintForSale') && getEl('view').innerHTML.includes('Find printer'), 'sale success offers Find printer');
+
   if (failures === 0) {
     console.log('MOBILE PAGE OK: boots via 8 /api endpoints, 11 views render, cart sale + quick sell + out-of-stock guard + Bayad + expenses + PO + reports + settings + offline queue/Sync-now all verified');
     process.exit(0);
