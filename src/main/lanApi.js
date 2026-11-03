@@ -9,13 +9,14 @@ const path = require('path');
 
 const EXPENSE_CATS = ['Purchases','Utilities','Rent','Supplies','Transportation','Salaries','Marketing','Maintenance','Food','Other'];
 
-// Rate is % per MONTH, prorated over whole days (min 1), matching desktop/mobile.
+// Rate is % per YEAR, compounded daily over whole days (min 1): the same
+// convention as the phone app (e.g. 3%/yr for 160 days on 20,000 = 264.74).
 function lineInterest(sub, intRate, dateStr, todayStr) {
   const rate = parseFloat(intRate) || 0;
   if (sub <= 0 || rate <= 0) return 0;
   let days = Math.floor((new Date(todayStr) - new Date(dateStr || todayStr)) / 86400000);
   if (!isFinite(days) || days < 1) days = 1;
-  return Math.round(sub * (rate / 100) * (days / 30) * 100) / 100;
+  return Math.round(sub * (Math.pow(1 + rate / 100 / 365, days) - 1) * 100) / 100;
 }
 
 const _offlineQueue = [];

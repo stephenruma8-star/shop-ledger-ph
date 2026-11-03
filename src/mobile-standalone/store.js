@@ -290,7 +290,7 @@ async function _apiInterestApply() {
     for (const c of clients) {
       const rate = await _clientRate(c.id);
       if (!(rate > 0)) continue;
-      const interest = Math.round((c.balance || 0) * (rate / 100) * (days / 30) * 100) / 100;
+      const interest = Math.round((c.balance || 0) * (Math.pow(1 + rate / 100 / 365, days) - 1) * 100) / 100;
       if (!(interest > 0)) continue;
       await db.run('UPDATE clients SET balance = ? WHERE id = ?', [_r2((c.balance || 0) + interest), c.id]);
       applied++;
@@ -508,8 +508,7 @@ async function _applySale(body) {
     const invoiceNo = await _nextInvoiceNo(db);
     const today = _todayStr();
     const lineSub = (i) => ((i.qty || 1) * (i.unitCost || 0));
-    // Desktop parity: rate is %/month, prorated by whole days from the line
-    // date (min 1 day), rounded per line like the desktop lineInt.
+    // Rate is %/YEAR, compounded daily from the line date (min 1 day).
     const lineInt = (i) => {
       const rate = parseFloat(i.intRate) || 0;
       if (!rate || !lineSub(i)) return 0;
@@ -517,7 +516,7 @@ async function _applySale(body) {
       let days = Math.floor((new Date(today) - new Date(d)) / 86400000);
       if (isNaN(days)) return 0;
       days = Math.max(1, days);
-      return _r2(lineSub(i) * (rate / 100) * (days / 30));
+      return _r2(lineSub(i) * (Math.pow(1 + rate / 100 / 365, days) - 1));
     };
     const subtotal = items.reduce((s, i) => s + lineSub(i), 0);
     const totalInterest = _r2(items.reduce((s, i) => s + lineInt(i), 0));
@@ -575,7 +574,7 @@ async function _applySale(body) {
     if (clientId) {
       const c = await db.get('SELECT * FROM clients WHERE id = ?', [clientId]);
       if (c && payMethod !== 'Cash') {
-        await db.run('UPDATE clients SET balance = ? WHERE id = ?', [(c.balance || 0) + grandTotal, c.id]);
+        await db.run('UPDATE clients SET balance = ? WHERE id = ?', [_r2((c.balance || 0) + grandTotal), c.id]);
       }
       if (c) {
         const s = await _settingsMap();
@@ -679,7 +678,7 @@ async function _apiSaleEdit(ref, body) {
     let days = Math.floor((new Date(today) - new Date(dstr)) / 86400000);
     if (isNaN(days)) days = 1;
     days = Math.max(1, days);
-    return _r2(lineSub(i) * (rate / 100) * (days / 30));
+    return _r2(lineSub(i) * (Math.pow(1 + rate / 100 / 365, days) - 1));
   };
   const subtotal = _r2(items.reduce((s, i) => s + lineSub(i), 0));
   const totalInterest = _r2(items.reduce((s, i) => s + lineInt(i), 0));
@@ -902,7 +901,7 @@ async function _apiReturns(body) {
     }
     if (orig.clientId && (orig.paymentMethod || 'Cash') !== 'Cash') {
       const c = await db.get('SELECT * FROM clients WHERE id = ?', [orig.clientId]);
-      if (c) await db.run('UPDATE clients SET balance = ? WHERE id = ?', [Math.max(0, (c.balance || 0) - absTotal), c.id]);
+      if (c) await db.run('UPDATE clients SET balance = ? WHERE id = ?', [_r2(Math.max(0, (c.balance || 0) - absTotal)), c.id]);
     }
     await _audit('return', 'Mobile return ' + (orig.invoiceNo || '') + ' → ' + invoiceNo + ' - ₱' + absTotal.toFixed(2) + (partial ? ' (partial)' : '') + ' (phone)');
     _bump();
@@ -927,7 +926,7 @@ async function _apiPayments(method, parts, body) {
     const applied = c ? Math.min(amtNum, Math.max(0, balBefore)) : amtNum;
     await db.run('INSERT INTO payments (clientId, amount, appliedAmount, type, date, notes, referenceNo, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [clientId || null, amtNum, applied, pt, safeDate, '', ref, new Date().toISOString()]);
-    if (c) await db.run('UPDATE clients SET balance = ? WHERE id = ?', [Math.max(0, balBefore - amtNum), c.id]);
+    if (c) await db.run('UPDATE clients SET balance = ? WHERE id = ?', [_r2(Math.max(0, balBefore - amtNum)), c.id]);
     await _audit('payment', 'Mobile payment ' + (c ? c.name : 'client') + ' - ₱' + amtNum.toFixed(2) + ' (phone)');
     _bump();
     return { success: true };
@@ -945,7 +944,7 @@ async function _apiPayments(method, parts, body) {
       if (c) {
         const base = (c.balance || 0) + oldApplied;
         const newApplied = Math.min(amtNum, Math.max(0, base));
-        await db.run('UPDATE clients SET balance = ? WHERE id = ?', [Math.max(0, base - newApplied), c.id]);
+        await db.run('UPDATE clients SET balance = ? WHERE id = ?', [_r2(Math.max(0, base - newApplied)), c.id]);
         await db.run('UPDATE payments SET appliedAmount = ? WHERE id = ?', [newApplied, p.id]);
       }
     }
@@ -961,7 +960,7 @@ async function _apiPayments(method, parts, body) {
       const c = await db.get('SELECT * FROM clients WHERE id = ?', [p.clientId]);
       // Reverse only what the payment actually applied — never invent debt.
       const wasApplied = (p.appliedAmount != null) ? p.appliedAmount : (p.amount || 0);
-      if (c) await db.run('UPDATE clients SET balance = ? WHERE id = ?', [(c.balance || 0) + wasApplied, c.id]);
+      if (c) await db.run('UPDATE clients SET balance = ? WHERE id = ?', [_r2((c.balance || 0) + wasApplied), c.id]);
     }
     await _audit('payment', 'Mobile payment delete (phone)');
     _bump();

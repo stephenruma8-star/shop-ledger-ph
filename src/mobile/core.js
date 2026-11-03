@@ -50,9 +50,9 @@ function validDateStr(s) {
 function dateTypedAttrs() {
   return 'type="text" inputmode="numeric" maxlength="10" autocomplete="off" placeholder="YYYY-MM-DD" oninput="onDateInput(this)"';
 }
-// Desktop-parity line interest: rate is %/MONTH, prorated by whole days from
-// the line date to today (min 1 day). Same-day items accrue rate/30 — the
-// old flat full-rate charge overbilled ~30x versus desktop.
+// Line interest: rate is %/YEAR, compounded daily from the line date to today
+// (min 1 day): sub * ((1 + rate/100/365)^days - 1). Matches the loan document
+// convention (e.g. 3%/yr compound for 160 days on 20,000 = 264.74).
 function lineIntCalc(sub, rate, dateStr, todayStr) {
   sub = Number(sub) || 0; rate = Number(rate) || 0;
   if (!sub || !rate) return 0;
@@ -61,7 +61,7 @@ function lineIntCalc(sub, rate, dateStr, todayStr) {
   let days = Math.floor((new Date(t) - new Date(d)) / 86400000);
   if (isNaN(days)) return 0;
   days = Math.max(1, days);
-  return Math.round(sub * (rate / 100) * (days / 30) * 100) / 100;
+  return Math.round(sub * (Math.pow(1 + rate / 100 / 365, days) - 1) * 100) / 100;
 }
 function fmtDate(d) {
   if (!d) return '';

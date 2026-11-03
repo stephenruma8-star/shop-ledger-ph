@@ -100,19 +100,19 @@ const sale = await A('POST', '/api/sales', {
 });
 ok(sale.success && sale.invoiceNo === 'INV-00001', 'sale invoice');
 const det = await A('GET', '/api/transactions/INV-00001');
-ok(det.subtotal === 190 && det.totalInterest === 9 && det.grandTotal === 194 && det.status === 'pending', 'sale math');
-ok(det.items[1].amount === 99, 'line amount with interest');
+ok(det.subtotal === 190 && det.totalInterest === 0.74 && det.grandTotal === 185.74 && det.status === 'pending', 'sale math');
+ok(det.items[1].amount === 90.74, 'line amount with interest');
 const invAfter = await A('GET', '/api/inventory');
 ok(invAfter.find(i => i.name === 'Rice').stock === 98, 'stock decremented');
 const h1 = await A('GET', '/api/clients/' + c1.id + '/history');
-ok(h1.client.balance === 194 && h1.client.loyaltyPoints === 194 && h1.sales.length === 1, 'balance + loyalty + history');
+ok(h1.client.balance === 185.74 && h1.client.loyaltyPoints === 185 && h1.sales.length === 1, 'balance + loyalty + history');
 ok(h1.sales[0].items.length === 2 && h1.sales[0].items[1].description === 'Oil', 'history includes purchased items');
-// cash sale with same-day rated item: accrues rate/30 (desktop parity)
+// cash sale with same-day rated item: accrues 1 day of annual interest
 const cs = await A('POST', '/api/sales', { items: [{ description: 'Oil', qty: 1, unitCost: 30, intRate: 10, invId: it2.id }], paymentMethod: 'Cash' });
 ok(cs.invoiceNo === 'INV-00002', 'cash sale invoice');
 const csDet = await A('GET', '/api/transactions/INV-00002');
-ok(Math.abs(csDet.totalInterest - 0.1) < 1e-9 && Math.abs(csDet.grandTotal - 30.1) < 1e-9, 'same-day interest prorated');
-ok((await A('GET', '/api/clients/' + c1.id + '/history')).client.balance === 194, 'cash sale adds no balance');
+ok(Math.abs(csDet.totalInterest - 0.01) < 1e-9 && Math.abs(csDet.grandTotal - 30.01) < 1e-9, 'same-day interest prorated');
+ok((await A('GET', '/api/clients/' + c1.id + '/history')).client.balance === 185.74, 'cash sale adds no balance');
 await throws(400, () => A('POST', '/api/sales', { items: [] }), 'sale needs items');
 const txns = await A('GET', '/api/transactions?limit=100');
 const cashTx = txns.find(t => t.invoiceNo === 'INV-00002');
@@ -121,26 +121,26 @@ ok(txns.length === 2 && cashTx && cashTx.items === 1, 'transactions list');
 // payments
 await A('POST', '/api/payments', { clientId: c1.id, amount: 100 });
 let h2 = await A('GET', '/api/clients/' + c1.id + '/history');
-ok(h2.client.balance === 94 && h2.payments.length === 1 && h2.payments[0].type === 'Partial', 'payment partial');
+ok(h2.client.balance === 85.74 && h2.payments.length === 1 && h2.payments[0].type === 'Partial', 'payment partial');
 await A('POST', '/api/payments/' + h2.payments[0].id, { amount: 120 }, 'PUT');
 h2 = await A('GET', '/api/clients/' + c1.id + '/history');
-ok(h2.client.balance === 74, 'payment edit rebalances');
+ok(h2.client.balance === 65.74, 'payment edit rebalances');
 await A('POST', '/api/payments/' + h2.payments[0].id, {}, 'DELETE');
 h2 = await A('GET', '/api/clients/' + c1.id + '/history');
-ok(h2.client.balance === 194 && h2.payments.length === 0, 'payment delete refunds balance');
+ok(h2.client.balance === 185.74 && h2.payments.length === 0, 'payment delete refunds balance');
 // overpay clamps (no negative debt) and delete reverses exactly
 await A('POST', '/api/payments', { clientId: c1.id, amount: 500 });
 h2 = await A('GET', '/api/clients/' + c1.id + '/history');
 ok(h2.client.balance === 0 && h2.payments.length === 1, 'overpay clamps to zero');
 await A('POST', '/api/payments/' + h2.payments[0].id, {}, 'DELETE');
 h2 = await A('GET', '/api/clients/' + c1.id + '/history');
-ok(h2.client.balance === 194 && h2.payments.length === 0, 'overpay delete reverses exactly');
+ok(h2.client.balance === 185.74 && h2.payments.length === 0, 'overpay delete reverses exactly');
 
 // returns: partial 1 Rice from INV-00001 (unit 50, origSub 199, discount 5)
 const ret = await A('POST', '/api/returns', { invoiceNo: 'INV-00001', items: [{ invId: it1.id, description: 'Rice', qty: 1 }] });
 ok(ret.success && ret.invoiceNo === 'INV-00003', 'partial return invoice');
 const retDet = await A('GET', '/api/transactions/' + ret.invoiceNo);
-const expectSub = 50, expectDisc = 5 * (50 / 199);
+const expectSub = 50, expectDisc = 5 * (50 / 190.74);
 ok(Math.abs(retDet.subtotal - (-expectSub)) < 1e-9 && Math.abs(retDet.grandTotal - (-(expectSub - expectDisc))) < 1e-9 && retDet.status === 'return', 'return prorate math');
 ok((await A('GET', '/api/inventory')).find(i => i.name === 'Rice').stock === 99, 'return restocks');
 ok((await A('GET', '/api/clients/' + c1.id + '/history')).client.balance < 194, 'return reduces credit');
@@ -190,9 +190,9 @@ const supDet = await A('GET', '/api/suppliers/' + sup.id + '/payments');
   await throws(404, () => A('POST', '/api/suppliers/999999', { name: 'Ghost' }, 'PUT'), 'supplier edit 404');
   await A('POST', '/api/purchase-orders/' + (await A('GET', '/api/purchase-orders')).find(p => p.poNo === poPend.poNo).id, {}, 'DELETE');
 
-// loyalty redeem (Maria has 194 pts from the ₱194 sale)
+// loyalty redeem (Maria has 185 pts from the ₱185.74 sale)
 const red = await A('POST', '/api/clients/' + c1.id + '/redeem', {});
-ok(red.points === 100 && red.discount === 1 && red.remaining === 94, 'loyalty redeem');
+ok(red.points === 100 && red.discount === 1 && red.remaining === 85, 'loyalty redeem');
 await throwsJson(400, () => A('POST', '/api/clients/' + c2.id + '/redeem', {}), 'redeem needs 100pts');
 
 // stats / reports / audit / version / csv / sms
@@ -293,7 +293,7 @@ await A('POST', '/api/sales', {
   clientId: intC.id,
   items: [{ description: 'Oil', qty: 2, unitCost: 30, intRate: 10, invId: it2.id, date: monthAgo }],
   paymentMethod: 'GCash'
-}); // balance 66 (60 + 6 interest over 30 backdated days), rate 10
+}); // balance 60.50 (60 + 0.50 interest over 30 backdated days), rate 10
 {
   const exp0 = await A('GET', '/api/backup/export');
   const bk = JSON.parse(JSON.stringify(exp0.backup));
@@ -307,7 +307,7 @@ await A('POST', '/api/sales', {
 const intRun = await A('POST', '/api/interest/apply', {});
 const intAfter = (await A('GET', '/api/clients/' + intC.id + '/history')).client;
 ok(intRun.applied >= 1 && intRun.days === 4, 'interest accrues over ' + intRun.days + ' days, ' + intRun.applied + ' client(s)');
-ok(Math.abs(intAfter.balance - (66 + Math.round(66 * 0.10 * (4 / 30) * 100) / 100)) < 1e-9, 'interest math matches desktop formula');
+ok(Math.abs(intAfter.balance - (60.5 + Math.round(60.5 * (Math.pow(1 + 0.10 / 365, 4) - 1) * 100) / 100)) < 1e-9, 'interest math matches annual compound formula');
 
 // void/return reasons stored + returned
 const rvSale = await A('POST', '/api/sales', { items: [{ description: 'Oil', qty: 1, unitCost: 30, invId: it2.id }], paymentMethod: 'Cash' });
@@ -428,13 +428,13 @@ const osItem = await A('POST', '/api/inventory', { name: 'Oversell Item', sellPr
 await A('POST', '/api/sales', { items: [{ description: 'Oversell Item', qty: 3, unitCost: 5, invId: osItem.id }], paymentMethod: 'Cash' });
 ok((await A('GET', '/api/inventory')).find(i => i.id === osItem.id).stock === -2, 'oversell tracked as negative stock');
 
-// per-line rates + variant lines (rated line backdated 30 days = full month)
+// per-line rates + variant lines (rated line backdated 30 days)
 const vrSale = await A('POST', '/api/sales', { items: [
   { description: 'Rice', qty: 1, unitCost: 50, intRate: 0, invId: it1.id },
   { description: 'Rice', qty: 1, unitCost: 50, intRate: 20, invId: it1.id, variantName: '1kg', date: monthAgo }
 ], paymentMethod: 'Cash' });
 const vrDet = await A('GET', '/api/transactions/' + vrSale.invoiceNo);
-ok(vrDet.subtotal === 100 && vrDet.totalInterest === 10 && vrDet.grandTotal === 110, 'per-line interest totals');
+ok(vrDet.subtotal === 100 && vrDet.totalInterest === 0.83 && vrDet.grandTotal === 100.83, 'per-line interest totals');
 ok(vrDet.items[1].variantName === '1kg', 'variant name stored on line');
 const vItem = await A('POST', '/api/inventory', { name: 'Var Item', sellPrice: 10, stock: 0, variants: [{ name: 'S', stock: 7 }, { name: 'L', stock: 5 }] });
 await A('POST', '/api/sales', { items: [{ description: 'Var Item', qty: 2, unitCost: 10, invId: vItem.id, variantName: 'S' }], paymentMethod: 'Cash' });
@@ -450,11 +450,11 @@ const setSale = await A('POST', '/api/sales', { clientId: setC.id, items: [
 ], paymentMethod: 'GCash' });
 ok(setSale.success, 'settle fixture sale');
 const set1 = await A('POST', '/api/sales/settle-item', { invoiceNo: setSale.invoiceNo, index: 1 });
-ok(set1.success && set1.amount === 66 && set1.allSettled === false, 'settle oil line (60 + 6 interest)');
+ok(set1.success && set1.amount === 60.5 && set1.allSettled === false, 'settle oil line (60 + 0.5 interest)');
 let setH = await A('GET', '/api/clients/' + setC.id + '/history');
 ok(setH.client.balance === 50 && setH.payments.length === 1 && setH.payments[0].type === 'Settle', 'settle payment + balance exact');
 const setDet = await A('GET', '/api/transactions/' + setSale.invoiceNo);
-ok(setDet.items[1].settled && setDet.items[1].settled.amount === 66 && !setDet.items[0].settled && setDet.status === 'pending', 'line flagged, sale still pending');
+ok(setDet.items[1].settled && setDet.items[1].settled.amount === 60.5 && !setDet.items[0].settled && setDet.status === 'pending', 'line flagged, sale still pending');
 await throws(400, () => A('POST', '/api/sales/settle-item', { invoiceNo: setSale.invoiceNo, index: 1 }), 'double settle rejected');
 await throws(404, () => A('POST', '/api/sales/settle-item', { invoiceNo: setSale.invoiceNo, index: 9 }), 'bad line index rejected');
 const walkSale = await A('POST', '/api/sales', { items: [{ description: 'Oil', qty: 1, unitCost: 30, invId: it2.id }], paymentMethod: 'Cash' });
