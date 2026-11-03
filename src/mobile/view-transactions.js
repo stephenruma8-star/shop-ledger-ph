@@ -338,6 +338,19 @@ function thermalPrintDocument(t) {
   const L = receiptLines(t);
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Receipt ${esc(t.invoiceNo || '')}</title><style>@page{size:A4;margin:12mm}body{margin:0;background:#fff;color:#111;font-family:"Courier New",Consolas,monospace;font-size:12px;white-space:pre-wrap}</style></head><body>${esc(L.join('\n'))}</body></html>`;
 }
+// Renders arbitrary printer lines as a printable page (systemPrintHtml fallback).
+function printLinesHtml(lines, title) {
+  const W = 32;
+  const body = (lines || []).map(l => {
+    if (!l) return '';
+    if (l.t === 'spacer') return '';
+    if (l.t === 'divider') return '-'.repeat(W);
+    const text = String(l.text == null ? '' : l.text);
+    if (l.t === 'center') { const p = Math.max(0, Math.floor((W - text.length) / 2)); return ' '.repeat(p) + text; }
+    return text;
+  }).join('\n');
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${esc(title || 'Receipt')}</title><style>@page{size:A4;margin:12mm}body{margin:0;background:#fff;color:#111;font-family:"Courier New",Consolas,monospace;font-size:12px;white-space:pre-wrap}</style></head><body>${esc(body)}</body></html>`;
+}
 // Opens the OS printer selection/search for the receipt currently previewed.
 function findPrinterForReceipt() {
   const st = receiptPreviewState;

@@ -154,23 +154,25 @@ async function submitShopEdit() {
 // desktop's printer; on the standalone app it uses the phone's own printer.
 async function printTestReceipt() {
   const s = data.settings || {};
+  const lines = [
+    { t: 'center', bold: true, size: 'double', text: s.shopName || 'Shop Ledger PH' },
+    { t: 'center', text: 'TEST PRINT' },
+    { t: 'divider' },
+    { text: 'Date: ' + phoneToday() },
+    { text: 'Printer: ' + (s.thermalHost || '(desktop default)') + ':' + (s.thermalPort || '9100') },
+    { t: 'divider' },
+    { t: 'center', text: 'If you can read this, printing works.' },
+    { t: 'spacer' },
+    { t: 'spacer' }
+  ];
   toast(T('sale.sending_print'), 'info');
   try {
-    await apiPostRaw('/api/print-thermal', {
-      lines: [
-        { t: 'center', bold: true, size: 'double', text: s.shopName || 'Shop Ledger PH' },
-        { t: 'center', text: 'TEST PRINT' },
-        { t: 'divider' },
-        { text: 'Date: ' + phoneToday() },
-        { text: 'Printer: ' + (s.thermalHost || '(desktop default)') + ':' + (s.thermalPort || '9100') },
-        { t: 'divider' },
-        { t: 'center', text: 'If you can read this, printing works.' },
-        { t: 'spacer' },
-        { t: 'spacer' }
-      ]
-    });
+    await apiPostRaw('/api/print-thermal', { lines });
     feelOk();
     toast(T('sale.printed_ok'), 'ok');
-  } catch (e) { feelErr(); toast(T('sale.print_failed', { msg: e.message }), 'err'); }
+  } catch (e) {
+    // Fall back to the OS printer chooser so this button never just errors.
+    systemPrintHtml(printLinesHtml(lines, 'Test print'), 'Test print');
+  }
 }
 

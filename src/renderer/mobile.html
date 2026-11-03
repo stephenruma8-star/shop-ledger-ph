@@ -3214,12 +3214,16 @@ async function previewClientStatement() {
 async function printClientStatement() {
   const h = await loadDetailHistory();
   if (!h) return;
+  const lines = clientStatementParts(h);
   toast(T('sale.sending_print'), 'info');
   try {
-    await apiPostRaw('/api/print-thermal', { lines: clientStatementParts(h) });
+    await apiPostRaw('/api/print-thermal', { lines });
     feelOk();
     toast(T('sale.printed_ok'), 'ok');
-  } catch (e) { feelErr(); toast(T('sale.print_failed', { msg: e.message }), 'err'); }
+  } catch (e) {
+    // Fall back to the OS printer chooser so Print never dead-ends.
+    systemPrintHtml(printLinesHtml(lines, 'Statement'), 'Statement');
+  }
 }
 function renderPaymentEdit(id, amount, referenceNo) {
   document.getElementById('modal-root').innerHTML = `
@@ -4146,7 +4150,15 @@ async function printSaleReceipt(invoiceNo) {
     await apiPostRaw('/api/print-thermal', { transactionId: invoiceNo });
     feelOk();
     toast(T('sale.printed_ok'), 'ok');
-  } catch (e) { toast(T('sale.print_failed', { msg: e.message }), 'err'); }
+  } catch (e) {
+    // Never dead-end: if the direct thermal printer isn't reachable/configured,
+    // open the OS printer chooser with the receipt instead of just failing.
+    try {
+      const t = await apiGet('/api/transactions/' + encodeURIComponent(invoiceNo));
+      if (t) { systemPrintHtml(bondPrintDocument(t), 'Receipt ' + (t.invoiceNo || '')); feelOk(); return; }
+    } catch (_) {}
+    toast(T('sale.print_failed', { msg: (e && e.message) || 'Print failed' }), 'err');
+  }
 }
 // ---------- counter search-add (type to add without leaving the sale) ----------
 function counterSearch(q) {
@@ -5048,6 +5060,19 @@ function printBondReceipt(t) {
 function thermalPrintDocument(t) {
   const L = receiptLines(t);
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Receipt ${esc(t.invoiceNo || '')}</title><style>@page{size:A4;margin:12mm}body{margin:0;background:#fff;color:#111;font-family:"Courier New",Consolas,monospace;font-size:12px;white-space:pre-wrap}</style></head><body>${esc(L.join('\n'))}</body></html>`;
+}
+// Renders arbitrary printer lines as a printable page (systemPrintHtml fallback).
+function printLinesHtml(lines, title) {
+  const W = 32;
+  const body = (lines || []).map(l => {
+    if (!l) return '';
+    if (l.t === 'spacer') return '';
+    if (l.t === 'divider') return '-'.repeat(W);
+    const text = String(l.text == null ? '' : l.text);
+    if (l.t === 'center') { const p = Math.max(0, Math.floor((W - text.length) / 2)); return ' '.repeat(p) + text; }
+    return text;
+  }).join('\n');
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${esc(title || 'Receipt')}</title><style>@page{size:A4;margin:12mm}body{margin:0;background:#fff;color:#111;font-family:"Courier New",Consolas,monospace;font-size:12px;white-space:pre-wrap}</style></head><body>${esc(body)}</body></html>`;
 }
 // Opens the OS printer selection/search for the receipt currently previewed.
 function findPrinterForReceipt() {
@@ -6098,24 +6123,26 @@ async function submitShopEdit() {
 // desktop's printer; on the standalone app it uses the phone's own printer.
 async function printTestReceipt() {
   const s = data.settings || {};
+  const lines = [
+    { t: 'center', bold: true, size: 'double', text: s.shopName || 'Shop Ledger PH' },
+    { t: 'center', text: 'TEST PRINT' },
+    { t: 'divider' },
+    { text: 'Date: ' + phoneToday() },
+    { text: 'Printer: ' + (s.thermalHost || '(desktop default)') + ':' + (s.thermalPort || '9100') },
+    { t: 'divider' },
+    { t: 'center', text: 'If you can read this, printing works.' },
+    { t: 'spacer' },
+    { t: 'spacer' }
+  ];
   toast(T('sale.sending_print'), 'info');
   try {
-    await apiPostRaw('/api/print-thermal', {
-      lines: [
-        { t: 'center', bold: true, size: 'double', text: s.shopName || 'Shop Ledger PH' },
-        { t: 'center', text: 'TEST PRINT' },
-        { t: 'divider' },
-        { text: 'Date: ' + phoneToday() },
-        { text: 'Printer: ' + (s.thermalHost || '(desktop default)') + ':' + (s.thermalPort || '9100') },
-        { t: 'divider' },
-        { t: 'center', text: 'If you can read this, printing works.' },
-        { t: 'spacer' },
-        { t: 'spacer' }
-      ]
-    });
+    await apiPostRaw('/api/print-thermal', { lines });
     feelOk();
     toast(T('sale.printed_ok'), 'ok');
-  } catch (e) { feelErr(); toast(T('sale.print_failed', { msg: e.message }), 'err'); }
+  } catch (e) {
+    // Fall back to the OS printer chooser so this button never just errors.
+    systemPrintHtml(printLinesHtml(lines, 'Test print'), 'Test print');
+  }
 }
 
 // ===== src/mobile/view-stocktake.js =====

@@ -736,7 +736,15 @@ async function printSaleReceipt(invoiceNo) {
     await apiPostRaw('/api/print-thermal', { transactionId: invoiceNo });
     feelOk();
     toast(T('sale.printed_ok'), 'ok');
-  } catch (e) { toast(T('sale.print_failed', { msg: e.message }), 'err'); }
+  } catch (e) {
+    // Never dead-end: if the direct thermal printer isn't reachable/configured,
+    // open the OS printer chooser with the receipt instead of just failing.
+    try {
+      const t = await apiGet('/api/transactions/' + encodeURIComponent(invoiceNo));
+      if (t) { systemPrintHtml(bondPrintDocument(t), 'Receipt ' + (t.invoiceNo || '')); feelOk(); return; }
+    } catch (_) {}
+    toast(T('sale.print_failed', { msg: (e && e.message) || 'Print failed' }), 'err');
+  }
 }
 // ---------- counter search-add (type to add without leaving the sale) ----------
 function counterSearch(q) {

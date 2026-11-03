@@ -20,6 +20,10 @@ import java.net.Socket;
 
 @CapacitorPlugin(name = "ShopPrinter")
 public class ShopPrinter extends Plugin {
+    // Keep the WebView alive while the print job is being prepared; a local
+    // variable can be garbage-collected and make printing fail on some devices.
+    private WebView _printWebView;
+
     @PluginMethod
     public void send(PluginCall call) {
         String host = call.getString("host");
@@ -59,25 +63,38 @@ public class ShopPrinter extends Plugin {
             return;
         }
         String jobName = call.getString("jobName", "Shop Ledger Receipt");
-        Activity activity = (Activity) getContext();
+        final Activity activity = (Activity) getContext();
+        if (activity == null) {
+            call.reject("No activity available");
+            return;
+        }
         activity.runOnUiThread(() -> {
-            WebView webView = new WebView(getContext());
-            webView.setWebViewClient(new WebViewClient() {
-                @Override
-                public void onPageFinished(WebView view, String url) {
-                    try {
-                        PrintManager printManager = (PrintManager) getContext().getSystemService(Context.PRINT_SERVICE);
-                        PrintDocumentAdapter adapter = view.createPrintDocumentAdapter(jobName);
-                        printManager.print(jobName, adapter, new PrintAttributes.Builder().build());
-                        JSObject ret = new JSObject();
-                        ret.put("success", true);
-                        call.resolve(ret);
-                    } catch (Exception e) {
-                        call.reject(e.getMessage() != null ? e.getMessage() : "Print failed");
+            try {
+                final WebView webView = new WebView(activity);
+                _printWebView = webView;
+                webView.setWebViewClient(new WebViewClient() {
+                    @Override
+                    public void onPageFinished(WebView view, String url) {
+                        try {
+                            PrintManager printManager = (PrintManager) activity.getSystemService(Context.PRINT_SERVICE);
+                            if (printManager == null) {
+                                call.reject("No print service on this device");
+                                return;
+                            }
+                            PrintDocumentAdapter adapter = view.createPrintDocumentAdapter(jobName);
+                            printManager.print(jobName, adapter, new PrintAttributes.Builder().build());
+                            JSObject ret = new JSObject();
+                            ret.put("success", true);
+                            call.resolve(ret);
+                        } catch (Exception e) {
+                            call.reject(e.getMessage() != null ? e.getMessage() : "Print failed");
+                        }
                     }
-                }
-            });
-            webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null);
+                });
+                webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null);
+            } catch (Exception e) {
+                call.reject(e.getMessage() != null ? e.getMessage() : "Print failed");
+            }
         });
     }
 }

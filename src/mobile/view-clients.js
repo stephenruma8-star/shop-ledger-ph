@@ -394,12 +394,16 @@ async function previewClientStatement() {
 async function printClientStatement() {
   const h = await loadDetailHistory();
   if (!h) return;
+  const lines = clientStatementParts(h);
   toast(T('sale.sending_print'), 'info');
   try {
-    await apiPostRaw('/api/print-thermal', { lines: clientStatementParts(h) });
+    await apiPostRaw('/api/print-thermal', { lines });
     feelOk();
     toast(T('sale.printed_ok'), 'ok');
-  } catch (e) { feelErr(); toast(T('sale.print_failed', { msg: e.message }), 'err'); }
+  } catch (e) {
+    // Fall back to the OS printer chooser so Print never dead-ends.
+    systemPrintHtml(printLinesHtml(lines, 'Statement'), 'Statement');
+  }
 }
 function renderPaymentEdit(id, amount, referenceNo) {
   document.getElementById('modal-root').innerHTML = `
