@@ -4,7 +4,7 @@ async function renderInventory() {
   const v = document.getElementById('view');
   invFilter = 'all';
   const low = data.inventory.filter(i => (i.stock || 0) <= (i.lowStock || 5)).length;
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = phoneToday();
   const expiring = (data.inventory || []).filter(i => {
     if (!i.expiryDate) return false;
     const d = Math.ceil((new Date(i.expiryDate + 'T00:00:00') - new Date(todayStr + 'T00:00:00')) / 86400000);
@@ -52,7 +52,7 @@ function invListHTML(items) {
   }).join('');
 }
 function invExpiringItems() {
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = phoneToday();
   return (data.inventory || [])
     .filter(i => i.expiryDate)
     .map(i => ({ ...i, _days: Math.ceil((new Date(i.expiryDate + 'T00:00:00') - new Date(todayStr + 'T00:00:00')) / 86400000) }))

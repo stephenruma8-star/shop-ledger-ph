@@ -3,7 +3,7 @@
 // names and response shapes as the LAN client, so every shared view works
 // unchanged. No imports/exports: concatenated. Requires store.js first.
 const IS_STANDALONE = true;
-const STANDALONE_VERSION = '4.8.31';
+const STANDALONE_VERSION = '4.8.32';
 function isNativeApp() {
   try { return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); } catch (e) { return false; }
 }
@@ -381,7 +381,7 @@ async function checkStockNotify() {
     const a = data.alerts || {};
     const out = a.outCount || 0, low = a.lowCount || 0;
     if (!out && !low) return;
-    const today = new Date().toISOString().split('T')[0];
+    const today = phoneToday();
     let stamped = '';
     try { stamped = localStorage.getItem('slpStockNote') || ''; } catch (e) {}
     if (stamped === today) return;

@@ -29,7 +29,6 @@ async function renderReports() {
         <div class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-1">${T('rep.today_profit')}</div>
         <div class="text-xl font-bold num ${(r.today.profit || 0) >= 0 ? 'text-blue-400' : 'text-red-400'}">${peso(r.today.profit)}</div>
         <div class="text-[11px] text-gray-500 mt-1">${T('home.collected')} <span class="text-green-400 font-semibold num">${peso(r.today.collected)}</span></div></div>
-      </div>
       <div class="stat-card rounded-2xl p-3.5">
         <div class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-1">${T('home.month_sales')}</div>
         <div class="text-xl font-bold text-green-400 num">${peso(r.month.sales)}</div>

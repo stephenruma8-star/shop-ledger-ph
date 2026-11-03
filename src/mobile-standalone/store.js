@@ -919,7 +919,7 @@ async function _apiPayments(method, parts, body) {
     if (clientId && typeof clientId !== 'number' && typeof clientId !== 'string') throw _apiErr(400, 'Invalid client ID');
     const amtNum = _r2(amount);
     if (amtNum <= 0) throw _apiErr(400, 'Amount must be greater than 0');
-    const safeDate = _sanitize(date) || new Date().toISOString().split('T')[0];
+    const safeDate = _sanitize(date) || _todayStr();
     const ref = String(referenceNo || '').trim().slice(0, 40);
     const c = clientId ? await db.get('SELECT * FROM clients WHERE id = ?', [clientId]) : null;
     const balBefore = c ? (c.balance || 0) : 0;

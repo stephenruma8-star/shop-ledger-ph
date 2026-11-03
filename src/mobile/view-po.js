@@ -85,7 +85,7 @@ function addPO() {
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('po.item')}</label>
             <div class="flex gap-2">
-              <select id="po-item" class="inp flex-1"><option value="">${T('po.select_item')}</option>${data.inventory.map(i => '<option value="' + i.id + '" data-name="' + esc(i.name) + '" data-price="' + (parseFloat(i.price) || 0) + '">' + esc(i.name) + ' — ' + peso(i.price) + '</option>').join('')}</select>
+              <select id="po-item" class="inp flex-1"><option value="">${T('po.select_item')}</option>${data.inventory.map(i => '<option value="' + i.id + '" data-name="' + escAttr(i.name) + '" data-price="' + (parseFloat(i.price) || 0) + '">' + esc(i.name) + ' — ' + peso(i.price) + '</option>').join('')}</select>
               <input id="po-qty" type="number" min="1" value="1" class="inp w-16 text-center" />
               <input id="po-price" type="number" min="0" step="0.01" placeholder="Price" class="inp w-24" />
             </div>
