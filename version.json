@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.21",
+    "version":  "3.37.22",
     "buildDate":  "2026-11-03T00:00:00.000Z",
-    "notes":  "Ships the updated phone UI served to paired phones: Word-style 'Find printer' (system printer selection) on receipts, scrollable sections that reach the last row, and date fields that support both typing and the native picker. Interest stays annual-compounded-daily."
+    "notes":  "Ships the updated paired-phone print flow: if the configured thermal printer fails (not set, unreachable, or no signal), the phone now opens the Android printer chooser instead of showing an error. Also makes printing more reliable on receipt, statement, and test-print buttons."
 }
