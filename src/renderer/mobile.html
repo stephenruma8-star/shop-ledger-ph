@@ -87,7 +87,7 @@ content no longer collapses into a stubby half-sheet. */
 #sheet-head{display:flex;align-items:center;gap:.75rem;padding:.65rem .9rem .6rem;border-bottom:1px solid rgba(255,255,255,.06);flex:none}
 #sheet-title{font-size:1.02rem;font-weight:800;color:#f1f5f9;line-height:1.15}
 #sheet-sub{font-size:.72rem;color:#64748b;margin-top:1px}
-#sheet-body{flex:1;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:.8rem .9rem calc(1rem + env(safe-area-inset-bottom))}
+#sheet-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:.8rem .9rem calc(4.8rem + env(safe-area-inset-bottom))}
 .grabber{width:40px;height:4.5px;border-radius:9999px;background:rgba(255,255,255,.16);margin:0 auto}
 .row{display:flex;align-items:center;gap:.75rem}
 .row+.row{border-top:1px solid rgba(255,255,255,.05)}
@@ -98,7 +98,7 @@ content no longer collapses into a stubby half-sheet. */
 #modal-root>div{padding-bottom:calc(4.4rem + env(safe-area-inset-bottom))}
 /* Modal sheets: momentum scroll + guaranteed bottom clearance so the last
 button is never stuck under the fold (small screens, open keyboards). */
-#modal-root .glass-card{padding-bottom:calc(1.75rem + env(safe-area-inset-bottom,0px));-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scrollbar-width:thin}
+#modal-root .glass-card{max-height:94vh;max-height:94dvh;overflow-y:auto;padding-bottom:calc(1.75rem + env(safe-area-inset-bottom,0px));-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scrollbar-width:thin}
 html,body{overscroll-behavior-y:none}
 body.day{background:#e8edf3;color:#0f172a;background-image:none}
 body.day header{background:rgba(255,255,255,.93);border-bottom-color:rgba(15,23,42,.08)}
