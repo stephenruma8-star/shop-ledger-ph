@@ -18,7 +18,7 @@ async function renderCashierHome() {
       <div class="text-[11px] text-gray-500">${T('home.cashier_sub')}</div>
     </div>
     <div class="grid grid-cols-2 gap-2.5 fade-in">
-      <button onclick="showView('sale')" class="stat-card rounded-2xl p-5 text-center card-hover"><div class="text-2xl mb-1">🧾</div><div class="text-sm font-bold text-gray-100">${T('nav.sale')}</div></button>
+      <button onclick="startNewSale()" class="stat-card rounded-2xl p-5 text-center card-hover"><div class="text-2xl mb-1">🧾</div><div class="text-sm font-bold text-gray-100">${T('nav.sale')}</div></button>
       <button onclick="showView('pay')" class="stat-card rounded-2xl p-5 text-center card-hover"><div class="text-2xl mb-1">💵</div><div class="text-sm font-bold text-gray-100">${T('nav.pay')}</div></button>
       <button onclick="showView('catalog')" class="stat-card rounded-2xl p-5 text-center card-hover"><div class="text-2xl mb-1">🏷️</div><div class="text-sm font-bold text-gray-100">${T('nav.catalog')}</div></button>
       <button onclick="showView('inventory')" class="stat-card rounded-2xl p-5 text-center card-hover"><div class="text-2xl mb-1">📦</div><div class="text-sm font-bold text-gray-100">${T('home.stock')}</div></button>

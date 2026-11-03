@@ -312,12 +312,17 @@ function bondReceiptHtml(t) {
   </div>`;
 }
 function bondPrintDocument(t) {
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Receipt ${esc(t.invoiceNo || '')}</title><style>@page{size:A4;margin:12mm}body{margin:0;background:#fff}${bondReceiptCss()}</style></head><body>${bondReceiptHtml(t)}</body></html>`;
+  const size = (receiptPreviewState && receiptPreviewState.bondSize) || 'A4';
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Receipt ${esc(t.invoiceNo || '')}</title><style>@page{size:${size};margin:12mm}body{margin:0;background:#fff}${bondReceiptCss()}</style></head><body>${bondReceiptHtml(t)}</body></html>`;
 }
-let receiptPreviewState = { t: null, draft: false, paper: 'thermal' };
+let receiptPreviewState = { t: null, draft: false, paper: 'thermal', bondSize: 'A4' };
 function setReceiptPaper(paper) {
   if (!receiptPreviewState.t) return;
-  showReceiptPreview(receiptPreviewState.t, { draft: receiptPreviewState.draft, paper });
+  showReceiptPreview(receiptPreviewState.t, { draft: receiptPreviewState.draft, paper, bondSize: receiptPreviewState.bondSize });
+}
+function setReceiptBondSize(bondSize) {
+  if (!receiptPreviewState.t) return;
+  showReceiptPreview(receiptPreviewState.t, { draft: receiptPreviewState.draft, paper: 'bond', bondSize });
 }
 function printPreviewReceipt() {
   const st = receiptPreviewState;
@@ -350,7 +355,8 @@ function showReceiptPreview(t, opts) {
   const o = opts || {};
   const draft = !!o.draft;
   const paper = o.paper || 'thermal';
-  receiptPreviewState = { t, draft, paper };
+  const bondSize = o.bondSize || 'A4';
+  receiptPreviewState = { t, draft, paper, bondSize };
   const L = receiptLines(t);
   const tab = (val, label) => `<button onclick="setReceiptPaper('${val}')" class="flex-1 py-1.5 rounded-lg text-xs font-semibold" style="${paper === val ? 'background:rgba(59,130,246,.9);color:#fff' : 'background:transparent;color:#94a3b8'}">${esc(label)}</button>`;
   document.getElementById('modal-root').innerHTML = `
@@ -361,6 +367,7 @@ function showReceiptPreview(t, opts) {
         <h3 class="font-bold text-gray-100 text-sm mb-3 flex items-center gap-2"><span class="icon-tile bg-blue-500/15 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>${draft ? esc(T('sale.preview_title')) : esc(t.invoiceNo || 'Receipt')}</h3>
         ${draft ? `<p class="text-[11px] font-semibold uppercase tracking-wider text-amber-400 mb-2">${esc(T('sale.preview_note'))}</p>` : ''}
         <div class="mb-2"><div class="text-[10px] uppercase tracking-wider text-gray-500 mb-1">${esc(T('receipt.paper'))}</div><div class="flex gap-1 p-1 rounded-xl" style="background:rgba(255,255,255,.05)">${tab('thermal', T('receipt.thermal'))}${tab('bond', T('receipt.bond'))}</div></div>
+        ${paper === 'bond' ? `<div class="mb-2"><div class="text-[10px] uppercase tracking-wider text-gray-500 mb-1">${esc(T('receipt.bond_size'))}</div><div class="flex gap-1 p-1 rounded-xl" style="background:rgba(255,255,255,.05)">${['A4', 'Letter', 'Legal'].map(sz => `<button onclick="setReceiptBondSize('${sz}')" class="flex-1 py-1.5 rounded-lg text-xs font-semibold" style="${bondSize === sz ? 'background:rgba(59,130,246,.9);color:#fff' : 'background:transparent;color:#94a3b8'}">${sz}</button>`).join('')}</div></div>` : ''}
         ${paper === 'bond' ? bondReceiptHtml(t) : `<pre class="receipt-paper">${esc(L.join('\n'))}</pre>`}
         ${draft
           ? `<button onclick="closeQuick()" class="btn btn-primary w-full">${esc(T('sale.preview_ok'))}</button>`

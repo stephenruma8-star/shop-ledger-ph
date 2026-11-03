@@ -59,7 +59,7 @@ function navTap(view) {
   }
   // Keep an in-progress cart attached to its client; only a truly empty
   // sale starts clean.
-  if (view === 'sale') { try { saleRateClient = null; if (!cart.length) { saleClientPreset = null; saleCartClient = ''; } else if (saleCartClient) saleClientPreset = saleCartClient; } catch (e) {} }
+  if (view === 'sale') { try { editingSaleInvoice = null; saleRateClient = null; if (!cart.length) { saleClientPreset = null; saleCartClient = ''; } else if (saleCartClient) saleClientPreset = saleCartClient; } catch (e) {} }
   if (navModalOpen && currentView === view) { closeNavModal(); return; }
   showView(view);
 }

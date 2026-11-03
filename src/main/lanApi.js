@@ -361,7 +361,7 @@ function createLanApiRouter(deps) {
     const hasBalance = b.balance !== undefined && b.balance !== null && b.balance !== '' && isFinite(rawBalance);
     const balance = hasBalance ? Math.max(-1e9, Math.min(1e9, rawBalance)) : null;
     const setBalance = hasBalance ? `c.balance=${JSON.stringify(balance)};` : '';
-    const ok = JSON.parse(await deps.rendererExec(`JSON.stringify((async()=>{const c=await dbGet('clients',${JSON.stringify(req.params.id)});if(!c)return false;c.name=${JSON.stringify(name)};c.phone=${JSON.stringify(String(b.phone || '').trim().slice(0, 20))};c.address=${JSON.stringify(String(b.address || '').trim().slice(0, 200))};c.dueDate=${JSON.stringify(String(b.dueDate || '').slice(0, 10))};c.isSC=${!!b.isSC};c.isPWD=${!!b.isPWD};${setBalance}await dbPut('clients',c);return true;})())`));
+    const ok = JSON.parse(await deps.rendererExec(`JSON.stringify(await (async()=>{const c=await dbGet('clients',${JSON.stringify(req.params.id)});if(!c)return false;c.name=${JSON.stringify(name)};c.phone=${JSON.stringify(String(b.phone || '').trim().slice(0, 20))};c.address=${JSON.stringify(String(b.address || '').trim().slice(0, 200))};c.dueDate=${JSON.stringify(String(b.dueDate || '').slice(0, 10))};c.isSC=${!!b.isSC};c.isPWD=${!!b.isPWD};${setBalance}await dbPut('clients',c);return true;})())`));
     if (!ok) return res.status(404).json({ error: 'Client not found' });
     try { await deps.rendererExec(`(async()=>{try{await logAudit('client-edit','Updated client ' + ${JSON.stringify(name)} + ${JSON.stringify(devTag(req))});}catch(e){}})()`); } catch (e) {}
     deps.notify({ source: 'api', kind: 'client' });
@@ -374,7 +374,7 @@ function createLanApiRouter(deps) {
   router.delete('/api/clients/:id', wrap(async (req, res) => {
     if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
     const force = !!(req.body && req.body.force);
-    const r = JSON.parse(await deps.rendererExec(`JSON.stringify((async()=>{
+    const r = JSON.parse(await deps.rendererExec(`JSON.stringify(await (async()=>{
       const c=await dbGet('clients',${JSON.stringify(req.params.id)});
       if(!c)return {ok:false,error:'Client not found',code:404};
       const txns=await dbAll('transactions');
@@ -428,7 +428,7 @@ function createLanApiRouter(deps) {
   // the desktop (applied to the client's next sale there).
   router.post('/api/clients/:id/redeem', wrap(async (req, res) => {
     if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
-    const r = JSON.parse(await deps.rendererExec(`JSON.stringify((async()=>{
+    const r = JSON.parse(await deps.rendererExec(`JSON.stringify(await (async()=>{
       const c=await dbGet('clients',${JSON.stringify(req.params.id)});
       if(!c)return {ok:false,error:'Client not found'};
       const pts=c.loyaltyPoints||0;
@@ -534,7 +534,7 @@ function createLanApiRouter(deps) {
     if (dup) return res.status(400).json({ error: 'Duplicate item, SKU or barcode' });
     if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
     const before = self.stock || 0;
-    const r = JSON.parse(await deps.rendererExec(`JSON.stringify((async()=>{
+    const r = JSON.parse(await deps.rendererExec(`JSON.stringify(await (async()=>{
       const e=await dbGet('inventory',${JSON.stringify(req.params.id)});
       if(!e)return false;
       const upd=${JSON.stringify(rec)};
@@ -702,7 +702,7 @@ function createLanApiRouter(deps) {
     const amountNum = Math.round((parseFloat(b.amount) || 0) * 100) / 100;
     if (!validateAmount(amountNum) || amountNum <= 0) return res.status(400).json({ error: 'Valid amount required' });
     if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
-    const ok = JSON.parse(await deps.rendererExec(`JSON.stringify((async()=>{
+    const ok = JSON.parse(await deps.rendererExec(`JSON.stringify(await (async()=>{
       const e=await dbGet('expenses',${JSON.stringify(req.params.id)});
       if(!e)return false;
       e.description=${JSON.stringify(sanitize(b.description))};
@@ -720,7 +720,7 @@ function createLanApiRouter(deps) {
 
   router.delete('/api/expenses/:id', wrap(async (req, res) => {
     if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
-    const ok = JSON.parse(await deps.rendererExec(`JSON.stringify((async()=>{const e=await dbGet('expenses',${JSON.stringify(req.params.id)});if(!e)return false;await dbDel('expenses',e.id);return true;})())`));
+    const ok = JSON.parse(await deps.rendererExec(`JSON.stringify(await (async()=>{const e=await dbGet('expenses',${JSON.stringify(req.params.id)});if(!e)return false;await dbDel('expenses',e.id);return true;})())`));
     if (!ok) return res.status(404).json({ error: 'Expense not found' });
     try { await deps.rendererExec(`(async()=>{try{await logAudit('expense-delete','Mobile expense delete' + ${JSON.stringify(devTag(req))});}catch(e){}})()`); } catch (e) {}
     bump({ source: 'api', kind: 'expense' });
@@ -747,7 +747,7 @@ function createLanApiRouter(deps) {
     if (!validateAmount(amt) || amt <= 0) return res.status(400).json({ error: 'Valid amount required' });
     if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
     const today = todayStr();
-    const r = JSON.parse(await deps.rendererExec(`JSON.stringify((async()=>{
+    const r = JSON.parse(await deps.rendererExec(`JSON.stringify(await (async()=>{
       const all=await dbAll('settings');
       const row=all.find(x=>x.key==='pettyCashBalance');
       const bal=parseFloat(row?row.value:0)||0;
@@ -860,7 +860,7 @@ function createLanApiRouter(deps) {
   router.post('/api/purchase-orders/:id/receive', wrap(async (req, res) => {
     if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
     const today = todayStr();
-    const r = JSON.parse(await deps.rendererExec(`JSON.stringify((async()=>{
+    const r = JSON.parse(await deps.rendererExec(`JSON.stringify(await (async()=>{
       const all=await dbAll('purchaseOrders');
       const po=all.find(p=>String(p.id)===${JSON.stringify(String(req.params.id))});
       if(!po)return {ok:false,error:'Purchase order not found'};
@@ -1033,7 +1033,7 @@ function createLanApiRouter(deps) {
     const amtNum = Math.round((parseFloat(amount) || 0) * 100) / 100;
     if (amtNum <= 0) return res.status(400).json({ error: 'Amount must be greater than 0' });
     if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
-    const ok = JSON.parse(await deps.rendererExec(`JSON.stringify((async()=>{
+    const ok = JSON.parse(await deps.rendererExec(`JSON.stringify(await (async()=>{
       const p=await dbGet('supplierPayments',${JSON.stringify(req.params.id)});
       if(!p)return false;
       p.amount=${amtNum};
@@ -1049,7 +1049,7 @@ function createLanApiRouter(deps) {
 
   router.delete('/api/supplier-payments/:id', wrap(async (req, res) => {
     if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
-    const ok = JSON.parse(await deps.rendererExec(`JSON.stringify((async()=>{
+    const ok = JSON.parse(await deps.rendererExec(`JSON.stringify(await (async()=>{
       const p=await dbGet('supplierPayments',${JSON.stringify(req.params.id)});
       if(!p)return false;
       await dbDel('supplierPayments',p.id);return true;
@@ -1128,7 +1128,7 @@ function createLanApiRouter(deps) {
     const payMethod = paymentMethod || 'Cash';
     const cId = clientId ? JSON.stringify(clientId) : 'null';
     const newItems = JSON.stringify(items.map(i => { const sub = (i.qty||1) * (i.unitCost || 0); return { ...i, amount: Math.round((sub + lineInterest(sub, i.intRate, i.date, todayStr())) * 100) / 100 }; }));
-    const r = JSON.parse(await deps.rendererExec(`JSON.stringify((async()=>{
+    const r = JSON.parse(await deps.rendererExec(`JSON.stringify(await (async()=>{
       const list=await dbAll('transactions');
       const t=list.find(x=>x.invoiceNo===${JSON.stringify(ref)}||String(x.id)===${JSON.stringify(ref)});
       if(!t)return {ok:false,error:'not found'};
@@ -1430,7 +1430,7 @@ function createLanApiRouter(deps) {
       return res.status(400).json({ error: 'Invalid payment method' });
     }
     if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
-    const r = JSON.parse(await deps.rendererExec(`JSON.stringify((async()=>{
+    const r = JSON.parse(await deps.rendererExec(`JSON.stringify(await (async()=>{
       const list=await dbAll('transactions');
       const t=list.find(x=>x.invoiceNo===${JSON.stringify(String(req.params.id))}||String(x.id)===${JSON.stringify(String(req.params.id))});
       if(!t)return {ok:false,error:'not found'};
@@ -1460,7 +1460,7 @@ function createLanApiRouter(deps) {
       return res.status(400).json({ error: 'invoiceNo required' });
     }
     if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
-    const ok = JSON.parse(await deps.rendererExec(`JSON.stringify((async()=>{
+    const ok = JSON.parse(await deps.rendererExec(`JSON.stringify(await (async()=>{
       const list=await dbAll('transactions');
       const t=list.find(x=>x.invoiceNo===${JSON.stringify(String(ref))}||String(x.id)===${JSON.stringify(String(ref))});
       if(!t||t.status==='voided')return false;
@@ -1483,7 +1483,7 @@ function createLanApiRouter(deps) {
     if (!validateAmount(amt) || amt <= 0) return res.status(400).json({ error: 'Valid amount required' });
     if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
     const ref = req.body && req.body.referenceNo !== undefined ? String(req.body.referenceNo || '').trim().slice(0, 40) : null;
-    const ok = JSON.parse(await deps.rendererExec(`JSON.stringify((async()=>{
+    const ok = JSON.parse(await deps.rendererExec(`JSON.stringify(await (async()=>{
       const p=await dbGet('payments',${JSON.stringify(req.params.id)});
       if(!p)return false;
       const diff=${Math.round(amt * 100) / 100}-(p.amount||0);
@@ -1501,7 +1501,7 @@ function createLanApiRouter(deps) {
 
   router.delete('/api/payments/:id', wrap(async (req, res) => {
     if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
-    const ok = JSON.parse(await deps.rendererExec(`JSON.stringify((async()=>{
+    const ok = JSON.parse(await deps.rendererExec(`JSON.stringify(await (async()=>{
       const p=await dbGet('payments',${JSON.stringify(req.params.id)});
       if(!p)return false;
       await dbDel('payments',p.id);
@@ -1618,7 +1618,7 @@ function createLanApiRouter(deps) {
       return res.status(400).json({ error: 'Photo must be an image data URL under ~700KB' });
     }
     if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
-    const saved = JSON.parse(await deps.rendererExec(`JSON.stringify((async()=>{const i=await dbGet('inventory',${JSON.stringify(req.params.id)});if(!i)return null;i.image=${JSON.stringify(img)};i.updatedAt=new Date().toISOString();await dbPut('inventory',i);return {name:i.name};})())`));
+    const saved = JSON.parse(await deps.rendererExec(`JSON.stringify(await (async()=>{const i=await dbGet('inventory',${JSON.stringify(req.params.id)});if(!i)return null;i.image=${JSON.stringify(img)};i.updatedAt=new Date().toISOString();await dbPut('inventory',i);return {name:i.name};})())`));
     if (!saved) return res.status(404).json({ error: 'Item not found' });
     try { await deps.rendererExec(`(async()=>{try{await logAudit('inventory','Photo updated: ' + ${JSON.stringify(saved.name || '')} + ${JSON.stringify(devTag(req))});}catch(e){}})()`); } catch (e) {}
     bump({ source: 'api', kind: 'inventory-photo' });

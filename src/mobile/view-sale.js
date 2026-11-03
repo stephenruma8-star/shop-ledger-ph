@@ -87,6 +87,7 @@ function renderSale(presetId) {
       <h2 class="card-title text-base"><span class="icon-tile bg-blue-500/15 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></span>${T('nav.sale')}</h2>
       <div class="flex gap-1.5">
         <button onclick="startBarcodeScan()" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/></svg>${T('sale.scan')}</button>
+        <button onclick="manualItem()" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Manual</button>
         <button onclick="showView('catalog')" class="btn btn-primary btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('sale.add_items')}</button>
       </div>
     </div>
@@ -294,7 +295,7 @@ function resumeSaleDraft(key) {
   saleClientPreset = key || null;
   saleRateClient = null;
   closeQuick();
-  showView('sale');
+  startNewSale();
   if (n) toast(T('sale.draft_loaded', { n }), 'ok');
 }
 function deleteSaleDraft(key) {
@@ -558,6 +559,16 @@ function addManualItem() {
   toast(T('sale.added_cart', { name }), 'ok');
   if (currentView === 'sale') renderSale();
 }
+// Explicit entry to a fresh sale: clears any pending in-place edit so the button
+// reads "Save sale" (not "Update sale") and saving POSTs a new sale.
+function startNewSale(presetId) {
+  editingSaleInvoice = null;
+  if (presetId !== undefined && presetId !== null && presetId !== '') {
+    saleClientPreset = String(presetId);
+    saleCartClient = String(presetId);
+  }
+  showView('sale');
+}
 function cancelSaleEdit() {
   editingSaleInvoice = null;
   cart = [];
@@ -704,7 +715,7 @@ function saleSuccessSheet(invoiceNo) {
       <div class="text-sm text-gray-400 mb-4">${esc(invoiceNo || '')}</div>
       <button onclick="printSaleReceipt(this.dataset.inv)" data-inv="${escAttr(invoiceNo || '')}" class="btn btn-primary btn-lg mb-2"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>${T('sale.print')}</button>
       <button onclick="shareReceiptTxn(this.dataset.inv)" data-inv="${escAttr(invoiceNo || '')}" class="btn btn-ghost btn-lg mb-2"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>${T('sale.share')}</button>
-      <button onclick="showView('sale')" class="btn btn-ghost btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('sale.new')}</button>
+      <button onclick="startNewSale()" class="btn btn-ghost btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('sale.new')}</button>
     </div>`;
   try { window.scrollTo(0, 0); } catch (e) {}
 }

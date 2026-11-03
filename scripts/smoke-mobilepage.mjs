@@ -847,6 +847,15 @@ try {
 
   for (const t of timerIds) clearTimeout(t);
 
+  // New Sale must clear a pending in-place edit, and the sale view offers a
+  // manual-item option.
+  await gcall(`startNewSale()`);
+  ok(getEl('view').innerHTML.includes('manualItem()'), 'sale view has a manual-item button');
+  await gcall(`editSaleFromDetail('INV-00001')`);
+  ok(getEl('view').innerHTML.includes('Update sale'), 'editing a sale shows the Update sale button');
+  await gcall(`startNewSale()`);
+  ok(!getEl('view').innerHTML.includes('Update sale') && !getEl('view').innerHTML.includes('Editing'), 'New Sale clears a pending edit');
+
   // Dead-button guard: every rendered view's inline handlers must be valid JS
   // (a truncated handler, e.g. from unescaped quotes, silently does nothing).
   const decodeH = (s) => s.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');

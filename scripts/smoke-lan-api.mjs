@@ -133,12 +133,11 @@ const writeRouter = createLanApiRouter({
   // Retry only those (a SyntaxError) inside an async IIFE so production semantics
   // — where `JSON.stringify(await dbGet(...))` is a valid script — are reproduced.
   rendererExec: (js) => {
-    try { return vm.runInContext(js, rctx); }
-    catch (e) {
-      // (vm SyntaxErrors come from another realm, so match on name, not instanceof)
-      if (!(e && e.name === 'SyntaxError')) throw e;
-      return vm.runInContext('(async () => (' + js + '))()', rctx);
-    }
+    // Electron runs these with top-level await. A bare vm script parses `await`
+    // as an identifier (sloppy mode) and either throws or, worse, runs the usual
+    // side effects then throws - so wrap any script that uses await up front.
+    const src = /\bawait\b/.test(js) ? '(async () => (' + js + '))()' : js;
+    return vm.runInContext(src, rctx);
   },
   setSetting: async () => ({ success: true }),
   lanToken: 'test-token-123',
@@ -468,6 +467,26 @@ const server = app.listen(0, '127.0.0.1', async () => {
     ok(recovered.status === 200 && recovered.body.success === true && /^INV-\d{5}$/.test(recovered.body.invoiceNo || ''), 'a sale right after a failure still succeeds (regression: the invoice mutex used to stay rejected forever)');
     ok(rstores.transactions.length === 2, 'the recovered sale is recorded');
     ok(rstores.inventory.some(i => i.name === 'Bread' && i.stock === 0), 'an unknown item is auto-created from the sale line');
+
+    // PUT /api/sales/:invoiceNo edits a live sale and reconciles stock + balance
+    const editRes = await json('/w/api/sales/INV-00001', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId: 1, paymentMethod: 'Credit (Utang)', items: [{ description: 'Coke', qty: 1, unitCost: 30, invId: 11 }] }) });
+    ok(editRes.status === 200 && editRes.body.success === true && editRes.body.invoiceNo === 'INV-00001', 'PUT /api/sales/:invoiceNo edits a live sale (200)');
+    ok(rstores.clients[0].balance === 30, 'sale edit recomputes the client balance (60 -> 30)');
+    const edRow = rstores.transactions.find(t => t.invoiceNo === 'INV-00001');
+    ok(edRow && edRow.items[0].qty === 1 && edRow.grandTotal === 30, 'sale edit rewrites items and total');
+
+    // PUT /api/transactions/:id changes a sale's payment method (live)
+    const pmRes = await json('/w/api/transactions/INV-00001', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paymentMethod: 'Cash' }) });
+    ok(pmRes.status === 200 && pmRes.body.success === true, 'PUT /api/transactions/:id changes the payment method (200)');
+    ok(rstores.clients[0].balance === 0, 'switching to Cash clears the utang balance');
+
+    // DELETE /api/clients/:id (live): refuses history unless forced
+    const delNo = await json('/w/api/clients/1', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+    ok(delNo.status === 400, 'DELETE /api/clients/:id refuses a client with history (400)');
+    const delYes = await json('/w/api/clients/1', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ force: true }) });
+    ok(delYes.status === 200 && delYes.body.success === true, 'DELETE /api/clients/:id with force removes the client (200)');
+    ok(!rstores.clients.some(c => String(c.id) === '1'), 'the forced-delete client is gone');
+    ok(!rstores.transactions.some(t => String(t.clientId) === '1'), 'the client sales are gone');
 
     // Free-text handling: stored verbatim (no HTML-entity mangling), markup stripped.
     const exp = await json('/w/api/expenses', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ description: 'LPG & rice', amount: 250, category: 'Purchases', payee: "Maria's Store" }) });
