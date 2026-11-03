@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.19",
+    "version":  "3.37.20",
     "buildDate":  "2026-11-03T00:00:00.000Z",
-    "notes":  "Mobile bug-hunt fixes: UTC-local date bugs in inventory expiring/low highlights, low-stock notification stamp, and payment date fallback now use local dates; purchase-order item picker escapes quotes in item names; reports summary grid no longer breaks the month cards layout; fixed the SMS-reminders button icon."
+    "notes":  "Interest is now an ANNUAL rate compounded daily everywhere (desktop, LAN API and phone), matching loan-document terms: 3%/yr for 160 days on 20,000 = 264.74. Rate labels now say %/yr. Also ships the phone fixes: reliable sale edit and daily interest (SQLite transaction handling) and typeable date fields."
 }

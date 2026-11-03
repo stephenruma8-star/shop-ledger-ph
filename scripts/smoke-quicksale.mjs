@@ -170,8 +170,8 @@ try {
   getEl('qs-interest').value = '10';
   getEl('qs-sc').checked = true;
   win.qsUpd();
-  eq(getEl('qs-total').textContent, '₱160.67', 'single sale total: 2x100 + 0.67 interest - 40 SC');
-  ok(getEl('qs-interestline').textContent === '₱0.67', 'single sale interest line ₱0.67');
+  eq(getEl('qs-total').textContent, '₱160.05', 'single sale total: 2x100 + 0.05 interest - 40 SC');
+  ok(getEl('qs-interestline').textContent === '₱0.05', 'single sale interest line ₱0.05');
   ok(getEl('qs-scline').textContent === '-₱40.00', 'single sale SC line -₱40.00');
 
   // --- add first item to cart ---
@@ -196,8 +196,8 @@ try {
   getEl('qs-cart-discount').value = '0';
   getEl('qs-cart-rpsize').value = '80mm';
   win.qsCartTotals();
-  eq(getEl('qs-cart-total').textContent, '₱282.33', 'cart total: 350 + 2.33 interest - 70 SC');
-  ok(getEl('qs-cart-int').textContent === '₱2.33', 'cart interest line ₱2.33 (20%/mo both lines)');
+  eq(getEl('qs-cart-total').textContent, '₱280.19', 'cart total: 350 + 0.19 interest - 70 SC');
+  ok(getEl('qs-cart-int').textContent === '₱0.19', 'cart interest line ₱0.19 (20%/yr both lines)');
   ok(getEl('qs-cart-sc2').textContent === '-₱70.00', 'cart SC line -₱70.00');
   ok(getEl('qs-cart-balance').textContent === '₱0.00', 'cart client balance shown ₱0.00');
 
@@ -207,9 +207,9 @@ try {
   const tx = await win.dbGet('transactions', 1);
   ok(!!tx, 'transaction #1 saved');
   eq(tx.invoiceNo, 'INV-00001', 'invoice number INV-00001');
-  eq(tx.grandTotal, 282.33, 'tx grandTotal 282.33');
+  eq(tx.grandTotal, 280.19, 'tx grandTotal 280.19');
   eq(tx.subtotal, 350, 'tx subtotal 350');
-  eq(tx.totalInterest, 2.33, 'tx totalInterest 2.33');
+  eq(tx.totalInterest, 0.19, 'tx totalInterest 0.19');
   eq(tx.scDiscount, 70, 'tx scDiscount 70');
   eq(tx.discount, 70, 'tx discount 70 (incl SC)');
   eq(tx.clientId, cliId, 'tx clientId set');
@@ -230,7 +230,7 @@ try {
   win.qsUpd();
   eq(getEl('qs-total').textContent, '₱59.97', 'fractional price rounds to cents: 3 x 19.99 = 59.97');
   const cli = await win.dbGet('clients', cliId);
-  eq(cli.balance, 282.33, 'GCash cart sale adds 282.33 to client balance');
+  eq(cli.balance, 280.19, 'GCash cart sale adds 280.19 to client balance');
   eq(tx.balanceAdded, true, 'GCash cart sale balanceAdded true');
   eq(getEl('qs-cart').innerHTML, '', 'cart cleared after sale');
   const audits = await win.dbAll('auditLogs');
@@ -246,11 +246,11 @@ try {
   getEl('qs-sc').checked = true;
   getEl('qs-rpsize').value = '58mm';
   win.qsUpd();
-  eq(getEl('qs-total').textContent, '₱80.33', 'single sale 2: 100 + 0.33 interest - 20 SC = 80.33');
+  eq(getEl('qs-total').textContent, '₱80.03', 'single sale 2: 100 + 0.03 interest - 20 SC = 80.03');
   await win.qsSell(true);
   const tx2 = await win.dbGet('transactions', 2);
   eq(tx2.invoiceNo, 'INV-00002', 'second invoice INV-00002');
-  eq(tx2.grandTotal, 80.33, 'tx2 grandTotal 80.33');
+  eq(tx2.grandTotal, 80.03, 'tx2 grandTotal 80.03');
   eq(tx2.clientId, null, 'tx2 walk-in client');
   const inv1b = await win.dbGet('inventory', invId1);
   eq(inv1b.stock, 7, 'item1 stock 8 -> 7 after single sale');
@@ -351,7 +351,7 @@ try {
   const txCash = await win.dbGet('transactions', 7);
   eq(txCash.invoiceNo, 'INV-00007', 'cash sale invoice INV-00007');
   eq(txCash.balanceAdded, false, 'cash sale balanceAdded false');
-  eq((await win.dbGet('clients', cliId)).balance, 282.33, 'cash sale leaves client balance unchanged (282.33 from GCash cart only)');
+  eq((await win.dbGet('clients', cliId)).balance, 280.19, 'cash sale leaves client balance unchanged (280.19 from GCash cart only)');
   eq(txCash.clientId, cliId, 'cash sale still records client id');
   eq(win.wasBalanceAdded(txCash), false, 'wasBalanceAdded false for cash sale');
   eq(win.wasBalanceAdded(tx), true, 'wasBalanceAdded true for GCash sale');
@@ -583,7 +583,7 @@ try {
   win.state.transactions = await win.dbAll('transactions');
   win.viewTransactionDetail(tx.id);
   const scDetail = document.getElementById('modal-root').innerHTML;
-  ok(scDetail.includes('282.33') && !scDetail.includes('212.33'), 'sale detail total is not double-discounted');
+  ok(scDetail.includes('280.19') && !scDetail.includes('210.19'), 'sale detail total is not double-discounted');
 
   // --- edits must not drop fields the UI does not expose ---
   const dayStr = new Date().toISOString().slice(0, 10);
@@ -625,8 +625,8 @@ try {
   const deskTxn = { id: 8002, status: 'pending', clientId: cliId, date: dayS, paymentMethod: 'Credit (Utang)', balanceAdded: true, discount: 0, totalInterest: 0.33, grandTotal: 100.33, items: [{ description: 'Rice', name: '1', unitCost: 100, intRate: 10, date: dayS, amount: 100.33 }] };
   const legacy = win.computeLegacyInterestCorrections([lanTxn, deskTxn]);
   ok(legacy.rows.length === 1 && legacy.rows[0].t.id === 8001, 'legacy interest detector flags only the flat-interest sale');
-  ok(Math.abs(legacy.rows[0].newGT - 100.33) < 0.001 && legacy.rows[0].newItems[0].amount === 100.33, 'legacy correction re-prorates line and total');
-  ok(legacy.perClient.get(cliId) === -9.67, 'legacy correction reports the balance delta');
+  ok(Math.abs(legacy.rows[0].newGT - 100.03) < 0.001 && legacy.rows[0].newItems[0].amount === 100.03, 'legacy correction re-prorates line and total');
+  ok(legacy.perClient.get(cliId) === -9.97, 'legacy correction reports the balance delta');
 
   if (failures === 0) {
     console.log('QUICK CART FLOW OK: single sale + multi-item cart + SC/PWD + interest + paper sizes + client balance + stock + print all verified');

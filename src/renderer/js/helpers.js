@@ -304,7 +304,9 @@ export function intRateOptions(selected) {
 }
 
 export function calcInterest(sub, ratePct, days) {
-  return sub === 0 || ratePct === 0 ? 0 : parseFloat((sub * (ratePct / 100) * (days / 30)).toFixed(2));
+  const d = Math.floor(Number(days) || 0);
+  if (!sub || !ratePct || d <= 0) return 0;
+  return parseFloat((sub * (Math.pow(1 + ratePct / 100 / 365, d) - 1)).toFixed(2));
 }
 
 export function formatVATBreakdown(subtotal) {
