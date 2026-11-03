@@ -197,7 +197,7 @@ function renderClientForm(id) {
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('cli.due')}</label>
-              <input id="cf-due" type="date" value="${escAttr(c?.dueDate || '')}" class="inp" />
+              <input id="cf-due" ${dateTypedAttrs()} value="${escAttr(c?.dueDate || '')}" class="inp" />
             </div>
           </div>
           <div>
@@ -233,7 +233,7 @@ async function submitClientForm(id, andSale) {
     name,
     phone: ((document.getElementById('cf-phone') || {}).value || '').trim(),
     address: ((document.getElementById('cf-address') || {}).value || '').trim(),
-    dueDate: (document.getElementById('cf-due') || {}).value || ''
+    dueDate: validDateStr((document.getElementById('cf-due') || {}).value)
   };
   // Opening balance on create, or a manual correction on edit. Normal sales
   // and payments still update the balance automatically.

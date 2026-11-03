@@ -3,7 +3,7 @@
 // names and response shapes as the LAN client, so every shared view works
 // unchanged. No imports/exports: concatenated. Requires store.js first.
 const IS_STANDALONE = true;
-const STANDALONE_VERSION = '4.8.32';
+const STANDALONE_VERSION = '4.8.33';
 function isNativeApp() {
   try { return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); } catch (e) { return false; }
 }
@@ -27,6 +27,27 @@ function jsArg(x) { const s = JSON.stringify(x); return (s === undefined ? 'null
 function phoneToday() {
   const d = new Date();
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+// Typeable date fields: Android's native date picker has no keyboard, so date
+// inputs are text boxes with a numeric keypad. onDateInput auto-inserts the
+// dashes while typing; validDateStr accepts only a complete, real YYYY-MM-DD.
+function onDateInput(el) {
+  if (!el) return;
+  const digits = String(el.value || '').replace(/\D/g, '').slice(0, 8);
+  let out = digits;
+  if (digits.length > 4) out = digits.slice(0, 4) + '-' + digits.slice(4, 6) + (digits.length > 6 ? '-' + digits.slice(6) : '');
+  if (el.value !== out) el.value = out;
+}
+function validDateStr(s) {
+  const v = String(s || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return '';
+  const y = +v.slice(0, 4), m = +v.slice(5, 7), d = +v.slice(8, 10);
+  const dt = new Date(v + 'T00:00:00');
+  if (isNaN(dt.getTime()) || dt.getFullYear() !== y || dt.getMonth() + 1 !== m || dt.getDate() !== d) return '';
+  return v;
+}
+function dateTypedAttrs() {
+  return 'type="text" inputmode="numeric" maxlength="10" autocomplete="off" placeholder="YYYY-MM-DD" oninput="onDateInput(this)"';
 }
 // Desktop-parity line interest: rate is %/MONTH, prorated by whole days from
 // the line date to today (min 1 day). Same-day items accrue rate/30.

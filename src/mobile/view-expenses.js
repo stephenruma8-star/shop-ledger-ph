@@ -77,7 +77,7 @@ function addExpense() {
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('exp.date')}</label>
-              <input id="ex-date" type="date" value="${phoneToday()}" class="inp" />
+              <input id="ex-date" ${dateTypedAttrs()} value="${escAttr(phoneToday())}" class="inp" />
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('exp.payee')}</label>
@@ -93,7 +93,7 @@ async function submitExpense() {
   const description = ((document.getElementById('ex-desc') || {}).value || '').trim();
   const amount = parseFloat((document.getElementById('ex-amount') || {}).value);
   const category = (document.getElementById('ex-category') || {}).value;
-  const date = (document.getElementById('ex-date') || {}).value || phoneToday();
+  const date = validDateStr((document.getElementById('ex-date') || {}).value) || phoneToday();
   const payee = ((document.getElementById('ex-payee') || {}).value || '').trim();
   if (!amount || amount <= 0) return toast(T('exp.need_amount'), 'err');
   if (!takeSubmitLock('expense')) return;

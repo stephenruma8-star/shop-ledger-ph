@@ -122,7 +122,7 @@ function renderSale(presetId) {
             <button onclick="cartRemove(${idx})" class="text-red-400 hover:text-red-300 p-1.5 shrink-0" title="Remove"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
           </div>
           <div class="flex gap-1.5 mt-1.5 pl-[3.25rem]">
-            <input type="date" value="${escAttr(i.date || phoneToday())}" onchange="cartLineDate(${idx},this.value)" class="w-[6.8rem] text-[11px] px-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 outline-none shrink-0" title="Item date — interest counts from here" />
+            <input ${dateTypedAttrs()} value="${escAttr(i.date || phoneToday())}" onchange="cartLineDate(${idx},this.value)" class="w-[6.8rem] text-[11px] px-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 outline-none shrink-0" title="Item date — interest counts from here" />
             ${variants.length ? `<select onchange="cartLineVariant(${idx},this.value)" class="flex-1 min-w-0 text-[11px] px-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 outline-none">${variants.map(v => '<option value="' + escAttr(v.name) + '"' + ((i.variantName || variants[0].name) === v.name ? ' selected' : '') + '>' + esc(v.name) + '</option>').join('')}</select>` : ''}
             <select id="sale-rate-${idx}" onchange="cartLineRate(${idx},this.value)" class="w-20 text-[11px] px-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 outline-none shrink-0" title="Interest">${intRateOptions(rate)}</select>
           </div>
@@ -217,7 +217,7 @@ function paintLineAmount(idx) {
 function cartLineDate(idx, val) {
   const line = cart[idx];
   if (!line) return;
-  line.date = val || phoneToday();
+  line.date = validDateStr(val) || phoneToday();
   saleTotals();
   paintLineAmount(idx);
 }
@@ -517,7 +517,7 @@ function manualItem() {
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('manual.date')}</label>
-            <input id="m-date" type="date" value="${escAttr(phoneToday())}" class="inp" />
+            <input id="m-date" ${dateTypedAttrs()} value="${escAttr(phoneToday())}" class="inp" />
           </div>
           <div class="grid grid-cols-2 gap-2.5">
             <div>
@@ -546,7 +546,7 @@ function addManualItem() {
   const qty = parseInt(qtyEl && qtyEl.value) || 1;
   if (!name) { toast(T('manual.name_req'), 'err'); return; }
   if (isNaN(price) || price < 0) { toast(T('manual.price_req'), 'err'); return; }
-  cart.push({ invId: null, name, qty: Math.max(1, qty), price, date: (dateEl && dateEl.value) || phoneToday() });
+  cart.push({ invId: null, name, qty: Math.max(1, qty), price, date: validDateStr(dateEl && dateEl.value) || phoneToday() });
   // Stay open for the next item: clear the fields, keep qty + date, refocus.
   if (nameEl) nameEl.value = '';
   if (priceEl) priceEl.value = '';
@@ -651,10 +651,17 @@ async function submitSale() {
     saleSuccessSheet(r.invoiceNo);
     announceClientBalance(clientId);
   } catch (e) {
-    // Cart is kept intact so nothing is lost; one tap retries the same payload.
-    lastFailedSale = { clientId, items, paymentMethod, discount: disc };
+    // Cart is kept intact so nothing is lost. A failed EDIT must never offer the
+    // "retry as new sale" button (that would duplicate the invoice), so only a
+    // failed CREATE arms the retry; both surface the server's message.
     feelErr();
-    toast(T('sale.failed_keep'), 'err');
+    const msg = (e && e.message) ? e.message : '';
+    if (editing) {
+      toast(msg ? T('sale.fail_generic', { msg }) : T('sale.failed_keep'), 'err');
+    } else {
+      lastFailedSale = { clientId, items, paymentMethod, discount: disc };
+      toast(T('sale.failed_keep') + (msg ? ' (' + msg + ')' : ''), 'err');
+    }
     if (currentView === 'sale') renderSale();
   } finally { releaseSubmitLock('sale'); }
 }

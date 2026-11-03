@@ -173,7 +173,7 @@ function renderItemForm(id) {
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('inv.expiry')}</label>
-            <input id="if-expiry" type="date" value="${escAttr(it?.expiryDate || '')}" class="inp" />
+            <input id="if-expiry" ${dateTypedAttrs()} value="${escAttr(it?.expiryDate || '')}" class="inp" />
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('inv.variants')}</label>
@@ -207,7 +207,7 @@ async function submitItemForm(id) {
     sellPrice: parseFloat(val('if-sell')) || 0, costPrice: parseFloat(val('if-cost')) || 0,
     stock: parseInt(val('if-stock')) || 0,
     minStock: parseInt(val('if-min')) || 5, lowStock: parseInt(val('if-min')) || 5,
-    unit: val('if-unit').trim() || 'pcs', variants, expiryDate: val('if-expiry')
+    unit: val('if-unit').trim() || 'pcs', variants, expiryDate: validDateStr(val('if-expiry'))
   };
   try {
     if (id) await apiPost('/api/inventory/' + encodeURIComponent(id), body, 'PUT');
