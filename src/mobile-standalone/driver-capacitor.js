@@ -5,10 +5,58 @@ async function makeCapacitorDriver() {
   const S = nativePlugin('CapacitorSQLite');
   if (!S || typeof S.createConnection !== 'function') throw new Error('SQLite plugin missing');
   const DBN = 'shopledger.db';
-  try {
+  const KEY_NAME = 'slpDbPassphrase';
+  // Random 256-bit passphrase for a brand-new encrypted database.
+  const newPass = () => {
+    try {
+      const a = new Uint8Array(32);
+      window.crypto.getRandomValues(a);
+      let s = '';
+      for (let i = 0; i < a.length; i++) s += ('0' + a[i].toString(16)).slice(-2);
+      return s;
+    } catch (e) { return 'k' + Date.now() + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2); }
+  };
+  let storedPass = null;
+  try { storedPass = localStorage.getItem(KEY_NAME) || null; } catch (e) {}
+  const openPlain = async () => {
     await S.createConnection({ database: DBN, version: 1, encrypted: false, mode: 'no-encryption', readonly: false });
-  } catch (e) { /* connection already exists: reuse */ }
-  await S.open({ database: DBN, readonly: false });
+    await S.open({ database: DBN, readonly: false });
+  };
+  const openEnc = async (p) => {
+    await S.createConnection({ database: DBN, version: 1, encrypted: true, mode: 'secret', readonly: false });
+    if (typeof S.setEncryptionSecret === 'function') await S.setEncryptionSecret({ database: DBN, passphrase: p });
+    await S.open({ database: DBN, readonly: false });
+  };
+  // Wipe a half-created connection/file and start clean in plaintext.
+  const resetToPlain = async () => {
+    try { await S.closeConnection({ database: DBN, readonly: false }); } catch (e) {}
+    try { await S.deleteDatabase({ database: DBN }); } catch (e) {}
+    await openPlain();
+  };
+  if (storedPass) {
+    // This install was created encrypted: open it with the stored key.
+    try { await openEnc(storedPass); }
+    catch (e) {
+      try { localStorage.removeItem(KEY_NAME); } catch (e2) {}
+      await resetToPlain();
+    }
+  } else {
+    // No key yet. Only ENCRYPT a brand-new database; an existing (plaintext)
+    // ledger is opened as-is so no data is ever migrated/lost here.
+    let exists = true;
+    try { const r = await S.isDatabase({ database: DBN }); exists = !!(r && r.result); } catch (e) { exists = true; }
+    if (!exists) {
+      const p = newPass();
+      try {
+        await openEnc(p);
+        try { localStorage.setItem(KEY_NAME, p); } catch (e) {}
+      } catch (e) {
+        await resetToPlain();
+      }
+    } else {
+      await openPlain();
+    }
+  }
   const norm = (p) => (p || []).map(v => (v === undefined ? null : v));
   // The plugin wraps execute()/run() in its own transaction by default, so an
   // explicit `BEGIN` statement passed to execute() throws ("cannot start a
