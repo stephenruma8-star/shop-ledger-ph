@@ -1483,12 +1483,15 @@ function createLanApiRouter(deps) {
     if (!validateAmount(amt) || amt <= 0) return res.status(400).json({ error: 'Valid amount required' });
     if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
     const ref = req.body && req.body.referenceNo !== undefined ? String(req.body.referenceNo || '').trim().slice(0, 40) : null;
+    const rawDate = req.body && req.body.date ? String(req.body.date).slice(0, 10) : '';
+    const newDate = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : null;
     const ok = JSON.parse(await deps.rendererExec(`JSON.stringify(await (async()=>{
       const p=await dbGet('payments',${JSON.stringify(req.params.id)});
       if(!p)return false;
       const diff=${Math.round(amt * 100) / 100}-(p.amount||0);
       p.amount=${Math.round(amt * 100) / 100};
       ${ref !== null ? `p.referenceNo=${JSON.stringify(ref)};` : ''}
+      ${newDate !== null ? `p.date=${JSON.stringify(newDate)};` : ''}
       await dbPut('payments',p);
       if(p.clientId){const c=await dbGet('clients',p.clientId);if(c){c.balance=Math.max(0,(c.balance||0)-diff);await dbPut('clients',c);}}
       return true;

@@ -11,6 +11,10 @@ async function renderPay(preselectedId) {
           <select id="pay-client" class="inp">${data.clients.map(c => '<option value="' + c.id + '"' + (String(c.id) === String(preselectedId) ? ' selected' : '') + '>' + esc(c.name) + ' — ' + peso(c.balance) + '</option>').join('')}</select>
         </div>
         <div>
+          <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('pay.date')}</label>
+          <div class="flex gap-1.5"><input id="pay-date" ${dateTypedAttrs()} value="${escAttr(phoneToday())}" class="inp flex-1" />${datePickBtn('pay-date')}</div>
+        </div>
+        <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('pay.amount')}</label>
           <input id="pay-amount" type="number" step="0.01" placeholder="0.00" inputmode="decimal" class="inp text-2xl font-bold text-center num" style="height:3.5rem" />
         </div>
@@ -54,7 +58,7 @@ async function submitPay() {
   if (!clientId || !(amount > 0)) return toast(T('pay.fill'), 'err');
   if (!takeSubmitLock('pay')) return;
   try {
-    const r = await apiPost('/api/payments', { clientId, amount, type, referenceNo, date: phoneToday() });
+    const r = await apiPost('/api/payments', { clientId, amount, type, referenceNo, date: validDateStr((document.getElementById('pay-date') || {}).value) || phoneToday() });
     if (r.queued) toast(T('pay.queued'), 'ok');
     else toast(T('pay.ok'), 'ok');
     showView('home'); await refreshAll();

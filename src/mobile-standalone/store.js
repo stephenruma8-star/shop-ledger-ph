@@ -937,8 +937,9 @@ async function _apiPayments(method, parts, body) {
     const amtNum = _r2(body && body.amount);
     if (!_validateAmount(amtNum) || amtNum <= 0) throw _apiErr(400, 'Valid amount required');
     const ref = body && body.referenceNo !== undefined ? String(body.referenceNo || '').trim().slice(0, 40) : (p.referenceNo || '');
+    const newDate = (body && typeof body.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.date)) ? body.date : (p.date || _todayStr());
     const oldApplied = (p.appliedAmount != null) ? p.appliedAmount : (p.amount || 0);
-    await db.run('UPDATE payments SET amount = ?, referenceNo = ? WHERE id = ?', [amtNum, ref, p.id]);
+    await db.run('UPDATE payments SET amount = ?, referenceNo = ?, date = ? WHERE id = ?', [amtNum, ref, newDate, p.id]);
     if (p.clientId) {
       const c = await db.get('SELECT * FROM clients WHERE id = ?', [p.clientId]);
       if (c) {

@@ -173,7 +173,7 @@ async function openClientDetail(id) {
           <span class="text-gray-200">${fmtDate(p.date)} <span class="text-gray-500">· ${esc(p.type || '')}${p.referenceNo ? ' · #' + esc(p.referenceNo) : ''}</span></span>
           <span class="flex items-center gap-1.5">
             <span class="text-green-400 num shrink-0">-${peso(p.amount)}</span>
-            ${phoneRole() === 'cashier' ? '' : `<button onclick="renderPaymentEdit(${jsArg(p.id)}, ${jsArg(p.amount || 0)}, ${jsArg(p.referenceNo || '')})" class="text-[11px] text-blue-400 px-1.5">✏️</button><button onclick="deletePayment(${jsArg(p.id)})" class="text-[11px] text-red-400 px-1.5">✕</button>`}
+            ${phoneRole() === 'cashier' ? '' : `<button onclick="renderPaymentEdit(${jsArg(p.id)}, ${jsArg(p.amount || 0)}, ${jsArg(p.referenceNo || '')}, ${jsArg(p.date || '')})" class="text-[11px] text-blue-400 px-1.5">✏️</button><button onclick="deletePayment(${jsArg(p.id)})" class="text-[11px] text-red-400 px-1.5">✕</button>`}
           </span>
         </div>`).join('') || `<p class="text-[11px] text-gray-500">${T('cli.no_history')}</p>`}
     </div>`;
@@ -405,12 +405,15 @@ async function printClientStatement() {
     systemPrintHtml(printLinesHtml(lines, 'Statement'), 'Statement');
   }
 }
-function renderPaymentEdit(id, amount, referenceNo) {
+function renderPaymentEdit(id, amount, referenceNo, date) {
   document.getElementById('modal-root').innerHTML = `
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
       <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" onclick="event.stopPropagation()">
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
         <div class="flex items-center justify-between gap-2 mb-3"><h3 class="font-bold text-gray-100 text-sm flex items-center gap-2"><span class="icon-tile bg-green-500/15 text-green-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>${T('pay.edit_title')}</h3><button onclick="closeQuick()" aria-label="Close" class="w-9 h-9 rounded-xl btn-ghost flex items-center justify-center text-gray-400 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+        <label class="text-[11px] text-gray-500 block mb-1">${T('pay.date')}</label>
+        <div class="flex gap-1.5 mb-3"><input id="pe-date" ${dateTypedAttrs()} value="${escAttr(validDateStr(date) || phoneToday())}" class="inp flex-1" />${datePickBtn('pe-date')}</div>
+        <label class="text-[11px] text-gray-500 block mb-1">${T('pay.amount')}</label>
         <input id="pe-amount" type="number" min="0" step="0.01" value="${amount || ''}" class="inp mb-3" />
         <input id="pe-ref" type="text" maxlength="40" value="${escAttr(referenceNo || '')}" placeholder="Reference # (optional)" autocomplete="off" class="inp mb-3" />
         <button onclick="submitPaymentEdit(${jsArg(id)})" class="btn btn-primary btn-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('pay.save_edit')}</button>
@@ -421,9 +424,10 @@ async function submitPaymentEdit(id) {
   const amount = parseFloat((document.getElementById('pe-amount') || {}).value);
   if (!amount || amount <= 0) { toast(T('exp.need_amount'), 'err'); return; }
   const referenceNo = ((document.getElementById('pe-ref') || {}).value || '').trim().slice(0, 40);
+  const date = validDateStr((document.getElementById('pe-date') || {}).value);
   if (!takeSubmitLock('payedit')) return;
   try {
-    await apiPost('/api/payments/' + encodeURIComponent(id), { amount, referenceNo }, 'PUT');
+    await apiPost('/api/payments/' + encodeURIComponent(id), { amount, referenceNo, date }, 'PUT');
     closeQuick();
     toast(T('pay.updated'), 'ok');
     await refreshAll();
