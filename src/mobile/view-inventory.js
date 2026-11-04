@@ -1,5 +1,44 @@
 // ---------- INVENTORY ----------
 let invFilter = 'all';
+// Manual item order: an "Add item" button on a row inserts the new item right
+// after that row instead of at the very end. Stored per device; the API's own
+// (name) order is used until the first in-place add seeds the order.
+const INV_ORDER_KEY = 'slpInvOrder';
+let invAddAfterId = null;
+function loadInvOrder() {
+  try { const v = JSON.parse(localStorage.getItem(INV_ORDER_KEY) || '[]'); return Array.isArray(v) ? v.map(String) : []; } catch (e) { return []; }
+}
+function saveInvOrder(arr) { try { localStorage.setItem(INV_ORDER_KEY, JSON.stringify((arr || []).map(String))); } catch (e) {} }
+function sortInvByOrder(items) {
+  const list = items || [];
+  const order = loadInvOrder();
+  if (!order.length) return list;
+  const idx = {};
+  order.forEach((id, i) => { idx[id] = i; });
+  return list.map((it, i) => ({ it, i })).sort((a, b) => {
+    const ai = Object.prototype.hasOwnProperty.call(idx, String(a.it.id)) ? idx[String(a.it.id)] : Infinity;
+    const bi = Object.prototype.hasOwnProperty.call(idx, String(b.it.id)) ? idx[String(b.it.id)] : Infinity;
+    if (ai !== bi) return ai - bi;
+    return a.i - b.i;
+  }).map(x => x.it);
+}
+function insertInvOrderAfter(afterId, newId) {
+  let order = loadInvOrder();
+  if (!order.length) order = (data.inventory || []).map(i => String(i.id));
+  const nid = String(newId);
+  order = order.filter(id => id !== nid);
+  const at = afterId == null ? -1 : order.indexOf(String(afterId));
+  if (at >= 0) order.splice(at + 1, 0, nid);
+  else order.push(nid);
+  saveInvOrder(order);
+}
+function removeInvOrder(id) {
+  const order = loadInvOrder();
+  if (!order.length) return;
+  saveInvOrder(order.filter(x => x !== String(id)));
+}
+function addItemAfter(id) { invAddAfterId = (id == null ? null : id); renderItemForm(null); }
+function addItemAtEnd() { invAddAfterId = null; renderItemForm(null); }
 async function renderInventory() {
   const v = document.getElementById('view');
   invFilter = 'all';
@@ -13,7 +52,7 @@ async function renderInventory() {
   v.innerHTML = `
     <div class="flex items-center justify-between gap-2 mb-3 fade-in">
       <h2 class="card-title text-base"><span class="icon-tile bg-blue-500/15 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></span>${T('view.inventory.title')} <span class="text-sm text-gray-500 font-normal">(${T('inv.count', { n: data.inventory.length })})</span></h2>
-      ${phoneRole() === 'cashier' ? '' : `<button onclick="renderItemForm(null)" class="btn btn-primary btn-sm shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('inv.add')}</button>`}
+      ${phoneRole() === 'cashier' ? '' : `<button onclick="addItemAtEnd()" class="btn btn-primary btn-sm shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('inv.add')}</button>`}
     </div>
     <div class="mb-2 fade-in"><span class="chip ${low > 0 ? 'chip-amber' : 'chip-green'}">${low > 0 ? T('inv.low_n', { n: low }) : T('inv.all_ok')}</span></div>
     <div class="flex gap-1.5 mb-2 fade-in">
@@ -33,7 +72,7 @@ ${phoneRole() === 'cashier' ? '' : `<button onclick="showView('stocktake')" clas
 }
 function invListHTML(items) {
   const soon = Date.now() + 30 * 86400000;
-  return items.map(i => {
+  return sortInvByOrder(items).map(i => {
     const stock = i.stock || 0;
     const exp = i.expiryDate ? new Date(i.expiryDate + 'T00:00:00').getTime() : null;
     const expSoon = exp && !isNaN(exp) && exp < soon;
@@ -48,7 +87,8 @@ function invListHTML(items) {
       <button onclick="openQuick(${i.id})" class="btn btn-sm ${stock <= 0 ? 'btn-ghost text-gray-500 cursor-not-allowed' : 'btn-primary'}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>${T('home.sell')}</button>
       <button onclick="photoForItem(${jsArg(i.id)})" title="${esc(T('photo.take'))}" class="btn btn-ghost btn-sm px-2">📷</button>
       ${phoneRole() === 'cashier' ? '' : `<button onclick="renderItemForm(${jsArg(i.id)})" title="${esc(T('inv.edit'))}" class="btn btn-ghost btn-sm px-2">✏️</button>`}
-    </div>`;
+    </div>
+    ${phoneRole() === 'cashier' ? '' : `<button onclick="addItemAfter(${jsArg(i.id)})" class="btn btn-ghost btn-sm w-full" style="font-size:.72rem;opacity:.8">+ ${T('inv.add_here')}</button>`}`;
   }).join('');
 }
 function invExpiringItems() {
@@ -125,6 +165,7 @@ async function loadValuation() {
 }
 function renderItemForm(id) {
   if (phoneRole() === 'cashier') return toast(T('nav.owner_only'), 'err');
+  if (id) invAddAfterId = null;
   const it = id ? (data.inventory || []).find(i => String(i.id) === String(id)) : null;
   const vs = (it && it.variants) || [];
   document.getElementById('modal-root').innerHTML = `
@@ -211,11 +252,16 @@ async function submitItemForm(id) {
   };
   try {
     if (id) await apiPost('/api/inventory/' + encodeURIComponent(id), body, 'PUT');
-    else await apiPost('/api/inventory', body);
+    else {
+      const r = await apiPost('/api/inventory', body);
+      // Place the new item right after the row whose "Add item" was tapped.
+      if (r && !r.queued && r.id != null) insertInvOrderAfter(invAddAfterId, r.id);
+    }
+    invAddAfterId = null;
     closeQuick();
     toast(id ? T('inv.updated') : T('inv.added'), 'ok');
     await refreshAll();
-  } catch (e) { toast(T('inv.failed', { msg: e.message }), 'err'); }
+  } catch (e) { invAddAfterId = null; toast(T('inv.failed', { msg: e.message }), 'err'); }
   finally { releaseSubmitLock('item'); }
 }
 // Standalone-only: delete an item with no sales history.
@@ -232,6 +278,7 @@ async function deleteItemForm(id) {
   if (!takeSubmitLock('itemdel')) return;
   try {
     await apiPost('/api/inventory/' + encodeURIComponent(id), {}, 'DELETE');
+    removeInvOrder(id);
     closeQuick();
     feelOk();
     toast('Item deleted', 'ok');

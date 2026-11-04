@@ -359,6 +359,16 @@ try {
   const invHtml = getEl('view').innerHTML;
   ok(invHtml.includes('Inventory') && invHtml.includes('3 items'), 'inventory view shows item count');
   ok(invHtml.includes('OUT OF STOCK') && invHtml.includes('low stock'), 'inventory shows stock statuses');
+  ok(invHtml.includes('addItemAfter('), 'inventory rows offer an Add-item button');
+  // Per-row "Add item": the new item is inserted right after the chosen row.
+  gcall(`saveInvOrder([])`);
+  const invIds = gget(`(data.inventory || []).map(i => i.id)`);
+  await gcall(`addItemAfter(${invIds[0]})`);
+  gcall(`insertInvOrderAfter(${invIds[0]}, 999001)`);
+  const invOrdered = gget(`sortInvByOrder((data.inventory || []).concat([{ id: 999001, name: 'ZZZ new' }])).map(i => i.id)`);
+  ok(invOrdered[0] === invIds[0] && invOrdered[1] === 999001, 'inventory: Add-item inserts after the chosen row');
+  await gcall(`closeQuick()`);
+  gcall(`saveInvOrder([])`);
   gcall(`filterInventory('biscuit')`);
   const invGrid = getEl('inv-grid').innerHTML;
   ok(invGrid.includes('Biscuit Pack') && !invGrid.includes('Coke'), 'inventory search filters');
