@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.26",
+    "version":  "3.37.27",
     "buildDate":  "2026-11-03T00:00:00.000Z",
-    "notes":  "Interest is monthly-simple everywhere again: I = P x rate%/100 x days/30 (e.g. 20,000 at 3%/month for 178 days = 3,560.00). Rate labels show %/mo. Applies to the desktop, the LAN API and the phone; the annual-compound option and its migration were removed."
+    "notes":  "Ships the phone payment-date feature to paired phones: the Payment screen and payment edit now have an editable Date field (type or pick), and the LAN API accepts a payment date on edit. Interest still accrues on the remaining balance after a partial payment."
 }
