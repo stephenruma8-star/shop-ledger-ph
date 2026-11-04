@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.23",
+    "version":  "3.37.24",
     "buildDate":  "2026-11-03T00:00:00.000Z",
-    "notes":  "Ships the per-item 'Add item' button to paired phones: on the Inventory list each row has an Add button that inserts the new item right after that row (instead of only at the bottom)."
+    "notes":  "Ships the per-item 'Add item here' button on paired phones' sale cart: each cart line has a button that inserts the next item right below that line instead of at the bottom (also removed the earlier Inventory variant)."
 }
