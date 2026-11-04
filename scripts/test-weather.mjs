@@ -7,6 +7,7 @@ import vm from 'node:vm';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const src = readFileSync(resolve(root, 'src', 'mobile', 'weather.js'), 'utf8');
+const iconsSrc = readFileSync(resolve(root, 'src', 'mobile', 'icons.js'), 'utf8');
 
 function makeSandbox(fetchImpl) {
   const store = {};
@@ -27,6 +28,7 @@ function makeSandbox(fetchImpl) {
   vm.createContext(sandbox);
   vm.runInContext('function esc(s){return String(s==null?"":s);}', sandbox);
   vm.runInContext('function escAttr(s){return esc(s).replace(/"/g,"&quot;").replace(/\'/g,"&#39;");}', sandbox);
+  vm.runInContext(iconsSrc, sandbox);
   vm.runInContext(src, sandbox);
   return { sandbox, store, els };
 }
@@ -39,14 +41,14 @@ function ok(cond, name) {
 
 {
   const { sandbox: s } = makeSandbox();
-  ok(s.weatherEmoji(113) === '☀️', 'emoji sun');
-  ok(s.weatherEmoji(118) === '⛅', 'emoji partly cloudy');
-  ok(s.weatherEmoji(130) === '☁️', 'emoji overcast');
-  ok(s.weatherEmoji(185) === '🌧️', 'emoji rain');
-  ok(s.weatherEmoji(230) === '🌨️', 'emoji snow');
-  ok(s.weatherEmoji(250) === '🌫️', 'emoji fog');
-  ok(s.weatherEmoji(300) === '⛈️', 'emoji storm');
-  ok(s.weatherEmoji(999) === '🌤️', 'emoji default');
+  ok(s.weatherEmoji(113).includes('r="5"'), 'icon sun');
+  ok(s.weatherEmoji(118).includes('r="4"'), 'icon partly cloudy');
+  ok(s.weatherEmoji(130).includes('M18 10h-1.26'), 'icon overcast');
+  ok(s.weatherEmoji(185).includes('y1="19"'), 'icon rain');
+  ok(s.weatherEmoji(230).includes('y2="23"'), 'icon snow');
+  ok(s.weatherEmoji(250).includes('y1="14"'), 'icon fog');
+  ok(s.weatherEmoji(300).includes('11 23'), 'icon storm');
+  ok(s.weatherEmoji(999).includes('r="4"'), 'icon default');
   const list = [
     { date: '2026-10-01', localName: 'Past' },
     { date: '2026-12-25', localName: 'Christmas Day' },
@@ -70,7 +72,7 @@ function ok(cond, name) {
   await s.loadPhoneWeather();
   ok(els['weather-display'].innerHTML.includes('needs internet'), 'offline weather message');
   await s.loadPhoneHolidays();
-  ok(els['next-holiday'].innerHTML.includes('🎉') || els['next-holiday'].innerHTML.includes('No upcoming'), 'next holiday renders offline');
+  ok(els['next-holiday'].innerHTML.includes('<svg') || els['next-holiday'].innerHTML.includes('No upcoming'), 'next holiday renders offline');
 }
 {
   // fresh cache renders with zero fetches

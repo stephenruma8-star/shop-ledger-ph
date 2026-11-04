@@ -87,7 +87,7 @@ function renderUpdateSheet(tag, url) {
   document.getElementById('modal-root').innerHTML = `
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
       <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-5 pb-6 slide-up glass-card text-center">
-        <div class="text-4xl mb-2">⬆️</div>
+        <div class="text-blue-400 mb-2 flex justify-center">${icon('arrowUp', 40)}</div>
         <div class="text-lg font-bold text-gray-100 mb-1">${T('upd.title')}</div>
         <p class="text-xs text-gray-400 mb-4">${T('upd.body', { tag })}</p>
         <button onclick="downloadPendingUpdate()" class="btn btn-primary btn-lg mb-2">${T('upd.download')}</button>

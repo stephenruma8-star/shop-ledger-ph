@@ -16,6 +16,7 @@ const sa = (...p) => resolve(root, 'src', 'mobile-standalone', ...p);
 const CHECK = process.argv.includes('--check');
 
 const STANDALONE_MODULES = [
+  ['mob', 'icons.js'],
   ['sa', 'store.js'],
   ['sa', 'driver-capacitor.js'],
   ['sa', 'escpos.js'],

@@ -10,7 +10,7 @@ async function renderReports() {
     <div class="glass-card rounded-2xl p-3 mb-3 fade-in flex items-center gap-2">
       <span class="text-xs text-gray-400 shrink-0">${T('rep.month')}</span>
       <input id="rep-month" type="month" value="${escAttr(repMonth)}" max="${escAttr(monthKey(new Date()))}" onchange="loadReportMonth()" class="inp flex-1" style="height:2.4rem" />
-      ${phoneRole() === 'cashier' ? '' : `<button onclick="exportMonthCsv()" class="btn btn-ghost btn-sm shrink-0">📥 ${T('rep.export')}</button>`}
+      ${phoneRole() === 'cashier' ? '' : `<button onclick="exportMonthCsv()" class="btn btn-ghost btn-sm shrink-0">${icon('download', 14)} ${T('rep.export')}</button>`}
     </div>
     <div class="grid grid-cols-2 gap-2 mb-3 fade-in">
       <button onclick="shareTodayReport()" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>Today's summary</button>

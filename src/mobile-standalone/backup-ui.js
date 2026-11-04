@@ -12,12 +12,12 @@ function updateBackupRow() {
   box.innerHTML = `
     <p class="text-[11px] text-gray-500 mb-2">Full ledger copy — the only way back after losing this phone.${last ? ' Last: ' + esc(String(last).slice(0, 16).replace('T', ' ')) : ''}</p>
     <input id="bk-pass" type="password" inputmode="numeric" autocomplete="off" maxlength="32" placeholder="Backup password (optional but safer)" class="inp mb-2" />
-    <button onclick="exportBackup()" class="w-full py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500 mb-3">⬇ Export backup</button>
+    <button onclick="exportBackup()" class="w-full py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500 mb-3">${icon('download', 14)} Export backup</button>
     <div class="border-t border-white/10 pt-3">
       <p class="text-[11px] text-gray-500 mb-2">Restore replaces EVERYTHING on this phone. Pick a backup file first.</p>
       <input id="bk-file" type="file" accept=".json,application/json" class="text-[11px] text-gray-400 mb-2 w-full" />
       <input id="bk-pass2" type="password" inputmode="numeric" autocomplete="off" maxlength="32" placeholder="Backup password (if set)" class="inp mb-2" />
-      <button onclick="importBackup()" class="w-full py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-200 text-sm font-semibold">⬆ Restore from file</button>
+      <button onclick="importBackup()" class="w-full py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-200 text-sm font-semibold">${icon('upload', 14)} Restore from file</button>
     </div>`;
 }
 function _backupFileName() {

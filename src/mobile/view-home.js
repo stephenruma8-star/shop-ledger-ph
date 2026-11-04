@@ -5,7 +5,7 @@ function alertsStrip() {
   if (!a.outCount && !a.lowCount && !expCount) return '';
   const names = (a.out || []).slice(0, 3).map(i => esc(i.name)).join(', ') + (a.outCount > 3 ? ` +${a.outCount - 3} more` : '');
   return `<button onclick="showView('inventory')" class="w-full text-left glass-card rounded-2xl p-3 mb-2.5 fade-in" style="border:1px solid rgba(239,68,68,.4)">
-    <div class="text-sm font-bold text-red-400">⚠ ${a.outCount} ${T('alerts.out')}${a.lowCount ? ` · ${a.lowCount} ${T('alerts.low')}` : ''}${expCount ? ` · ⏳ ${expCount} expiring` : ''}</div>
+    <div class="text-sm font-bold text-red-400">${icon('warn', 14)} ${a.outCount} ${T('alerts.out')}${a.lowCount ? ` · ${a.lowCount} ${T('alerts.low')}` : ''}${expCount ? ` · ⏳ ${expCount} expiring` : ''}</div>
     ${names ? `<div class="text-[11px] text-gray-400 truncate">${names}</div>` : ''}</button>`;
 }
 async function renderCashierHome() {
@@ -18,10 +18,10 @@ async function renderCashierHome() {
       <div class="text-[11px] text-gray-500">${T('home.cashier_sub')}</div>
     </div>
     <div class="grid grid-cols-2 gap-2.5 fade-in">
-      <button onclick="startNewSale()" class="stat-card rounded-2xl p-5 text-center card-hover"><div class="text-2xl mb-1">🧾</div><div class="text-sm font-bold text-gray-100">${T('nav.sale')}</div></button>
-      <button onclick="showView('pay')" class="stat-card rounded-2xl p-5 text-center card-hover"><div class="text-2xl mb-1">💵</div><div class="text-sm font-bold text-gray-100">${T('nav.pay')}</div></button>
-      <button onclick="showView('catalog')" class="stat-card rounded-2xl p-5 text-center card-hover"><div class="text-2xl mb-1">🏷️</div><div class="text-sm font-bold text-gray-100">${T('nav.catalog')}</div></button>
-      <button onclick="showView('inventory')" class="stat-card rounded-2xl p-5 text-center card-hover"><div class="text-2xl mb-1">📦</div><div class="text-sm font-bold text-gray-100">${T('home.stock')}</div></button>
+      <button onclick="startNewSale()" class="stat-card rounded-2xl p-5 text-center card-hover"><div class="text-blue-400 mb-1 flex justify-center">${icon('receipt', 24)}</div><div class="text-sm font-bold text-gray-100">${T('nav.sale')}</div></button>
+      <button onclick="showView('pay')" class="stat-card rounded-2xl p-5 text-center card-hover"><div class="text-green-400 mb-1 flex justify-center">${icon('cash', 24)}</div><div class="text-sm font-bold text-gray-100">${T('nav.pay')}</div></button>
+      <button onclick="showView('catalog')" class="stat-card rounded-2xl p-5 text-center card-hover"><div class="text-blue-400 mb-1 flex justify-center">${icon('tag', 24)}</div><div class="text-sm font-bold text-gray-100">${T('nav.catalog')}</div></button>
+      <button onclick="showView('inventory')" class="stat-card rounded-2xl p-5 text-center card-hover"><div class="text-blue-400 mb-1 flex justify-center">${icon('box', 24)}</div><div class="text-sm font-bold text-gray-100">${T('home.stock')}</div></button>
     </div>`;
 }
 // Standalone-only setup checklist on a fresh ledger. Each step links where
@@ -40,7 +40,7 @@ function onboardingCard() {
       <span class="text-sm ${done ? 'text-gray-500 line-through' : 'text-gray-200 font-medium'}">${label}</span>
     </button>`;
   return `<div class="glass-card rounded-2xl p-3.5 mb-2.5 fade-in" style="border:1px solid rgba(59,130,246,.35)">
-    <div class="text-sm font-bold text-gray-100 mb-1">🚀 Set up your shop</div>
+    <div class="text-sm font-bold text-gray-100 mb-1">${icon('rocket', 14)} Set up your shop</div>
     ${step(hasItems, 'Add your catalog items', 'inventory')}
     ${step(hasPrinter, 'Set the receipt printer IP', 'settings')}
     ${step(hasSale, 'Make your first sale', 'sale')}

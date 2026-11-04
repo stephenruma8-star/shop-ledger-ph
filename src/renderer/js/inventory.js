@@ -410,8 +410,8 @@ export function viewItemHistory(id) {
   let running = 0;
   let rows = entries.map(e => {
     running += e.qty;
-    const icon = e.type === 'sale' ? '🔴' : '🟡';
-    return `<tr class="border-b dark:border-gray-700"><td class="p-2 whitespace-nowrap text-xs text-gray-500">${escHtml(e.date || '')}</td><td class="p-2 text-xs">${icon} ${e.type === 'sale' ? escHtml(e.ref) : 'Adjust'}</td><td class="p-2 text-xs text-gray-500">${e.type === 'sale' ? escHtml(e.client) : escHtml(e.note || '')}</td><td class="p-2 text-right text-xs ${e.qty < 0 ? 'text-red-600' : 'text-green-600'}">${e.qty > 0 ? '+' : ''}${e.qty}</td><td class="p-2 text-right text-xs font-semibold">${running}</td></tr>`;
+    const dot = e.type === 'sale' ? '<span class="text-red-500"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="12" r="7"/></svg></span>' : '<span class="text-amber-500"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="12" r="7"/></svg></span>';
+    return `<tr class="border-b dark:border-gray-700"><td class="p-2 whitespace-nowrap text-xs text-gray-500">${escHtml(e.date || '')}</td><td class="p-2 text-xs">${dot} ${e.type === 'sale' ? escHtml(e.ref) : 'Adjust'}</td><td class="p-2 text-xs text-gray-500">${e.type === 'sale' ? escHtml(e.client) : escHtml(e.note || '')}</td><td class="p-2 text-right text-xs ${e.qty < 0 ? 'text-red-600' : 'text-green-600'}">${e.qty > 0 ? '+' : ''}${e.qty}</td><td class="p-2 text-right text-xs font-semibold">${running}</td></tr>`;
   }).join('');
 
   modal(`<div class="p-4 flex flex-col" style="min-height:60vh">

@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.27",
-    "buildDate":  "2026-11-03T00:00:00.000Z",
-    "notes":  "Ships the phone payment-date feature to paired phones: the Payment screen and payment edit now have an editable Date field (type or pick), and the LAN API accepts a payment date on edit. Interest still accrues on the remaining balance after a partial payment."
+    "version":  "3.37.28",
+    "buildDate":  "2026-11-04T00:00:00.000Z",
+    "notes":  "Shared inline-SVG icon set for desktop and phone: one source of symbols guarded against drift, phone emoji replaced with the same SVGs, and desktop date fields now use the phone's calendar glyph."
 }

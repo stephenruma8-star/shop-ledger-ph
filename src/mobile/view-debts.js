@@ -52,7 +52,7 @@ async function sendSmsReminders() {  if (!takeSubmitLock('sms')) return;
         `<a href="smsto:${escAttr(t.phone)}?body=${encodeURIComponent(t.text)}" class="row py-2.5" style="text-decoration:none">
           <span class="flex-1 min-w-0"><span class="block font-semibold text-sm text-gray-200 truncate">${esc(t.name)}</span>
           <span class="block text-[11px] text-gray-500 truncate">${esc(t.phone)}</span></span>
-          <span class="btn btn-ghost btn-sm shrink-0">📩 Text</span>
+          <span class="btn btn-ghost btn-sm shrink-0">${icon('mail', 14)} Text</span>
         </a>`).join('');
       document.getElementById('modal-root').innerHTML = `
         <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">

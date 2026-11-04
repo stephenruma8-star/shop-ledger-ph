@@ -1,4 +1,5 @@
 import { logAudit } from './auth.js'
+import { icon } from './icons.js';
 import { cfCart, cfUpdateRowAmt, cfUpdateTotals } from './clients.js'
 import { dbAdd, dbAll, dbDel, dbPut } from './database.js'
 import { renderExpTable } from './expenses.js'
@@ -584,7 +585,7 @@ export function toggleTheme() {
 export function showShortcuts() {
   modal(`
     <div class="p-6">
-      <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">⌨️ Keyboard Shortcuts</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+      <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">${icon('keyboard', 20)} Keyboard Shortcuts</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
       <div class="space-y-2 text-sm">
         <div class="grid grid-cols-2 gap-2">
           <div class="p-2 bg-blue-50 dark:bg-blue-900/20 rounded col-span-2 font-semibold text-xs text-blue-600">Navigation</div>
@@ -802,11 +803,23 @@ export function updateLowStockBadge() {
   else badge.classList.add('hidden');
 }
 
-export function pushSysNotif(id, text, act = 'dismiss', icon = 'ℹ️') {
+export function pushSysNotif(id, text, act = 'dismiss', icon = 'help') {
   window.__sysNotifs = window.__sysNotifs || [];
   window.__sysNotifs = window.__sysNotifs.filter(n => n.id !== id);
   window.__sysNotifs.push({ id, text, act, icon });
   updateNotifications();
+}
+
+// Renders a notification symbol from the shared icon set. Accepts an icon name
+// or legacy emoji (mapped) so the panel never shows a device-specific glyph.
+function sysIcon(name) {
+  const map = {
+    '\u2B06\uFE0F': 'download', '\u2B06': 'download', '\u2705': 'check',
+    '\u{1F4F1}': 'phone', '\u{1F4E6}': 'box', '\u26A0\uFE0F': 'warn', '\u26A0': 'warn',
+    '\u{1F4BE}': 'save', '\u{1F514}': 'help', 'i\uFE0F': 'help'
+  };
+  const key = map[name] || name;
+  return icon(key, 14) || escapeHtml(String(name || ''));
 }
 
 export function dismissSysNotif(id) {
@@ -832,15 +845,15 @@ export function updateNotifications() {
       if (n.act === 'download') btn = `<button onclick="window.electronAPI.downloadUpdate();window.dismissSysNotif('${n.id}');if(window.showUpdateProgress)window.showUpdateProgress()" class="ml-auto shrink-0 text-[11px] px-2 py-1 rounded-lg bg-blue-600 text-white hover:bg-blue-700">Download</button>`;
       else if (n.act === 'restart') btn = `<button onclick="window.electronAPI.installUpdate();window.dismissSysNotif('${n.id}')" class="ml-auto shrink-0 text-[11px] px-2 py-1 rounded-lg bg-green-600 text-white hover:bg-green-700">Restart</button>`;
       else btn = `<button onclick="window.dismissSysNotif('${n.id}')" class="ml-auto shrink-0 text-gray-400 hover:text-gray-600" aria-label="Dismiss" title="Dismiss"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`;
-      return `<div class="flex items-center gap-2 text-gray-700 dark:text-gray-300"><span class="shrink-0">${n.icon}</span><span class="min-w-0 break-words">${escapeHtml(n.text)}</span>${btn}</div>`;
+      return `<div class="flex items-center gap-2 text-gray-700 dark:text-gray-300"><span class="shrink-0">${sysIcon(n.icon)}</span><span class="min-w-0 break-words">${escapeHtml(n.text)}</span>${btn}</div>`;
     }).join('');
     panel.innerHTML = `<div class="p-3 space-y-2 text-sm">
       <div class="flex justify-between items-center border-b dark:border-gray-700 pb-2"><span class="font-bold">Notifications</span><button onclick="document.getElementById('notif-panel').classList.add('hidden')" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
       ${sys.length ? `<div class="border-b dark:border-gray-700 pb-2 space-y-2">${sysRows}</div>` : ''}
-      ${overdue > 0 ? `<div class="flex items-center gap-2 text-red-600"><span>⚠️</span><span>${overdue} overdue balances</span></div>` : ''}
+      ${overdue > 0 ? `<div class="flex items-center gap-2 text-red-600"><span class="shrink-0">${icon('warn', 14)}</span><span>${overdue} overdue balances</span></div>` : ''}
       ${lowStock > 0 ? `<div class="flex items-center gap-2 text-orange-600"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg><span>${lowStock} low stock items</span></div>` : ''}
       ${recentPOs > 0 ? `<div class="flex items-center gap-2 text-green-600"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg><span>${recentPOs} POs received today</span></div>` : ''}
-      ${total === 0 ? '<div class="text-gray-400 text-center py-4">✓ All good!</div>' : ''}
+      ${total === 0 ? '<div class="text-gray-400 text-center py-4">' + icon('check', 14) + ' All good!</div>' : ''}
     </div>`;
   }
 }

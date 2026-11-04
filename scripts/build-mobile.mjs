@@ -15,7 +15,7 @@ const mob = (...p) => resolve(root, 'src', 'mobile', ...p);
 const CHECK = process.argv.includes('--check');
 
 const MODULES = [
-  'core.js', 'pair.js', 'pwa.js', 'pin.js', 'display.js', 'ptr.js',
+  'icons.js', 'core.js', 'pair.js', 'pwa.js', 'pin.js', 'display.js', 'ptr.js',
   'offline.js', 'nav.js', 'lang.js', 'weather.js', 'debt-form.js', 'view-home.js', 'view-clients.js',
   'view-catalog.js', 'view-quick.js', 'view-sale.js', 'view-pay.js',
   'view-inventory.js', 'view-transactions.js', 'view-expenses.js',

@@ -40,7 +40,7 @@ function expenseListHTML(items) {
       </div>
       <div class="text-right shrink-0">
         <div class="font-bold text-sm text-red-400 num">${peso(e.amount)}</div>
-        ${owner && e.id ? `<div class="flex gap-1 justify-end mt-1"><button onclick="renderExpenseEdit(${jsArg(e.id)})" class="text-[11px] text-blue-400 px-1">✏️</button><button onclick="deleteExpense(${jsArg(e.id)})" class="text-[11px] text-red-400 px-1">✕</button></div>` : ''}
+        ${owner && e.id ? `<div class="flex gap-1 justify-end mt-1"><button onclick="renderExpenseEdit(${jsArg(e.id)})" class="text-[11px] text-blue-400 px-1">${icon('edit', 12)}</button><button onclick="deleteExpense(${jsArg(e.id)})" class="text-[11px] text-red-400 px-1">${icon('x', 12)}</button></div>` : ''}
       </div>
     </div>`).join('');
 }

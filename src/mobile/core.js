@@ -58,7 +58,7 @@ function datePickBtn(targetId) {
   const id = String(targetId).replace(/'/g, "\\'");
   const onchange = "if(this.value){var t=document.getElementById('" + id + "');if(t){t.value=this.value;try{t.dispatchEvent(new Event('change',{bubbles:true}));}catch(e){}}}";
   return '<span class="relative inline-flex shrink-0" style="width:2.9rem;min-height:2.2rem;align-self:stretch">'
-    + '<span class="absolute inset-0 flex items-center justify-center rounded-lg border border-white/10 text-gray-300" style="background:rgba(30,41,59,.6);pointer-events:none">📅</span>'
+    + '<span class="absolute inset-0 flex items-center justify-center rounded-lg border border-white/10 text-gray-300" style="background:rgba(30,41,59,.6);pointer-events:none">' + icon('calendar', 16) + '</span>'
     + '<input type="date" aria-label="Pick a date" onchange="' + onchange + '" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer" />'
     + '</span>';
 }

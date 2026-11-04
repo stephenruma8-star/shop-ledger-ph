@@ -2,6 +2,7 @@ import { logAudit } from './auth.js'
 import { dbGet } from './database.js'
 import { applyDailyInterest, closeModal, dbLoad, debounce, escapeHtml, modal, searchData, toast } from './helpers.js'
 import { openPrintWindow } from './printLayout.js'
+import { icon } from './icons.js';
 import { fmtDate, peso, state, today } from './state.js'
 
 export async function viewUtang(root) {
@@ -63,7 +64,7 @@ export function renderUtangTable() {
         return `<tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 ${isOverdue ? 'bg-red-50 dark:bg-red-900/10' : ''}">
         <td class="p-3 font-medium">${escapeHtml(c.name)}</td><td class="p-3 text-gray-500">${escapeHtml(c.phone || '-')}</td>
         <td class="p-3 text-right font-bold text-orange-600">${peso(c.balance)}</td>
-        <td class="p-3 text-center">${c.dueDate ? (isOverdue ? '<span class="text-red-600 font-bold">'+escapeHtml(fmtDate(c.dueDate))+' ⚠️</span>' : escapeHtml(fmtDate(c.dueDate))) : '<span class="text-gray-400">—</span>'}</td>
+        <td class="p-3 text-center">${c.dueDate ? (isOverdue ? '<span class="text-red-600 font-bold">'+escapeHtml(fmtDate(c.dueDate))+' ' + icon('warn', 12) + '</span>' : escapeHtml(fmtDate(c.dueDate))) : '<span class="text-gray-400">—</span>'}</td>
         <td class="p-3 text-center">
           <button onclick="viewClientHistory(${c.id})" class="text-blue-600 hover:text-blue-800 text-xs mr-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>View</button>
           ${c.phone ? `<button onclick="sendSMSReminder(${c.id})" class="text-green-600 hover:text-green-800 text-xs"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>SMS</button>` : ''}

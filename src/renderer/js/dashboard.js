@@ -1,4 +1,5 @@
 import { dbAdd, dbAll, dbPut } from './database.js'
+import { icon } from './icons.js';
 import { animateCount, dbLoad, escapeHtml, modal, toast } from './helpers.js'
 import { escHtml, openPrintWindow } from './printLayout.js'
 import { fmtDate, fmtDateTime, peso, state, today } from './state.js'
@@ -394,21 +395,21 @@ export async function loadWeather() {
     if (cache) {
       el.innerHTML = el.innerHTML.replace('<p class="text-xs text-gray-400 mt-1"><span class="pulse-soft">↻ refreshing...</span></p>', '');
     } else {
-      el.innerHTML = `<p class="text-xs text-gray-400 py-1">🌤 Weather unavailable — check internet or set location in Settings</p>`;
+      el.innerHTML = `<p class="text-xs text-gray-400 py-1">${icon('partly', 14)} Weather unavailable — check internet or set location in Settings</p>`;
     }
   }
 }
 
 export function getWeatherEmoji(code) {
   const codeNum = parseInt(code);
-  if (codeNum === 113) return '☀️';
-  if (codeNum >= 116 && codeNum <= 119) return '⛅';
-  if (codeNum >= 122 && codeNum <= 143) return '☁️';
-  if (codeNum >= 176 && codeNum <= 200) return '🌧️';
-  if (codeNum >= 227 && codeNum <= 230) return '🌨️';
-  if (codeNum >= 248 && codeNum <= 260) return '🌫️';
-  if (codeNum >= 263 && codeNum <= 389) return '⛈️';
-  return '🌤️';
+  if (codeNum === 113) return icon('sun', 28);
+  if (codeNum >= 116 && codeNum <= 119) return icon('partly', 28);
+  if (codeNum >= 122 && codeNum <= 143) return icon('cloud', 28);
+  if (codeNum >= 176 && codeNum <= 200) return icon('rain', 28);
+  if (codeNum >= 227 && codeNum <= 230) return icon('snow', 28);
+  if (codeNum >= 248 && codeNum <= 260) return icon('fog', 28);
+  if (codeNum >= 263 && codeNum <= 389) return icon('storm', 28);
+  return icon('partly', 28);
 }
 
 export const PH_HOLIDAYS_FALLBACK = {

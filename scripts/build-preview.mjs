@@ -14,6 +14,7 @@ const mob = (...p) => resolve(root, 'src', 'mobile', ...p);
 const sa = (...p) => resolve(root, 'src', 'mobile-standalone', ...p);
 
 const MODULES = [
+  ['mob', 'icons.js'],
   ['sa', 'store.js'],
   ['sa', 'driver-capacitor.js'],
   ['sa', 'preview-engine.js'],

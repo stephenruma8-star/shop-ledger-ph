@@ -126,7 +126,7 @@ async function fillBioUnlock(atBoot) {
   try {
     if (!pinBioEnabled() || !(await bioAvailable())) return;
     const slot = document.getElementById('bio-unlock-slot');
-    if (slot) slot.innerHTML = `<button onclick="unlockPhoneBio(${atBoot ? 'true' : 'false'})" class="w-full mt-2 py-2.5 rounded-xl text-sm font-semibold" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:#e2e8f0">👆 ${T('lock.bio_btn')}</button>`;
+    if (slot) slot.innerHTML = `<button onclick="unlockPhoneBio(${atBoot ? 'true' : 'false'})" class="w-full mt-2 py-2.5 rounded-xl text-sm font-semibold" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:#e2e8f0">${icon('tap', 14)} ${T('lock.bio_btn')}</button>`;
   } catch (e) {}
 }
 async function unlockPhoneBio(atBoot) {

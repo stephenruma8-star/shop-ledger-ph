@@ -20,7 +20,7 @@ async function renderClients() {
       <div class="flex gap-1.5 flex-wrap">
       <button onclick="showView('debts')" class="btn btn-ghost btn-sm flex-1"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>${T('view.debts.title')}</button>
       ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button onclick="importClientsCsv()" class="btn btn-ghost btn-sm flex-1"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Import</button>` : ''}
-      ${phoneRole() === 'cashier' ? '' : `<button onclick="exportClientsCsv()" class="btn btn-ghost btn-sm flex-1">📥 CSV</button>`}
+      ${phoneRole() === 'cashier' ? '' : `<button onclick="exportClientsCsv()" class="btn btn-ghost btn-sm flex-1">${icon('download', 14)} CSV</button>`}
       </div>
     </div>
     <div class="relative mb-3 fade-in">
@@ -135,22 +135,22 @@ async function openClientDetail(id) {
       </div>
       <div class="text-right shrink-0">
         <div class="font-bold num ${(c.balance || 0) <= 0 ? 'text-green-400' : 'text-orange-400'}">${peso(c.balance)}</div>
-        <div class="text-[11px] text-amber-400">★ ${c.loyaltyPoints || 0}</div>
+        <div class="text-[11px] text-amber-400">${icon('star', 11)} ${c.loyaltyPoints || 0}</div>
       </div>
       <button onclick="closeQuick()" aria-label="Close" class="w-9 h-9 rounded-xl btn-ghost flex items-center justify-center text-gray-400 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
     <div class="grid grid-cols-2 gap-2 mb-2">
       <button onclick="renderClientForm(${jsArg(c.id)})" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>${T('cli.edit')}</button>
-      <button onclick="shareClientStatement()" class="btn btn-ghost btn-sm">📤 ${T('cli.statement')}</button>
-      <button onclick="previewClientStatement()" class="btn btn-ghost btn-sm">🧾 Preview</button>
-      <button onclick="printClientStatement()" class="btn btn-ghost btn-sm">🖨 Print</button>
+      <button onclick="shareClientStatement()" class="btn btn-ghost btn-sm">${icon('upload', 14)} ${T('cli.statement')}</button>
+      <button onclick="previewClientStatement()" class="btn btn-ghost btn-sm">${icon('receipt', 14)} Preview</button>
+      <button onclick="printClientStatement()" class="btn btn-ghost btn-sm">${icon('printer', 14)} Print</button>
     </div>
     ${(c.loyaltyPoints || 0) >= 100 ? `<button id="redeem-btn" onclick="redeemClientPoints(${jsArg(c.id)})" class="btn btn-sm w-full mb-2" style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.5);color:#fbbf24"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>${T('cli.redeem')}</button>` : ''}
     <div class="grid grid-cols-2 gap-2 mb-3">
       <button onclick="closeQuick();showView('pay', ${jsArg(c.id)})" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>${T('cli.record_payment')}</button>
       <button onclick="closeQuick();startNewSale(${jsArg(c.id)})" class="btn btn-primary btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>${T('sale.new')}</button>
     </div>
-    ${phoneRole() === 'cashier' ? '' : `<button id="client-del-btn" onclick="deleteClient(${jsArg(c.id)})" class="btn btn-sm w-full mb-3" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);color:#f87171">🗑 Delete client</button>`}
+    ${phoneRole() === 'cashier' ? '' : `<button id="client-del-btn" onclick="deleteClient(${jsArg(c.id)})" class="btn btn-sm w-full mb-3" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);color:#f87171">${icon('trash', 14)} Delete client</button>`}
     <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">${T('cli.history_sales')}</h4>
     <div class="space-y-1.5 mb-3">
       ${(h.sales || []).slice(0, 20).map(t => `
@@ -173,7 +173,7 @@ async function openClientDetail(id) {
           <span class="text-gray-200">${fmtDate(p.date)} <span class="text-gray-500">· ${esc(p.type || '')}${p.referenceNo ? ' · #' + esc(p.referenceNo) : ''}</span></span>
           <span class="flex items-center gap-1.5">
             <span class="text-green-400 num shrink-0">-${peso(p.amount)}</span>
-            ${phoneRole() === 'cashier' ? '' : `<button onclick="renderPaymentEdit(${jsArg(p.id)}, ${jsArg(p.amount || 0)}, ${jsArg(p.referenceNo || '')}, ${jsArg(p.date || '')})" class="text-[11px] text-blue-400 px-1.5">✏️</button><button onclick="deletePayment(${jsArg(p.id)})" class="text-[11px] text-red-400 px-1.5">✕</button>`}
+            ${phoneRole() === 'cashier' ? '' : `<button onclick="renderPaymentEdit(${jsArg(p.id)}, ${jsArg(p.amount || 0)}, ${jsArg(p.referenceNo || '')}, ${jsArg(p.date || '')})" class="text-[11px] text-blue-400 px-1.5">${icon('edit', 12)}</button><button onclick="deletePayment(${jsArg(p.id)})" class="text-[11px] text-red-400 px-1.5">${icon('x', 12)}</button>`}
           </span>
         </div>`).join('') || `<p class="text-[11px] text-gray-500">${T('cli.no_history')}</p>`}
     </div>`;
@@ -384,8 +384,8 @@ async function previewClientStatement() {
         <h3 class="font-bold text-gray-100 text-sm mb-3">${esc((h.client && h.client.name) || '')} — statement</h3>
         <pre class="receipt-paper">${esc(text)}</pre>
         <div class="grid grid-cols-2 gap-2">
-          <button onclick="printClientStatement()" class="btn btn-primary btn-sm">🖨 Print</button>
-          <button onclick="shareClientStatement()" class="btn btn-ghost btn-sm">📤 Share</button>
+          <button onclick="printClientStatement()" class="btn btn-primary btn-sm">${icon('printer', 14)} Print</button>
+          <button onclick="shareClientStatement()" class="btn btn-ghost btn-sm">${icon('upload', 14)} Share</button>
         </div>
         <button onclick="openClientDetail(${jsArg(detailClientId)})" class="btn btn-ghost w-full mt-2">Back to client</button>
       </div>

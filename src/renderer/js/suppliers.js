@@ -1,5 +1,6 @@
 import { logAudit } from './auth.js'
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
+import { icon } from './icons.js';
 import { closeModal, confirmModal, dbLoad, debounce, escapeHtml, modal, pushUndo, requireFields, searchData, toast } from './helpers.js'
 import { now, peso, round2, state, today } from './state.js'
 
@@ -112,7 +113,7 @@ export async function showSupplierPaymentHistory(supplierId) {
       <td class="p-2 text-gray-500">${escapeHtml(p.referenceNo || '')}</td>
       <td class="p-2 text-gray-500">${escapeHtml(p.notes || '')}</td>
       <td class="p-2 font-medium ${runningBalance > 0 ? 'text-red-600' : 'text-green-600'}">${peso(runningBalance)}</td>
-      <td class="p-2 text-center whitespace-nowrap"><button onclick="editSupplierPayment(${p.id})" class="text-blue-500 hover:text-blue-700 text-xs mr-1" title="Edit payment">✎</button><button onclick="deleteSupplierPayment(${p.id})" class="text-red-500 hover:text-red-700 text-xs" title="Delete payment">✕</button></td>
+      <td class="p-2 text-center whitespace-nowrap"><button onclick="editSupplierPayment(${p.id})" class="text-blue-500 hover:text-blue-700 text-xs mr-1" title="Edit payment">${icon('edit', 12)}</button><button onclick="deleteSupplierPayment(${p.id})" class="text-red-500 hover:text-red-700 text-xs" title="Delete payment">${icon('x', 12)}</button></td>
     </tr>`;
   }).join('');
   modal(`

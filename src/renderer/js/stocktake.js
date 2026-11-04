@@ -1,4 +1,5 @@
 import { logAudit } from './auth.js'
+import { icon } from './icons.js';
 import { dbAll, dbGet, dbPut } from './database.js'
 import { confirmModal, dbLoad, escapeHtml, itemThumbHtml, toast, updateLowStockBadge } from './helpers.js'
 import { state } from './state.js'
@@ -104,7 +105,7 @@ export async function applyStockTake() {
   const resultEl = document.getElementById('st-results');
   resultEl.classList.remove('hidden');
   resultEl.innerHTML = `<div class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4 shadow-sm">
-    <h4 class="font-bold text-sm text-green-800 dark:text-green-300 mb-2">✓ Adjustments Applied</h4>
+    <h4 class="font-bold text-sm text-green-800 dark:text-green-300 mb-2">${icon('check', 14)} Adjustments Applied</h4>
     <table class="w-full text-xs"><thead><tr class="text-left text-green-700 dark:text-green-400"><th class="p-1">Item</th><th class="p-1 text-right">System</th><th class="p-1 text-right">Physical</th><th class="p-1 text-right">Change</th></tr></thead>
     <tbody>${diffs.map(d => `<tr class="border-b border-green-200 dark:border-green-800"><td class="p-1">${escapeHtml(d.item.name)}</td><td class="p-1 text-right">${d.sys}</td><td class="p-1 text-right font-bold">${d.phys}</td><td class="p-1 text-right font-bold ${d.diff >= 0 ? 'text-green-600' : 'text-red-600'}">${d.diff > 0 ? '+' : ''}${d.diff}</td></tr>`).join('')}</tbody></table>
   </div>`;

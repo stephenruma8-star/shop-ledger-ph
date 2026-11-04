@@ -798,6 +798,7 @@ function T(key, vars) {
   if (vars) {
     for (const k of Object.keys(vars)) s = String(s).split('{' + k + '}').join(vars[k]);
   }
+  s = String(s).replace(/\p{Extended_Pictographic}\uFE0F?\s*/gu, '');
   return s;
 }
 function setPhoneLang(v) {

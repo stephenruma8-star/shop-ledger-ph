@@ -36,7 +36,7 @@ function stocktakeListHTML(items) {
         <div class="text-sm font-medium truncate text-gray-200">${esc(i.name)}</div>
         <div class="text-[11px] text-gray-500">system: <span class="font-semibold text-gray-300">${sys}</span></div>
       </div>
-      <button onclick="photoForItem(${jsArg(i.id)})" title="${esc(T('photo.take'))}" class="btn btn-ghost btn-sm px-2 shrink-0">📷</button>
+      <button onclick="photoForItem(${jsArg(i.id)})" title="${esc(T('photo.take'))}" class="btn btn-ghost btn-sm px-2 shrink-0">${icon('camera', 14)}</button>
       <div class="flex items-center gap-1 shrink-0">
         <button onclick='stocktakeStep(${jsArg(i.id)},-1)' class="w-8 h-8 rounded-lg font-bold text-gray-200" style="background:rgba(30,41,59,.6);border:1px solid rgba(255,255,255,.09)">−</button>
         <span id="st-c-${esc(String(i.id))}" class="w-9 text-center text-sm font-bold text-gray-100 num">${counted}</span>

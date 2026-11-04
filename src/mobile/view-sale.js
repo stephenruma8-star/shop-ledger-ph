@@ -97,7 +97,7 @@ function renderSale(presetId) {
       <input id="counter-search" type="text" placeholder="${esc(T('sale.search_ph'))}" oninput="counterSearch(this.value)" autocomplete="off" class="inp pl-10" />
       <div id="counter-results" class="grid gap-1.5 mt-1.5"></div>
     </div>
-    ${(data.quickItems || []).length ? `<div class="flex gap-1.5 mb-3 fade-in overflow-x-auto" style="scrollbar-width:none">${data.quickItems.slice(0, 12).map((q, qi) => `<button onclick="quickAddItem(${qi})" class="shrink-0 px-3 py-2 rounded-xl text-xs font-semibold" style="background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);color:#93c5fd">${esc(q.name)} · ${peso(q.price)}</button>`).join('')}${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button onclick="managePresets()" class="shrink-0 px-3 py-2 rounded-xl text-xs font-semibold" style="background:rgba(255,255,255,.06);border:1px dashed rgba(255,255,255,.2);color:#94a3b8">⚙️ Presets</button>` : ''}</div>` : ''}
+    ${(data.quickItems || []).length ? `<div class="flex gap-1.5 mb-3 fade-in overflow-x-auto" style="scrollbar-width:none">${data.quickItems.slice(0, 12).map((q, qi) => `<button onclick="quickAddItem(${qi})" class="shrink-0 px-3 py-2 rounded-xl text-xs font-semibold" style="background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);color:#93c5fd">${esc(q.name)} · ${peso(q.price)}</button>`).join('')}${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button onclick="managePresets()" class="shrink-0 px-3 py-2 rounded-xl text-xs font-semibold" style="background:rgba(255,255,255,.06);border:1px dashed rgba(255,255,255,.2);color:#94a3b8">${icon('gear', 12)} Presets</button>` : ''}</div>` : ''}
     ${editingSaleInvoice ? `<div class="glass-card rounded-2xl p-3 mb-3 flex items-center justify-between gap-2 fade-in" style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4)"><span class="text-xs font-semibold text-amber-300">Editing ${esc(editingSaleInvoice)}</span><button onclick="cancelSaleEdit()" class="btn btn-ghost btn-sm">Cancel</button></div>` : ''}
     ${saleDraftBanner()}
     ${cartInsertAfter != null && cart[cartInsertAfter] ? `<div class="glass-card rounded-2xl p-2.5 mb-3 flex items-center justify-between gap-2 fade-in" style="background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.4)"><span class="text-xs font-semibold text-blue-300 truncate">${esc(T('sale.inserting_after', { name: cart[cartInsertAfter].name }))}</span><button onclick="cancelInsert()" class="btn btn-ghost btn-sm shrink-0">${esc(T('sale.cancel_insert'))}</button></div>` : ''}
@@ -744,7 +744,7 @@ function saleSuccessSheet(invoiceNo) {
   const v = document.getElementById('view');
   v.innerHTML = `
     <div class="glass-card rounded-2xl p-6 mt-10 text-center fade-in">
-      <div class="text-4xl mb-2">✅</div>
+      <div class="text-green-400 mb-2 flex justify-center">${icon('check', 40)}</div>
       <div class="text-lg font-bold text-gray-100 mb-1">${T('sale.success_title')}</div>
       <div class="text-sm text-gray-400 mb-4">${esc(invoiceNo || '')}</div>
       <button onclick="printSaleReceipt(this.dataset.inv)" data-inv="${escAttr(invoiceNo || '')}" class="btn btn-primary btn-lg mb-2"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>${T('sale.print')}</button>
@@ -840,7 +840,7 @@ function managePresets() {
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
       <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:94vh;max-height:94dvh;overflow-y:auto" onclick="event.stopPropagation()">
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
-        <h3 class="font-bold text-gray-100 text-sm mb-3">⚡ Quick-sale presets</h3>
+        <h3 class="font-bold text-gray-100 text-sm mb-3">${icon('zap', 14)} Quick-sale presets</h3>
         ${list}
         <div class="border-t border-white/10 mt-3 pt-3 space-y-2">
           <input id="preset-name" class="inp" maxlength="80" placeholder="Preset name" />

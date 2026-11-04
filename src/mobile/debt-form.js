@@ -107,7 +107,7 @@ function previewDebtForm(orientation) {
         <h3 class="font-bold text-gray-100 text-sm mb-3">Debt form (${orientation})</h3>
         ${frame}
         <div class="grid grid-cols-2 gap-2 mt-3">
-          <button onclick="shareDebtForm()" class="btn btn-primary btn-sm">📤 Save / Print</button>
+          <button onclick="shareDebtForm()" class="btn btn-primary btn-sm">${icon('upload', 14)} Save / Print</button>
           <button onclick="openDebtFormSetup()" class="btn btn-ghost btn-sm">← Back</button>
         </div>
       </div>

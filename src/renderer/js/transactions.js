@@ -1,4 +1,5 @@
 import { logAudit } from './auth.js'
+import { icon } from './icons.js';
 import { renderClientGrid } from './clients.js'
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
 import { calcInterest, closeModal, confirmModal, dbLoad, debounce, escapeHtml, filterByYear, intRateOptions, itemThumbHtml, modal, paginate, pushUndo, renderPagination, searchData, showUndoToast, toast, updateLowStockBadge } from './helpers.js'
@@ -699,7 +700,7 @@ export function viewTransactionDetail(id) {
         ${t.status !== 'voided' && t.status !== 'return' ? `<button onclick="closeModal();voidTransaction(${t.id})" class="btn btn-danger btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>Void</button>` : ''}
         <button onclick="closeModal()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1 -mt-0.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Close</button>
       </div>
-      ${t.status === 'voided' ? '<p class="text-center text-red-500 font-bold text-sm mt-2">⚠️ VOIDED</p>' : t.status === 'return' ? '<p class="text-center text-purple-500 font-bold text-sm mt-2">↩️ RETURN</p>' : ''}
+      ${t.status === 'voided' ? '<p class="text-center text-red-500 font-bold text-sm mt-2">' + icon('warn', 14) + ' VOIDED</p>' : t.status === 'return' ? '<p class="text-center text-purple-500 font-bold text-sm mt-2">' + icon('undo', 14) + ' RETURN</p>' : ''}
     </div>`);
 }
 

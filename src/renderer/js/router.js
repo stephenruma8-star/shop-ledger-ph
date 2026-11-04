@@ -1,4 +1,5 @@
 import { viewClients } from './clients.js'
+import { icon } from './icons.js';
 import { dbAll } from './database.js'
 import { viewExpenses } from './expenses.js'
 import { applyDailyInterest, checkCloudBackupDue, checkSmsReminderDue, closeModal, escapeHtml, focusPageSearch, populateYearSelector, saveCurrentModal, showShortcuts, toast, toggleTheme, updateLowStockBadge, updateNotifications } from './helpers.js'
@@ -51,7 +52,7 @@ export function renderViewError(root, route, title, err) {
     root.className = 'flex-1 overflow-auto p-6';
     root.innerHTML = `
       <div class="max-w-lg mx-auto mt-10 p-6 bg-white dark:bg-gray-800 rounded-xl border border-red-200 dark:border-red-900 shadow-sm text-center">
-        <p class="text-4xl mb-3">⚠️</p>
+        <p class="text-red-500 mb-3 flex justify-center">${icon('warn', 48)}</p>
         <h3 class="text-lg font-bold mb-1">Couldn't load ${escapeHtml(title || route)}</h3>
         <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">Something went wrong while opening this section. Your data is safe — details were saved to the app logs.</p>
         <pre class="text-left text-xs bg-gray-100 dark:bg-gray-900 rounded-lg p-3 mb-4 overflow-auto max-h-32 text-red-600 dark:text-red-400">${escapeHtml(msg)}</pre>

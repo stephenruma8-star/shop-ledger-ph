@@ -23,14 +23,14 @@ const PH_HOLIDAYS_FALLBACK = {
 };
 function weatherEmoji(code) {
   const n = parseInt(code);
-  if (n === 113) return '☀️';
-  if (n >= 116 && n <= 119) return '⛅';
-  if (n >= 122 && n <= 143) return '☁️';
-  if (n >= 176 && n <= 200) return '🌧️';
-  if (n >= 227 && n <= 230) return '🌨️';
-  if (n >= 248 && n <= 260) return '🌫️';
-  if (n >= 263 && n <= 389) return '⛈️';
-  return '🌤️';
+  if (n === 113) return icon('sun', 28);
+  if (n >= 116 && n <= 119) return icon('partly', 28);
+  if (n >= 122 && n <= 143) return icon('cloud', 28);
+  if (n >= 176 && n <= 200) return icon('rain', 28);
+  if (n >= 227 && n <= 230) return icon('snow', 28);
+  if (n >= 248 && n <= 260) return icon('fog', 28);
+  if (n >= 263 && n <= 389) return icon('storm', 28);
+  return icon('partly', 28);
 }
 function weatherLocGet() {
   try { return localStorage.getItem('slpWeatherLoc') || 'Manila'; } catch (e) { return 'Manila'; }
@@ -117,7 +117,7 @@ async function loadPhoneWeather() {
   } catch (e) {
     if (!cache || cache.temp == null) {
       const box = document.getElementById('weather-display');
-      if (box) box.innerHTML = '<p class="text-xs text-gray-400 py-1">🌤 Weather needs internet</p>';
+      if (box) box.innerHTML = '<p class="text-xs text-gray-400 py-1">' + icon('partly', 14) + ' Weather needs internet</p>';
     }
   }
 }
@@ -172,7 +172,7 @@ async function loadPhoneHolidays() {
     if (!nx) { el.innerHTML = '<p class="text-[11px] text-gray-500">No upcoming holidays</p>'; return; }
     const days = holidayDaysAway(nx.date, localTodayStr());
     el.innerHTML = `<button onclick="showPhoneHolidays()" class="w-full text-left">`
-      + `<p class="text-sm font-bold text-gray-200 truncate">🎉 ${esc(nx.localName || nx.name || 'Holiday')}</p>`
+      + `<p class="text-sm font-bold text-gray-200 truncate">${icon('calendar', 14)} ${esc(nx.localName || nx.name || 'Holiday')}</p>`
       + `<p class="text-[11px] text-gray-500">${esc(nx.date)}${days === 0 ? ' · today!' : days === 1 ? ' · tomorrow' : ' · in ' + days + ' days'}</p></button>`;
   } catch (e) {
     el.innerHTML = '<p class="text-[11px] text-gray-500">Holidays unavailable offline</p>';

@@ -36,8 +36,8 @@ function supplierListHTML(items) {
         <span class="chip chip-blue">${T('sup.bought', { amt: peso(s.purchased) })}</span>
         <span class="chip chip-green">${T('sup.paid', { amt: peso(s.paid) })}</span>
         ${(s.owed || 0) > 0 && phoneRole() !== 'cashier' ? `<button onclick="renderSupplierPay(${jsArg(s.id)})" class="btn btn-ghost btn-sm shrink-0">Pay</button>` : ''}
-        ${phoneRole() !== 'cashier' ? `<button onclick="renderSupplierForm(${jsArg(s.id)})" title="${esc(T('sup.edit'))}" class="btn btn-ghost btn-sm px-2 shrink-0">✏️</button>` : ''}
-        ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button onclick="deleteSupplier(${jsArg(s.id)})" id="sup-del-${s.id}" class="ml-auto text-[11px] text-red-400 px-2 py-1 rounded-lg shrink-0" style="background:rgba(239,68,68,.1)">🗑</button>` : ''}
+        ${phoneRole() !== 'cashier' ? `<button onclick="renderSupplierForm(${jsArg(s.id)})" title="${esc(T('sup.edit'))}" class="btn btn-ghost btn-sm px-2 shrink-0">${icon('edit', 14)}</button>` : ''}
+        ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button onclick="deleteSupplier(${jsArg(s.id)})" id="sup-del-${s.id}" class="ml-auto text-[11px] text-red-400 px-2 py-1 rounded-lg shrink-0" style="background:rgba(239,68,68,.1)">${icon('trash', 12)}</button>` : ''}
       </div>
     </div>`).join('');
 }

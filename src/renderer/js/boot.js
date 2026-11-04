@@ -1,4 +1,5 @@
 import '../tailwind.css'
+import { icon } from './icons.js';
 import { applyPermissions } from './auth.js'
 import { cfCart, cfRenderCart, ensureBalanceSnapshot } from './clients.js'
 import { completeUnlock, dbAdd, dbAll, dbPut, needDbPassword, openDB } from './database.js'
@@ -242,7 +243,7 @@ export async function checkForNewBuild() {
       if (currentVer) {
         const notes = ver.notes ? ' — ' + ver.notes : '';
         setTimeout(() => {
-          toast(`📦 New build v${ver.version} available${notes}. Go to Settings → Rebuild & Restart .exe`, 'info');
+          toast(`New build v${ver.version} available${notes}. Go to Settings → Rebuild & Restart .exe`, 'info');
         }, 2000);
       }
       if (existing) { existing.value = ver.version; await dbPut('settings', existing); }
@@ -268,7 +269,7 @@ export function promptDbUnlock() {
     panel.className = 'space-y-3';
     panel.innerHTML = `
       <div class="text-center mb-2">
-        <p class="text-5xl mb-3">🔒</p>
+        <p class="text-blue-400 mb-3 flex justify-center">${icon('lock', 48)}</p>
         <h2 class="text-xl font-bold text-gray-800 dark:text-white">Database Locked</h2>
         <p class="text-gray-500 dark:text-gray-400 text-sm mt-1">This database is encrypted. Enter the password to unlock it.</p>
       </div>
