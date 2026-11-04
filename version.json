@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.28",
+    "version":  "3.37.29",
     "buildDate":  "2026-11-04T00:00:00.000Z",
-    "notes":  "Shared inline-SVG icon set for desktop and phone: one source of symbols guarded against drift, phone emoji replaced with the same SVGs, and desktop date fields now use the phone's calendar glyph."
+    "notes":  "Colored icons: the shared symbol set now uses a per-symbol accent palette on both desktop and phone, while icons on solid buttons stay white for contrast."
 }

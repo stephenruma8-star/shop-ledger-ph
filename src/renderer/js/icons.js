@@ -50,9 +50,23 @@ export const SLP_ICONS = {
   wave: '<path d="M18 11V6a2 2 0 0 0-4 0v5"/><path d="M14 10V4a2 2 0 0 0-4 0v6"/><path d="M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2a8 8 0 0 1-8-8 2 2 0 1 1 4 0"/>',
   bulb: '<path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2z"/>'
 };
-export function icon(name, size, cls) {
+// Per-symbol accent colours (kept identical to the phone copy; guarded by
+// scripts/check-icons.mjs). Solid/white buttons override these to white via CSS.
+export const SLP_ICON_COLORS = {
+  check: '#22c55e', x: '#ef4444', star: '#f59e0b', plus: '#22c55e', warn: '#f59e0b',
+  upload: '#38bdf8', download: '#60a5fa', printer: '#f59e0b', box: '#f59e0b', trash: '#ef4444',
+  edit: '#38bdf8', cloud: '#94a3b8', sun: '#fbbf24', moon: '#a78bfa', partly: '#fbbf24',
+  rain: '#60a5fa', snow: '#93c5fd', fog: '#94a3b8', storm: '#a78bfa', hourglass: '#f59e0b',
+  undo: '#fb923c', arrowUp: '#22c55e', arrowDown: '#ef4444', camera: '#a78bfa', calendar: '#60a5fa',
+  file: '#94a3b8', help: '#38bdf8', clipboard: '#f59e0b', eye: '#38bdf8', receipt: '#60a5fa',
+  refresh: '#22c55e', tap: '#a78bfa', mail: '#38bdf8', cash: '#22c55e', tag: '#a78bfa',
+  rocket: '#f97316', gear: '#94a3b8', zap: '#facc15', save: '#60a5fa', lock: '#f59e0b',
+  keyboard: '#94a3b8', coins: '#fbbf24', phone: '#38bdf8', dot: '#60a5fa', wave: '#fbbf24', bulb: '#facc15'
+};
+export function icon(name, size, cls, color) {
   const body = SLP_ICONS[name];
   if (!body) return '';
   const s = size || 16;
-  return '<svg xmlns="http://www.w3.org/2000/svg" width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="' + (cls || 'shrink-0') + '">' + body + '</svg>';
+  const c = color || SLP_ICON_COLORS[name] || 'currentColor';
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="' + (cls || 'shrink-0') + '" style="color:' + c + '">' + body + '</svg>';
 }
