@@ -602,7 +602,7 @@ export function buildReceiptHTML(t) {
     const iDate = item.date || t.date;
     const days = rate > 0 && sub > 0 ? Math.max(1, Math.floor((new Date(today()) - new Date(iDate)) / 86400000)) : 0;
     const intr = days > 0 ? calcInterest(sub, rate, days) : 0;
-    lines.push((qt + '/' + (item.description || item.name || 'Item')) + (rate > 0 ? ` (${rate}%/yr, ${days}d)` : ''));
+    lines.push((qt + '/' + (item.description || item.name || 'Item')) + (rate > 0 ? ` (${rate}%/mo, ${days}d)` : ''));
     lines.push(`  ${qt} x ${peso(item.unitCost || item.price)}  ${peso(sub + intr)}`);
   });
   lines.push('-'.repeat(32));
@@ -644,7 +644,7 @@ export async function printThermalReceipt(id) {
     const qt = getQty(item.name || String(item.qty || 1));
     const sub = qt * (item.unitCost || item.price || 0);
     const rate = item.intRate != null ? item.intRate : 0;
-    lines.push({ text: (item.description || item.name || 'Item') + (rate > 0 ? ' (' + rate + '%/yr)' : '') });
+    lines.push({ text: (item.description || item.name || 'Item') + (rate > 0 ? ' (' + rate + '%/mo)' : '') });
     lines.push({ text: '  ' + qt + ' x ' + peso(item.unitCost || item.price) + '      ' + peso(sub) });
   });
   lines.push({ t: 'divider' });

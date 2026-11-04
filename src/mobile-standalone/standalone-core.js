@@ -3,7 +3,7 @@
 // names and response shapes as the LAN client, so every shared view works
 // unchanged. No imports/exports: concatenated. Requires store.js first.
 const IS_STANDALONE = true;
-const STANDALONE_VERSION = '4.8.41';
+const STANDALONE_VERSION = '4.8.42';
 function isNativeApp() {
   try { return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); } catch (e) { return false; }
 }
@@ -61,9 +61,8 @@ function datePickBtn(targetId) {
     + '<input type="date" aria-label="Pick a date" onchange="' + onchange + '" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer" />'
     + '</span>';
 }
-// Line interest: rate is %/YEAR, compounded daily from the line date to today
-// (min 1 day): sub * ((1 + rate/100/365)^days - 1). Matches the loan document
-// convention (e.g. 3%/yr compound for 160 days on 20,000 = 264.74).
+// Line interest: rate is %/MONTH, prorated by whole days from the line date
+// (min 1 day): sub * rate/100 * days/30.
 function lineIntCalc(sub, rate, dateStr, todayStr) {
   sub = Number(sub) || 0; rate = Number(rate) || 0;
   if (!sub || !rate) return 0;
@@ -72,7 +71,7 @@ function lineIntCalc(sub, rate, dateStr, todayStr) {
   let days = Math.floor((new Date(t) - new Date(d)) / 86400000);
   if (isNaN(days)) return 0;
   days = Math.max(1, days);
-  return Math.round(sub * (Math.pow(1 + rate / 100 / 365, days) - 1) * 100) / 100;
+  return Math.round(sub * (rate / 100) * (days / 30) * 100) / 100;
 }
 function fmtDate(d) {
   if (!d) return '';

@@ -290,7 +290,7 @@ async function _apiInterestApply() {
     for (const c of clients) {
       const rate = await _clientRate(c.id);
       if (!(rate > 0)) continue;
-      const interest = Math.round((c.balance || 0) * (Math.pow(1 + rate / 100 / 365, days) - 1) * 100) / 100;
+      const interest = Math.round((c.balance || 0) * (rate / 100) * (days / 30) * 100) / 100;
       if (!(interest > 0)) continue;
       await db.run('UPDATE clients SET balance = ? WHERE id = ?', [_r2((c.balance || 0) + interest), c.id]);
       applied++;
@@ -304,69 +304,6 @@ async function _apiInterestApply() {
   if (applied > 0) await _audit('interest', 'Daily interest applied to ' + applied + ' client(s) over ' + days + ' day(s) (phone)');
   _bump();
   return { success: true, applied, days };
-}
-
-// One-time migration: after the app updates to the ANNUAL-compound interest
-// model, rewrite each historical sale's sale-time interest (computed under the
-// old monthly formula) to the new formula, and lower the affected client's
-// balance by the difference. Only ever reduces debt (the old formula charged
-// more), and is idempotent via the interestModelVersion setting so it runs once.
-const INTEREST_MODEL_VERSION = '2';
-async function _migrateAnnualInterest() {
-  const db = _db();
-  const s = await _settingsMap();
-  if (String(s.interestModelVersion || '') === INTEREST_MODEL_VERSION) {
-    return { success: true, corrected: 0, already: true };
-  }
-  const txns = await db.all("SELECT * FROM transactions WHERE status NOT IN ('voided','return')", []);
-  let corrected = 0;
-  const touched = new Set();
-  for (const t of txns) {
-    if (!(parseFloat(t.totalInterest) > 0)) continue;
-    const items = _parseJson(t.items, []);
-    if (!items.length) continue;
-    // Interest was computed as of the sale (or its last edit), so use that day
-    // as "today" when recomputing the line's window.
-    const refDate = String(t.editedAt || t.date || (t.createdAt || '').slice(0, 10)).slice(0, 10);
-    let newInt = 0, changed = false;
-    const newItems = items.map(it => {
-      const rate = parseFloat(it.intRate) || 0;
-      const qty = parseFloat(it.qty) || 1;
-      const unit = parseFloat(it.unitCost || it.price) || 0;
-      const sub = qty * unit;
-      if (!(rate > 0) || !(sub > 0)) return it;
-      const lineDate = String(it.date || refDate).slice(0, 10);
-      let days = Math.floor((new Date(refDate) - new Date(lineDate)) / 86400000);
-      if (!isFinite(days) || days < 1) days = 1;
-      const nInt = _r2(sub * (Math.pow(1 + rate / 100 / 365, days) - 1));
-      newInt += nInt;
-      const nAmt = _r2(sub + nInt);
-      if (Math.abs(nAmt - (parseFloat(it.amount) || 0)) > 0.004) changed = true;
-      return Object.assign({}, it, { amount: nAmt });
-    });
-    if (!changed) continue;
-    newInt = _r2(newInt);
-    const disc = parseFloat(t.discount) || 0;
-    const newGT = Math.max(0, _r2((parseFloat(t.subtotal) || 0) + newInt - disc));
-    const delta = _r2(newGT - (parseFloat(t.grandTotal) || 0));
-    await db.run('UPDATE transactions SET items = ?, totalInterest = ?, grandTotal = ? WHERE id = ?',
-      [JSON.stringify(newItems), newInt, newGT, t.id]);
-    const added = t.balanceAdded !== undefined ? !!t.balanceAdded : (t.clientId && t.paymentMethod !== 'Cash');
-    if (added && t.clientId && delta !== 0) {
-      const c = await db.get('SELECT * FROM clients WHERE id = ?', [t.clientId]);
-      if (c) {
-        await db.run('UPDATE clients SET balance = ? WHERE id = ?', [_r2(Math.max(0, (c.balance || 0) + delta)), c.id]);
-        touched.add(t.clientId);
-      }
-    }
-    corrected++;
-  }
-  const row = await db.get("SELECT id FROM settings WHERE key = 'interestModelVersion'", []);
-  if (row) await db.run('UPDATE settings SET value = ? WHERE id = ?', [INTEREST_MODEL_VERSION, row.id]);
-  else await db.run("INSERT INTO settings (key, value) VALUES ('interestModelVersion', ?)", [INTEREST_MODEL_VERSION]);
-  if (corrected) await _audit('interest-model', 'Corrected ' + corrected + ' legacy sale(s) to annual-compound interest (phone)');
-  _bump();
-  return { success: true, corrected, clients: touched.size };
 }
 
 // ---------- inventory ----------
@@ -571,7 +508,7 @@ async function _applySale(body) {
     const invoiceNo = await _nextInvoiceNo(db);
     const today = _todayStr();
     const lineSub = (i) => ((i.qty || 1) * (i.unitCost || 0));
-    // Rate is %/YEAR, compounded daily from the line date (min 1 day).
+    // Rate is %/MONTH, prorated by whole days from the line date (min 1 day).
     const lineInt = (i) => {
       const rate = parseFloat(i.intRate) || 0;
       if (!rate || !lineSub(i)) return 0;
@@ -579,7 +516,7 @@ async function _applySale(body) {
       let days = Math.floor((new Date(today) - new Date(d)) / 86400000);
       if (isNaN(days)) return 0;
       days = Math.max(1, days);
-      return _r2(lineSub(i) * (Math.pow(1 + rate / 100 / 365, days) - 1));
+      return _r2(lineSub(i) * (rate / 100) * (days / 30));
     };
     const subtotal = items.reduce((s, i) => s + lineSub(i), 0);
     const totalInterest = _r2(items.reduce((s, i) => s + lineInt(i), 0));
@@ -741,7 +678,7 @@ async function _apiSaleEdit(ref, body) {
     let days = Math.floor((new Date(today) - new Date(dstr)) / 86400000);
     if (isNaN(days)) days = 1;
     days = Math.max(1, days);
-    return _r2(lineSub(i) * (Math.pow(1 + rate / 100 / 365, days) - 1));
+    return _r2(lineSub(i) * (rate / 100) * (days / 30));
   };
   const subtotal = _r2(items.reduce((s, i) => s + lineSub(i), 0));
   const totalInterest = _r2(items.reduce((s, i) => s + lineInt(i), 0));
@@ -1640,7 +1577,6 @@ async function localApi(method, rawPath, body) {
   if (head === 'audit' && m === 'GET') return _apiAudit(query);
   if (head === 'sms-reminders' && m === 'POST') return _apiSms();
   if (head === 'interest' && m === 'POST' && parts[1] === 'apply') return _apiInterestApply();
-  if (head === 'interest' && m === 'POST' && parts[1] === 'migrate') return _migrateAnnualInterest();
   if (head === 'backup' && parts[1] === 'export' && m === 'GET') return _apiBackupExport();
   if (head === 'backup' && parts[1] === 'import' && m === 'POST') return _apiBackupImport(body);
   if (head === 'alerts' && m === 'GET') {

@@ -26,8 +26,8 @@ const _d = new Date();
 const TODAY = _d.getFullYear() + '-' + String(_d.getMonth() + 1).padStart(2, '0') + '-' + String(_d.getDate()).padStart(2, '0');
 const _m = new Date(_d.getTime() - 30 * 86400000);
 const MONTH_AGO = _m.getFullYear() + '-' + String(_m.getMonth() + 1).padStart(2, '0') + '-' + String(_m.getDate()).padStart(2, '0');
-ok(lineInterest(30, 10, TODAY, TODAY) === 0.01, 'LAN sale interest is annual-compound (same day)');
-ok(lineInterest(100, 10, MONTH_AGO, TODAY) === 0.83, 'LAN sale interest compounds over 30 days');
+ok(lineInterest(30, 10, TODAY, TODAY) === 0.1, 'LAN sale interest is monthly-prorated (same day)');
+ok(lineInterest(100, 10, MONTH_AGO, TODAY) === 10, 'LAN sale interest prorates over 30 days');
 ok(lineInterest(100, 0, MONTH_AGO, TODAY) === 0, 'LAN sale interest ignores zero rate');
 await invoke('db-migrate', { dump: {
   clients: [{ id: 1, name: 'Aling Nena', balance: 125.5 }, { id: 2, name: 'Mang Jose', balance: 10 }],

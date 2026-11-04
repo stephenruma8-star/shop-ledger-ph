@@ -128,7 +128,7 @@ export function openQuickSaleModal(id) {
             <option>Cash</option><option>GCash</option><option>Maya</option><option>Bank Transfer</option>
           </select>
         </div>
-        <div><label class="text-xs text-gray-500 block">Interest (%/yr)</label>
+        <div><label class="text-xs text-gray-500 block">Interest (%/mo)</label>
           <select id="qs-interest" onchange="qsUpd()" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm">
             ${INT_RATES.map(r => `<option value="${r}" ${r === '0' ? 'selected' : ''}>${r === '0' ? '0 (Cash sale)' : r + '%'}</option>`).join('')}
           </select>
@@ -250,7 +250,7 @@ function cartLineHtml(l, i) {
     <span class="w-8 h-8 rounded overflow-hidden flex items-center justify-center bg-gray-100 dark:bg-gray-700 shrink-0">${inv?.image ? `<img src="${inv.image}" alt="" class="w-full h-full object-cover" />` : '<span class="text-base">📦</span>'}</span>
     <div class="min-w-0 flex-1">
       <div class="text-xs font-medium truncate">${escapeHtml(inv?.name || 'Item')}${l.variantName ? ` <span class="text-gray-400">(${escapeHtml(l.variantName)})</span>` : ''}</div>
-      <div class="text-[10px] text-gray-400">${peso(l.unitCost)} each${l.intRate > 0 ? ' · ' + l.intRate + '%/yr' : ''}</div>
+      <div class="text-[10px] text-gray-400">${peso(l.unitCost)} each${l.intRate > 0 ? ' · ' + l.intRate + '%/mo' : ''}</div>
     </div>
     <div class="flex items-center gap-1">
       <button onclick="qsCartStep(${i},-1)" class="w-6 h-6 rounded border dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm leading-none">-</button>
@@ -292,7 +292,7 @@ export function renderCartPanel() {
             <option>Cash</option><option>GCash</option><option>Maya</option><option>Bank Transfer</option>
           </select>
         </div>
-        <div><label class="text-xs text-gray-500 block">Interest (%/yr, all lines)</label>
+        <div><label class="text-xs text-gray-500 block">Interest (%/mo, all lines)</label>
           <select id="qs-cart-interest" onchange="qsCartInterest(this.value)" class="w-full px-2 py-1.5 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-xs">
             ${INT_RATES.map(r => `<option value="${r}" ${r === '0' ? 'selected' : ''}>${r === '0' ? '0 (Cash sale)' : r + '%'}</option>`).join('')}
           </select>

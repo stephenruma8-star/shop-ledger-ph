@@ -346,12 +346,12 @@ async function runStandaloneAudit() {
     const idx = cart.length - 1;
     cartLineRate(idx, 10);
     const sameDay = document.getElementById('mc-amt-' + idx).textContent;
-    if (sameDay !== peso(300.08)) throw new Error('same-day should accrue 1 day of annual interest, got ' + sameDay);
+    if (sameDay !== peso(301)) throw new Error('same-day should accrue rate/30, got ' + sameDay);
     const d = new Date(); const b = new Date(d.getFullYear(), d.getMonth(), d.getDate() - 30);
     const p2 = (x) => String(x).padStart(2, '0');
     cartLineDate(idx, b.getFullYear() + '-' + p2(b.getMonth() + 1) + '-' + p2(b.getDate()));
     const backdated = document.getElementById('mc-amt-' + idx).textContent;
-    if (backdated !== peso(302.48)) throw new Error('30-day 10% should compound, got ' + backdated);
+    if (backdated !== peso(330)) throw new Error('30-day 10% should be full rate, got ' + backdated);
     cart.length = n;
     showView('home');
   });
