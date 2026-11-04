@@ -24,13 +24,23 @@ async function renderPay(preselectedId) {
           <button onclick="setAmt(1000)" class="btn btn-ghost btn-sm">+₱1000</button>
           <button onclick="setAmt('full')" class="btn btn-sm" style="background:rgba(59,130,246,.18);color:#60a5fa;border:1px solid rgba(59,130,246,.35)">${T('pay.full')}</button>
         </div>
-        <div>
-          <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('pay.method')}</label>
-          <select id="pay-type" class="inp"><option>Cash</option><option>GCash</option><option>Maya</option><option>Bank Transfer</option></select>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('pay.kind')}</label>
+            <select id="pay-kind" class="inp"><option>Partial</option><option>Full</option></select>
+          </div>
+          <div>
+            <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('pay.method')}</label>
+            <select id="pay-method" class="inp"><option>Cash</option><option>GCash</option><option>Maya</option><option>Bank Transfer</option></select>
+          </div>
         </div>
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">Reference # (GCash/Maya/Bank, optional)</label>
           <input id="pay-ref" type="text" maxlength="40" placeholder="e.g. 1234 567 890" autocomplete="off" class="inp" />
+        </div>
+        <div>
+          <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('pay.notes')}</label>
+          <textarea id="pay-notes" rows="2" maxlength="300" placeholder="" class="inp"></textarea>
         </div>
         <div style="height:2rem"></div>
       </div>
@@ -43,22 +53,25 @@ async function renderPay(preselectedId) {
 function setAmt(val) {
   const input = document.getElementById('pay-amount');
   if (!input) return;
-  if (val === 'full') { const sel = document.getElementById('pay-client'); const id = sel ? parseInt(sel.value) : NaN; const c = data.clients.find(x => String(x.id) === String(id)); input.value = c ? (c.balance || 0).toFixed(2) : ''; }
+  if (val === 'full') { const sel = document.getElementById('pay-client'); const id = sel ? parseInt(sel.value) : NaN; const c = data.clients.find(x => String(x.id) === String(id)); input.value = c ? (c.balance || 0).toFixed(2) : ''; const k = document.getElementById('pay-kind'); if (k) k.value = 'Full'; }
   else input.value = ((parseFloat(input.value) || 0) + val).toFixed(2);
 }
 async function submitPay() {
   const sel = document.getElementById('pay-client');
   const amtEl = document.getElementById('pay-amount');
-  const typeEl = document.getElementById('pay-type');
-  if (!sel || !amtEl || !typeEl) return toast(T('pay.fill'), 'err');
+  const kindEl = document.getElementById('pay-kind');
+  const methodEl = document.getElementById('pay-method');
+  if (!sel || !amtEl) return toast(T('pay.fill'), 'err');
   const clientId = parseInt(sel.value);
   const amount = parseFloat(amtEl.value);
-  const type = typeEl.value;
+  const type = kindEl ? kindEl.value : 'Partial';
+  const paymentMethod = methodEl ? methodEl.value : 'Cash';
   const referenceNo = ((document.getElementById('pay-ref') || {}).value || '').trim().slice(0, 40);
+  const notes = ((document.getElementById('pay-notes') || {}).value || '').trim().slice(0, 300);
   if (!clientId || !(amount > 0)) return toast(T('pay.fill'), 'err');
   if (!takeSubmitLock('pay')) return;
   try {
-    const r = await apiPost('/api/payments', { clientId, amount, type, referenceNo, date: validDateStr((document.getElementById('pay-date') || {}).value) || phoneToday() });
+    const r = await apiPost('/api/payments', { clientId, amount, type, paymentMethod, notes, referenceNo, date: validDateStr((document.getElementById('pay-date') || {}).value) || phoneToday() });
     if (r.queued) toast(T('pay.queued'), 'ok');
     else toast(T('pay.ok'), 'ok');
     showView('home'); await refreshAll();

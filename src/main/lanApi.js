@@ -1074,13 +1074,15 @@ function createLanApiRouter(deps) {
     const amt = JSON.stringify(amtNum);
     const payType = JSON.stringify(amtNum > 0 ? (type === 'Full' || type === 'Partial' ? type : null) : null);
     const referenceNo = String((req.body && req.body.referenceNo) || '').trim().slice(0, 40);
+    const notes = String((req.body && req.body.notes) || '').trim().slice(0, 300);
+    const paymentMethod = String((req.body && req.body.paymentMethod) || '').trim().slice(0, 20);
     const safeDate = sanitize(date) || new Date().toISOString().split('T')[0];
     await deps.rendererExec(`
       (async () => {
         const c = await dbGet('clients', ${cId});
         const balBefore = c ? (c.balance || 0) : 0;
         const pt = ${payType} || (${amt} >= balBefore ? 'Full' : 'Partial');
-        await dbAdd('payments', { clientId: ${cId}, amount: ${amt}, type: pt, date: ${JSON.stringify(safeDate)}, notes: ${JSON.stringify('')}, referenceNo: ${JSON.stringify(referenceNo)}, createdAt: new Date().toISOString() });
+        await dbAdd('payments', { clientId: ${cId}, amount: ${amt}, type: pt, date: ${JSON.stringify(safeDate)}, notes: ${JSON.stringify(notes)}, referenceNo: ${JSON.stringify(referenceNo)}, paymentMethod: ${JSON.stringify(paymentMethod)}, createdAt: new Date().toISOString() });
         if (c) await dbPut('clients', { ...c, balance: Math.max(0, balBefore - ${amt}) });
         try { await logAudit('payment', 'Mobile payment ' + (c ? c.name : 'client') + ' - ₱' + (Number(${amt})).toFixed(2) + ${JSON.stringify(devTag(req))}); } catch (e) {}
         return { success: true };

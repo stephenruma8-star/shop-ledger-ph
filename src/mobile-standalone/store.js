@@ -92,6 +92,11 @@ async function initStore(driver) {
     if (!cols.some(c => c.name === 'appliedAmount')) {
       await db.exec('ALTER TABLE payments ADD COLUMN appliedAmount REAL DEFAULT NULL');
     }
+    // paymentMethod: how the money arrived (Cash/GCash/Maya/Bank) - separate
+    // from `type` which is Partial/Full, matching the desktop ledger.
+    if (!cols.some(c => c.name === 'paymentMethod')) {
+      await db.exec('ALTER TABLE payments ADD COLUMN paymentMethod TEXT');
+    }
   } catch (e) {}
   return true;
 }
@@ -913,19 +918,21 @@ async function _apiReturns(body) {
 async function _apiPayments(method, parts, body) {
   const db = _db();
   if (method === 'POST' && parts.length === 0) {
-    const { clientId, amount, type, date, referenceNo } = body || {};
+    const { clientId, amount, type, date, referenceNo, notes, paymentMethod } = body || {};
     if (!_validateAmount(amount)) throw _apiErr(400, 'Valid amount required');
     if (clientId && typeof clientId !== 'number' && typeof clientId !== 'string') throw _apiErr(400, 'Invalid client ID');
     const amtNum = _r2(amount);
     if (amtNum <= 0) throw _apiErr(400, 'Amount must be greater than 0');
     const safeDate = _sanitize(date) || _todayStr();
     const ref = String(referenceNo || '').trim().slice(0, 40);
+    const note = String(notes || '').trim().slice(0, 300);
+    const pm = String(paymentMethod || '').trim().slice(0, 20);
     const c = clientId ? await db.get('SELECT * FROM clients WHERE id = ?', [clientId]) : null;
     const balBefore = c ? (c.balance || 0) : 0;
     const pt = (type === 'Full' || type === 'Partial' || type === 'Settle') ? type : (amtNum >= balBefore ? 'Full' : 'Partial');
     const applied = c ? Math.min(amtNum, Math.max(0, balBefore)) : amtNum;
-    await db.run('INSERT INTO payments (clientId, amount, appliedAmount, type, date, notes, referenceNo, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [clientId || null, amtNum, applied, pt, safeDate, '', ref, new Date().toISOString()]);
+    await db.run('INSERT INTO payments (clientId, amount, appliedAmount, type, date, notes, referenceNo, paymentMethod, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [clientId || null, amtNum, applied, pt, safeDate, note, ref, pm, new Date().toISOString()]);
     if (c) await db.run('UPDATE clients SET balance = ? WHERE id = ?', [_r2(Math.max(0, balBefore - amtNum)), c.id]);
     await _audit('payment', 'Mobile payment ' + (c ? c.name : 'client') + ' - ₱' + amtNum.toFixed(2) + ' (phone)');
     _bump();

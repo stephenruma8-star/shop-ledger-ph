@@ -375,15 +375,18 @@ try {
   const payHtml = getEl('view').innerHTML;
   ok(payHtml.includes('Record Payment') && payHtml.includes('Maria Santos'), 'pay view rendered with preselected client');
   ok(payHtml.includes('id="pay-date"'), 'pay view has an editable payment date field');
+  ok(payHtml.includes('id="pay-kind"') && payHtml.includes('id="pay-method"') && payHtml.includes('id="pay-notes"'), 'pay view has Type + Method + Notes fields');
   getEl('pay-client').value = '1';
   getEl('pay-amount').value = '100';
-  getEl('pay-type').value = 'GCash';
+  getEl('pay-kind').value = 'Partial';
+  getEl('pay-method').value = 'GCash';
+  getEl('pay-notes').value = 'half payment';
   getEl('pay-date').value = '2026-11-04';
   const beforePayPosts = posts.length;
   await gcall(`submitPay()`);
   const payPost = posts[beforePayPosts];
   ok(payPost && payPost.path === '/api/payments', 'payment posted to POST /api/payments');
-  if (payPost) ok(payPost.body.clientId === 1 && payPost.body.amount === 100 && payPost.body.type === 'GCash' && payPost.body.date === '2026-11-04', 'payment payload includes the chosen date');
+  if (payPost) ok(payPost.body.clientId === 1 && payPost.body.amount === 100 && payPost.body.type === 'Partial' && payPost.body.paymentMethod === 'GCash' && payPost.body.notes === 'half payment' && payPost.body.date === '2026-11-04', 'payment payload includes type, method, notes and the chosen date');
 
   // WS live-update path: 'update' triggers data refresh + home re-render stays live
   const ws = gget('ws');

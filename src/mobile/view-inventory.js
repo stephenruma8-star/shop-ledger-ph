@@ -1,8 +1,12 @@
 // ---------- INVENTORY ----------
 let invFilter = 'all';
+let invShown = 40;
+let invSearch = '';
 async function renderInventory() {
   const v = document.getElementById('view');
   invFilter = 'all';
+  invShown = 40;
+  invSearch = '';
   const low = data.inventory.filter(i => (i.stock || 0) <= (i.lowStock || 5)).length;
   const todayStr = phoneToday();
   const expiring = (data.inventory || []).filter(i => {
@@ -33,7 +37,9 @@ ${phoneRole() === 'cashier' ? '' : `<button onclick="showView('stocktake')" clas
 }
 function invListHTML(items) {
   const soon = Date.now() + 30 * 86400000;
-  return items.map(i => {
+  const shown = items.slice(0, invShown);
+  const more = items.length - shown.length;
+  return shown.map(i => {
     const stock = i.stock || 0;
     const exp = i.expiryDate ? new Date(i.expiryDate + 'T00:00:00').getTime() : null;
     const expSoon = exp && !isNaN(exp) && exp < soon;
@@ -49,7 +55,14 @@ function invListHTML(items) {
       <button onclick="photoForItem(${jsArg(i.id)})" title="${esc(T('photo.take'))}" class="btn btn-ghost btn-sm px-2">${icon('camera', 14)}</button>
       ${phoneRole() === 'cashier' ? '' : `<button onclick="renderItemForm(${jsArg(i.id)})" title="${esc(T('inv.edit'))}" class="btn btn-ghost btn-sm px-2">${icon('edit', 14)}</button>`}
     </div>`;
-  }).join('');
+  }).join('') + (more > 0 ? `<button onclick="invMore()" class="btn btn-ghost w-full mt-1">${T('inv.show_more', { n: more })}</button>` : '');
+}
+function invMore() {
+  invShown += 40;
+  const g = document.getElementById('inv-grid');
+  const items = invFilterItems().filter(i => (i.name || '').toLowerCase().includes(invSearch));
+  if (g) g.innerHTML = invListHTML(items);
+  loadValuation();
 }
 function invExpiringItems() {
   const todayStr = phoneToday();
@@ -70,6 +83,7 @@ function invFilterItems() {
   return data.inventory || [];
 }
 function paintInvFilter(items, note, emptyText) {
+  invShown = 40;
   const g = document.getElementById('inv-grid');
   const n = document.getElementById('inv-filter-note');
   if (g) g.innerHTML = items.length ? invListHTML(items) : `<div class="text-center text-gray-500 py-10 fade-in"><p class="text-sm">${esc(emptyText)}</p></div>`;
@@ -94,6 +108,8 @@ function showAllInv() {
 }
 function filterInventory(q) {
   q = (q || '').toLowerCase();
+  invSearch = q;
+  invShown = 40;
   const g = document.getElementById('inv-grid');
   const items = invFilterItems().filter(i => (i.name || '').toLowerCase().includes(q));
   if (g) g.innerHTML = invListHTML(items);
@@ -123,7 +139,7 @@ async function loadValuation() {
     </div>`;
   } catch (e) {}
 }
-function renderItemForm(id) {
+function renderItemForm(id, prefillBarcode) {
   if (phoneRole() === 'cashier') return toast(T('nav.owner_only'), 'err');
   const it = id ? (data.inventory || []).find(i => String(i.id) === String(id)) : null;
   const vs = (it && it.variants) || [];
@@ -144,7 +160,7 @@ function renderItemForm(id) {
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('inv.barcode')}</label>
-              <input id="if-barcode" type="text" maxlength="40" value="${escAttr(it?.barcode || '')}" class="inp" />
+              <input id="if-barcode" type="text" maxlength="40" value="${escAttr(it?.barcode || prefillBarcode || '')}" class="inp" />
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('inv.sell')}</label>

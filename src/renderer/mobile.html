@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="theme-color" content="#0f172a" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' http: https: ws: wss: blob:; media-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'" />
 <meta name="description" content="Shop Ledger PH - Mobile companion for sari-sari stores" />
 <link rel="manifest" href="/manifest.webmanifest" />
 <link rel="icon" type="image/png" sizes="192x192" href="/assets/pwa-192.png" />
@@ -328,12 +329,41 @@ function isNativeApp() {
 function nativePlugin(name) {
   try { return (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins[name]) || null; } catch (e) { return null; }
 }
+// LAN sync is plain HTTP to the shop PC. Cleartext is allowed only for the
+// local network: a saved http:// server URL with a public host is rejected
+// (https:// stays allowed for any host, e.g. a Tailscale tunnel).
+function isPrivateHost(host) {
+  const h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '');
+  if (!h) return false;
+  if (h === 'localhost' || h.endsWith('.local') || h === '10.0.2.2') return true;
+  const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (m) {
+    const a = +m[1], b = +m[2];
+    if (a === 10 || a === 127) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 169 && b === 254) return true;
+    return false;
+  }
+  if (h.includes(':')) return h === '::1' || h.startsWith('fe80:') || h.startsWith('fc') || h.startsWith('fd');
+  return false;
+}
+function safeServerUrl(raw) {
+  const u = String(raw || '').trim().replace(/\/+$/, '');
+  if (!u) return '';
+  try {
+    const parsed = new URL(u);
+    if (parsed.protocol === 'https:') return u;
+    if (parsed.protocol === 'http:' && isPrivateHost(parsed.hostname)) return u;
+    return '';
+  } catch (e) { return ''; }
+}
 // In the native app the UI is bundled (capacitor://localhost) while the shop
 // lives at the saved LAN address; in the browser it is just the page origin.
 const API = (() => {
   try {
     const u = localStorage.getItem('slpServerUrl');
-    if (u) return String(u).replace(/\/+$/, '');
+    if (u) { const safe = safeServerUrl(u); if (safe) return safe; }
   } catch (e) {}
   return window.location.origin;
 })();
@@ -1714,7 +1744,7 @@ const LANG_STRINGS = {
     'cat.no_match': 'No items match your search', 'cat.empty': 'No items yet',
     'cat.in_stock': '{n} in stock',
     'cat.oos': 'Out of stock',
-    'pay.amount': 'Amount', 'pay.method': 'Method', 'pay.full': 'Full', 'pay.date': 'Date',
+    'pay.amount': 'Amount', 'pay.method': 'Method', 'pay.full': 'Full', 'pay.date': 'Date', 'pay.kind': 'Type', 'pay.notes': 'Notes',
     'pay.record': 'Record Payment',     'pay.fill': 'Fill in client and amount',
     'pay.edit_title': 'Edit Payment',
     'pay.save_edit': 'Save changes',
@@ -1816,7 +1846,7 @@ const LANG_STRINGS = {
     'txn.vat_incl': 'Includes {amt} VAT',
   'inv.oos': 'OUT OF STOCK', 'inv.left': '{n} left',
   'inv.low_n': '{n} low stock', 'inv.all_ok': 'All stocked',
-  'inv.expiring': 'Expiring', 'inv.reorder': 'Reorder', 'inv.show_all': 'All',
+  'inv.expiring': 'Expiring', 'inv.reorder': 'Reorder', 'inv.show_all': 'All', 'inv.show_more': 'Show {n} more',
   'inv.expiring_note': 'Expiring or expired within 30 days: {n}',
   'inv.reorder_note': 'At or below low-stock level: {n}',
   'inv.none_expiring': 'No items expiring soon',
@@ -2105,7 +2135,7 @@ const LANG_STRINGS = {
     'cat.no_match': 'Walang tumutugmang item', 'cat.empty': 'Wala pang item',
     'cat.in_stock': '{n} ang stock',
     'cat.oos': 'Ubos na',
-    'pay.amount': 'Halaga', 'pay.method': 'Paraan', 'pay.full': 'Buo', 'pay.date': 'Petsa',
+    'pay.amount': 'Halaga', 'pay.method': 'Paraan', 'pay.full': 'Buo', 'pay.date': 'Petsa', 'pay.kind': 'Uri', 'pay.notes': 'Tala',
     'pay.record': 'I-record ang Bayad',     'pay.fill': 'Punan ang kliyente at halaga',
     'pay.edit_title': 'I-edit ang Bayad',
     'pay.save_edit': 'I-save ang pagbabago',
@@ -2206,7 +2236,7 @@ const LANG_STRINGS = {
     'txn.void_failed': 'Nabigo ang pag-void: {msg}',
     'txn.vat_incl': 'Kasama ang {amt} VAT',
   'inv.oos': 'UBOS NA', 'inv.left': '{n} ang natira',
-  'inv.expiring': 'Malapit nang ma-expire', 'inv.reorder': 'Muling bilhin', 'inv.show_all': 'Lahat',
+  'inv.expiring': 'Malapit nang ma-expire', 'inv.reorder': 'Muling bilhin', 'inv.show_all': 'Lahat', 'inv.show_more': 'Ipakita ang {n} pa',
   'inv.expiring_note': 'Malapit nang ma-expire o expired sa loob ng 30 araw: {n}',
   'inv.reorder_note': 'Nasa o mas mababa sa low-stock level: {n}',
   'inv.none_expiring': 'Walang malapit nang ma-expire',
@@ -3070,7 +3100,7 @@ async function openClientDetail(id) {
           <span class="text-gray-200">${fmtDate(p.date)} <span class="text-gray-500">· ${esc(p.type || '')}${p.referenceNo ? ' · #' + esc(p.referenceNo) : ''}</span></span>
           <span class="flex items-center gap-1.5">
             <span class="text-green-400 num shrink-0">-${peso(p.amount)}</span>
-            ${phoneRole() === 'cashier' ? '' : `<button onclick="renderPaymentEdit(${jsArg(p.id)}, ${jsArg(p.amount || 0)}, ${jsArg(p.referenceNo || '')}, ${jsArg(p.date || '')})" class="text-[11px] text-blue-400 px-1.5">${icon('edit', 12)}</button><button onclick="deletePayment(${jsArg(p.id)})" class="text-[11px] text-red-400 px-1.5">${icon('x', 12)}</button>`}
+            ${phoneRole() === 'cashier' ? '' : `<button onclick="renderPaymentEdit(${jsArg(p.id)}, ${jsArg(p.amount || 0)}, ${jsArg(p.referenceNo || '')}, ${jsArg(p.date || '')})" class="text-[11px] text-blue-400 px-1.5" aria-label="Edit payment">${icon('edit', 12)}</button><button onclick="deletePayment(${jsArg(p.id)})" class="text-[11px] text-red-400 px-1.5" aria-label="Delete payment">${icon('x', 12)}</button>`}
           </span>
         </div>`).join('') || `<p class="text-[11px] text-gray-500">${T('cli.no_history')}</p>`}
     </div>`;
@@ -4448,7 +4478,14 @@ function scanToCart(code) {
   if (!code) return;
   const item = (data.inventory || []).find(i => String(i.barcode || '') === code || String(i.sku || '').toLowerCase() === code.toLowerCase());
   stopBarcodeScan();
-  if (!item) { toast(T('sale.no_product', { code }), 'err'); return; }
+  if (!item) {
+    toast(T('sale.no_product', { code }), 'err');
+    if (phoneRole() !== 'cashier' && typeof renderItemForm === 'function') {
+      if (typeof openQuick === 'function') openQuick(null);
+      renderItemForm(null, code);
+    }
+    return;
+  }
   if ((item.stock || 0) <= 0) { toast(T('sale.oos_item', { name: item.name }), 'err'); return; }
   const line = cart.find(c => c.invId === item.id);
   if (line) line.qty++;
@@ -4486,13 +4523,23 @@ async function renderPay(preselectedId) {
           <button onclick="setAmt(1000)" class="btn btn-ghost btn-sm">+₱1000</button>
           <button onclick="setAmt('full')" class="btn btn-sm" style="background:rgba(59,130,246,.18);color:#60a5fa;border:1px solid rgba(59,130,246,.35)">${T('pay.full')}</button>
         </div>
-        <div>
-          <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('pay.method')}</label>
-          <select id="pay-type" class="inp"><option>Cash</option><option>GCash</option><option>Maya</option><option>Bank Transfer</option></select>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('pay.kind')}</label>
+            <select id="pay-kind" class="inp"><option>Partial</option><option>Full</option></select>
+          </div>
+          <div>
+            <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('pay.method')}</label>
+            <select id="pay-method" class="inp"><option>Cash</option><option>GCash</option><option>Maya</option><option>Bank Transfer</option></select>
+          </div>
         </div>
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">Reference # (GCash/Maya/Bank, optional)</label>
           <input id="pay-ref" type="text" maxlength="40" placeholder="e.g. 1234 567 890" autocomplete="off" class="inp" />
+        </div>
+        <div>
+          <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('pay.notes')}</label>
+          <textarea id="pay-notes" rows="2" maxlength="300" placeholder="" class="inp"></textarea>
         </div>
         <div style="height:2rem"></div>
       </div>
@@ -4505,22 +4552,25 @@ async function renderPay(preselectedId) {
 function setAmt(val) {
   const input = document.getElementById('pay-amount');
   if (!input) return;
-  if (val === 'full') { const sel = document.getElementById('pay-client'); const id = sel ? parseInt(sel.value) : NaN; const c = data.clients.find(x => String(x.id) === String(id)); input.value = c ? (c.balance || 0).toFixed(2) : ''; }
+  if (val === 'full') { const sel = document.getElementById('pay-client'); const id = sel ? parseInt(sel.value) : NaN; const c = data.clients.find(x => String(x.id) === String(id)); input.value = c ? (c.balance || 0).toFixed(2) : ''; const k = document.getElementById('pay-kind'); if (k) k.value = 'Full'; }
   else input.value = ((parseFloat(input.value) || 0) + val).toFixed(2);
 }
 async function submitPay() {
   const sel = document.getElementById('pay-client');
   const amtEl = document.getElementById('pay-amount');
-  const typeEl = document.getElementById('pay-type');
-  if (!sel || !amtEl || !typeEl) return toast(T('pay.fill'), 'err');
+  const kindEl = document.getElementById('pay-kind');
+  const methodEl = document.getElementById('pay-method');
+  if (!sel || !amtEl) return toast(T('pay.fill'), 'err');
   const clientId = parseInt(sel.value);
   const amount = parseFloat(amtEl.value);
-  const type = typeEl.value;
+  const type = kindEl ? kindEl.value : 'Partial';
+  const paymentMethod = methodEl ? methodEl.value : 'Cash';
   const referenceNo = ((document.getElementById('pay-ref') || {}).value || '').trim().slice(0, 40);
+  const notes = ((document.getElementById('pay-notes') || {}).value || '').trim().slice(0, 300);
   if (!clientId || !(amount > 0)) return toast(T('pay.fill'), 'err');
   if (!takeSubmitLock('pay')) return;
   try {
-    const r = await apiPost('/api/payments', { clientId, amount, type, referenceNo, date: validDateStr((document.getElementById('pay-date') || {}).value) || phoneToday() });
+    const r = await apiPost('/api/payments', { clientId, amount, type, paymentMethod, notes, referenceNo, date: validDateStr((document.getElementById('pay-date') || {}).value) || phoneToday() });
     if (r.queued) toast(T('pay.queued'), 'ok');
     else toast(T('pay.ok'), 'ok');
     showView('home'); await refreshAll();
@@ -4531,9 +4581,13 @@ async function submitPay() {
 // ===== src/mobile/view-inventory.js =====
 // ---------- INVENTORY ----------
 let invFilter = 'all';
+let invShown = 40;
+let invSearch = '';
 async function renderInventory() {
   const v = document.getElementById('view');
   invFilter = 'all';
+  invShown = 40;
+  invSearch = '';
   const low = data.inventory.filter(i => (i.stock || 0) <= (i.lowStock || 5)).length;
   const todayStr = phoneToday();
   const expiring = (data.inventory || []).filter(i => {
@@ -4564,7 +4618,9 @@ ${phoneRole() === 'cashier' ? '' : `<button onclick="showView('stocktake')" clas
 }
 function invListHTML(items) {
   const soon = Date.now() + 30 * 86400000;
-  return items.map(i => {
+  const shown = items.slice(0, invShown);
+  const more = items.length - shown.length;
+  return shown.map(i => {
     const stock = i.stock || 0;
     const exp = i.expiryDate ? new Date(i.expiryDate + 'T00:00:00').getTime() : null;
     const expSoon = exp && !isNaN(exp) && exp < soon;
@@ -4580,7 +4636,14 @@ function invListHTML(items) {
       <button onclick="photoForItem(${jsArg(i.id)})" title="${esc(T('photo.take'))}" class="btn btn-ghost btn-sm px-2">${icon('camera', 14)}</button>
       ${phoneRole() === 'cashier' ? '' : `<button onclick="renderItemForm(${jsArg(i.id)})" title="${esc(T('inv.edit'))}" class="btn btn-ghost btn-sm px-2">${icon('edit', 14)}</button>`}
     </div>`;
-  }).join('');
+  }).join('') + (more > 0 ? `<button onclick="invMore()" class="btn btn-ghost w-full mt-1">${T('inv.show_more', { n: more })}</button>` : '');
+}
+function invMore() {
+  invShown += 40;
+  const g = document.getElementById('inv-grid');
+  const items = invFilterItems().filter(i => (i.name || '').toLowerCase().includes(invSearch));
+  if (g) g.innerHTML = invListHTML(items);
+  loadValuation();
 }
 function invExpiringItems() {
   const todayStr = phoneToday();
@@ -4601,6 +4664,7 @@ function invFilterItems() {
   return data.inventory || [];
 }
 function paintInvFilter(items, note, emptyText) {
+  invShown = 40;
   const g = document.getElementById('inv-grid');
   const n = document.getElementById('inv-filter-note');
   if (g) g.innerHTML = items.length ? invListHTML(items) : `<div class="text-center text-gray-500 py-10 fade-in"><p class="text-sm">${esc(emptyText)}</p></div>`;
@@ -4625,6 +4689,8 @@ function showAllInv() {
 }
 function filterInventory(q) {
   q = (q || '').toLowerCase();
+  invSearch = q;
+  invShown = 40;
   const g = document.getElementById('inv-grid');
   const items = invFilterItems().filter(i => (i.name || '').toLowerCase().includes(q));
   if (g) g.innerHTML = invListHTML(items);
@@ -4654,7 +4720,7 @@ async function loadValuation() {
     </div>`;
   } catch (e) {}
 }
-function renderItemForm(id) {
+function renderItemForm(id, prefillBarcode) {
   if (phoneRole() === 'cashier') return toast(T('nav.owner_only'), 'err');
   const it = id ? (data.inventory || []).find(i => String(i.id) === String(id)) : null;
   const vs = (it && it.variants) || [];
@@ -4675,7 +4741,7 @@ function renderItemForm(id) {
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('inv.barcode')}</label>
-              <input id="if-barcode" type="text" maxlength="40" value="${escAttr(it?.barcode || '')}" class="inp" />
+              <input id="if-barcode" type="text" maxlength="40" value="${escAttr(it?.barcode || prefillBarcode || '')}" class="inp" />
             </div>
             <div>
               <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('inv.sell')}</label>
@@ -5288,7 +5354,7 @@ function expenseListHTML(items) {
       </div>
       <div class="text-right shrink-0">
         <div class="font-bold text-sm text-red-400 num">${peso(e.amount)}</div>
-        ${owner && e.id ? `<div class="flex gap-1 justify-end mt-1"><button onclick="renderExpenseEdit(${jsArg(e.id)})" class="text-[11px] text-blue-400 px-1">${icon('edit', 12)}</button><button onclick="deleteExpense(${jsArg(e.id)})" class="text-[11px] text-red-400 px-1">${icon('x', 12)}</button></div>` : ''}
+        ${owner && e.id ? `<div class="flex gap-1 justify-end mt-1"><button onclick="renderExpenseEdit(${jsArg(e.id)})" aria-label="Edit expense" class="text-[11px] text-blue-400 px-1">${icon('edit', 12)}</button><button onclick="deleteExpense(${jsArg(e.id)})" aria-label="Delete expense" class="text-[11px] text-red-400 px-1">${icon('x', 12)}</button></div>` : ''}
       </div>
     </div>`).join('');
 }
@@ -5496,7 +5562,7 @@ function supplierListHTML(items) {
         <span class="chip chip-green">${T('sup.paid', { amt: peso(s.paid) })}</span>
         ${(s.owed || 0) > 0 && phoneRole() !== 'cashier' ? `<button onclick="renderSupplierPay(${jsArg(s.id)})" class="btn btn-ghost btn-sm shrink-0">Pay</button>` : ''}
         ${phoneRole() !== 'cashier' ? `<button onclick="renderSupplierForm(${jsArg(s.id)})" title="${esc(T('sup.edit'))}" class="btn btn-ghost btn-sm px-2 shrink-0">${icon('edit', 14)}</button>` : ''}
-        ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button onclick="deleteSupplier(${jsArg(s.id)})" id="sup-del-${s.id}" class="ml-auto text-[11px] text-red-400 px-2 py-1 rounded-lg shrink-0" style="background:rgba(239,68,68,.1)">${icon('trash', 12)}</button>` : ''}
+        ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button onclick="deleteSupplier(${jsArg(s.id)})" id="sup-del-${s.id}" aria-label="Delete supplier" class="ml-auto text-[11px] text-red-400 px-2 py-1 rounded-lg shrink-0" style="background:rgba(239,68,68,.1)">${icon('trash', 12)}</button>` : ''}
       </div>
     </div>`).join('');
 }
@@ -5711,7 +5777,7 @@ async function renderPOs() {
           <div class="flex items-center justify-between mt-1.5">
             <div class="text-sm font-bold text-teal-400 num">${peso(po.total)}</div>
             <div class="flex gap-1.5">
-            ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) && po.status !== 'Received' ? `<button onclick="editPO(${jsArg(po.id)})" class="btn btn-ghost btn-sm" style="font-size:.75rem">${icon('edit', 14)}</button><button onclick="deletePO(${jsArg(po.id)})" id="po-del-${po.id}" class="btn btn-sm" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);color:#f87171;font-size:.75rem">${icon('trash', 14)}</button>` : ''}
+            ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) && po.status !== 'Received' ? `<button onclick="editPO(${jsArg(po.id)})" class="btn btn-ghost btn-sm" style="font-size:.75rem" aria-label="Edit purchase order">${icon('edit', 14)}</button><button onclick="deletePO(${jsArg(po.id)})" id="po-del-${po.id}" class="btn btn-sm" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);color:#f87171;font-size:.75rem" aria-label="Delete purchase order">${icon('trash', 14)}</button>` : ''}
             ${phoneRole() !== 'cashier' && po.status !== 'Received' ? `<button onclick="receivePO(${jsArg(po.id)})" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('po.receive')}</button>` : ''}
             </div>
           </div>

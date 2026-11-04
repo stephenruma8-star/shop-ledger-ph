@@ -1,0 +1,9 @@
+appId: ph.shopledger.mobile
+---
+# Minimal launch smoke: proves the release/debug build boots to a UI without a
+# native crash. Extend with PIN setup + a sale flow once a signed build is wired
+# to a device farm.
+- launchApp
+- takeScreenshot: launch
+- assertVisible:
+    text: "Shop Ledger"

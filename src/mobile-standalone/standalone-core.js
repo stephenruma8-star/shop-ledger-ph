@@ -3,7 +3,7 @@
 // names and response shapes as the LAN client, so every shared view works
 // unchanged. No imports/exports: concatenated. Requires store.js first.
 const IS_STANDALONE = true;
-const STANDALONE_VERSION = '4.8.45';
+const STANDALONE_VERSION = '4.8.46';
 function isNativeApp() {
   try { return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); } catch (e) { return false; }
 }
@@ -508,7 +508,7 @@ async function checkStandaloneUpdate(manual) {
       .map(x => {
         const apk = (x.assets || []).find(a => /standalone\.apk$/i.test(a.name || a.browser_download_url || ''));
         if (!apk || !apk.browser_download_url) return null;
-        return { tag: x.tag_name.slice('mobile-v'.length), url: apk.browser_download_url, file: String(apk.name || 'Shop-Ledger-Mobile-update.apk'), name: x.name || x.tag_name };
+        return { tag: x.tag_name.slice('mobile-v'.length), url: apk.browser_download_url, file: String(apk.name || 'Shop-Ledger-Mobile-update.apk'), name: x.name || x.tag_name, digest: String(apk.digest || '') };
       })
       .filter(Boolean);
     if (!mobile.length) throw new Error('no mobile release found');
@@ -532,14 +532,14 @@ async function checkStandaloneUpdate(manual) {
 function openPendingStandaloneUpdate() {
   const u = pendingStandaloneUpdate;
   if (!u) return;
-  openStandaloneUpdate(u.url, u.file, u.tag);
+  openStandaloneUpdate(u.url, u.file, u.tag, u.digest);
 }
 function openPendingStandaloneUpdateFallback() {
   const u = pendingStandaloneUpdate;
   if (!u) return;
   openStandaloneUpdateFallback(u.url);
 }
-function openStandaloneUpdate(url, fileName, tag) {
+function openStandaloneUpdate(url, fileName, tag, expectedSha256) {
   // Primary path: system downloader + installer prompt, with a live in-app
   // progress bar. Every outcome toasts — nothing in this chain is allowed
   // to fail silently anymore.
@@ -551,7 +551,7 @@ function openStandaloneUpdate(url, fileName, tag) {
       // app: even in the worst case the ledger is restorable. Never blocks
       // the download — failures here are silent by design.
       autoPreUpdateBackup().catch(() => {}).then(() => {
-        U.fetchAndInstall({ url, fileName: fileName || 'Shop-Ledger-Mobile-update.apk' })
+        U.fetchAndInstall({ url, fileName: fileName || 'Shop-Ledger-Mobile-update.apk', expectedSha256: expectedSha256 || '' })
           .then((ret) => {
             toast('Downloading update — watch it here', 'ok');
             try { pollStandaloneDownload(U, ret && ret.downloadId, tag); } catch (e) {}

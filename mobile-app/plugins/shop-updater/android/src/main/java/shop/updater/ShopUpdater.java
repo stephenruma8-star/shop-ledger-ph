@@ -6,6 +6,9 @@ import android.content.ClipData;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.Signature;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
@@ -19,6 +22,8 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import java.io.File;
+import java.io.FileInputStream;
+import java.security.MessageDigest;
 
 @CapacitorPlugin(name = "ShopUpdater")
 public class ShopUpdater extends Plugin {
@@ -28,6 +33,7 @@ public class ShopUpdater extends Plugin {
     public void fetchAndInstall(PluginCall call) {
         String url = call.getString("url");
         String fileName = call.getString("fileName", "Shop-Ledger-Mobile-update.apk");
+        final String expectedSha256 = call.getString("expectedSha256", "");
         if (url == null || url.isEmpty()) {
             call.reject("download url required");
             return;
@@ -95,9 +101,31 @@ public class ShopUpdater extends Plugin {
                             } finally { try { cur.close(); } catch (Exception ignored) {} }
                         }
                     } catch (Exception ignored) {}
-                    if (ok) {
+if (ok) {
                         try {
                             File apk = new File(c.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), fName);
+                            // Integrity gate: never hand an unverified APK to the installer.
+                            if (!apk.isFile() || apk.length() == 0) {
+                                toastSafe(c, "Update blocked: download missing");
+                                return;
+                            }
+                            if (expectedSha256 != null && !expectedSha256.isEmpty()) {
+                                String want = expectedSha256.trim().toLowerCase();
+                                if (want.startsWith("sha256:")) want = want.substring(7);
+                                String got = sha256Hex(apk);
+                                if (got == null || !got.equalsIgnoreCase(want)) {
+                                    try { apk.delete(); } catch (Exception ignored) {}
+                                    toastSafe(c, "Update blocked: checksum mismatch");
+                                    return;
+                                }
+                            }
+                            String apkSigner = apkSignerSha256(c, apk.getAbsolutePath());
+                            String ownSigner = ownSignerSha256(c);
+                            if (apkSigner == null || ownSigner == null || !apkSigner.equalsIgnoreCase(ownSigner)) {
+                                try { apk.delete(); } catch (Exception ignored) {}
+                                toastSafe(c, "Update blocked: signature mismatch");
+                                return;
+                            }
                             Uri uri = FileProvider.getUriForFile(c, c.getPackageName() + ".fileprovider", apk);
                             Intent ins = new Intent(Intent.ACTION_VIEW);
                             ins.setDataAndType(uri, "application/vnd.android.package-archive");
@@ -109,7 +137,7 @@ public class ShopUpdater extends Plugin {
                             return;
                         } catch (Exception ignored) {}
                     }
-                    try { Toast.makeText(c, "Update downloaded — open Downloads and tap the APK to install", Toast.LENGTH_LONG).show(); } catch (Exception ignored) {}
+                    try { Toast.makeText(c, "Update downloaded - open Downloads and tap the APK to install", Toast.LENGTH_LONG).show(); } catch (Exception ignored) {}
                 }
             };
             try {
@@ -169,6 +197,77 @@ public class ShopUpdater extends Plugin {
             call.resolve(ret);
         } catch (Exception e) {
             call.reject(e.getMessage() != null ? e.getMessage() : "query failed");
+        }
+    }
+
+    // ---------- integrity helpers ----------
+    private static void toastSafe(Context c, String msg) {
+        try { Toast.makeText(c, msg, Toast.LENGTH_LONG).show(); } catch (Exception ignored) {}
+    }
+
+    private static String sha256Hex(File f) {
+        FileInputStream in = null;
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            in = new FileInputStream(f);
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) md.update(buf, 0, n);
+            StringBuilder sb = new StringBuilder();
+            for (byte b : md.digest()) sb.append(String.format("%02x", b));
+            return sb.toString();
+        } catch (Exception e) {
+            return null;
+        } finally {
+            try { if (in != null) in.close(); } catch (Exception ignored) {}
+        }
+    }
+
+    private static String sha256Hex(Signature sig) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] d = md.digest(sig.toByteArray());
+            StringBuilder sb = new StringBuilder();
+            for (byte b : d) sb.append(String.format("%02x", b));
+            return sb.toString();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static String apkSignerSha256(Context ctx, String apkPath) {
+        try {
+            PackageManager pm = ctx.getPackageManager();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                PackageInfo info = pm.getPackageArchiveInfo(apkPath, PackageManager.GET_SIGNING_CERTIFICATES);
+                if (info == null || info.signingInfo == null) return null;
+                Signature[] sigs = info.signingInfo.getApkContentsSigners();
+                return (sigs != null && sigs.length > 0) ? sha256Hex(sigs[0]) : null;
+            } else {
+                PackageInfo info = pm.getPackageArchiveInfo(apkPath, PackageManager.GET_SIGNATURES);
+                if (info == null || info.signatures == null || info.signatures.length == 0) return null;
+                return sha256Hex(info.signatures[0]);
+            }
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static String ownSignerSha256(Context ctx) {
+        try {
+            PackageManager pm = ctx.getPackageManager();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                PackageInfo info = pm.getPackageInfo(ctx.getPackageName(), PackageManager.GET_SIGNING_CERTIFICATES);
+                if (info == null || info.signingInfo == null) return null;
+                Signature[] sigs = info.signingInfo.getApkContentsSigners();
+                return (sigs != null && sigs.length > 0) ? sha256Hex(sigs[0]) : null;
+            } else {
+                PackageInfo info = pm.getPackageInfo(ctx.getPackageName(), PackageManager.GET_SIGNATURES);
+                if (info == null || info.signatures == null || info.signatures.length == 0) return null;
+                return sha256Hex(info.signatures[0]);
+            }
+        } catch (Exception e) {
+            return null;
         }
     }
 }

@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.29",
+    "version":  "3.37.30",
     "buildDate":  "2026-11-04T00:00:00.000Z",
-    "notes":  "Colored icons: the shared symbol set now uses a per-symbol accent palette on both desktop and phone, while icons on solid buttons stay white for contrast."
+    "notes":  "Security and mobile upgrades: update installs are checksum+signature verified, phone CSP, LAN-only cleartext, R8 + ARM-only build (APK ~24MB), v2/v3/v4 signing; phone payments get Type (Partial/Full), Method and Notes; scan-to-create for unknown barcodes; Show-more inventory; accessibility labels; CI security gate and Maestro smoke flow."
 }

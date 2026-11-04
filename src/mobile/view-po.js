@@ -19,7 +19,7 @@ async function renderPOs() {
           <div class="flex items-center justify-between mt-1.5">
             <div class="text-sm font-bold text-teal-400 num">${peso(po.total)}</div>
             <div class="flex gap-1.5">
-            ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) && po.status !== 'Received' ? `<button onclick="editPO(${jsArg(po.id)})" class="btn btn-ghost btn-sm" style="font-size:.75rem">${icon('edit', 14)}</button><button onclick="deletePO(${jsArg(po.id)})" id="po-del-${po.id}" class="btn btn-sm" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);color:#f87171;font-size:.75rem">${icon('trash', 14)}</button>` : ''}
+            ${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) && po.status !== 'Received' ? `<button onclick="editPO(${jsArg(po.id)})" class="btn btn-ghost btn-sm" style="font-size:.75rem" aria-label="Edit purchase order">${icon('edit', 14)}</button><button onclick="deletePO(${jsArg(po.id)})" id="po-del-${po.id}" class="btn btn-sm" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.35);color:#f87171;font-size:.75rem" aria-label="Delete purchase order">${icon('trash', 14)}</button>` : ''}
             ${phoneRole() !== 'cashier' && po.status !== 'Received' ? `<button onclick="receivePO(${jsArg(po.id)})" class="btn btn-ghost btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('po.receive')}</button>` : ''}
             </div>
           </div>

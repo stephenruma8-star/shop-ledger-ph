@@ -953,7 +953,14 @@ function scanToCart(code) {
   if (!code) return;
   const item = (data.inventory || []).find(i => String(i.barcode || '') === code || String(i.sku || '').toLowerCase() === code.toLowerCase());
   stopBarcodeScan();
-  if (!item) { toast(T('sale.no_product', { code }), 'err'); return; }
+  if (!item) {
+    toast(T('sale.no_product', { code }), 'err');
+    if (phoneRole() !== 'cashier' && typeof renderItemForm === 'function') {
+      if (typeof openQuick === 'function') openQuick(null);
+      renderItemForm(null, code);
+    }
+    return;
+  }
   if ((item.stock || 0) <= 0) { toast(T('sale.oos_item', { name: item.name }), 'err'); return; }
   const line = cart.find(c => c.invId === item.id);
   if (line) line.qty++;

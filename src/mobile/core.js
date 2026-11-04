@@ -4,12 +4,41 @@ function isNativeApp() {
 function nativePlugin(name) {
   try { return (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins[name]) || null; } catch (e) { return null; }
 }
+// LAN sync is plain HTTP to the shop PC. Cleartext is allowed only for the
+// local network: a saved http:// server URL with a public host is rejected
+// (https:// stays allowed for any host, e.g. a Tailscale tunnel).
+function isPrivateHost(host) {
+  const h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '');
+  if (!h) return false;
+  if (h === 'localhost' || h.endsWith('.local') || h === '10.0.2.2') return true;
+  const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (m) {
+    const a = +m[1], b = +m[2];
+    if (a === 10 || a === 127) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 169 && b === 254) return true;
+    return false;
+  }
+  if (h.includes(':')) return h === '::1' || h.startsWith('fe80:') || h.startsWith('fc') || h.startsWith('fd');
+  return false;
+}
+function safeServerUrl(raw) {
+  const u = String(raw || '').trim().replace(/\/+$/, '');
+  if (!u) return '';
+  try {
+    const parsed = new URL(u);
+    if (parsed.protocol === 'https:') return u;
+    if (parsed.protocol === 'http:' && isPrivateHost(parsed.hostname)) return u;
+    return '';
+  } catch (e) { return ''; }
+}
 // In the native app the UI is bundled (capacitor://localhost) while the shop
 // lives at the saved LAN address; in the browser it is just the page origin.
 const API = (() => {
   try {
     const u = localStorage.getItem('slpServerUrl');
-    if (u) return String(u).replace(/\/+$/, '');
+    if (u) { const safe = safeServerUrl(u); if (safe) return safe; }
   } catch (e) {}
   return window.location.origin;
 })();
