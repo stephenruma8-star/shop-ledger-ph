@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.22",
+    "version":  "3.37.23",
     "buildDate":  "2026-11-03T00:00:00.000Z",
-    "notes":  "Ships the updated paired-phone print flow: if the configured thermal printer fails (not set, unreachable, or no signal), the phone now opens the Android printer chooser instead of showing an error. Also makes printing more reliable on receipt, statement, and test-print buttons."
+    "notes":  "Ships the per-item 'Add item' button to paired phones: on the Inventory list each row has an Add button that inserts the new item right after that row (instead of only at the bottom)."
 }
