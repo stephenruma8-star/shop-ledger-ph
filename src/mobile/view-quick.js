@@ -58,7 +58,7 @@ function quickAdd(id) {
   const qty = Math.max(1, Math.min(qStepQty || 1, item.stock || 1));
   const existing = cart.find(c => c.invId === id);
   if (existing) existing.qty = Math.min(existing.qty + qty, item.stock || existing.qty);
-  else cart.push({ invId: id, name: item.name, qty, price: item.price });
+  else cartAdd({ invId: id, name: item.name, qty, price: item.price });
   closeQuick();
   updateCartUI();
   toast(T('quick.added_cart', { name: item.name, qty: existing ? existing.qty : qty }), 'ok');

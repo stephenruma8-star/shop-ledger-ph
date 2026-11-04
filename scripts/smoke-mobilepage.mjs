@@ -359,16 +359,6 @@ try {
   const invHtml = getEl('view').innerHTML;
   ok(invHtml.includes('Inventory') && invHtml.includes('3 items'), 'inventory view shows item count');
   ok(invHtml.includes('OUT OF STOCK') && invHtml.includes('low stock'), 'inventory shows stock statuses');
-  ok(invHtml.includes('addItemAfter('), 'inventory rows offer an Add-item button');
-  // Per-row "Add item": the new item is inserted right after the chosen row.
-  gcall(`saveInvOrder([])`);
-  const invIds = gget(`(data.inventory || []).map(i => i.id)`);
-  await gcall(`addItemAfter(${invIds[0]})`);
-  gcall(`insertInvOrderAfter(${invIds[0]}, 999001)`);
-  const invOrdered = gget(`sortInvByOrder((data.inventory || []).concat([{ id: 999001, name: 'ZZZ new' }])).map(i => i.id)`);
-  ok(invOrdered[0] === invIds[0] && invOrdered[1] === 999001, 'inventory: Add-item inserts after the chosen row');
-  await gcall(`closeQuick()`);
-  gcall(`saveInvOrder([])`);
   gcall(`filterInventory('biscuit')`);
   const invGrid = getEl('inv-grid').innerHTML;
   ok(invGrid.includes('Biscuit Pack') && !invGrid.includes('Coke'), 'inventory search filters');
@@ -890,6 +880,17 @@ try {
   await gcall(`closeQuick()`);
   await gcall(`saleSuccessSheet('INV-00001')`);
   ok(getEl('view').innerHTML.includes('openSystemPrintForSale') && getEl('view').innerHTML.includes('Find printer'), 'sale success offers Find printer');
+
+  // Cart: "Add item here" inserts the next added item right after that line.
+  await gcall(`startNewSale()`);
+  gget(`(function(){ cart.length = 0; cartInsertAfter = null; cartAdd({ invId: null, name: 'A', qty: 1, price: 1 }); cartAdd({ invId: null, name: 'B', qty: 1, price: 1 }); })()`);
+  await gcall(`renderSale()`);
+  ok(getEl('view').innerHTML.includes('insertItemAfter('), 'cart rows offer an Add-item button');
+  gcall(`insertItemAfter(0)`);
+  gget(`(function(){ cartAdd({ invId: null, name: 'NEW', qty: 1, price: 1 }); })()`);
+  const cartNames = gget(`cart.map(c => c.name)`);
+  ok(cartNames.length === 3 && cartNames[0] === 'A' && cartNames[1] === 'NEW' && cartNames[2] === 'B', 'cart: Add item here inserts below the chosen line');
+  gget(`(function(){ cart.length = 0; cartInsertAfter = null; updateCartUI(); })()`);
 
   if (failures === 0) {
     console.log('MOBILE PAGE OK: boots via 8 /api endpoints, 11 views render, cart sale + quick sell + out-of-stock guard + Bayad + expenses + PO + reports + settings + offline queue/Sync-now all verified');

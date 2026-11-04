@@ -5,6 +5,7 @@ let saleClientPreset = null;
 let saleRateClient = null; // client key whose rate was last bulk-applied to lines
 let saleCartClient = ''; // who the current cart items are for ('' = walk-in); switching asks whether to keep them
 let editingSaleInvoice = null; // invoiceNo being edited in-place (null = new sale)
+let cartInsertAfter = null; // when set, the next added item is placed right after this cart index
 const SALE_DRAFTS_KEY = 'slpSaleDrafts';
 let saleDrafts = {};
 try {
@@ -66,7 +67,7 @@ function renderSale(presetId) {
     }
   }
   const v = document.getElementById('view');
-  if (!cart.length) tendered = 0;
+  if (!cart.length) { tendered = 0; cartInsertAfter = null; }
   // Preserve cashier-entered header state across re-renders (qty steps, cart
   // edits, pull-refresh and LAN updates all re-render; losing the discount
   // or client pick mid-sale is a data-entry bug, not a refresh).
@@ -99,6 +100,7 @@ function renderSale(presetId) {
     ${(data.quickItems || []).length ? `<div class="flex gap-1.5 mb-3 fade-in overflow-x-auto" style="scrollbar-width:none">${data.quickItems.slice(0, 12).map((q, qi) => `<button onclick="quickAddItem(${qi})" class="shrink-0 px-3 py-2 rounded-xl text-xs font-semibold" style="background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);color:#93c5fd">${esc(q.name)} · ${peso(q.price)}</button>`).join('')}${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button onclick="managePresets()" class="shrink-0 px-3 py-2 rounded-xl text-xs font-semibold" style="background:rgba(255,255,255,.06);border:1px dashed rgba(255,255,255,.2);color:#94a3b8">⚙️ Presets</button>` : ''}</div>` : ''}
     ${editingSaleInvoice ? `<div class="glass-card rounded-2xl p-3 mb-3 flex items-center justify-between gap-2 fade-in" style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4)"><span class="text-xs font-semibold text-amber-300">Editing ${esc(editingSaleInvoice)}</span><button onclick="cancelSaleEdit()" class="btn btn-ghost btn-sm">Cancel</button></div>` : ''}
     ${saleDraftBanner()}
+    ${cartInsertAfter != null && cart[cartInsertAfter] ? `<div class="glass-card rounded-2xl p-2.5 mb-3 flex items-center justify-between gap-2 fade-in" style="background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.4)"><span class="text-xs font-semibold text-blue-300 truncate">${esc(T('sale.inserting_after', { name: cart[cartInsertAfter].name }))}</span><button onclick="cancelInsert()" class="btn btn-ghost btn-sm shrink-0">${esc(T('sale.cancel_insert'))}</button></div>` : ''}
     ${lastFailedSale ? `<button onclick="retrySale()" class="btn w-full mb-3 py-2.5 rounded-xl font-semibold text-sm fade-in" style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.5);color:#fbbf24"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>${T('sale.retry')}</button>` : ''}
     <div class="glass-card rounded-2xl p-2 mb-3 fade-in">
       ${cart.length ? cart.map((i, idx) => {
@@ -126,6 +128,7 @@ function renderSale(presetId) {
             ${variants.length ? `<select onchange="cartLineVariant(${idx},this.value)" class="flex-1 min-w-0 text-[11px] px-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 outline-none">${variants.map(v => '<option value="' + escAttr(v.name) + '"' + ((i.variantName || variants[0].name) === v.name ? ' selected' : '') + '>' + esc(v.name) + '</option>').join('')}</select>` : ''}
             <select id="sale-rate-${idx}" onchange="cartLineRate(${idx},this.value)" class="w-20 text-[11px] px-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 outline-none shrink-0" title="Interest">${intRateOptions(rate)}</select>
           </div>
+          <button onclick="insertItemAfter(${idx})" class="w-full mt-1 py-1 rounded-lg text-[11px] font-semibold ${cartInsertAfter === idx ? 'text-amber-300' : 'text-blue-300'}" style="background:rgba(59,130,246,.1);border:1px dashed rgba(59,130,246,.35)">${cartInsertAfter === idx ? esc(T('sale.adding_here')) : '+ ' + esc(T('sale.add_here'))}</button>
         </div>`;
       }).join('')
       : `<p class="text-center text-gray-500 py-8 px-4 text-sm">${T('sale.empty_a')} <button class="text-blue-400 font-semibold underline" onclick="manualItem()">${T('sale.empty_manual')}</button></p>`}
@@ -490,6 +493,7 @@ function cartStep(idx, delta) {
 let cartRemoving = false;
 function cartRemove(idx) {
   if (cartRemoving) return;
+  cartInsertAfter = null;
   const row = document.getElementById('mc-row-' + idx);
   const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (row && !reduceMotion) {
@@ -498,6 +502,26 @@ function cartRemove(idx) {
     setTimeout(() => { cartRemoving = false; cart.splice(idx, 1); updateCartUI(); renderSale(); }, 220);
   } else { cart.splice(idx, 1); updateCartUI(); renderSale(); }
 }
+// Add a line to the cart. When "Add item here" was tapped on a row, the new
+// line is inserted right after that row instead of at the very bottom.
+function cartAdd(line) {
+  if (cartInsertAfter != null && cartInsertAfter >= 0 && cartInsertAfter < cart.length) {
+    cart.splice(cartInsertAfter + 1, 0, line);
+  } else {
+    cart.push(line);
+  }
+  cartInsertAfter = null;
+}
+function insertItemAfter(idx) {
+  cartInsertAfter = (cartInsertAfter === idx) ? null : idx;
+  if (currentView === 'sale') renderSale();
+  if (cartInsertAfter != null) {
+    const inp = document.getElementById('counter-search');
+    if (inp) { try { inp.focus(); } catch (e) {} }
+    try { const row = document.getElementById('mc-row-' + cartInsertAfter); if (row && row.scrollIntoView) row.scrollIntoView({ block: 'center' }); } catch (e) {}
+  }
+}
+function cancelInsert() { cartInsertAfter = null; if (currentView === 'sale') renderSale(); }
 function manualItem() {
   document.getElementById('modal-root').innerHTML = `
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
@@ -546,7 +570,7 @@ function addManualItem() {
   const qty = parseInt(qtyEl && qtyEl.value) || 1;
   if (!name) { toast(T('manual.name_req'), 'err'); return; }
   if (isNaN(price) || price < 0) { toast(T('manual.price_req'), 'err'); return; }
-  cart.push({ invId: null, name, qty: Math.max(1, qty), price, date: validDateStr(dateEl && dateEl.value) || phoneToday() });
+  cartAdd({ invId: null, name, qty: Math.max(1, qty), price, date: validDateStr(dateEl && dateEl.value) || phoneToday() });
   // Stay open for the next item: clear the fields, keep qty + date, refocus.
   if (nameEl) nameEl.value = '';
   if (priceEl) priceEl.value = '';
@@ -563,6 +587,7 @@ function addManualItem() {
 // reads "Save sale" (not "Update sale") and saving POSTs a new sale.
 function startNewSale(presetId) {
   editingSaleInvoice = null;
+  cartInsertAfter = null;
   if (presetId !== undefined && presetId !== null && presetId !== '') {
     saleClientPreset = String(presetId);
     saleCartClient = String(presetId);
@@ -571,6 +596,7 @@ function startNewSale(presetId) {
 }
 function cancelSaleEdit() {
   editingSaleInvoice = null;
+  cartInsertAfter = null;
   cart = [];
   try { saleClientPreset = null; saleRateClient = null; saleCartClient = ''; } catch (e) {}
   updateCartUI();
@@ -585,6 +611,7 @@ async function editSaleFromDetail(invoiceNo) {
   if (!t) return;
   if (t.status === 'voided' || t.status === 'return') { toast('This sale cannot be edited', 'err'); return; }
   editingSaleInvoice = t.invoiceNo || invoiceNo;
+  cartInsertAfter = null;
   const cid = t.clientId != null ? String(t.clientId) : '';
   const c = cid ? (data.clients || []).find(x => String(x.id) === String(cid)) : null;
   cart = (t.items || []).map(it => ({
@@ -767,7 +794,7 @@ function counterAdd(id) {
   if ((item.stock || 0) <= 0) { feelErr(); toast(T('sale.oos_item', { name: item.name }), 'err'); return; }
   const line = cart.find(c => c.invId === item.id);
   if (line) line.qty++;
-  else cart.push({ invId: item.id, name: item.name, qty: 1, price: item.price || 0 });
+  else cartAdd({ invId: item.id, name: item.name, qty: 1, price: item.price || 0 });
   updateCartUI();
   feelAdd();
   const inp = document.getElementById('counter-search');
@@ -787,9 +814,9 @@ function quickAddItem(qi) {
     if ((item.stock || 0) <= 0) { feelErr(); toast(T('sale.oos_item', { name: item.name }), 'err'); return; }
     const line = cart.find(c => c.invId === item.id);
     if (line) line.qty++;
-    else cart.push({ invId: item.id, name: item.name, qty: 1, price: item.price || 0 });
+    else cartAdd({ invId: item.id, name: item.name, qty: 1, price: item.price || 0 });
   } else {
-    cart.push({ invId: null, name: q.name, qty: 1, price: q.price || 0 });
+    cartAdd({ invId: null, name: q.name, qty: 1, price: q.price || 0 });
   }
   updateCartUI();
   feelAdd();
@@ -930,7 +957,7 @@ function scanToCart(code) {
   if ((item.stock || 0) <= 0) { toast(T('sale.oos_item', { name: item.name }), 'err'); return; }
   const line = cart.find(c => c.invId === item.id);
   if (line) line.qty++;
-  else cart.push({ invId: item.id, name: item.name, qty: 1, price: item.price || 0 });
+  else cartAdd({ invId: item.id, name: item.name, qty: 1, price: item.price || 0 });
   updateCartUI();
   feelAdd();
   toast(T('sale.added', { name: item.name }), 'ok');

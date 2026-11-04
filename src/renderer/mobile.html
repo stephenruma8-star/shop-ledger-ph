@@ -1496,7 +1496,7 @@ const LANG_STRINGS = {
     'sale.empty_a': 'Cart is empty — add items from the Catalog or',
     'sale.empty_manual': 'add a manual item',
     'sale.subtotal': 'Subtotal', 'sale.client': 'Client', 'sale.payment': 'Payment',
-    'sale.interest': 'Interest (%/yr)', 'sale.discount': 'Discount (₱)',
+    'sale.interest': 'Interest (%/yr)', 'sale.add_here': 'Add item here', 'sale.adding_here': 'Adding here - pick an item', 'sale.inserting_after': 'Adding after: {name}', 'sale.cancel_insert': 'Cancel', 'sale.discount': 'Discount (₱)',
     'sale.sc': 'SC/PWD 20% Discount', 'sale.charge': 'Charge to client (credit)',
     'sale.total': 'Total', 'sale.save': 'Save Sale',
     'sale.preview': 'Preview Receipt', 'sale.preview_title': 'Receipt preview',
@@ -1745,7 +1745,7 @@ const LANG_STRINGS = {
   'inv.reorder_note': 'At or below low-stock level: {n}',
   'inv.none_expiring': 'No items expiring soon',
   'inv.none_reorder': 'All items sufficiently stocked',
-    'inv.add': 'Add Item', 'inv.edit': 'Edit Item', 'inv.add_here': 'Add item here',
+    'inv.add': 'Add Item', 'inv.edit': 'Edit Item',
     'inv.count': '{n} items',
     'inv.name': 'Name', 'inv.sku': 'SKU', 'inv.barcode': 'Barcode',
     'inv.category': 'Category', 'inv.sell': 'Sell price (₱)',
@@ -1886,7 +1886,7 @@ const LANG_STRINGS = {
     'sale.empty_a': 'Walang laman ang cart — magdagdag mula sa Catalog o',
     'sale.empty_manual': 'magdagdag ng manual na item',
     'sale.subtotal': 'Subtotal', 'sale.client': 'Kliyente', 'sale.payment': 'Bayad',
-    'sale.interest': 'Interes (%/taon)', 'sale.discount': 'Diskwento (₱)',
+    'sale.interest': 'Interes (%/taon)', 'sale.add_here': 'Magdagdag ng item dito', 'sale.adding_here': 'Nagdadagdag dito - pumili ng item', 'sale.inserting_after': 'Idadagdag pagkatapos ng: {name}', 'sale.cancel_insert': 'Kanselahin', 'sale.discount': 'Diskwento (₱)',
     'sale.sc': 'Diskwentong SC/PWD 20%', 'sale.charge': 'I-charge sa kliyente (utang)',
     'sale.total': 'Kabuuan', 'sale.save': 'I-save ang Benta',
     'sale.preview': 'I-preview ang Resibo', 'sale.preview_title': 'Preview ng resibo',
@@ -2135,7 +2135,7 @@ const LANG_STRINGS = {
   'inv.reorder_note': 'Nasa o mas mababa sa low-stock level: {n}',
   'inv.none_expiring': 'Walang malapit nang ma-expire',
   'inv.none_reorder': 'Sapat ang stock ng lahat',
-  'inv.add': 'Magdagdag ng Item', 'inv.edit': 'I-edit ang Item', 'inv.add_here': 'Magdagdag ng item dito',
+  'inv.add': 'Magdagdag ng Item', 'inv.edit': 'I-edit ang Item',
     'inv.count': '{n} na item',
     'inv.name': 'Pangalan', 'inv.sku': 'SKU', 'inv.barcode': 'Barcode',
     'inv.category': 'Kategorya', 'inv.sell': 'Presyong benta (₱)',
@@ -3383,7 +3383,7 @@ function quickAdd(id) {
   const qty = Math.max(1, Math.min(qStepQty || 1, item.stock || 1));
   const existing = cart.find(c => c.invId === id);
   if (existing) existing.qty = Math.min(existing.qty + qty, item.stock || existing.qty);
-  else cart.push({ invId: id, name: item.name, qty, price: item.price });
+  else cartAdd({ invId: id, name: item.name, qty, price: item.price });
   closeQuick();
   updateCartUI();
   toast(T('quick.added_cart', { name: item.name, qty: existing ? existing.qty : qty }), 'ok');
@@ -3419,6 +3419,7 @@ let saleClientPreset = null;
 let saleRateClient = null; // client key whose rate was last bulk-applied to lines
 let saleCartClient = ''; // who the current cart items are for ('' = walk-in); switching asks whether to keep them
 let editingSaleInvoice = null; // invoiceNo being edited in-place (null = new sale)
+let cartInsertAfter = null; // when set, the next added item is placed right after this cart index
 const SALE_DRAFTS_KEY = 'slpSaleDrafts';
 let saleDrafts = {};
 try {
@@ -3480,7 +3481,7 @@ function renderSale(presetId) {
     }
   }
   const v = document.getElementById('view');
-  if (!cart.length) tendered = 0;
+  if (!cart.length) { tendered = 0; cartInsertAfter = null; }
   // Preserve cashier-entered header state across re-renders (qty steps, cart
   // edits, pull-refresh and LAN updates all re-render; losing the discount
   // or client pick mid-sale is a data-entry bug, not a refresh).
@@ -3513,6 +3514,7 @@ function renderSale(presetId) {
     ${(data.quickItems || []).length ? `<div class="flex gap-1.5 mb-3 fade-in overflow-x-auto" style="scrollbar-width:none">${data.quickItems.slice(0, 12).map((q, qi) => `<button onclick="quickAddItem(${qi})" class="shrink-0 px-3 py-2 rounded-xl text-xs font-semibold" style="background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);color:#93c5fd">${esc(q.name)} · ${peso(q.price)}</button>`).join('')}${(typeof IS_STANDALONE !== 'undefined' && IS_STANDALONE) ? `<button onclick="managePresets()" class="shrink-0 px-3 py-2 rounded-xl text-xs font-semibold" style="background:rgba(255,255,255,.06);border:1px dashed rgba(255,255,255,.2);color:#94a3b8">⚙️ Presets</button>` : ''}</div>` : ''}
     ${editingSaleInvoice ? `<div class="glass-card rounded-2xl p-3 mb-3 flex items-center justify-between gap-2 fade-in" style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4)"><span class="text-xs font-semibold text-amber-300">Editing ${esc(editingSaleInvoice)}</span><button onclick="cancelSaleEdit()" class="btn btn-ghost btn-sm">Cancel</button></div>` : ''}
     ${saleDraftBanner()}
+    ${cartInsertAfter != null && cart[cartInsertAfter] ? `<div class="glass-card rounded-2xl p-2.5 mb-3 flex items-center justify-between gap-2 fade-in" style="background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.4)"><span class="text-xs font-semibold text-blue-300 truncate">${esc(T('sale.inserting_after', { name: cart[cartInsertAfter].name }))}</span><button onclick="cancelInsert()" class="btn btn-ghost btn-sm shrink-0">${esc(T('sale.cancel_insert'))}</button></div>` : ''}
     ${lastFailedSale ? `<button onclick="retrySale()" class="btn w-full mb-3 py-2.5 rounded-xl font-semibold text-sm fade-in" style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.5);color:#fbbf24"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>${T('sale.retry')}</button>` : ''}
     <div class="glass-card rounded-2xl p-2 mb-3 fade-in">
       ${cart.length ? cart.map((i, idx) => {
@@ -3540,6 +3542,7 @@ function renderSale(presetId) {
             ${variants.length ? `<select onchange="cartLineVariant(${idx},this.value)" class="flex-1 min-w-0 text-[11px] px-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 outline-none">${variants.map(v => '<option value="' + escAttr(v.name) + '"' + ((i.variantName || variants[0].name) === v.name ? ' selected' : '') + '>' + esc(v.name) + '</option>').join('')}</select>` : ''}
             <select id="sale-rate-${idx}" onchange="cartLineRate(${idx},this.value)" class="w-20 text-[11px] px-1.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-200 outline-none shrink-0" title="Interest">${intRateOptions(rate)}</select>
           </div>
+          <button onclick="insertItemAfter(${idx})" class="w-full mt-1 py-1 rounded-lg text-[11px] font-semibold ${cartInsertAfter === idx ? 'text-amber-300' : 'text-blue-300'}" style="background:rgba(59,130,246,.1);border:1px dashed rgba(59,130,246,.35)">${cartInsertAfter === idx ? esc(T('sale.adding_here')) : '+ ' + esc(T('sale.add_here'))}</button>
         </div>`;
       }).join('')
       : `<p class="text-center text-gray-500 py-8 px-4 text-sm">${T('sale.empty_a')} <button class="text-blue-400 font-semibold underline" onclick="manualItem()">${T('sale.empty_manual')}</button></p>`}
@@ -3904,6 +3907,7 @@ function cartStep(idx, delta) {
 let cartRemoving = false;
 function cartRemove(idx) {
   if (cartRemoving) return;
+  cartInsertAfter = null;
   const row = document.getElementById('mc-row-' + idx);
   const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (row && !reduceMotion) {
@@ -3912,6 +3916,26 @@ function cartRemove(idx) {
     setTimeout(() => { cartRemoving = false; cart.splice(idx, 1); updateCartUI(); renderSale(); }, 220);
   } else { cart.splice(idx, 1); updateCartUI(); renderSale(); }
 }
+// Add a line to the cart. When "Add item here" was tapped on a row, the new
+// line is inserted right after that row instead of at the very bottom.
+function cartAdd(line) {
+  if (cartInsertAfter != null && cartInsertAfter >= 0 && cartInsertAfter < cart.length) {
+    cart.splice(cartInsertAfter + 1, 0, line);
+  } else {
+    cart.push(line);
+  }
+  cartInsertAfter = null;
+}
+function insertItemAfter(idx) {
+  cartInsertAfter = (cartInsertAfter === idx) ? null : idx;
+  if (currentView === 'sale') renderSale();
+  if (cartInsertAfter != null) {
+    const inp = document.getElementById('counter-search');
+    if (inp) { try { inp.focus(); } catch (e) {} }
+    try { const row = document.getElementById('mc-row-' + cartInsertAfter); if (row && row.scrollIntoView) row.scrollIntoView({ block: 'center' }); } catch (e) {}
+  }
+}
+function cancelInsert() { cartInsertAfter = null; if (currentView === 'sale') renderSale(); }
 function manualItem() {
   document.getElementById('modal-root').innerHTML = `
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
@@ -3960,7 +3984,7 @@ function addManualItem() {
   const qty = parseInt(qtyEl && qtyEl.value) || 1;
   if (!name) { toast(T('manual.name_req'), 'err'); return; }
   if (isNaN(price) || price < 0) { toast(T('manual.price_req'), 'err'); return; }
-  cart.push({ invId: null, name, qty: Math.max(1, qty), price, date: validDateStr(dateEl && dateEl.value) || phoneToday() });
+  cartAdd({ invId: null, name, qty: Math.max(1, qty), price, date: validDateStr(dateEl && dateEl.value) || phoneToday() });
   // Stay open for the next item: clear the fields, keep qty + date, refocus.
   if (nameEl) nameEl.value = '';
   if (priceEl) priceEl.value = '';
@@ -3977,6 +4001,7 @@ function addManualItem() {
 // reads "Save sale" (not "Update sale") and saving POSTs a new sale.
 function startNewSale(presetId) {
   editingSaleInvoice = null;
+  cartInsertAfter = null;
   if (presetId !== undefined && presetId !== null && presetId !== '') {
     saleClientPreset = String(presetId);
     saleCartClient = String(presetId);
@@ -3985,6 +4010,7 @@ function startNewSale(presetId) {
 }
 function cancelSaleEdit() {
   editingSaleInvoice = null;
+  cartInsertAfter = null;
   cart = [];
   try { saleClientPreset = null; saleRateClient = null; saleCartClient = ''; } catch (e) {}
   updateCartUI();
@@ -3999,6 +4025,7 @@ async function editSaleFromDetail(invoiceNo) {
   if (!t) return;
   if (t.status === 'voided' || t.status === 'return') { toast('This sale cannot be edited', 'err'); return; }
   editingSaleInvoice = t.invoiceNo || invoiceNo;
+  cartInsertAfter = null;
   const cid = t.clientId != null ? String(t.clientId) : '';
   const c = cid ? (data.clients || []).find(x => String(x.id) === String(cid)) : null;
   cart = (t.items || []).map(it => ({
@@ -4181,7 +4208,7 @@ function counterAdd(id) {
   if ((item.stock || 0) <= 0) { feelErr(); toast(T('sale.oos_item', { name: item.name }), 'err'); return; }
   const line = cart.find(c => c.invId === item.id);
   if (line) line.qty++;
-  else cart.push({ invId: item.id, name: item.name, qty: 1, price: item.price || 0 });
+  else cartAdd({ invId: item.id, name: item.name, qty: 1, price: item.price || 0 });
   updateCartUI();
   feelAdd();
   const inp = document.getElementById('counter-search');
@@ -4201,9 +4228,9 @@ function quickAddItem(qi) {
     if ((item.stock || 0) <= 0) { feelErr(); toast(T('sale.oos_item', { name: item.name }), 'err'); return; }
     const line = cart.find(c => c.invId === item.id);
     if (line) line.qty++;
-    else cart.push({ invId: item.id, name: item.name, qty: 1, price: item.price || 0 });
+    else cartAdd({ invId: item.id, name: item.name, qty: 1, price: item.price || 0 });
   } else {
-    cart.push({ invId: null, name: q.name, qty: 1, price: q.price || 0 });
+    cartAdd({ invId: null, name: q.name, qty: 1, price: q.price || 0 });
   }
   updateCartUI();
   feelAdd();
@@ -4344,7 +4371,7 @@ function scanToCart(code) {
   if ((item.stock || 0) <= 0) { toast(T('sale.oos_item', { name: item.name }), 'err'); return; }
   const line = cart.find(c => c.invId === item.id);
   if (line) line.qty++;
-  else cart.push({ invId: item.id, name: item.name, qty: 1, price: item.price || 0 });
+  else cartAdd({ invId: item.id, name: item.name, qty: 1, price: item.price || 0 });
   updateCartUI();
   feelAdd();
   toast(T('sale.added', { name: item.name }), 'ok');
@@ -4419,45 +4446,6 @@ async function submitPay() {
 // ===== src/mobile/view-inventory.js =====
 // ---------- INVENTORY ----------
 let invFilter = 'all';
-// Manual item order: an "Add item" button on a row inserts the new item right
-// after that row instead of at the very end. Stored per device; the API's own
-// (name) order is used until the first in-place add seeds the order.
-const INV_ORDER_KEY = 'slpInvOrder';
-let invAddAfterId = null;
-function loadInvOrder() {
-  try { const v = JSON.parse(localStorage.getItem(INV_ORDER_KEY) || '[]'); return Array.isArray(v) ? v.map(String) : []; } catch (e) { return []; }
-}
-function saveInvOrder(arr) { try { localStorage.setItem(INV_ORDER_KEY, JSON.stringify((arr || []).map(String))); } catch (e) {} }
-function sortInvByOrder(items) {
-  const list = items || [];
-  const order = loadInvOrder();
-  if (!order.length) return list;
-  const idx = {};
-  order.forEach((id, i) => { idx[id] = i; });
-  return list.map((it, i) => ({ it, i })).sort((a, b) => {
-    const ai = Object.prototype.hasOwnProperty.call(idx, String(a.it.id)) ? idx[String(a.it.id)] : Infinity;
-    const bi = Object.prototype.hasOwnProperty.call(idx, String(b.it.id)) ? idx[String(b.it.id)] : Infinity;
-    if (ai !== bi) return ai - bi;
-    return a.i - b.i;
-  }).map(x => x.it);
-}
-function insertInvOrderAfter(afterId, newId) {
-  let order = loadInvOrder();
-  if (!order.length) order = (data.inventory || []).map(i => String(i.id));
-  const nid = String(newId);
-  order = order.filter(id => id !== nid);
-  const at = afterId == null ? -1 : order.indexOf(String(afterId));
-  if (at >= 0) order.splice(at + 1, 0, nid);
-  else order.push(nid);
-  saveInvOrder(order);
-}
-function removeInvOrder(id) {
-  const order = loadInvOrder();
-  if (!order.length) return;
-  saveInvOrder(order.filter(x => x !== String(id)));
-}
-function addItemAfter(id) { invAddAfterId = (id == null ? null : id); renderItemForm(null); }
-function addItemAtEnd() { invAddAfterId = null; renderItemForm(null); }
 async function renderInventory() {
   const v = document.getElementById('view');
   invFilter = 'all';
@@ -4471,7 +4459,7 @@ async function renderInventory() {
   v.innerHTML = `
     <div class="flex items-center justify-between gap-2 mb-3 fade-in">
       <h2 class="card-title text-base"><span class="icon-tile bg-blue-500/15 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></span>${T('view.inventory.title')} <span class="text-sm text-gray-500 font-normal">(${T('inv.count', { n: data.inventory.length })})</span></h2>
-      ${phoneRole() === 'cashier' ? '' : `<button onclick="addItemAtEnd()" class="btn btn-primary btn-sm shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('inv.add')}</button>`}
+      ${phoneRole() === 'cashier' ? '' : `<button onclick="renderItemForm(null)" class="btn btn-primary btn-sm shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('inv.add')}</button>`}
     </div>
     <div class="mb-2 fade-in"><span class="chip ${low > 0 ? 'chip-amber' : 'chip-green'}">${low > 0 ? T('inv.low_n', { n: low }) : T('inv.all_ok')}</span></div>
     <div class="flex gap-1.5 mb-2 fade-in">
@@ -4491,7 +4479,7 @@ ${phoneRole() === 'cashier' ? '' : `<button onclick="showView('stocktake')" clas
 }
 function invListHTML(items) {
   const soon = Date.now() + 30 * 86400000;
-  return sortInvByOrder(items).map(i => {
+  return items.map(i => {
     const stock = i.stock || 0;
     const exp = i.expiryDate ? new Date(i.expiryDate + 'T00:00:00').getTime() : null;
     const expSoon = exp && !isNaN(exp) && exp < soon;
@@ -4506,8 +4494,7 @@ function invListHTML(items) {
       <button onclick="openQuick(${i.id})" class="btn btn-sm ${stock <= 0 ? 'btn-ghost text-gray-500 cursor-not-allowed' : 'btn-primary'}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>${T('home.sell')}</button>
       <button onclick="photoForItem(${jsArg(i.id)})" title="${esc(T('photo.take'))}" class="btn btn-ghost btn-sm px-2">📷</button>
       ${phoneRole() === 'cashier' ? '' : `<button onclick="renderItemForm(${jsArg(i.id)})" title="${esc(T('inv.edit'))}" class="btn btn-ghost btn-sm px-2">✏️</button>`}
-    </div>
-    ${phoneRole() === 'cashier' ? '' : `<button onclick="addItemAfter(${jsArg(i.id)})" class="btn btn-ghost btn-sm w-full" style="font-size:.72rem;opacity:.8">+ ${T('inv.add_here')}</button>`}`;
+    </div>`;
   }).join('');
 }
 function invExpiringItems() {
@@ -4584,7 +4571,6 @@ async function loadValuation() {
 }
 function renderItemForm(id) {
   if (phoneRole() === 'cashier') return toast(T('nav.owner_only'), 'err');
-  if (id) invAddAfterId = null;
   const it = id ? (data.inventory || []).find(i => String(i.id) === String(id)) : null;
   const vs = (it && it.variants) || [];
   document.getElementById('modal-root').innerHTML = `
@@ -4671,16 +4657,11 @@ async function submitItemForm(id) {
   };
   try {
     if (id) await apiPost('/api/inventory/' + encodeURIComponent(id), body, 'PUT');
-    else {
-      const r = await apiPost('/api/inventory', body);
-      // Place the new item right after the row whose "Add item" was tapped.
-      if (r && !r.queued && r.id != null) insertInvOrderAfter(invAddAfterId, r.id);
-    }
-    invAddAfterId = null;
+    else await apiPost('/api/inventory', body);
     closeQuick();
     toast(id ? T('inv.updated') : T('inv.added'), 'ok');
     await refreshAll();
-  } catch (e) { invAddAfterId = null; toast(T('inv.failed', { msg: e.message }), 'err'); }
+  } catch (e) { toast(T('inv.failed', { msg: e.message }), 'err'); }
   finally { releaseSubmitLock('item'); }
 }
 // Standalone-only: delete an item with no sales history.
@@ -4697,7 +4678,6 @@ async function deleteItemForm(id) {
   if (!takeSubmitLock('itemdel')) return;
   try {
     await apiPost('/api/inventory/' + encodeURIComponent(id), {}, 'DELETE');
-    removeInvOrder(id);
     closeQuick();
     feelOk();
     toast('Item deleted', 'ok');
