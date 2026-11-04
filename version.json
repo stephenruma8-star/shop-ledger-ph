@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.25",
+    "version":  "3.37.26",
     "buildDate":  "2026-11-03T00:00:00.000Z",
-    "notes":  "Client form and sale-edit item tables: each row now has a '+' button that inserts a blank row directly below that row (instead of always at the bottom). Also fixes a missing import that could break the client cart's rate dropdown."
+    "notes":  "Interest is monthly-simple everywhere again: I = P x rate%/100 x days/30 (e.g. 20,000 at 3%/month for 178 days = 3,560.00). Rate labels show %/mo. Applies to the desktop, the LAN API and the phone; the annual-compound option and its migration were removed."
 }
