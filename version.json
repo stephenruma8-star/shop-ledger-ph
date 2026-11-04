@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.24",
+    "version":  "3.37.25",
     "buildDate":  "2026-11-03T00:00:00.000Z",
-    "notes":  "Ships the per-item 'Add item here' button on paired phones' sale cart: each cart line has a button that inserts the next item right below that line instead of at the bottom (also removed the earlier Inventory variant)."
+    "notes":  "Client form and sale-edit item tables: each row now has a '+' button that inserts a blank row directly below that row (instead of always at the bottom). Also fixes a missing import that could break the client cart's rate dropdown."
 }

@@ -511,6 +511,15 @@ try {
   await win.navigate('clients');
   await win.openClientModal(null);
   ok(document.getElementById('modal-root').innerHTML.includes('Opening Balance'), 'client create form labels the field Opening Balance');
+  // Per-row "add blank row": inserts directly below the chosen row.
+  win.cfCart.length = 0;
+  win.cfCart.push({ date: '2026-01-01', description: 'A', name: '1', unitCost: 10, intRate: 0, invId: null });
+  win.cfCart.push({ date: '2026-01-01', description: 'B', name: '1', unitCost: 20, intRate: 0, invId: null });
+  win.cfRenderCart();
+  ok(document.getElementById('cf-cart').innerHTML.includes('cfInsertRow('), 'client cart rows offer an insert-row button');
+  win.cfInsertRow(0);
+  ok(win.cfCart.length === 3 && win.cfCart[0].description === 'A' && win.cfCart[1].description === '' && win.cfCart[2].description === 'B', 'client insert-row adds a blank row directly below row 0');
+  win.cfCart.length = 0; win.cfRenderCart();
   getEl('cf-name').value = 'Debtor Dan';
   getEl('cf-phone').value = '09171234567';
   getEl('cf-address').value = 'St';

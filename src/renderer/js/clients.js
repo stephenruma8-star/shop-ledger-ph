@@ -1,6 +1,6 @@
 import { logAudit } from './auth.js'
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
-import { calcInterest, closeModal, confetti, confirmModal, debounce, escapeHtml, filterByYear, jsArg, modal, parseCSVLine, playSound, requireFields, searchData, toast, validatePhone } from './helpers.js'
+import { calcInterest, closeModal, confetti, confirmModal, debounce, escapeHtml, filterByYear, intRateOptions, jsArg, modal, parseCSVLine, playSound, requireFields, searchData, toast, validatePhone } from './helpers.js'
 import { escHtml, excelTableCss, openPrintWindow } from './printLayout.js'
 import { fmtDate, fmtDateTime, now, peso, state, today } from './state.js'
 import { adjustStock, getQty, lineAmt, receiptContentHtml, resolveInvIds, undoSale, wasBalanceAdded } from './transactions.js'
@@ -172,6 +172,14 @@ export function cfAddInvItem() {
   cfRenderCart();
 }
 
+// Insert a blank item row directly below row i (the per-row "+" button), so a
+// client with many items can add one in place instead of at the very bottom.
+export function cfInsertRow(i) {
+  const idx = Math.min(Math.max(0, parseInt(i) || 0), cfCart.length);
+  cfCart.splice(idx + 1, 0, { date: today(), description: '', name: '1', unitCost: 0, intRate: 0, invId: null });
+  cfRenderCart();
+}
+
 export function cfUpdateRowAmt(i) {
   const el = document.getElementById('cf-amt-' + i);
   if (el) el.textContent = peso(cfLineAmt(cfCart[i]));
@@ -189,7 +197,7 @@ export function cfRenderCart() {
       <td class="p-1 text-right"><input type="number" id="cf-cost-${i}" value="${item.unitCost}" step="0.01" oninput="cfCart[${i}].unitCost=Math.max(0,parseFloat(this.value)||0);cfUpdateRowAmt(${i});cfUpdateTotals()" class="w-16 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs text-right" /></td>
       <td class="p-1 text-right"><select onchange="cfCart[${i}].intRate=Math.max(0,parseFloat(this.value)||0);cfUpdateRowAmt(${i});cfUpdateTotals()" class="w-14 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs text-right">${intRateOptions(item.intRate)}</select></td>
       <td class="p-1 text-right font-medium" id="cf-amt-${i}">${peso(cfLineAmt(item))}</td>
-      <td class="p-1"><button onclick="cfCart.splice(${i},1);cfRenderCart()" class="text-red-500 hover:text-red-700" title="Remove"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></td>
+      <td class="p-1 whitespace-nowrap"><button onclick="cfInsertRow(${i})" class="text-green-600 hover:text-green-800 mr-1 align-middle" title="Add blank row below"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button><button onclick="cfCart.splice(${i},1);cfRenderCart()" class="text-red-500 hover:text-red-700 align-middle" title="Remove"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></td>
     </tr>`;
   }).join('')}</tbody></table>`;
   cfUpdateTotals();
@@ -738,6 +746,7 @@ Object.defineProperties(window, {
   saveClientDraft: { get: () => saveClientDraft, configurable: true },
   openClientModal: { get: () => openClientModal, configurable: true },
   cfAddInvItem: { get: () => cfAddInvItem, configurable: true },
+  cfInsertRow: { get: () => cfInsertRow, configurable: true },
   cfUpdateRowAmt: { get: () => cfUpdateRowAmt, configurable: true },
   cfRenderCart: { get: () => cfRenderCart, configurable: true },
   cfUpdateTotals: { get: () => cfUpdateTotals, configurable: true },

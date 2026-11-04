@@ -218,9 +218,17 @@ export function renderTMCart() {
       <td class="p-1 text-right"><input type="number" id="tx-cost-${i}" value="${item.unitCost}" min="0" step="0.01" oninput="txCart[${i}].unitCost=Math.max(0,parseFloat(this.value)||0);updateCartRowAmt(${i});updateTMTotals()" class="w-16 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs text-right" /></td>
       <td class="p-1 text-right"><select onchange="txCart[${i}].intRate=Math.max(0,parseFloat(this.value)||0);updateCartRowAmt(${i});updateTMTotals()" class="w-14 px-1 py-1 border dark:border-gray-700 rounded bg-white dark:bg-gray-800 text-xs text-right">${intRateOptions(item.intRate)}</select></td>
       <td class="p-1 text-right font-medium whitespace-nowrap" id="cart-amt-${i}">${peso(lineAmt(item))}</td>
-      <td class="p-1"><button onclick="removeCartItem(${i})" class="text-red-500"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></td>
+      <td class="p-1 whitespace-nowrap"><button onclick="txInsertRow(${i})" class="text-green-600 hover:text-green-800 mr-1 align-middle" title="Add blank row below"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button><button onclick="removeCartItem(${i})" class="text-red-500 align-middle"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></td>
     </tr>`;
   }).join('')}</tbody></table>`;
+}
+
+// Insert a blank row directly below row i (per-row "+"), instead of at the end.
+export function txInsertRow(i) {
+  const idx = Math.min(Math.max(0, parseInt(i) || 0), txCart.length);
+  txCart.splice(idx + 1, 0, { date: today(), description: '', name: '1', unitCost: 0, intRate: 0, invId: null });
+  renderTMCart();
+  updateTMTotals();
 }
 
 let _tmRemoving = false;
@@ -1162,6 +1170,7 @@ Object.defineProperties(window, {
   addToCart: { get: () => addToCart, configurable: true },
   quickAddToCart: { get: () => quickAddToCart, configurable: true },
   renderTMCart: { get: () => renderTMCart, configurable: true },
+  txInsertRow: { get: () => txInsertRow, configurable: true },
   removeCartItem: { get: () => removeCartItem, configurable: true },
   updateTMTotals: { get: () => updateTMTotals, configurable: true },
   toggleSC: { get: () => toggleSC, configurable: true },
