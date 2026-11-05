@@ -525,6 +525,20 @@ await A('PUT', '/api/sales/' + peSale.invoiceNo, { clientId: peC2.id, items: [{ 
 ok((await A('GET', '/api/clients/' + peC.id + '/history')).client.balance === -30, 'partial-edit move leaves the old client a -30 credit');
 ok((await A('GET', '/api/clients/' + peC2.id + '/history')).client.balance === 120, 'partial-edit move bills the new client 120');
 
+// void and payment-method change must ALSO reverse the old total exactly, so a
+// partial payment is never discarded (same bug class as the sale edit).
+const vpC = await A('POST', '/api/clients', { name: 'Void Regr' });
+const vpSale = await A('POST', '/api/sales', { clientId: vpC.id, items: [{ description: 'V', qty: 1, unitCost: 100 }], paymentMethod: 'Credit (Utang)' });
+await A('POST', '/api/payments', { clientId: vpC.id, amount: 30 });
+ok((await A('GET', '/api/clients/' + vpC.id + '/history')).client.balance === 70, 'void-regr balance is 70 after a 30 payment');
+await A('POST', '/api/void', { invoiceNo: vpSale.invoiceNo, reason: 'test' });
+ok((await A('GET', '/api/clients/' + vpC.id + '/history')).client.balance === -30, 'void keeps the payment (70 - 100 = -30 credit)');
+const pmC2 = await A('POST', '/api/clients', { name: 'PM Change Regr' });
+const pmSale2 = await A('POST', '/api/sales', { clientId: pmC2.id, items: [{ description: 'P', qty: 1, unitCost: 100 }], paymentMethod: 'Credit (Utang)' });
+await A('POST', '/api/payments', { clientId: pmC2.id, amount: 30 });
+await A('PUT', '/api/transactions/' + pmSale2.invoiceNo, { paymentMethod: 'Cash' });
+ok((await A('GET', '/api/clients/' + pmC2.id + '/history')).client.balance === -30, 'payment-method change keeps the payment (70 - 100 = -30)');
+
 // supplier payment edit + delete
 const supEP = await A('POST', '/api/suppliers', { name: 'Edit Sup' });
 await A('POST', '/api/supplier-payments', { supplierId: supEP.id, amount: 100, paymentMethod: 'Cash' });

@@ -405,7 +405,7 @@ export async function undoSale(t) {
   }
   if (wasBalanceAdded(t)) {
     const c = await dbGet('clients', t.clientId);
-    if (c) { c.balance = Math.max(0, (c.balance || 0) - (t.grandTotal || 0)); await dbPut('clients', c); }
+    if (c) { c.balance = round2((c.balance || 0) - (t.grandTotal || 0)); await dbPut('clients', c); }
   }
 }
 
@@ -757,7 +757,7 @@ window.confirmVoidTransaction = async function(id) {
   }
   if (wasBalanceAdded(t)) {
     const c = await dbGet('clients', t.clientId);
-    if (c) { c.balance = Math.max(0, (c.balance || 0) - (t.grandTotal || 0)); await dbPut('clients', c); }
+    if (c) { c.balance = round2((c.balance || 0) - (t.grandTotal || 0)); await dbPut('clients', c); }
   }
   t.status = 'voided'; t.voidedAt = now(); t.voidReason = reason; t.voidNotes = notes;
   await dbPut('transactions', t);
@@ -789,7 +789,7 @@ window.confirmVoidTransaction = async function(id) {
       }
       if (wasBalanceAdded(tx)) {
         const c = await dbGet('clients', tx.clientId);
-        if (c) { c.balance = Math.max(0, (c.balance || 0) - (tx.grandTotal || 0)); await dbPut('clients', c); }
+        if (c) { c.balance = round2((c.balance || 0) - (tx.grandTotal || 0)); await dbPut('clients', c); }
       }
       tx.status = 'voided'; tx.voidedAt = now();
       await dbPut('transactions', tx);
@@ -926,7 +926,7 @@ export async function doReturn(orig, returnItems, opts = {}) {
   const retTotal = retTxn.grandTotal || 0;
   if (wasBalanceAdded(orig)) {
     const c = await dbGet('clients', orig.clientId);
-    if (c) { c.balance = Math.max(0, (c.balance || 0) - Math.abs(retTotal)); await dbPut('clients', c); }
+    if (c) { c.balance = round2((c.balance || 0) - Math.abs(retTotal)); await dbPut('clients', c); }
   }
   await dbAdd('transactions', retTxn);
   [state.transactions, state.inventory] = await Promise.all([dbAll('transactions'), dbAll('inventory')]);

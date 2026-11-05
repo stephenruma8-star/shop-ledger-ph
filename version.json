@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.31",
+    "version":  "3.37.32",
     "buildDate":  "2026-11-05T00:00:00.000Z",
-    "notes":  "Fixes: editing a sale now keeps partial payments intact (the reverse step clamped the balance to zero and snapped it back to the old total); deleting a client clears any unsaved sale cart/draft so its items can't reappear in a new sale; balance math on sale edit is now exact on desktop and phone."
+    "notes":  "Correctness: voiding a sale, recording a return, changing a sale's payment method, and undoing a sale now reverse the old total exactly instead of clamping the balance to zero — so partial payments are never discarded. Same fix on desktop, phone, and the phone↔desktop LAN API."
 }

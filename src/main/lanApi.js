@@ -1230,7 +1230,7 @@ function createLanApiRouter(deps) {
           } catch (e) {}
         }
         if (balanceUndo) {
-          try { await deps.rendererExec(`(async()=>{const c=await dbGet('clients',${JSON.stringify(clientId)});if(c){c.balance=Math.max(0,(c.balance||0)-${grandTotal});await dbPut('clients',c);}})()`); } catch (e) {}
+          try { await deps.rendererExec(`(async()=>{const c=await dbGet('clients',${JSON.stringify(clientId)});if(c){c.balance=(c.balance||0)-${grandTotal};await dbPut('clients',c);}})()`); } catch (e) {}
         }
         if (txnId !== null) {
           try { await deps.rendererExec(`dbDel('transactions', ${JSON.stringify(txnId)})`); } catch (e) {}
@@ -1442,7 +1442,7 @@ function createLanApiRouter(deps) {
       const newAdded=!!(t.clientId&&pm!=='Cash');
       if(oldAdded!==newAdded&&t.clientId){
         const c=await dbGet('clients',t.clientId);
-        if(c){const delta=newAdded?(t.grandTotal||0):-(t.grandTotal||0);c.balance=Math.max(0,(c.balance||0)+delta);await dbPut('clients',c);}
+        if(c){const delta=newAdded?(t.grandTotal||0):-(t.grandTotal||0);c.balance=(c.balance||0)+delta;await dbPut('clients',c);}
       }
       t.paymentMethod=pm;t.balanceAdded=newAdded;t.editedAt=new Date().toISOString();
       await dbPut('transactions',t);
@@ -1469,7 +1469,7 @@ function createLanApiRouter(deps) {
       for(const it of (t.items||[])){
         if(it.invId){const i=await dbGet('inventory',it.invId);if(i){i.stock=(i.stock||0)+(parseInt(it.qty)||1);await dbPut('inventory',i);}}
       }
-      if(t.balanceAdded&&t.clientId){const c=await dbGet('clients',t.clientId);if(c){c.balance=Math.max(0,(c.balance||0)-(t.grandTotal||0));await dbPut('clients',c);}}
+      if(t.balanceAdded&&t.clientId){const c=await dbGet('clients',t.clientId);if(c){c.balance=(c.balance||0)-(t.grandTotal||0);await dbPut('clients',c);}}
       t.status='voided';t.voidedAt=new Date().toISOString();
       await dbPut('transactions',t);return t.invoiceNo||true;
     })())`));

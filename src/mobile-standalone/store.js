@@ -649,7 +649,7 @@ async function _apiSetPayment(ref, body) {
     const c = await db.get('SELECT * FROM clients WHERE id = ?', [t.clientId]);
     if (c) {
       const delta = newAdded ? (t.grandTotal || 0) : -(t.grandTotal || 0);
-      await db.run('UPDATE clients SET balance = ? WHERE id = ?', [_r2(Math.max(0, (c.balance || 0) + delta)), c.id]);
+      await db.run('UPDATE clients SET balance = ? WHERE id = ?', [_r2((c.balance || 0) + delta), c.id]);
     }
   }
   await db.run('UPDATE transactions SET paymentMethod = ?, balanceAdded = ?, editedAt = ? WHERE id = ?', [pm, newAdded ? 1 : 0, new Date().toISOString(), t.id]);
@@ -800,7 +800,8 @@ async function _apiVoid(body) {
   }
   if (t.balanceAdded && t.clientId) {
     const c = await db.get('SELECT * FROM clients WHERE id = ?', [t.clientId]);
-    if (c) await db.run('UPDATE clients SET balance = ? WHERE id = ?', [Math.max(0, (c.balance || 0) - (t.grandTotal || 0)), c.id]);
+    // Reverse exactly (no clamp) so a void keeps any partial payments intact.
+    if (c) await db.run('UPDATE clients SET balance = ? WHERE id = ?', [_r2((c.balance || 0) - (t.grandTotal || 0)), c.id]);
   }
   await db.run('UPDATE transactions SET status = ?, voidedAt = ?, voidReason = ? WHERE id = ?', ['voided', new Date().toISOString(), reason, t.id]);
   await _audit('sale-void', 'Mobile void ' + String(ref) + ' (phone)');
@@ -908,7 +909,7 @@ async function _apiReturns(body) {
     }
     if (orig.clientId && (orig.paymentMethod || 'Cash') !== 'Cash') {
       const c = await db.get('SELECT * FROM clients WHERE id = ?', [orig.clientId]);
-      if (c) await db.run('UPDATE clients SET balance = ? WHERE id = ?', [_r2(Math.max(0, (c.balance || 0) - absTotal)), c.id]);
+      if (c) await db.run('UPDATE clients SET balance = ? WHERE id = ?', [_r2((c.balance || 0) - absTotal), c.id]);
     }
     await _audit('return', 'Mobile return ' + (orig.invoiceNo || '') + ' → ' + invoiceNo + ' - ₱' + absTotal.toFixed(2) + (partial ? ' (partial)' : '') + ' (phone)');
     _bump();
