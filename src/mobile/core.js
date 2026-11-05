@@ -43,6 +43,9 @@ const API = (() => {
   return window.location.origin;
 })();
 const peso = (n) => '₱' + (Number(n) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// A negative balance is money the store holds for the client (overpayment as
+// credit); show it as "<amount> credit" instead of a confusing negative.
+function pesoBal(n) { const v = Number(n) || 0; return v < 0 ? peso(Math.abs(v)) + ' ' + T('cli.credit') : peso(v); }
 function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
 // escAttr: esc() does NOT escape quotes (text-node serialization leaves ' and
 // " raw), so it is unsafe inside attribute values and quoted JS strings.
@@ -327,7 +330,7 @@ function buildStatementText(client, sales, payments) {
     L.push(`${p.date || ''}  ${T('cli.stmt_pay')}  -${peso(p.amount)}${p.type ? ' (' + p.type + ')' : ''}`);
   });
   L.push('--------------------------------');
-  L.push(T('cli.stmt_balance', { amt: peso(client.balance) }));
+  L.push(T('cli.stmt_balance', { amt: pesoBal(client.balance) }));
   return L.join('\n');
 }
 // ---------- receipt sharing ----------

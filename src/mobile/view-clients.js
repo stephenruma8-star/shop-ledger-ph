@@ -3,7 +3,7 @@ async function renderClients() {
   const v = document.getElementById('view');
   v.innerHTML = skeleton(T('common.loading'));
   if (!data.clients.length) await loadClients();
-  const total = data.clients.reduce((s, c) => s + (c.balance || 0), 0);
+  const total = data.clients.reduce((s, c) => s + Math.max(0, c.balance || 0), 0);
   v.innerHTML = `
     <div class="mb-3 fade-in">
       <button onclick="renderClientForm(null)" class="btn btn-primary w-full mb-2.5"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('cli.add')}</button>
@@ -39,7 +39,7 @@ function clientListHTML(clients) {
         <div class="text-xs text-gray-500 truncate">${esc(c.phone || '—')}</div>
       </div>
       <div class="text-right shrink-0">
-        <div class="font-bold text-sm num ${(c.balance || 0) <= 0 ? 'text-green-400' : 'text-orange-400'}">${peso(c.balance)}</div>
+        <div class="font-bold text-sm num ${(c.balance || 0) <= 0 ? 'text-green-400' : 'text-orange-400'}">${pesoBal(c.balance)}</div>
       </div>
       <button onclick="event.stopPropagation();showView('pay', ${jsArg(c.id)})" class="btn btn-success btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>${T('cli.pay')}</button>
     </div>`).join('');
@@ -134,7 +134,7 @@ async function openClientDetail(id) {
         <div class="text-[11px] ${c.isSC || c.isPWD ? 'text-amber-400 font-semibold' : 'text-gray-500'}">${[c.isSC ? 'SC' : '', c.isPWD ? 'PWD' : ''].filter(Boolean).join(' + ') || ''}</div>
       </div>
       <div class="text-right shrink-0">
-        <div class="font-bold num ${(c.balance || 0) <= 0 ? 'text-green-400' : 'text-orange-400'}">${peso(c.balance)}</div>
+        <div class="font-bold num ${(c.balance || 0) <= 0 ? 'text-green-400' : 'text-orange-400'}">${pesoBal(c.balance)}</div>
         <div class="text-[11px] text-amber-400">${icon('star', 11)} ${c.loyaltyPoints || 0}</div>
       </div>
       <button onclick="closeQuick()" aria-label="Close" class="w-9 h-9 rounded-xl btn-ghost flex items-center justify-center text-gray-400 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
@@ -358,7 +358,7 @@ function clientStatementParts(h) {
     pays.slice(0, 30).forEach((p) => L.push({ text: (p.date || '') + '  ' + (p.type || '') + '  -' + peso(p.amount) }));
   }
   L.push({ t: 'divider' });
-  L.push({ bold: true, size: 'double', text: 'BALANCE: ' + peso(c.balance) });
+  L.push({ bold: true, size: 'double', text: 'BALANCE: ' + pesoBal(c.balance) });
   L.push({ t: 'spacer' });
   L.push({ t: 'center', text: 'Please settle your balance. Thank you!' });
   L.push({ t: 'spacer' });

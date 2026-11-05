@@ -36,7 +36,7 @@ async function renderDebts() {
           <div class="font-semibold text-sm text-gray-200 truncate">${esc(c.name)}</div>
           <div class="text-[11px] ${c.overdueDays > 0 ? 'text-red-400 font-semibold' : 'text-gray-500'}">${c.overdueDays > 0 ? T('debts.overdue', { n: c.overdueDays }) : (c.dueDate ? T('debts.due', { d: c.dueDate }) : '')}</div>
         </div>
-        <div class="font-bold text-sm text-orange-400 num shrink-0">${peso(c.balance)}</div>
+        <div class="font-bold text-sm text-orange-400 num shrink-0">${pesoBal(c.balance)}</div>
       </div>`).join('') || `<div class="text-center text-gray-500 py-10"><svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#15803d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-2"><polyline points="20 6 9 17 4 12"/></svg><p class="text-sm">${T('debts.empty')}</p></div>`}
     </div>`;
 }

@@ -6,7 +6,7 @@ import { renderExpTable } from './expenses.js'
 import { toggleLang } from './i18n.js'
 import { renderPayTable } from './payments.js'
 import { navigate } from './router.js'
-import { now, peso, state, today, VAT_RATE } from './state.js'
+import { now, peso, pesoBal, state, today, VAT_RATE } from './state.js'
 import { renderTxTable, txCart, updateCartRowAmt, updateTMTotals } from './transactions.js'
 
 export function dp(d) { const p = (d||'').split('-'); return { y: p[0]||'', m: p[1]||'', d: p[2]||'' }; }
@@ -237,7 +237,7 @@ export function showAllYearsSummary() {
       .reduce((s, t) => s + ((t.status === 'interest' || (t.balanceAdded !== undefined ? !!t.balanceAdded : (t.paymentMethod || 'Cash') !== 'Cash')) ? (t.grandTotal || 0) : 0), 0);
     const paid = state.payments.filter(p => p.clientId === c.id).reduce((s, p) => s + (p.amount || 0), 0);
     const since = c.ledgerYear || (() => { const tx = state.transactions.filter(tx2 => tx2.clientId === c.id && tx2.date).sort((a, b) => a.date.localeCompare(b.date))[0]; return tx ? tx.date.split('-')[0] : '—'; })();
-    return `<tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer" onclick="closeModal();viewClientHistory(${c.id})"><td class="p-2 font-medium">${escapeHtml(c.name)}</td><td class="p-2 text-xs text-gray-400">${since}</td><td class="p-2 text-right">${peso(charged)}</td><td class="p-2 text-right text-green-600">${peso(paid)}</td><td class="p-2 text-right font-bold ${(c.balance||0)>0?'text-red-600':'text-green-600'}">${peso(c.balance)}</td></tr>`;
+    return `<tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer" onclick="closeModal();viewClientHistory(${c.id})"><td class="p-2 font-medium">${escapeHtml(c.name)}</td><td class="p-2 text-xs text-gray-400">${since}</td><td class="p-2 text-right">${peso(charged)}</td><td class="p-2 text-right text-green-600">${peso(paid)}</td><td class="p-2 text-right font-bold ${(c.balance||0)>0?'text-red-600':'text-green-600'}">${pesoBal(c.balance)}</td></tr>`;
   }).join('');
 
   const totNet = totalSales - totalExpenses - totalPayments;
@@ -1014,7 +1014,7 @@ export async function sendOverdueReminders() {
   const targets = overdue.slice(0, 100);
   let sent = 0, failed = 0;
   for (const c of targets) {
-    const msg = `Hi ${c.name}, this is a friendly reminder from ${shopName}. Your balance of ${peso(c.balance)} is overdue. Please settle at your earliest convenience. Thank you!`;
+    const msg = `Hi ${c.name}, this is a friendly reminder from ${shopName}. Your balance of ${pesoBal(c.balance)} is overdue. Please settle at your earliest convenience. Thank you!`;
     try {
       const r = await window.electronAPI.sendSMS({ apiKey, number: c.phone, message: msg });
       if (r.success) sent++; else failed++;

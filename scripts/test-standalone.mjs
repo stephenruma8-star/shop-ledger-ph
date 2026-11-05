@@ -130,10 +130,10 @@ ok(h2.payments[0].date === '2026-01-02', 'payment edit can change the date');
 await A('POST', '/api/payments/' + h2.payments[0].id, {}, 'DELETE');
 h2 = await A('GET', '/api/clients/' + c1.id + '/history');
 ok(h2.client.balance === 194 && h2.payments.length === 0, 'payment delete refunds balance');
-// overpay clamps (no negative debt) and delete reverses exactly
+// overpay becomes a credit (negative balance) and delete reverses exactly
 await A('POST', '/api/payments', { clientId: c1.id, amount: 500 });
 h2 = await A('GET', '/api/clients/' + c1.id + '/history');
-ok(h2.client.balance === 0 && h2.payments.length === 1, 'overpay clamps to zero');
+ok(h2.client.balance === -306 && h2.payments.length === 1, 'overpay becomes a 306 credit');
 await A('POST', '/api/payments/' + h2.payments[0].id, {}, 'DELETE');
 h2 = await A('GET', '/api/clients/' + c1.id + '/history');
 ok(h2.client.balance === 194 && h2.payments.length === 0, 'overpay delete reverses exactly');
@@ -233,7 +233,7 @@ const tmpC = await A('POST', '/api/clients', { name: 'Temp Client' });
 ok((await A('POST', '/api/clients/' + tmpC.id, {}, 'DELETE')).success, 'delete clean client');
 const histC = await A('POST', '/api/clients', { name: 'Hist Client' });
 await A('POST', '/api/payments', { clientId: histC.id, amount: 50 });
-ok((await A('GET', '/api/clients/' + histC.id + '/history')).client.balance === 0, 'payment on zero balance keeps zero');
+ok((await A('GET', '/api/clients/' + histC.id + '/history')).client.balance === -50, 'payment on zero balance becomes a 50 credit');
 await throws(400, () => A('POST', '/api/clients/' + histC.id, {}, 'DELETE'), 'delete client with payment history blocked');
 const poId2 = (await A('POST', '/api/purchase-orders', { supplierId: sup.id, items: [{ name: 'X', price: 1, qty: 1 }] }));
 ok((await A('POST', '/api/purchase-orders/' + (await A('GET', '/api/purchase-orders')).find(p => p.poNo === poId2.poNo).id, {}, 'DELETE')).success, 'cancel pending PO');
@@ -538,6 +538,13 @@ const pmSale2 = await A('POST', '/api/sales', { clientId: pmC2.id, items: [{ des
 await A('POST', '/api/payments', { clientId: pmC2.id, amount: 30 });
 await A('PUT', '/api/transactions/' + pmSale2.invoiceNo, { paymentMethod: 'Cash' });
 ok((await A('GET', '/api/clients/' + pmC2.id + '/history')).client.balance === -30, 'payment-method change keeps the payment (70 - 100 = -30)');
+
+// an overpayment credit offsets the next utang purchase
+const coC = await A('POST', '/api/clients', { name: 'Credit Offset' });
+await A('POST', '/api/payments', { clientId: coC.id, amount: 100 });
+ok((await A('GET', '/api/clients/' + coC.id + '/history')).client.balance === -100, 'overpayment becomes a 100 credit');
+await A('POST', '/api/sales', { clientId: coC.id, items: [{ description: 'Sugar', qty: 1, unitCost: 30 }], paymentMethod: 'Credit (Utang)' });
+ok((await A('GET', '/api/clients/' + coC.id + '/history')).client.balance === -70, 'a 30 utang draws the credit down (-100 + 30 = -70)');
 
 // supplier payment edit + delete
 const supEP = await A('POST', '/api/suppliers', { name: 'Edit Sup' });

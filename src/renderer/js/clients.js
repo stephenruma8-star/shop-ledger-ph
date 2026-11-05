@@ -2,7 +2,7 @@ import { logAudit } from './auth.js'
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
 import { calcInterest, closeModal, confetti, confirmModal, debounce, escapeHtml, filterByYear, intRateOptions, jsArg, modal, parseCSVLine, playSound, requireFields, searchData, toast, validatePhone } from './helpers.js'
 import { escHtml, excelTableCss, openPrintWindow } from './printLayout.js'
-import { fmtDate, fmtDateTime, now, peso, state, today } from './state.js'
+import { fmtDate, fmtDateTime, now, peso, pesoBal, state, today } from './state.js'
 import { adjustStock, getQty, lineAmt, receiptContentHtml, resolveInvIds, undoSale, wasBalanceAdded } from './transactions.js'
 
 // Signed debt movement a history row actually caused. Cash sales are recorded
@@ -388,7 +388,7 @@ export async function viewClientHistory(id) {
       </div>
     </div>
     <div class="grid grid-cols-4 gap-2 mb-3 shrink-0">
-      <div class="bg-gray-50 dark:bg-gray-700 p-2 rounded-lg text-center"><p class="text-xs text-gray-500">Balance</p><p class="text-lg font-bold ${(c.balance||0)>0?'text-red-600':'text-green-600'}">${peso(c.balance)}</p></div>
+      <div class="bg-gray-50 dark:bg-gray-700 p-2 rounded-lg text-center"><p class="text-xs text-gray-500">Balance</p><p class="text-lg font-bold ${(c.balance||0)>0?'text-red-600':'text-green-600'}">${pesoBal(c.balance)}</p></div>
       <div class="bg-gray-50 dark:bg-gray-700 p-2 rounded-lg text-center"><p class="text-xs text-gray-500">Spent</p><p class="text-lg font-bold">${peso(c.totalSpent || totalSpent)}</p></div>
       <div class="bg-gray-50 dark:bg-gray-700 p-2 rounded-lg text-center"><p class="text-xs text-gray-500">Paid</p><p class="text-lg font-bold text-green-600">${peso(totalPaid)}</p></div>
       <div class="bg-gray-50 dark:bg-gray-700 p-2 rounded-lg text-center"><p class="text-xs text-gray-500">Points</p><p class="text-lg font-bold text-amber-600">${c.loyaltyPoints || 0}</p></div>
@@ -498,7 +498,8 @@ export function printClientInfo(id) {
   html += `<div style="border-top:2px solid #1e293b;padding-top:10px;margin-top:6px;text-align:center">`;
   const balColor = (c.balance||0) > 0 ? '#dc2626' : '#059669';
   html += `<h3 style="margin:0 0 4px;color:${balColor}">Remaining Balance: ₱${amt(c.balance)}</h3>`;
-  if ((c.balance || 0) <= 0) html += `<p style="font-weight:700;font-size:15px;margin:4px 0;color:#059669">FULLY PAID</p>`;
+  if ((c.balance || 0) === 0) html += `<p style="font-weight:700;font-size:15px;margin:4px 0;color:#059669">FULLY PAID</p>`;
+  else if ((c.balance || 0) < 0) html += `<p style="font-weight:700;font-size:15px;margin:4px 0;color:#2563eb">CREDIT ON FILE</p>`;
   html += `</div>`;
 
   openPrintWindow('Client - '+c.name, 1200, 800, html);
@@ -510,7 +511,7 @@ export async function recordClientPayment(id) {
   modal(`
     <div class="p-6">
       <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold">Payment — ${escapeHtml(c.name)}</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
-      <p class="text-sm text-gray-500 mb-3">Current balance: <strong class="${(c.balance||0)>0?'text-red-600':'text-green-600'}">${peso(c.balance)}</strong></p>
+      <p class="text-sm text-gray-500 mb-3">Current balance: <strong class="${(c.balance||0)>0?'text-red-600':'text-green-600'}">${pesoBal(c.balance)}</strong></p>
       <div class="space-y-3">
         <div class="grid grid-cols-2 gap-3">
           <div><label class="text-xs text-gray-500 block">Date</label><input id="cp-date" type="date" value="${today()}" class="w-full px-3 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800" /></div>
@@ -542,7 +543,7 @@ export async function saveClientPayment(id) {
   if (!c) { toast('Client not found', 'error'); return; }
   const wasFullyPaid = (c.balance || 0) <= 0;
   const wasFull = amount >= (c.balance || 0);
-  c.balance = Math.max(0, (c.balance || 0) - amount);
+  c.balance = round2((c.balance || 0) - amount);
   await dbPut('clients', c);
   await dbAdd('payments', { clientId: id, clientName: c.name, amount, date: dtEl.value || today(), type: wasFull ? 'Full' : 'Partial', notes: ntEl.value.trim(), createdAt: now() });
   await logAudit('payment', `${c.name} - ${peso(amount)}`);
@@ -649,7 +650,7 @@ export async function deleteClient(id) {
   const payCount = state.payments.filter(p => p.clientId === id).length;
   let msg = `Delete client "${c.name}"?`;
   if (txCount > 0 || payCount > 0) msg = `"${c.name}" has ${txCount} sale(s) and ${payCount} payment(s). All history will be removed. Continue?`;
-  else if ((c.balance || 0) > 0) msg = `"${c.name}" owes ${peso(c.balance)}. Deleting will lose this debt. Continue?`;
+  else if ((c.balance || 0) > 0) msg = `"${c.name}" owes ${pesoBal(c.balance)}. Deleting will lose this debt. Continue?`;
   if (!await confirmModal(msg)) return;
   const txs = state.transactions.filter(t => t.clientId === id);
   for (const t of txs) await undoSale(t);

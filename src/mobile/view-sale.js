@@ -322,7 +322,7 @@ function deleteSaleDraft(key) {
 }
 function clientOptions() {
   const picked = saleClientPreset != null ? saleClientPreset : saleCartClient;
-  return '<option value="">' + T('sale.walkin') + '</option>' + data.clients.map(c => '<option value="' + c.id + '"' + (picked != null && String(c.id) === String(picked) ? ' selected' : '') + '>' + esc(c.name) + ' — ' + peso(c.balance) + '</option>').join('');
+  return '<option value="">' + T('sale.walkin') + '</option>' + data.clients.map(c => '<option value="' + c.id + '"' + (picked != null && String(c.id) === String(picked) ? ' selected' : '') + '>' + esc(c.name) + ' — ' + pesoBal(c.balance) + '</option>').join('');
 }
 // Manual client switch with items in the cart: let the cashier keep those
 // items for the new client or start fresh. Never silently discard work.
@@ -726,7 +726,7 @@ async function announceClientBalance(clientId) {
   if (!clientId) return;
   try {
     const h = await apiGet('/api/clients/' + encodeURIComponent(clientId) + '/history');
-    if (h && h.client) toast((h.client.name || 'Client') + ' now owes ' + peso(h.client.balance || 0), 'info');
+    if (h && h.client) toast((h.client.name || 'Client') + ' now owes ' + pesoBal(h.client.balance || 0), 'info');
   } catch (e) {}
 }
 // Pre-save receipt preview: the same thermal layout the printer gets, built

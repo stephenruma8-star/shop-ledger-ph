@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.32",
+    "version":  "3.37.33",
     "buildDate":  "2026-11-05T00:00:00.000Z",
-    "notes":  "Correctness: voiding a sale, recording a return, changing a sale's payment method, and undoing a sale now reverse the old total exactly instead of clamping the balance to zero — so partial payments are never discarded. Same fix on desktop, phone, and the phone↔desktop LAN API."
+    "notes":  "Overpayments are now kept as credit: paying more than the balance leaves a credit (shown as e.g. \"P50.00 credit\") that offsets the client's next utang instead of being discarded. Payment edit/delete are symmetric on desktop and phone, so deleting an overpayment no longer inflates the debt. Total utang and interest ignore credits."
 }

@@ -111,9 +111,9 @@ export async function savePayment(id) {
     if (oldPay.clientId !== clientId) {
       const oldClient = await dbGet('clients', oldPay.clientId);
       if (oldClient) { oldClient.balance = (oldClient.balance || 0) + (oldPay.amount || 0); await dbPut('clients', oldClient); }
-      c.balance = Math.max(0, (c.balance || 0) - amount);
+      c.balance = round2((c.balance || 0) - amount);
     } else if (oldPay.amount !== amount) {
-      c.balance = Math.max(0, (c.balance || 0) + (oldPay.amount || 0) - amount);
+      c.balance = round2((c.balance || 0) + (oldPay.amount || 0) - amount);
     }
     await dbPut('clients', c);
     // Merge so fields this form does not edit (referenceNo, appliedAmount…)
@@ -123,7 +123,7 @@ export async function savePayment(id) {
     await dbPut('payments', pay);
     toast('Payment updated');
   } else {
-    c.balance = Math.max(0, (c.balance || 0) - amount);
+    c.balance = round2((c.balance || 0) - amount);
     await dbPut('clients', c);
     const pay = { clientId, clientName: c.name, amount, date, type, notes, createdAt: now() };
     await dbAdd('payments', pay);
@@ -145,7 +145,7 @@ export async function deletePay(id) {
     description: `Deleted payment from ${pay.clientName} (${peso(pay.amount)})`,
     undo: async () => {
       const c = await dbGet('clients', paySnapshot.clientId);
-      if (c) { c.balance = Math.max(0, (c.balance || 0) - (paySnapshot.amount || 0)); await dbPut('clients', c); }
+      if (c) { c.balance = round2((c.balance || 0) - (paySnapshot.amount || 0)); await dbPut('clients', c); }
       delete paySnapshot.id;
       const newId = await dbAdd('payments', paySnapshot);
       paySnapshot.id = newId;

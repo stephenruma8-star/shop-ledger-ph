@@ -8,7 +8,7 @@ async function renderPay(preselectedId) {
       <div class="space-y-3.5">
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sale.client')}</label>
-          <select id="pay-client" class="inp">${data.clients.map(c => '<option value="' + c.id + '"' + (String(c.id) === String(preselectedId) ? ' selected' : '') + '>' + esc(c.name) + ' — ' + peso(c.balance) + '</option>').join('')}</select>
+          <select id="pay-client" class="inp">${data.clients.map(c => '<option value="' + c.id + '"' + (String(c.id) === String(preselectedId) ? ' selected' : '') + '>' + esc(c.name) + ' — ' + pesoBal(c.balance) + '</option>').join('')}</select>
         </div>
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('pay.date')}</label>
@@ -53,7 +53,7 @@ async function renderPay(preselectedId) {
 function setAmt(val) {
   const input = document.getElementById('pay-amount');
   if (!input) return;
-  if (val === 'full') { const sel = document.getElementById('pay-client'); const id = sel ? parseInt(sel.value) : NaN; const c = data.clients.find(x => String(x.id) === String(id)); input.value = c ? (c.balance || 0).toFixed(2) : ''; const k = document.getElementById('pay-kind'); if (k) k.value = 'Full'; }
+  if (val === 'full') { const sel = document.getElementById('pay-client'); const id = sel ? parseInt(sel.value) : NaN; const c = data.clients.find(x => String(x.id) === String(id)); input.value = c ? Math.max(0, c.balance || 0).toFixed(2) : ''; const k = document.getElementById('pay-kind'); if (k) k.value = 'Full'; }
   else input.value = ((parseFloat(input.value) || 0) + val).toFixed(2);
 }
 async function submitPay() {

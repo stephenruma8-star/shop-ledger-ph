@@ -19,6 +19,9 @@ export const state = {
 };
 
 export const peso = (n) => '₱' + (Math.round(Number(n || 0) * 100) / 100).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+// Negative balance = store holds a credit for the client; label it instead of
+// showing a bare negative number.
+export const pesoBal = (n) => { const v = Number(n || 0); return v < 0 ? peso(Math.abs(v)) + ' credit' : peso(v); };
 export const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
 export const VAT_RATE = 0.12;
@@ -55,6 +58,7 @@ window.__app.chartInstances = {};
 Object.defineProperties(window, {
   state: { get: () => state, configurable: true },
   peso: { get: () => peso, configurable: true },
+  pesoBal: { get: () => pesoBal, configurable: true },
   fmtDate: { get: () => fmtDate, configurable: true },
   fmtDateTime: { get: () => fmtDateTime, configurable: true },
   today: { get: () => today, configurable: true },

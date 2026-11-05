@@ -3,7 +3,7 @@
 // names and response shapes as the LAN client, so every shared view works
 // unchanged. No imports/exports: concatenated. Requires store.js first.
 const IS_STANDALONE = true;
-const STANDALONE_VERSION = '4.8.50';
+const STANDALONE_VERSION = '4.8.51';
 function isNativeApp() {
   try { return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); } catch (e) { return false; }
 }
@@ -249,7 +249,7 @@ function buildStatementText(client, sales, payments) {
     L.push(`${p.date || ''}  ${T('cli.stmt_pay')}  -${peso(p.amount)}${p.type ? ' (' + p.type + ')' : ''}`);
   });
   L.push('--------------------------------');
-  L.push(T('cli.stmt_balance', { amt: peso(client.balance) }));
+  L.push(T('cli.stmt_balance', { amt: pesoBal(client.balance) }));
   return L.join('\n');
 }
 function buildReceiptText(t, shop) {

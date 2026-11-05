@@ -332,11 +332,11 @@ async function runStandaloneAudit() {
     const cid = r.id;
     await apiPost('/api/payments', { clientId: cid, amount: 500, type: 'Partial', date: '2026-10-15' });
     let h = await apiGet('/api/clients/' + cid + '/history');
-    if ((h.client.balance || 0) !== 0) throw new Error('zero-balance pay moved balance to ' + h.client.balance);
+    if ((h.client.balance || 0) !== -500) throw new Error('overpay should become a 500 credit, got ' + h.client.balance);
     const pid = (h.payments || []).find(p => p.amount === 500).id;
     await apiPost('/api/payments/' + pid, {}, 'DELETE');
     h = await apiGet('/api/clients/' + cid + '/history');
-    if ((h.client.balance || 0) !== 0) throw new Error('delete invented debt: ' + h.client.balance);
+    if ((h.client.balance || 0) !== 0) throw new Error('overpay delete should return to zero, got ' + h.client.balance);
   });
   await A('line-date-prorates', async () => {
     showView('sale');

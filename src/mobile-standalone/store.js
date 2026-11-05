@@ -933,10 +933,10 @@ async function _apiPayments(method, parts, body) {
     const c = clientId ? await db.get('SELECT * FROM clients WHERE id = ?', [clientId]) : null;
     const balBefore = c ? (c.balance || 0) : 0;
     const pt = (type === 'Full' || type === 'Partial' || type === 'Settle') ? type : (amtNum >= balBefore ? 'Full' : 'Partial');
-    const applied = c ? Math.min(amtNum, Math.max(0, balBefore)) : amtNum;
+    const applied = amtNum;
     await db.run('INSERT INTO payments (clientId, amount, appliedAmount, type, date, notes, referenceNo, paymentMethod, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [clientId || null, amtNum, applied, pt, safeDate, note, ref, pm, new Date().toISOString()]);
-    if (c) await db.run('UPDATE clients SET balance = ? WHERE id = ?', [_r2(Math.max(0, balBefore - amtNum)), c.id]);
+    if (c) await db.run('UPDATE clients SET balance = ? WHERE id = ?', [_r2(balBefore - amtNum), c.id]);
     await _audit('payment', 'Mobile payment ' + (c ? c.name : 'client') + ' - ₱' + amtNum.toFixed(2) + ' (phone)');
     _bump();
     return { success: true };
@@ -954,9 +954,8 @@ async function _apiPayments(method, parts, body) {
       const c = await db.get('SELECT * FROM clients WHERE id = ?', [p.clientId]);
       if (c) {
         const base = (c.balance || 0) + oldApplied;
-        const newApplied = Math.min(amtNum, Math.max(0, base));
-        await db.run('UPDATE clients SET balance = ? WHERE id = ?', [_r2(Math.max(0, base - newApplied)), c.id]);
-        await db.run('UPDATE payments SET appliedAmount = ? WHERE id = ?', [newApplied, p.id]);
+        await db.run('UPDATE clients SET balance = ? WHERE id = ?', [_r2(base - amtNum), c.id]);
+        await db.run('UPDATE payments SET appliedAmount = ? WHERE id = ?', [amtNum, p.id]);
       }
     }
     await _audit('payment', 'Mobile payment edit (phone)');

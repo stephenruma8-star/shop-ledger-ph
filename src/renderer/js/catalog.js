@@ -1,7 +1,7 @@
 import { logAudit } from './auth.js'
 import { dbAdd, dbAll, dbGet, dbPut } from './database.js'
 import { calcInterest, closeModal, escapeHtml, modal, playSound, toast, updateLowStockBadge } from './helpers.js'
-import { now, peso, state, today } from './state.js'
+import { now, peso, pesoBal, state, today } from './state.js'
 import { adjustStock, doPrintReceipt } from './transactions.js'
 
 let _root = null;
@@ -196,7 +196,7 @@ export function qsRender() {
   const balEl = document.getElementById('qs-balance');
   if (balEl && clientSel) {
     const c = clientSel.value ? state.clients.find(x => x.id === parseInt(clientSel.value)) : null;
-    balEl.textContent = c ? peso(c.balance || 0) : '';
+    balEl.textContent = c ? pesoBal(c.balance || 0) : '';
   }
 }
 
@@ -342,7 +342,7 @@ export function qsCartTotals() {
   const balEl = document.getElementById('qs-cart-balance');
   if (balEl && clientSel) {
     const c = clientSel.value ? state.clients.find(x => x.id === parseInt(clientSel.value)) : null;
-    balEl.textContent = c ? peso(c.balance || 0) : '';
+    balEl.textContent = c ? pesoBal(c.balance || 0) : '';
   }
 }
 

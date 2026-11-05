@@ -1083,7 +1083,7 @@ function createLanApiRouter(deps) {
         const balBefore = c ? (c.balance || 0) : 0;
         const pt = ${payType} || (${amt} >= balBefore ? 'Full' : 'Partial');
         await dbAdd('payments', { clientId: ${cId}, amount: ${amt}, type: pt, date: ${JSON.stringify(safeDate)}, notes: ${JSON.stringify(notes)}, referenceNo: ${JSON.stringify(referenceNo)}, paymentMethod: ${JSON.stringify(paymentMethod)}, createdAt: new Date().toISOString() });
-        if (c) await dbPut('clients', { ...c, balance: Math.max(0, balBefore - ${amt}) });
+        if (c) await dbPut('clients', { ...c, balance: balBefore - ${amt} });
         try { await logAudit('payment', 'Mobile payment ' + (c ? c.name : 'client') + ' - ₱' + (Number(${amt})).toFixed(2) + ${JSON.stringify(devTag(req))}); } catch (e) {}
         return { success: true };
       })()
@@ -1313,7 +1313,7 @@ function createLanApiRouter(deps) {
           const amtNum = Math.round((parseFloat(amount) || 0) * 100) / 100;
           if (amtNum <= 0) { errors.push({ type: 'payment', error: 'Amount must be greater than 0' }); continue; }
           const safeDate = sanitize(date) || new Date().toISOString().split('T')[0];
-          await deps.rendererExec(`(async()=>{const c=await dbGet('clients',${JSON.stringify(clientId)});const balBefore=c?(c.balance||0):0;const pt=${JSON.stringify(type)}||(amtNum>=balBefore?'Full':'Partial');await dbAdd('payments',{clientId:${JSON.stringify(clientId)},amount:${amtNum},type:pt,date:${JSON.stringify(safeDate)},notes:'',createdAt:new Date().toISOString()});if(c)await dbPut('clients',{...c,balance:Math.max(0,balBefore-${amtNum})});})()`);
+          await deps.rendererExec(`(async()=>{const c=await dbGet('clients',${JSON.stringify(clientId)});const balBefore=c?(c.balance||0):0;const pt=${JSON.stringify(type)}||(amtNum>=balBefore?'Full':'Partial');await dbAdd('payments',{clientId:${JSON.stringify(clientId)},amount:${amtNum},type:pt,date:${JSON.stringify(safeDate)},notes:'',createdAt:new Date().toISOString()});if(c)await dbPut('clients',{...c,balance:balBefore-${amtNum}});})()`);
         } else if (item.type === 'sale') {
           const { clientId, items, paymentMethod, discount } = item.body;
           if (!items || !Array.isArray(items) || items.length === 0) { errors.push({ type: 'sale', error: 'No items' }); continue; }
@@ -1495,7 +1495,7 @@ function createLanApiRouter(deps) {
       ${ref !== null ? `p.referenceNo=${JSON.stringify(ref)};` : ''}
       ${newDate !== null ? `p.date=${JSON.stringify(newDate)};` : ''}
       await dbPut('payments',p);
-      if(p.clientId){const c=await dbGet('clients',p.clientId);if(c){c.balance=Math.max(0,(c.balance||0)-diff);await dbPut('clients',c);}}
+      if(p.clientId){const c=await dbGet('clients',p.clientId);if(c){c.balance=(c.balance||0)-diff;await dbPut('clients',c);}}
       return true;
     })())`));
     if (!ok) return res.status(404).json({ error: 'Payment not found' });
@@ -1607,7 +1607,7 @@ function createLanApiRouter(deps) {
       for (const item of items) {
         if (item.invId) await deps.rendererExec(`(async()=>{const i=await dbGet('inventory',${JSON.stringify(item.invId)});if(i){i.stock=(i.stock||0)+${Math.abs(parseInt(item.qty) || 1)};await dbPut('inventory',i);}})()`);
       }
-      if (orig.clientId) await deps.rendererExec(`(async()=>{const c=await dbGet('clients',${JSON.stringify(orig.clientId)});if(c && ${JSON.stringify(orig.paymentMethod || 'Cash')} !== 'Cash'){c.balance=Math.max(0,(c.balance||0)-${absTotal});await dbPut('clients',c);}})()`);
+      if (orig.clientId) await deps.rendererExec(`(async()=>{const c=await dbGet('clients',${JSON.stringify(orig.clientId)});if(c && ${JSON.stringify(orig.paymentMethod || 'Cash')} !== 'Cash'){c.balance=(c.balance||0)-${absTotal};await dbPut('clients',c);}})()`);
       await deps.rendererExec(`(async()=>{try{await logAudit('return','Mobile return ' + ${JSON.stringify(orig.invoiceNo || '')} + ' → ' + ${JSON.stringify(invoiceNo)} + ' - ₱' + (${absTotal}).toFixed(2) + ${partial ? ' (partial)' : ''} + ${JSON.stringify(devTag(req))});}catch(e){}})()`);
       bump({ source: 'api', kind: 'return' });
       return { success: true, invoiceNo };

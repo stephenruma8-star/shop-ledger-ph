@@ -368,6 +368,9 @@ const API = (() => {
   return window.location.origin;
 })();
 const peso = (n) => '₱' + (Number(n) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// A negative balance is money the store holds for the client (overpayment as
+// credit); show it as "<amount> credit" instead of a confusing negative.
+function pesoBal(n) { const v = Number(n) || 0; return v < 0 ? peso(Math.abs(v)) + ' ' + T('cli.credit') : peso(v); }
 function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
 // escAttr: esc() does NOT escape quotes (text-node serialization leaves ' and
 // " raw), so it is unsafe inside attribute values and quoted JS strings.
@@ -652,7 +655,7 @@ function buildStatementText(client, sales, payments) {
     L.push(`${p.date || ''}  ${T('cli.stmt_pay')}  -${peso(p.amount)}${p.type ? ' (' + p.type + ')' : ''}`);
   });
   L.push('--------------------------------');
-  L.push(T('cli.stmt_balance', { amt: peso(client.balance) }));
+  L.push(T('cli.stmt_balance', { amt: pesoBal(client.balance) }));
   return L.join('\n');
 }
 // ---------- receipt sharing ----------
@@ -1809,7 +1812,7 @@ const LANG_STRINGS = {
     'cli.add': 'Add Client', 'cli.edit': 'Edit', 'cli.save': 'Save Client', 'cli.save_new_sale': 'Save & New Sale',
     'cli.add_title': 'Add Client', 'cli.edit_title': 'Edit Client',
     'cli.name': 'Name', 'cli.phone': 'Phone', 'cli.address': 'Address',
-    'cli.balance': 'Balance',
+    'cli.balance': 'Balance', 'cli.credit': 'credit',
     'cli.balance_hint': 'Correct what this client owes. New sales and payments still update it automatically.',
     'cli.record_payment': 'Record payment',
     'cli.open_bal': 'Opening Balance (₱)',
@@ -2200,7 +2203,7 @@ const LANG_STRINGS = {
     'cli.add': 'Magdagdag ng Kliyente', 'cli.edit': 'I-edit', 'cli.save': 'I-save ang Kliyente', 'cli.save_new_sale': 'I-save at Bagong Benta',
     'cli.add_title': 'Magdagdag ng Kliyente', 'cli.edit_title': 'I-edit ang Kliyente',
     'cli.name': 'Pangalan', 'cli.phone': 'Phone', 'cli.address': 'Address',
-    'cli.balance': 'Balanse',
+    'cli.balance': 'Balanse', 'cli.credit': 'kredito',
     'cli.balance_hint': 'Itama ang utang ng kliyente. Awtomatiko pa ring nagbabago ito sa benta at bayad.',
     'cli.record_payment': 'Magbayad',
     'cli.open_bal': 'Opening Balance (₱)',
@@ -2930,7 +2933,7 @@ async function renderClients() {
   const v = document.getElementById('view');
   v.innerHTML = skeleton(T('common.loading'));
   if (!data.clients.length) await loadClients();
-  const total = data.clients.reduce((s, c) => s + (c.balance || 0), 0);
+  const total = data.clients.reduce((s, c) => s + Math.max(0, c.balance || 0), 0);
   v.innerHTML = `
     <div class="mb-3 fade-in">
       <button onclick="renderClientForm(null)" class="btn btn-primary w-full mb-2.5"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${T('cli.add')}</button>
@@ -2966,7 +2969,7 @@ function clientListHTML(clients) {
         <div class="text-xs text-gray-500 truncate">${esc(c.phone || '—')}</div>
       </div>
       <div class="text-right shrink-0">
-        <div class="font-bold text-sm num ${(c.balance || 0) <= 0 ? 'text-green-400' : 'text-orange-400'}">${peso(c.balance)}</div>
+        <div class="font-bold text-sm num ${(c.balance || 0) <= 0 ? 'text-green-400' : 'text-orange-400'}">${pesoBal(c.balance)}</div>
       </div>
       <button onclick="event.stopPropagation();showView('pay', ${jsArg(c.id)})" class="btn btn-success btn-sm"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>${T('cli.pay')}</button>
     </div>`).join('');
@@ -3061,7 +3064,7 @@ async function openClientDetail(id) {
         <div class="text-[11px] ${c.isSC || c.isPWD ? 'text-amber-400 font-semibold' : 'text-gray-500'}">${[c.isSC ? 'SC' : '', c.isPWD ? 'PWD' : ''].filter(Boolean).join(' + ') || ''}</div>
       </div>
       <div class="text-right shrink-0">
-        <div class="font-bold num ${(c.balance || 0) <= 0 ? 'text-green-400' : 'text-orange-400'}">${peso(c.balance)}</div>
+        <div class="font-bold num ${(c.balance || 0) <= 0 ? 'text-green-400' : 'text-orange-400'}">${pesoBal(c.balance)}</div>
         <div class="text-[11px] text-amber-400">${icon('star', 11)} ${c.loyaltyPoints || 0}</div>
       </div>
       <button onclick="closeQuick()" aria-label="Close" class="w-9 h-9 rounded-xl btn-ghost flex items-center justify-center text-gray-400 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
@@ -3285,7 +3288,7 @@ function clientStatementParts(h) {
     pays.slice(0, 30).forEach((p) => L.push({ text: (p.date || '') + '  ' + (p.type || '') + '  -' + peso(p.amount) }));
   }
   L.push({ t: 'divider' });
-  L.push({ bold: true, size: 'double', text: 'BALANCE: ' + peso(c.balance) });
+  L.push({ bold: true, size: 'double', text: 'BALANCE: ' + pesoBal(c.balance) });
   L.push({ t: 'spacer' });
   L.push({ t: 'center', text: 'Please settle your balance. Thank you!' });
   L.push({ t: 'spacer' });
@@ -3856,7 +3859,7 @@ function deleteSaleDraft(key) {
 }
 function clientOptions() {
   const picked = saleClientPreset != null ? saleClientPreset : saleCartClient;
-  return '<option value="">' + T('sale.walkin') + '</option>' + data.clients.map(c => '<option value="' + c.id + '"' + (picked != null && String(c.id) === String(picked) ? ' selected' : '') + '>' + esc(c.name) + ' — ' + peso(c.balance) + '</option>').join('');
+  return '<option value="">' + T('sale.walkin') + '</option>' + data.clients.map(c => '<option value="' + c.id + '"' + (picked != null && String(c.id) === String(picked) ? ' selected' : '') + '>' + esc(c.name) + ' — ' + pesoBal(c.balance) + '</option>').join('');
 }
 // Manual client switch with items in the cart: let the cashier keep those
 // items for the new client or start fresh. Never silently discard work.
@@ -4260,7 +4263,7 @@ async function announceClientBalance(clientId) {
   if (!clientId) return;
   try {
     const h = await apiGet('/api/clients/' + encodeURIComponent(clientId) + '/history');
-    if (h && h.client) toast((h.client.name || 'Client') + ' now owes ' + peso(h.client.balance || 0), 'info');
+    if (h && h.client) toast((h.client.name || 'Client') + ' now owes ' + pesoBal(h.client.balance || 0), 'info');
   } catch (e) {}
 }
 // Pre-save receipt preview: the same thermal layout the printer gets, built
@@ -4529,7 +4532,7 @@ async function renderPay(preselectedId) {
       <div class="space-y-3.5">
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sale.client')}</label>
-          <select id="pay-client" class="inp">${data.clients.map(c => '<option value="' + c.id + '"' + (String(c.id) === String(preselectedId) ? ' selected' : '') + '>' + esc(c.name) + ' — ' + peso(c.balance) + '</option>').join('')}</select>
+          <select id="pay-client" class="inp">${data.clients.map(c => '<option value="' + c.id + '"' + (String(c.id) === String(preselectedId) ? ' selected' : '') + '>' + esc(c.name) + ' — ' + pesoBal(c.balance) + '</option>').join('')}</select>
         </div>
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('pay.date')}</label>
@@ -4574,7 +4577,7 @@ async function renderPay(preselectedId) {
 function setAmt(val) {
   const input = document.getElementById('pay-amount');
   if (!input) return;
-  if (val === 'full') { const sel = document.getElementById('pay-client'); const id = sel ? parseInt(sel.value) : NaN; const c = data.clients.find(x => String(x.id) === String(id)); input.value = c ? (c.balance || 0).toFixed(2) : ''; const k = document.getElementById('pay-kind'); if (k) k.value = 'Full'; }
+  if (val === 'full') { const sel = document.getElementById('pay-client'); const id = sel ? parseInt(sel.value) : NaN; const c = data.clients.find(x => String(x.id) === String(id)); input.value = c ? Math.max(0, c.balance || 0).toFixed(2) : ''; const k = document.getElementById('pay-kind'); if (k) k.value = 'Full'; }
   else input.value = ((parseFloat(input.value) || 0) + val).toFixed(2);
 }
 async function submitPay() {
@@ -6576,7 +6579,7 @@ async function renderDebts() {
           <div class="font-semibold text-sm text-gray-200 truncate">${esc(c.name)}</div>
           <div class="text-[11px] ${c.overdueDays > 0 ? 'text-red-400 font-semibold' : 'text-gray-500'}">${c.overdueDays > 0 ? T('debts.overdue', { n: c.overdueDays }) : (c.dueDate ? T('debts.due', { d: c.dueDate }) : '')}</div>
         </div>
-        <div class="font-bold text-sm text-orange-400 num shrink-0">${peso(c.balance)}</div>
+        <div class="font-bold text-sm text-orange-400 num shrink-0">${pesoBal(c.balance)}</div>
       </div>`).join('') || `<div class="text-center text-gray-500 py-10"><svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#15803d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-2"><polyline points="20 6 9 17 4 12"/></svg><p class="text-sm">${T('debts.empty')}</p></div>`}
     </div>`;
 }

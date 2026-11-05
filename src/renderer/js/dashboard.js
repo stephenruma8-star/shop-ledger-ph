@@ -2,7 +2,7 @@ import { dbAdd, dbAll, dbPut } from './database.js'
 import { icon } from './icons.js';
 import { animateCount, dbLoad, escapeHtml, modal, toast } from './helpers.js'
 import { escHtml, openPrintWindow } from './printLayout.js'
-import { fmtDate, fmtDateTime, peso, state, today } from './state.js'
+import { fmtDate, fmtDateTime, peso, pesoBal, state, today } from './state.js'
 
 export async function viewDashboard(root) {
   await Promise.all([dbLoad('clients'), dbLoad('transactions'), dbLoad('expenses'), dbLoad('payments'), dbLoad('inventory'), dbLoad('settings')]);
@@ -13,7 +13,7 @@ export async function viewDashboard(root) {
   const todaySales = todayTx.reduce((s, t) => s + (t.grandTotal || 0), 0);
   const todayExpTotal = todayExp.reduce((s, e) => s + (e.amount || 0), 0);
   const todayPayTotal = todayPay.reduce((s, p) => s + (p.amount || 0), 0);
-  const totalUtang = state.clients.reduce((s, c) => s + (c.balance || 0), 0);
+  const totalUtang = state.clients.reduce((s, c) => s + Math.max(0, c.balance || 0), 0);
   const lowStock = state.inventory.filter(i => (i.stock || 0) <= (i.minStock || 5));
   const topUtang = [...state.clients].filter(c => (c.balance || 0) > 0).sort((a, b) => (b.balance || 0) - (a.balance || 0));
   const todayProfit = todaySales - todayExpTotal;
@@ -120,7 +120,7 @@ export async function viewDashboard(root) {
           <h3 class="font-bold text-xs mb-1">Top Debts</h3>
           <div class="max-h-48 overflow-y-auto">${topUtang.length === 0 ? '<p class="text-gray-400 text-xs">No debts</p>' : topUtang.slice(0, 10).map(c => `
             <div class="flex justify-between py-0.5 text-xs border-b dark:border-gray-700 last:border-0">
-              <span>${escapeHtml(c.name)}</span><span class="font-semibold text-orange-600">${peso(c.balance)}</span>
+              <span>${escapeHtml(c.name)}</span><span class="font-semibold text-orange-600">${pesoBal(c.balance)}</span>
             </div>`).join('') + (topUtang.length > 10 ? `<div class="text-center pt-1"><a href="#" onclick="event.preventDefault();navigate('utang')" class="text-blue-500 text-xs hover:underline"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-0.5 -mt-0.5"><polyline points="9 18 15 12 9 6"/></svg>View all (${topUtang.length})</a></div>` : '')}</div>
         </div>` : ''}
         ${dw.lowStock ? `<div class="bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm">
@@ -294,7 +294,7 @@ export async function askAI() {
     const recentTx = [...state.transactions].sort((a,b) => new Date(b.createdAt)-new Date(a.createdAt)).slice(0, 30);
     const lowStock = state.inventory.filter(i => (i.stock||0) <= (i.minStock||5));
     const todaySales = state.transactions.filter(t => t.date === today() && t.status !== 'voided' && t.status !== 'interest').reduce((s,t) => s+(t.grandTotal||0), 0);
-    const totalUtang = state.clients.reduce((s,c) => s+(c.balance||0), 0);
+    const totalUtang = state.clients.reduce((s,c) => s+Math.max(0,c.balance||0), 0);
     let baseUrl, model, headers;
     if (provider === 'ollama') {
       baseUrl = 'http://localhost:11434/v1';
