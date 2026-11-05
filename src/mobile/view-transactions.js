@@ -267,19 +267,31 @@ function receiptLines(t) {
   return L;
 }
 function bondReceiptCss() {
-  return `.bond-receipt{background:#fff;color:#111;border-radius:.75rem;padding:1rem;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.35}
-.bond-receipt .bond-head{text-align:center;border-bottom:2px solid #111;padding-bottom:.6rem;margin-bottom:.6rem}
-.bond-receipt .bond-shop{font-size:1.05rem;font-weight:700;letter-spacing:.2px}
-.bond-receipt .bond-muted{color:#475569;font-size:.72rem;margin-top:.1rem}
-.bond-receipt .bond-meta{display:flex;justify-content:space-between;gap:.75rem;font-size:.72rem;margin-bottom:.4rem}
-.bond-receipt .bond-table{width:100%;border-collapse:collapse;margin:.35rem 0}
-.bond-receipt .bond-table th{border-bottom:1px solid #111;padding:.3rem .2rem;font-size:.65rem;text-transform:uppercase;text-align:left}
-.bond-receipt .bond-table td{padding:.32rem .2rem;border-bottom:1px dotted #cbd5e1;vertical-align:top}
-.bond-receipt .bond-table .num{text-align:right;white-space:nowrap}
-.bond-receipt .bond-totals{width:100%;margin-top:.45rem}
-.bond-receipt .bond-totals td{padding:.2rem}
-.bond-receipt .bond-totals .grand{font-weight:700;font-size:1.02rem;border-top:2px solid #111}
-.bond-receipt .bond-foot{text-align:center;border-top:1px solid #cbd5e1;margin-top:.7rem;padding-top:.5rem;font-size:.72rem;color:#475569}`;
+  return `.bond-receipt{background:#fff;color:#0f172a;border:1px solid #cbd5e1;border-radius:.7rem;padding:1rem 1.05rem;font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-size:12px;line-height:1.4;box-shadow:0 6px 24px rgba(0,0,0,.18)}
+.bond-receipt *{box-sizing:border-box}
+.bond-receipt .bond-top{height:6px;border-radius:3px;background:linear-gradient(90deg,#2563eb,#38bdf8,#22c55e);margin:-1rem -1.05rem .8rem}
+.bond-receipt .bond-head{display:flex;justify-content:space-between;align-items:flex-start;gap:.9rem;border-bottom:2px solid #0f172a;padding-bottom:.55rem;margin-bottom:.65rem}
+.bond-receipt .bond-shop{font-size:1.15rem;font-weight:800;letter-spacing:.2px}
+.bond-receipt .bond-muted{color:#475569;font-size:.72rem;margin-top:.12rem}
+.bond-receipt .bond-badge{align-self:flex-start;border:2px solid #2563eb;color:#2563eb;border-radius:.4rem;padding:.28rem .5rem;font-weight:800;font-size:.66rem;letter-spacing:1px;white-space:nowrap}
+.bond-receipt .bond-meta{display:grid;grid-template-columns:1fr 1fr;gap:.1rem .9rem;font-size:.72rem;margin:.15rem 0 .6rem}
+.bond-receipt .bond-meta div{display:flex;justify-content:space-between;gap:.5rem;border-bottom:1px dotted #cbd5e1;padding:.16rem 0}
+.bond-receipt .bond-meta span{color:#64748b}
+.bond-receipt .bond-meta b{font-weight:700}
+.bond-receipt table.bond-table{width:100%;border-collapse:collapse;margin:.3rem 0 .15rem;border:1px solid #94a3b8}
+.bond-receipt table.bond-table th{background:#e2e8f0;border:1px solid #94a3b8;padding:.36rem .42rem;font-size:.63rem;text-transform:uppercase;letter-spacing:.4px;text-align:left}
+.bond-receipt table.bond-table td{border:1px solid #cbd5e1;padding:.34rem .42rem;vertical-align:top}
+.bond-receipt table.bond-table tbody tr:nth-child(odd){background:#ffffff}
+.bond-receipt table.bond-table tbody tr:nth-child(even){background:#f1f5f9}
+.bond-receipt table.bond-table .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.bond-receipt .bond-totals{width:100%;border-collapse:collapse;margin-top:.15rem}
+.bond-receipt .bond-totals td{padding:.28rem .42rem;border:1px solid #cbd5e1}
+.bond-receipt .bond-totals .lbl{background:#f8fafc;font-weight:600}
+.bond-receipt .bond-totals .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.bond-receipt .bond-totals tr.grand td{background:#0f172a;color:#fff;font-weight:800;font-size:1rem;border-color:#0f172a}
+.bond-receipt .bond-sign{display:flex;gap:1.6rem;margin-top:1.15rem}
+.bond-receipt .bond-sign .line{flex:1;text-align:center;border-top:1px solid #94a3b8;padding-top:.26rem;font-size:.62rem;color:#475569}
+.bond-receipt .bond-foot{text-align:center;border-top:1px dashed #cbd5e1;margin-top:.9rem;padding-top:.5rem;font-size:.7rem;color:#475569}`;
 }
 function bondReceiptHtml(t) {
   const s = (typeof data !== 'undefined' && data.settings) || {};
@@ -291,24 +303,43 @@ function bondReceiptHtml(t) {
     const amt = Number(i.amount) || qty * unit + lineIntCalc(qty * unit, i.intRate, i.date);
     return `<tr><td>${esc(i.description || i.name || 'Item')}${i.variantName ? ' - ' + esc(i.variantName) : ''}</td><td class="num">${qty}</td><td class="num">${money(unit)}</td>${hasInt ? `<td class="num">${Number(i.intRate) || 0}%</td>` : ''}<td class="num">${money(amt)}</td></tr>`;
   }).join('');
+  const sc = Number(t.scDiscount) || 0;
+  const extraDisc = Math.max(0, (Number(t.discount) || 0) - sc);
+  const stamped = new Date().toLocaleString('en-PH', { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  const dateOnly = String(t.createdAt || t.date || '').slice(0, 10);
   return `<div class="bond-receipt">
+    <div class="bond-top"></div>
     <div class="bond-head">
-      <div class="bond-shop">${esc(s.shopName || 'Shop Ledger PH')}</div>
-      ${s.shopAddress ? `<div class="bond-muted">${esc(s.shopAddress)}</div>` : ''}
-      ${s.shopContact ? `<div class="bond-muted">${esc(s.shopContact)}</div>` : ''}
-      ${s.receiptHeaderText ? `<div class="bond-muted">${esc(s.receiptHeaderText)}</div>` : ''}
-      <div class="bond-muted" style="font-weight:700;margin-top:.35rem">OFFICIAL RECEIPT</div>
+      <div>
+        <div class="bond-shop">${esc(s.shopName || 'Shop Ledger PH')}</div>
+        ${s.shopAddress ? `<div class="bond-muted">${esc(s.shopAddress)}</div>` : ''}
+        ${s.shopContact ? `<div class="bond-muted">${esc(s.shopContact)}</div>` : ''}
+        ${s.receiptHeaderText ? `<div class="bond-muted">${esc(s.receiptHeaderText)}</div>` : ''}
+      </div>
+      <div class="bond-badge">OFFICIAL RECEIPT</div>
     </div>
-    <div class="bond-meta"><span>Invoice: <b>${esc(t.invoiceNo || 'N/A')}</b></span><span>${esc(t.createdAt || t.date || '')}</span></div>
-    ${t.clientName && t.clientName !== 'Walk-in' ? `<div class="bond-meta"><span>Client: ${esc(t.clientName)}</span><span>${esc(t.paymentMethod || 'Cash')}</span></div>` : ''}
-    <table class="bond-table"><thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Price</th>${hasInt ? '<th class="num">Int</th>' : ''}<th class="num">Amount</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="bond-meta">
+      <div><span>Invoice</span><b>${esc(t.invoiceNo || 'N/A')}</b></div>
+      <div><span>Date</span><b>${esc(dateOnly)}</b></div>
+      <div><span>Client</span><b>${esc(t.clientName || 'Walk-in')}</b></div>
+      <div><span>Payment</span><b>${esc(t.paymentMethod || 'Cash')}</b></div>
+    </div>
+    <table class="bond-table">
+      <thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Price</th>${hasInt ? '<th class="num">Int</th>' : ''}<th class="num">Amount</th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="${hasInt ? 5 : 4}" style="text-align:center;color:#94a3b8">No items</td></tr>`}</tbody>
+    </table>
     <table class="bond-totals">
-      <tr><td>Subtotal</td><td class="num">${money(t.subtotal)}</td></tr>
-      ${Number(t.totalInterest) > 0 ? `<tr><td>Interest</td><td class="num">${money(t.totalInterest)}</td></tr>` : ''}
-      ${Number(t.discount) > 0 ? `<tr><td>Discount</td><td class="num">-${money(t.discount)}</td></tr>` : ''}
+      <tr><td class="lbl">Subtotal</td><td class="num">${money(t.subtotal)}</td></tr>
+      ${Number(t.totalInterest) > 0 ? `<tr><td class="lbl">Interest</td><td class="num">${money(t.totalInterest)}</td></tr>` : ''}
+      ${sc > 0 ? `<tr><td class="lbl">SC/PWD 20%</td><td class="num">-${money(sc)}</td></tr>` : ''}
+      ${extraDisc > 0 ? `<tr><td class="lbl">Discount</td><td class="num">-${money(extraDisc)}</td></tr>` : ''}
       <tr class="grand"><td>TOTAL</td><td class="num">${money(t.grandTotal)}</td></tr>
     </table>
-    <div class="bond-foot">${esc(s.receiptFooter || 'Thank you for your patronage!')}</div>
+    <div class="bond-sign">
+      <div class="line">Served by${s.cashierName ? ' — ' + esc(s.cashierName) : ''}</div>
+      <div class="line">Received by (signature)</div>
+    </div>
+    <div class="bond-foot">${esc(s.receiptFooter || 'Thank you for your patronage!')}<br>Printed ${esc(stamped)}</div>
   </div>`;
 }
 function bondPrintDocument(t) {

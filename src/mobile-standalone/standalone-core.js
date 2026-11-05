@@ -3,7 +3,7 @@
 // names and response shapes as the LAN client, so every shared view works
 // unchanged. No imports/exports: concatenated. Requires store.js first.
 const IS_STANDALONE = true;
-const STANDALONE_VERSION = '4.8.51';
+const STANDALONE_VERSION = '4.8.52';
 function isNativeApp() {
   try { return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); } catch (e) { return false; }
 }
@@ -13,6 +13,10 @@ function nativePlugin(name) {
 const API = '';
 const HDR = () => ({});
 const peso = (n) => '₱' + (Number(n) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// A negative balance is a credit the store holds for the client; label it on
+// statements instead of showing a bare negative. (core.js defines this for the
+// paired app; the standalone bundle needs its own copy.)
+function pesoBal(n) { const v = Number(n) || 0; return v < 0 ? peso(Math.abs(v)) + ' ' + (typeof T === 'function' ? T('cli.credit') : 'credit') : peso(v); }
 function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
 // escAttr: esc() does NOT escape quotes (text-node serialization leaves ' and
 // " raw), so it is unsafe inside attribute values and quoted JS strings.
