@@ -640,6 +640,8 @@ export async function printThermalReceipt(id) {
   if (settingsMap['receiptHeaderText']) settingsMap['receiptHeaderText'].split('\n').filter(Boolean).forEach(l => lines.push({ t: 'center', text: l }));
   lines.push({ t: 'divider' });
   lines.push({ t: 'center', bold: true, text: 'OFFICIAL RECEIPT' });
+  if (t.status === 'voided') lines.push({ t: 'center', bold: true, text: '** VOIDED **' });
+  if (t.status === 'return') lines.push({ t: 'center', bold: true, text: '** RETURN / REFUND **' });
   lines.push({ text: 'Invoice: ' + (t.invoiceNo || 'N/A') });
   lines.push({ text: 'Date: ' + fmtDateTime(t.createdAt) });
   if (t.clientName && t.clientName !== 'Walk-in') lines.push({ text: 'Client: ' + t.clientName });
@@ -657,6 +659,10 @@ export async function printThermalReceipt(id) {
   const extraDiscount = Math.max(0, (t.discount || 0) - (t.scDiscount || 0));
   if (t.scDiscount > 0) lines.push({ text: 'SC/PWD 20%:           -' + peso(t.scDiscount) });
   if (extraDiscount > 0) lines.push({ text: 'Discount:             -' + peso(extraDiscount) });
+  if (settingsMap['registeredForVat'] === 'true' && Number(t.vatExclusive) > 0) {
+    lines.push({ text: 'VAT Excl:             ' + peso(t.vatExclusive) });
+    lines.push({ text: 'VAT (' + ((Number(t.vatRate) || 0) * 100).toFixed(0) + '%):          ' + peso(t.vatAmount) });
+  }
   lines.push({ bold: true, text: 'TOTAL:                ' + peso(t.grandTotal) });
   lines.push({ t: 'divider' });
   lines.push({ text: 'Payment: ' + (t.paymentMethod || 'Cash') });
@@ -1074,12 +1080,13 @@ export function receiptContentHtml(t, size) {
 
   const itemsHtml = (t.items || []).map(item => {
     const qt = item.name || String(item.qty || 1);
-    const rate = item.intRate != null ? item.intRate : (item.interest ? +((item.interest / (getQty(item.name) * (item.unitCost || 1)) * 100).toFixed(1)) : 0);
-    const sub = getQty(item.name||item.qty) * (item.unitCost||item.price||0);
-    const iDate = item.date || t.date;
-    const days = rate > 0 && sub > 0 ? Math.max(1, Math.floor((new Date(today()) - new Date(iDate)) / 86400000)) : 0;
-    const intr = days > 0 ? calcInterest(sub, rate, days) : 0;
-    return `<tr><td style="text-align:left">${escapeHtml(item.description||item.name||'Item')}</td><td style="text-align:center">${qt}</td><td style="text-align:right">${peso(item.unitCost||item.price||0)}</td>${rate>0?`<td style="text-align:right">${peso(intr)}</td>`:''}<td style="text-align:right;font-weight:600">${peso(sub+intr)}</td></tr>`;
+    const rate = Number(item.intRate) || 0;
+    const sub = getQty(item.name || item.qty) * (item.unitCost || item.price || 0);
+    // Use the STORED line amount so a reprint matches the original sale exactly
+    // (recomputing interest from today's date would drift the numbers over time).
+    const amt = Number(item.amount) > 0 ? Number(item.amount) : sub;
+    const intr = Math.max(0, round2(amt - sub));
+    return `<tr><td style="text-align:left">${escapeHtml(item.description||item.name||'Item')}</td><td style="text-align:center">${qt}</td><td style="text-align:right">${peso(item.unitCost||item.price||0)}</td>${rate>0?`<td style="text-align:right">${peso(intr)}</td>`:''}<td style="text-align:right;font-weight:600">${peso(amt)}</td></tr>`;
   }).join('');
 
   const hasInt = t.totalInterest > 0;
@@ -1106,6 +1113,8 @@ export function receiptContentHtml(t, size) {
     </style></head><body>
     <div class="receipt">
       ${t.status === 'preview' ? '<div class="draft-banner">PREVIEW — details not saved yet</div>' : ''}
+      ${t.status === 'voided' ? '<div class="draft-banner" style="border-color:#dc2626;color:#dc2626">VOIDED</div>' : ''}
+      ${t.status === 'return' ? '<div class="draft-banner" style="border-color:#7c3aed;color:#7c3aed">RETURN / REFUND</div>' : ''}
       <h1>${escapeHtml(shopName)}</h1>
       ${shopAddr ? `<div class="shop-info">${escapeHtml(shopAddr)}</div>` : ''}
       ${shopContact ? `<div class="shop-info">${escapeHtml(shopContact)}</div>` : ''}
@@ -1122,6 +1131,7 @@ export function receiptContentHtml(t, size) {
       ${t.totalInterest>0?`<tr><td style="text-align:right">Interest:</td><td style="text-align:right">${peso(t.totalInterest)}</td></tr>`:''}
       ${t.scDiscount>0?`<tr><td style="text-align:right">SC/PWD:</td><td style="text-align:right">-${peso(t.scDiscount)}</td></tr>`:''}
       ${Math.max(0,(t.discount||0)-(t.scDiscount||0))>0?`<tr><td style="text-align:right">Discount:</td><td style="text-align:right">-${peso(Math.max(0,(t.discount||0)-(t.scDiscount||0)))}</td></tr>`:''}
+      ${(settingsMap['registeredForVat'] === 'true' && Number(t.vatExclusive) > 0) ? `<tr><td style="text-align:right">VAT Excl:</td><td style="text-align:right">${peso(t.vatExclusive)}</td></tr><tr><td style="text-align:right">VAT (${((Number(t.vatRate)||0)*100).toFixed(0)}%):</td><td style="text-align:right">${peso(t.vatAmount)}</td></tr>` : ''}
       <tr style="font-weight:700"><td style="text-align:right">TOTAL:</td><td style="text-align:right">${peso(t.grandTotal)}</td></tr></table>
       <div class="payment">Payment: ${escapeHtml(t.paymentMethod||'Cash')}</div>
       <div class="footer">${escapeHtml(footerMsg)}</div>

@@ -245,14 +245,16 @@ function receiptLines(t) {
   if (s.shopContact) L.push(center('Contact: ' + s.shopContact));
   L.push('-'.repeat(W));
   L.push(center('OFFICIAL RECEIPT'));
+  if (t.status === 'voided') L.push(center('*** VOIDED ***'));
+  if (t.status === 'return') L.push(center('*** RETURN ***'));
   L.push(clip('Invoice: ' + (t.invoiceNo || 'N/A')));
   L.push(clip('Date: ' + (t.createdAt || t.date || '')));
   if (t.clientName && t.clientName !== 'Walk-in') L.push(clip('Client: ' + t.clientName));
   L.push('-'.repeat(W));
   (t.items || []).forEach(it => {
-    const q = parseFloat(it.qty) || 1;
+    const q = parseFloat((it.qty != null && it.qty !== '') ? it.qty : it.name) || 1;
     const p = it.unitCost || it.price || 0;
-    L.push(String(it.description || it.name || 'Item').slice(0, W));
+    L.push(String(it.description || 'Item').slice(0, W));
     L.push(row2('  ' + q + ' x ' + pesoPlain(p), pesoPlain(q * p)));
   });
   L.push('-'.repeat(W));
@@ -274,6 +276,7 @@ function bondReceiptCss() {
 .bond-receipt .bond-shop{font-size:1.15rem;font-weight:800;letter-spacing:.2px}
 .bond-receipt .bond-muted{color:#475569;font-size:.72rem;margin-top:.12rem}
 .bond-receipt .bond-badge{align-self:flex-start;border:2px solid #2563eb;color:#2563eb;border-radius:.4rem;padding:.28rem .5rem;font-weight:800;font-size:.66rem;letter-spacing:1px;white-space:nowrap}
+.bond-receipt .bond-status{text-align:center;font-weight:800;font-size:.8rem;letter-spacing:2px;border:2px solid;border-radius:.4rem;padding:.3rem;margin-bottom:.5rem}
 .bond-receipt .bond-meta{display:grid;grid-template-columns:1fr 1fr;gap:.1rem .9rem;font-size:.72rem;margin:.15rem 0 .6rem}
 .bond-receipt .bond-meta div{display:flex;justify-content:space-between;gap:.5rem;border-bottom:1px dotted #cbd5e1;padding:.16rem 0}
 .bond-receipt .bond-meta span{color:#64748b}
@@ -301,7 +304,7 @@ function bondReceiptHtml(t) {
     const qty = Number(i.qty) || 1;
     const unit = Number(i.unitCost ?? i.price) || 0;
     const amt = Number(i.amount) || qty * unit + lineIntCalc(qty * unit, i.intRate, i.date);
-    return `<tr><td>${esc(i.description || i.name || 'Item')}${i.variantName ? ' - ' + esc(i.variantName) : ''}</td><td class="num">${qty}</td><td class="num">${money(unit)}</td>${hasInt ? `<td class="num">${Number(i.intRate) || 0}%</td>` : ''}<td class="num">${money(amt)}</td></tr>`;
+    return `<tr><td>${esc(i.description || 'Item')}${i.variantName ? ' - ' + esc(i.variantName) : ''}</td><td class="num">${qty}</td><td class="num">${money(unit)}</td>${hasInt ? `<td class="num">${Number(i.intRate) || 0}%</td>` : ''}<td class="num">${money(amt)}</td></tr>`;
   }).join('');
   const sc = Number(t.scDiscount) || 0;
   const extraDisc = Math.max(0, (Number(t.discount) || 0) - sc);
@@ -309,6 +312,8 @@ function bondReceiptHtml(t) {
   const dateOnly = String(t.createdAt || t.date || '').slice(0, 10);
   return `<div class="bond-receipt">
     <div class="bond-top"></div>
+    ${t.status === 'voided' ? '<div class="bond-status" style="border-color:#dc2626;color:#dc2626">VOIDED</div>' : ''}
+    ${t.status === 'return' ? '<div class="bond-status" style="border-color:#7c3aed;color:#7c3aed">RETURN / REFUND</div>' : ''}
     <div class="bond-head">
       <div>
         <div class="bond-shop">${esc(s.shopName || 'Shop Ledger PH')}</div>
@@ -333,6 +338,7 @@ function bondReceiptHtml(t) {
       ${Number(t.totalInterest) > 0 ? `<tr><td class="lbl">Interest</td><td class="num">${money(t.totalInterest)}</td></tr>` : ''}
       ${sc > 0 ? `<tr><td class="lbl">SC/PWD 20%</td><td class="num">-${money(sc)}</td></tr>` : ''}
       ${extraDisc > 0 ? `<tr><td class="lbl">Discount</td><td class="num">-${money(extraDisc)}</td></tr>` : ''}
+      ${Number(t.vatExclusive) > 0 ? `<tr><td class="lbl">VAT Excl</td><td class="num">${money(t.vatExclusive)}</td></tr><tr><td class="lbl">VAT (${((Number(t.vatRate) || 0) * 100).toFixed(0)}%)</td><td class="num">${money(t.vatAmount)}</td></tr>` : ''}
       <tr class="grand"><td>TOTAL</td><td class="num">${money(t.grandTotal)}</td></tr>
     </table>
     <div class="bond-sign">

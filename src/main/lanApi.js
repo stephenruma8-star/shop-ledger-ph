@@ -1382,20 +1382,32 @@ function createLanApiRouter(deps) {
       if (s.shopContact) lines.push({ t: 'center', text: 'Contact: ' + s.shopContact });
       lines.push({ t: 'divider' });
       lines.push({ t: 'center', bold: true, text: 'OFFICIAL RECEIPT' });
+      if (t.status === 'voided') lines.push({ t: 'center', bold: true, text: '** VOIDED **' });
+      if (t.status === 'return') lines.push({ t: 'center', bold: true, text: '** RETURN / REFUND **' });
       lines.push({ text: 'Invoice: ' + (t.invoiceNo || 'N/A') });
       lines.push({ text: 'Date: ' + (t.createdAt || t.date || '') });
       if (t.clientName && t.clientName !== 'Walk-in') lines.push({ text: 'Client: ' + t.clientName });
       lines.push({ t: 'divider' });
       (t.items || []).forEach(item => {
-        const qt = parseFloat(item.qty) || 1;
+        // Desktop sales store the quantity in `name` (a string); phone sales
+        // also set `qty`. Accept either so a reprint never prints qty 1.
+        const rawQty = (item.qty != null && item.qty !== '') ? item.qty : item.name;
+        const qt = parseFloat(rawQty) || 1;
         const sub = qt * (item.unitCost || item.price || 0);
-        lines.push({ text: (item.description || item.name || 'Item') });
+        lines.push({ text: (item.description || 'Item') });
         lines.push({ text: '  ' + qt + ' x ' + peso(item.unitCost || item.price) + '      ' + peso(sub) });
       });
       lines.push({ t: 'divider' });
       lines.push({ text: 'Subtotal:             ' + peso(t.subtotal) });
       if (t.totalInterest > 0) lines.push({ text: 'Interest:             ' + peso(t.totalInterest) });
-      if (t.discount > 0) lines.push({ text: 'Discount:             -' + peso(t.discount) });
+      const scEx = Number(t.scDiscount) || 0;
+      const extraEx = Math.max(0, (Number(t.discount) || 0) - scEx);
+      if (scEx > 0) lines.push({ text: 'SC/PWD 20%:           -' + peso(scEx) });
+      if (extraEx > 0) lines.push({ text: 'Discount:             -' + peso(extraEx) });
+      if (s.registeredForVat === 'true' && Number(t.vatExclusive) > 0) {
+        lines.push({ text: 'VAT Excl:             ' + peso(t.vatExclusive) });
+        lines.push({ text: 'VAT (' + ((Number(t.vatRate) || 0) * 100).toFixed(0) + '%):          ' + peso(t.vatAmount) });
+      }
       lines.push({ bold: true, text: 'TOTAL:                ' + peso(t.grandTotal) });
       lines.push({ t: 'divider' });
       lines.push({ text: 'Payment: ' + (t.paymentMethod || 'Cash') });

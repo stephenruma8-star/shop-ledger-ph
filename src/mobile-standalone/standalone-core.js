@@ -3,7 +3,7 @@
 // names and response shapes as the LAN client, so every shared view works
 // unchanged. No imports/exports: concatenated. Requires store.js first.
 const IS_STANDALONE = true;
-const STANDALONE_VERSION = '4.8.52';
+const STANDALONE_VERSION = '4.8.53';
 function isNativeApp() {
   try { return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); } catch (e) { return false; }
 }
@@ -268,9 +268,9 @@ function buildReceiptText(t, shop) {
   L.push('Date: ' + (t.createdAt || t.date || ''));
   if (t.clientName && t.clientName !== 'Walk-in') L.push('Client: ' + t.clientName);
   (t.items || []).forEach(it => {
-    const q = parseFloat(it.qty) || 1;
+    const q = parseFloat((it.qty != null && it.qty !== '') ? it.qty : it.name) || 1;
     const p = it.unitCost || it.price || 0;
-    L.push(`${it.description || it.name || 'Item'}  ${q} x ${peso(p)} = ${peso(q * p)}`);
+    L.push(`${it.description || 'Item'}  ${q} x ${peso(p)} = ${peso(q * p)}`);
   });
   L.push('--------------------------------');
   L.push('TOTAL: ' + peso(t.grandTotal) + ' (' + (t.paymentMethod || 'Cash') + ')');

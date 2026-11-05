@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.34",
+    "version":  "3.37.35",
     "buildDate":  "2026-11-05T00:00:00.000Z",
-    "notes":  "Desktop client statement: the running Balance column is now exact (payments are allocated chronologically instead of matched to sales by date), and overpayment credits are labelled \"credit\" instead of showing a negative number. Phone unchanged (4.8.51)."
+    "notes":  "Receipt fixes: thermal reprints of desktop sales show the correct quantities (no more qty 1), receipts reprint from the stored sale amounts so totals no longer drift, voided/returned sales print with a VOIDED or RETURN / REFUND banner, and VAT-registered shops show the VAT-exclusive + VAT breakdown. Phone 4.8.53 has the same changes plus they apply to the bond-paper receipt."
 }
