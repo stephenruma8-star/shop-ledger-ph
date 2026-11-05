@@ -456,8 +456,11 @@ export async function doSaveTransaction() {
       }
       if (wasBalanceAdded(oldTxn)) {
         const oldC = await dbGet('clients', oldTxn.clientId);
-        if (oldC) { oldC.balance = Math.max(0, (oldC.balance || 0) - (oldTxn.grandTotal || 0)); await dbPut('clients', oldC); }
-        editRollback.push(() => dbGet('clients', oldTxn.clientId).then(cc => { if (cc) { cc.balance = (cc.balance || 0) + (oldTxn.grandTotal || 0); return dbPut('clients', cc); } }));
+        // Reverse the old total EXACTLY: clamping to 0 here would erase the
+        // effect of any partial payments the client already made, so the edit
+        // would snap the balance back to the original amount.
+        if (oldC) { oldC.balance = round2((oldC.balance || 0) - (oldTxn.grandTotal || 0)); await dbPut('clients', oldC); }
+        editRollback.push(() => dbGet('clients', oldTxn.clientId).then(cc => { if (cc) { cc.balance = round2((cc.balance || 0) + (oldTxn.grandTotal || 0)); return dbPut('clients', cc); } }));
       }
       const newItems = txCart.map(i => ({ date: i.date, description: i.description, name: i.name, unitCost: i.unitCost, intRate: i.intRate, amount: lineAmt(i), invId: i.invId, variantName: i.variantName }));
       for (const item of txCart) {

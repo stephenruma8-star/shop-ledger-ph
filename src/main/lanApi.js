@@ -1137,7 +1137,7 @@ function createLanApiRouter(deps) {
       if(t.status==='voided'||t.status==='return'||t.status==='interest')return {ok:false,error:'closed'};
       for(const it of (t.items||[])){if(it.invId){const i=await dbGet('inventory',it.invId);if(i){i.stock=(i.stock||0)+(parseInt(it.qty)||1);const vn=it.variantName;if(vn&&i.variants){const v=i.variants.find(x=>x.name===vn);if(v)v.stock=(v.stock||0)+(parseInt(it.qty)||1);}await dbPut('inventory',i);}}}
       const oldAdded=!!(t.balanceAdded!==undefined?t.balanceAdded:(t.clientId&&t.paymentMethod!=='Cash'));
-      if(oldAdded&&t.clientId){const c=await dbGet('clients',t.clientId);if(c){c.balance=Math.max(0,(c.balance||0)-(t.grandTotal||0));await dbPut('clients',c);}}
+      if(oldAdded&&t.clientId){const c=await dbGet('clients',t.clientId);if(c){c.balance=(c.balance||0)-(t.grandTotal||0);await dbPut('clients',c);}}
       const newItems=${newItems};
       for(const it of newItems){if(it.invId){const i=await dbGet('inventory',it.invId);if(i){i.stock=(i.stock||0)-(parseInt(it.qty)||1);const vn=it.variantName;if(vn&&i.variants){const v=i.variants.find(x=>x.name===vn);if(v)v.stock=(v.stock||0)-(parseInt(it.qty)||1);}await dbPut('inventory',i);}}}
       const newAdded=!!(${cId} && ${JSON.stringify(payMethod)}!=='Cash');

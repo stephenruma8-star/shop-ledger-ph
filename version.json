@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.30",
-    "buildDate":  "2026-11-04T00:00:00.000Z",
-    "notes":  "Security and mobile upgrades: update installs are checksum+signature verified, phone CSP, LAN-only cleartext, R8 + ARM-only build (APK ~24MB), v2/v3/v4 signing; phone payments get Type (Partial/Full), Method and Notes; scan-to-create for unknown barcodes; Show-more inventory; accessibility labels; CI security gate and Maestro smoke flow."
+    "version":  "3.37.31",
+    "buildDate":  "2026-11-05T00:00:00.000Z",
+    "notes":  "Fixes: editing a sale now keeps partial payments intact (the reverse step clamped the balance to zero and snapped it back to the old total); deleting a client clears any unsaved sale cart/draft so its items can't reappear in a new sale; balance math on sale edit is now exact on desktop and phone."
 }

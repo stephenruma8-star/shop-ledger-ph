@@ -35,7 +35,11 @@ function clearSaleDraft(id) {
   persistSaleDrafts();
 }
 function saleDraftKeys() {
-  return Object.keys(saleDrafts).filter(key => saleDrafts[key] && Array.isArray(saleDrafts[key].cart) && saleDrafts[key].cart.length);
+  return Object.keys(saleDrafts).filter(key => {
+    if (!(saleDrafts[key] && Array.isArray(saleDrafts[key].cart) && saleDrafts[key].cart.length)) return false;
+    if (key === '') return true;
+    return (data.clients || []).some(c => String(c.id) === String(key));
+  });
 }
 function saleDraftName(key) {
   if (key === '') return T('sale.walkin');
@@ -43,6 +47,15 @@ function saleDraftName(key) {
   return c ? c.name : '#' + key;
 }
 function renderSale(presetId) {
+  // A cart or draft left over from a client that no longer exists must never
+  // reappear (e.g. after deleting then re-adding a client). Drop it first.
+  if (saleCartClient && !(data.clients || []).some(c => String(c.id) === String(saleCartClient))) {
+    try { delete saleDrafts[saleCartClient]; persistSaleDrafts(); } catch (e) {}
+    cart = [];
+    saleCartClient = '';
+    saleClientPreset = null;
+    cartInsertAfter = null;
+  }
   if (presetId !== undefined && presetId !== null && presetId !== '') {
     const currentKey = saleKey(saleCartClient);
     const nextKey = saleKey(presetId);

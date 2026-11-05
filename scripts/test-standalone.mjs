@@ -509,6 +509,22 @@ ok((await A('GET', '/api/clients/' + edC.id + '/history')).client.balance === 0,
 await throws(400, () => A('PUT', '/api/sales/' + edSale.invoiceNo, { items: [] }), 'sale edit needs items');
 await throws(404, () => A('PUT', '/api/sales/INV-99999', { items: [{ description: 'x', qty: 1, unitCost: 1 }] }), 'sale edit 404s on an unknown invoice');
 
+// sale edit must PRESERVE a partial payment's effect. Regression: the reverse
+// side used to clamp the balance at 0, which discarded the payment credit and
+// snapped the balance back to the full old total.
+const peC = await A('POST', '/api/clients', { name: 'Partial Edit Client' });
+const peSale = await A('POST', '/api/sales', { clientId: peC.id, items: [{ description: 'Bag', qty: 1, unitCost: 100 }], paymentMethod: 'Credit (Utang)' });
+ok((await A('GET', '/api/clients/' + peC.id + '/history')).client.balance === 100, 'partial-edit sale opens a 100 debt');
+await A('POST', '/api/payments', { clientId: peC.id, amount: 30 });
+ok((await A('GET', '/api/clients/' + peC.id + '/history')).client.balance === 70, 'partial-edit balance is 70 after a 30 payment');
+await A('PUT', '/api/sales/' + peSale.invoiceNo, { clientId: peC.id, items: [{ description: 'Bag', qty: 1, unitCost: 120 }], paymentMethod: 'Credit (Utang)' });
+ok((await A('GET', '/api/clients/' + peC.id + '/history')).client.balance === 90, 'partial-edit keeps the payment (70 - 100 + 120 = 90)');
+// moving the edited sale to another client must also reverse the old debt exactly
+const peC2 = await A('POST', '/api/clients', { name: 'Partial Edit Target' });
+await A('PUT', '/api/sales/' + peSale.invoiceNo, { clientId: peC2.id, items: [{ description: 'Bag', qty: 1, unitCost: 120 }], paymentMethod: 'Credit (Utang)' });
+ok((await A('GET', '/api/clients/' + peC.id + '/history')).client.balance === -30, 'partial-edit move leaves the old client a -30 credit');
+ok((await A('GET', '/api/clients/' + peC2.id + '/history')).client.balance === 120, 'partial-edit move bills the new client 120');
+
 // supplier payment edit + delete
 const supEP = await A('POST', '/api/suppliers', { name: 'Edit Sup' });
 await A('POST', '/api/supplier-payments', { supplierId: supEP.id, amount: 100, paymentMethod: 'Cash' });

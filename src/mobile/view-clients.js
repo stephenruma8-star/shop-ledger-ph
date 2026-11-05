@@ -307,9 +307,18 @@ async function deleteClient(id) {
   }
   clientDeleteArmed = null;
   if (!takeSubmitLock('clientdel')) return;
-  try {
-    await apiPost('/api/clients/' + encodeURIComponent(id), { force: withHistory }, 'DELETE');
-    closeQuick();
+    try {
+      await apiPost('/api/clients/' + encodeURIComponent(id), { force: withHistory }, 'DELETE');
+      // Drop any unsaved sale cart/draft for this client so its items can't
+      // leak into a later "New Sale" (ids can be reused after a delete).
+      try { clearSaleDraft(id); } catch (e2) {}
+      try {
+        if (String(saleCartClient) === String(id)) {
+          cart = []; saleCartClient = ''; saleClientPreset = null; cartInsertAfter = null;
+          if (typeof updateCartUI === 'function') updateCartUI();
+        }
+      } catch (e2) {}
+      closeQuick();
     feelOk();
     toast('Client deleted', 'ok');
     await refreshAll();

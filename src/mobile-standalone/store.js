@@ -710,7 +710,9 @@ async function _apiSaleEdit(ref, body) {
     for (const it of oldItems) await adjustStock(it.invId, it.variantName, (parseInt(it.qty) || 1));
     if (oldAdded && t.clientId) {
       const c = await db.get('SELECT * FROM clients WHERE id = ?', [t.clientId]);
-      if (c) await db.run('UPDATE clients SET balance = ? WHERE id = ?', [Math.max(0, _r2((c.balance || 0) - (t.grandTotal || 0))), c.id]);
+      // Reverse the old total EXACTLY (no clamp): clamping to 0 discards the
+      // effect of partial payments and snaps the balance back to the old total.
+      if (c) await db.run('UPDATE clients SET balance = ? WHERE id = ?', [_r2((c.balance || 0) - (t.grandTotal || 0)), c.id]);
     }
     for (const it of items) await adjustStock(it.invId, it.variantName, -((parseInt(it.qty) || 1)));
     if (newAdded && clientId) {
