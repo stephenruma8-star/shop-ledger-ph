@@ -884,7 +884,7 @@ try {
   ok(getEl('modal-root').innerHTML.includes('findPrinterForReceipt'), 'receipt preview offers Find printer');
   await gcall(`closeQuick()`);
   await gcall(`saleSuccessSheet('INV-00001')`);
-  ok(getEl('view').innerHTML.includes('openSystemPrintForSale') && getEl('view').innerHTML.includes('Find printer'), 'sale success offers Find printer');
+  ok(getEl('view').innerHTML.includes('previewSaleReceipt') && getEl('view').innerHTML.includes('Find printer'), 'sale success offers Find printer (via the preview chooser)');
 
   // Cart: "Add item here" inserts the next added item right after that line.
   await gcall(`startNewSale()`);

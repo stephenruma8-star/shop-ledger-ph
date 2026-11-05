@@ -446,4 +446,16 @@ async function previewReceiptTxn(id) {
   }
   showReceiptPreview(t);
 }
+// Open the receipt preview (with the Thermal/Bond chooser) for a saved sale,
+// so Print / Find printer are consistent instead of silently picking a paper.
+async function previewSaleReceipt(invoiceNo, paper) {
+  if (!invoiceNo) return;
+  let t = (receiptPreviewState.t && (String(receiptPreviewState.t.invoiceNo) === String(invoiceNo) || String(receiptPreviewState.t.id) === String(invoiceNo))) ? receiptPreviewState.t : null;
+  if (!t) {
+    try { t = await apiGet('/api/transactions/' + encodeURIComponent(invoiceNo)); }
+    catch (e) { toast(T('txn.load_fail', { msg: e.message }), 'err'); return; }
+  }
+  if (!t) return;
+  showReceiptPreview(t, { paper: paper || 'thermal' });
+}
 

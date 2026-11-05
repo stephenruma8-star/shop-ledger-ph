@@ -382,19 +382,64 @@ async function loadDetailHistory() {
   catch (e) { toast(T('cli.load_fail', { msg: e.message }), 'err'); return null; }
   return detailClientHistory;
 }
+let statementPaper = 'thermal';
+function setStatementPaper(p) { statementPaper = p === 'bond' ? 'bond' : 'thermal'; previewClientStatement(); }
+function clientStatementBondCss() {
+  return `.st{border:1px solid #cbd5e1;border-radius:.7rem;padding:1rem;background:#fff;color:#0f172a;font-family:'Segoe UI',Arial,sans-serif;font-size:12px}
+.st h1{font-size:1.15rem;margin:0 0 .1rem}
+.st .muted{color:#475569;font-size:.72rem}
+.st .meta{display:flex;justify-content:space-between;border-bottom:2px solid #0f172a;padding-bottom:.4rem;margin:.4rem 0 .6rem;font-weight:700;font-size:.72rem}
+.st table{width:100%;border-collapse:collapse;border:1px solid #94a3b8}
+.st th{background:#e2e8f0;border:1px solid #94a3b8;padding:.35rem .42rem;font-size:.63rem;text-transform:uppercase;text-align:left}
+.st td{border:1px solid #cbd5e1;padding:.34rem .42rem}
+.st tbody tr:nth-child(even){background:#f1f5f9}
+.st .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.st .bal{margin-top:.6rem;display:flex;justify-content:flex-end;gap:1rem;font-weight:800;font-size:1rem}
+.st .foot{margin-top:.8rem;border-top:1px dashed #cbd5e1;padding-top:.5rem;text-align:center;color:#475569;font-size:.7rem}`;
+}
+// Bond-paper statement: Excel-style bordered table with zebra-striped rows.
+function clientStatementBondBody(h) {
+  const s = data.settings || {};
+  const c = (h && h.client) || {};
+  const money = (n) => peso(n);
+  const rows = [];
+  ((h && h.sales) || []).forEach(t => rows.push({ date: t.date || '', ref: t.invoiceNo || '', what: 'Sale' + (t.status ? ' (' + t.status + ')' : ''), amt: Number(t.grandTotal) || 0, pay: 0 }));
+  ((h && h.payments) || []).forEach(p => rows.push({ date: p.date || '', ref: p.referenceNo || '', what: 'Payment' + (p.type ? ' (' + p.type + ')' : '') + (p.notes ? ' - ' + p.notes : ''), amt: 0, pay: Number(p.amount) || 0 }));
+  rows.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const body = rows.map(r => `<tr><td>${esc(r.date)}</td><td>${esc(r.ref)}</td><td>${esc(r.what)}</td><td class="num">${r.amt ? money(r.amt) : ''}</td><td class="num">${r.pay ? money(r.pay) : ''}</td></tr>`).join('') || `<tr><td colspan="5" style="text-align:center;color:#94a3b8">No activity</td></tr>`;
+  return `<div class="st">
+    <h1>${esc(s.shopName || 'Shop Ledger PH')}</h1>
+    ${s.shopAddress ? `<div class="muted">${esc(s.shopAddress)}</div>` : ''}
+    ${s.shopContact ? `<div class="muted">${esc(s.shopContact)}</div>` : ''}
+    <div class="meta"><span>STATEMENT OF ACCOUNT</span><span>${esc(phoneToday())}</span></div>
+    <div class="muted" style="margin-bottom:.5rem">Client: <b>${esc(c.name || '')}</b>${c.phone ? ' · ' + esc(c.phone) : ''}</div>
+    <table><thead><tr><th>Date</th><th>Ref</th><th>Particulars</th><th class="num">Amount</th><th class="num">Payment</th></tr></thead>
+    <tbody>${body}</tbody></table>
+    <div class="bal"><span>Balance:</span><span>${pesoBal(c.balance)}</span></div>
+    <div class="foot">${esc(s.receiptFooter || 'Please settle your balance. Thank you!')}</div>
+  </div>`;
+}
+function clientStatementBondHtml(h) {
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Statement ${esc((h && h.client && h.client.name) || '')}</title><style>@page{size:A4;margin:12mm}body{margin:0}${clientStatementBondCss()}</style></head><body>${clientStatementBondBody(h)}</body></html>`;
+}
 async function previewClientStatement() {
   const h = await loadDetailHistory();
   if (!h) return;
-  const text = statementLinesToText(clientStatementParts(h));
+  const c = (h && h.client) || {};
+  const ptab = (val, label) => `<button onclick="setStatementPaper('${val}')" class="flex-1 py-1.5 rounded-lg text-xs font-semibold" style="${statementPaper === val ? 'background:rgba(59,130,246,.9);color:#fff' : 'background:transparent;color:#94a3b8'}">${esc(label)}</button>`;
+  const body = statementPaper === 'bond'
+    ? `<style>${clientStatementBondCss()}</style><div style="overflow:auto">${clientStatementBondBody(h)}</div>`
+    : `<pre class="receipt-paper">${esc(statementLinesToText(clientStatementParts(h)))}</pre>`;
   document.getElementById('modal-root').innerHTML = `
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
       <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:94vh;max-height:94dvh;overflow-y:auto" onclick="event.stopPropagation()">
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
-        <h3 class="font-bold text-gray-100 text-sm mb-3">${esc((h.client && h.client.name) || '')} — statement</h3>
-        <pre class="receipt-paper">${esc(text)}</pre>
-        <div class="grid grid-cols-2 gap-2">
-          <button onclick="printClientStatement()" class="btn btn-primary btn-sm">${icon('printer', 14)} Print</button>
-          <button onclick="shareClientStatement()" class="btn btn-ghost btn-sm">${icon('upload', 14)} Share</button>
+        <h3 class="font-bold text-gray-100 text-sm mb-3">${esc(c.name || '')} — statement</h3>
+        <div class="mb-2"><div class="text-[10px] uppercase tracking-wider text-gray-500 mb-1">${esc(T('receipt.paper'))}</div><div class="flex gap-1 p-1 rounded-xl" style="background:rgba(255,255,255,.05)">${ptab('thermal', T('receipt.thermal'))}${ptab('bond', T('receipt.bond'))}</div></div>
+        ${body}
+        <div class="grid grid-cols-2 gap-2 mt-2">
+          <button onclick="printClientStatement()" class="btn btn-primary btn-sm">${icon('printer', 14)} ${T('txn.print')}</button>
+          <button onclick="shareClientStatement()" class="btn btn-ghost btn-sm">${icon('upload', 14)} ${T('txn.share')}</button>
         </div>
         <button onclick="openClientDetail(${jsArg(detailClientId)})" class="btn btn-ghost w-full mt-2">Back to client</button>
       </div>
@@ -403,6 +448,7 @@ async function previewClientStatement() {
 async function printClientStatement() {
   const h = await loadDetailHistory();
   if (!h) return;
+  if (statementPaper === 'bond') { systemPrintHtml(clientStatementBondHtml(h), 'Statement'); return; }
   const lines = clientStatementParts(h);
   toast(T('sale.sending_print'), 'info');
   try {
