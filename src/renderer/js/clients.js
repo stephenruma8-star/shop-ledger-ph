@@ -410,30 +410,56 @@ export async function viewClientHistory(id) {
 export function printClientStatement(id) {
   const c = state.clients.find(x => x.id === id);
   if (!c) { toast('Client not found', 'error'); return; }
-  const txs = state.transactions.filter(t => t.clientId === id && t.status !== 'voided' && t.status !== 'interest').sort((a, b) => new Date(a.date) - new Date(b.date));
+  const txs = state.transactions.filter(t => t.clientId === id && t.status !== 'voided' && t.status !== 'interest');
+  const pays = (state.payments || []).filter(p => p.clientId === id);
 
-  function amt(n) { return '₱' + Number(n || 0).toFixed(2); }
+  // One chronological timeline of everything that moved the balance: utang
+  // sales add to it, payments take from it. This keeps the running Balance
+  // column exact even when a payment falls on a different day than its sale.
+  const events = [];
+  for (const t of txs) {
+    events.push({
+      date: t.date || (t.createdAt || '').slice(0, 10),
+      at: t.createdAt || t.date || '',
+      ref: t.invoiceNo || '',
+      desc: (t.items || []).map(i => i.description || i.name).join(', '),
+      amount: t.grandTotal || 0,
+      delta: balanceDelta(t),
+      pay: 0
+    });
+  }
+  for (const p of pays) {
+    events.push({
+      date: p.date || (p.createdAt || '').slice(0, 10),
+      at: p.createdAt || p.date || '',
+      ref: p.referenceNo ? String(p.referenceNo) : (p.type || 'Payment'),
+      desc: 'Payment' + (p.type ? ' (' + p.type + ')' : '') + (p.notes ? ' — ' + p.notes : ''),
+      amount: 0,
+      delta: 0,
+      pay: p.amount || 0
+    });
+  }
+  events.sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.at).localeCompare(String(b.at)));
+  const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
   let html = `
     <div class="excel-sheet-head">
       <div class="excel-sheet-title">Client Statement — ${escapeHtml(c.name)}</div>
       <div class="excel-sheet-sub">${escapeHtml(c.phone || '')}</div>
       <div class="excel-sheet-sub">Address: ${escapeHtml(c.address || 'N/A')}</div>
-      <div class="excel-sheet-sub">Generated: ${new Date().toLocaleDateString()} &nbsp;|&nbsp; Outstanding Balance: ${amt(c.balance || 0)}</div>
+      <div class="excel-sheet-sub">Generated: ${new Date().toLocaleDateString()} &nbsp;|&nbsp; Outstanding Balance: ${pesoBal(c.balance || 0)}</div>
     </div>
     <table class="excel-table">
       <thead><tr><th>Date</th><th>Invoice</th><th>Description</th><th class="num">Amount</th><th class="num">Payment</th><th class="num">Balance</th></tr></thead>
       <tbody>`;
 
   let runningBalance = 0;
-  for (const t of txs) {
-    runningBalance += balanceDelta(t);
-    const payment = (state.payments || []).filter(p => p.clientId === id && p.date === t.date).reduce((s, p) => s + (p.amount || 0), 0);
-    runningBalance -= payment;
-    html += `<tr><td>${escapeHtml(t.date || '')}</td><td>${escapeHtml(t.invoiceNo || '')}</td><td>${escapeHtml((t.items || []).map(i => i.description || i.name).join(', '))}</td><td class="num">${amt(t.grandTotal || 0)}</td><td class="num">${amt(payment)}</td><td class="num">${amt(runningBalance)}</td></tr>`;
+  for (const e of events) {
+    runningBalance = r2(runningBalance + e.delta - e.pay);
+    html += `<tr><td>${escapeHtml(e.date || '')}</td><td>${escapeHtml(e.ref || '')}</td><td>${escapeHtml(e.desc || '')}</td><td class="num">${e.amount ? peso(e.amount) : ''}</td><td class="num">${e.pay ? peso(e.pay) : ''}</td><td class="num">${pesoBal(runningBalance)}</td></tr>`;
   }
 
-  html += `<tr class="excel-total"><td colspan="5">Outstanding Balance</td><td class="num">${amt(c.balance || 0)}</td></tr>`;
+  html += `<tr class="excel-total"><td colspan="5">Outstanding Balance</td><td class="num">${pesoBal(c.balance || 0)}</td></tr>`;
   html += `</tbody></table>`;
 
   openPrintWindow('Client Statement - ' + c.name, 900, 800, html, { extraCss: excelTableCss() });

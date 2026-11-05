@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.33",
+    "version":  "3.37.34",
     "buildDate":  "2026-11-05T00:00:00.000Z",
-    "notes":  "Overpayments are now kept as credit: paying more than the balance leaves a credit (shown as e.g. \"P50.00 credit\") that offsets the client's next utang instead of being discarded. Payment edit/delete are symmetric on desktop and phone, so deleting an overpayment no longer inflates the debt. Total utang and interest ignore credits."
+    "notes":  "Desktop client statement: the running Balance column is now exact (payments are allocated chronologically instead of matched to sales by date), and overpayment credits are labelled \"credit\" instead of showing a negative number. Phone unchanged (4.8.51)."
 }
