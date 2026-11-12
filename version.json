@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.35",
-    "buildDate":  "2026-11-05T00:00:00.000Z",
-    "notes":  "Receipt fixes: thermal reprints of desktop sales show the correct quantities (no more qty 1), receipts reprint from the stored sale amounts so totals no longer drift, voided/returned sales print with a VOIDED or RETURN / REFUND banner, and VAT-registered shops show the VAT-exclusive + VAT breakdown. Phone 4.8.53 has the same changes plus they apply to the bond-paper receipt."
+    "version":  "3.37.36",
+    "buildDate":  "2026-11-12T00:00:00.000Z",
+    "notes":  "Reliability update: reports, client statements and CSV exports now show the correct quantities (including returned units), BIR 2550M/2551Q net VAT and refunds are computed correctly, restoring a backup keeps your login/PIN and printer secrets, phone pairing stays stable with repeated codes, and receipt/VAT quantity fixes from 3.37.35 are included. Phone 4.8.55 has the matching mobile fixes."
 }
