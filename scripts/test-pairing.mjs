@@ -110,6 +110,20 @@ const restored = pairing.restoreDevices([...snap, null, { id: 'x' }, { id: 'dev-
 ok(restored === snap.length && pairing.verifyToken(rc1.token).ok === true, 'restore round-trips, drops malformed');
 ok(pairing.verifyToken(rc1.token).device.role === 'cashier', 'restore preserves roles');
 
+// duplicate ids/tokens and oversized registries are collapsed, never trusted
+const dupRestore = pairing.restoreDevices([...snap, ...snap]);
+ok(dupRestore === snap.length, 'restore dedupes duplicate device ids/tokens');
+const crossDup = pairing.restoreDevices([...snap, { id: 'dev-aaaaaaaa', token: snap[0].token }]);
+ok(crossDup === snap.length, 'restore dedupes a token reused under another id');
+const oversized = Array.from({ length: pairing.MAX_DEVICES + 5 }, (_, i) => ({
+  id: 'dev-' + String(i).padStart(8, '0'),
+  token: 'dev_' + String(i).padStart(48, '0'),
+  name: 'P' + i,
+  role: 'cashier',
+  createdAt: Date.now()
+}));
+ok(pairing.restoreDevices(oversized) === pairing.MAX_DEVICES && pairing.listDevices().length === pairing.MAX_DEVICES, 'restore caps registry at MAX_DEVICES');
+
 // registry cap: full house refuses new phones with guidance
 pairing.clearDeviceTokens();
 for (let i = 0; i < pairing.MAX_DEVICES; i++) pairing.issueDeviceToken('P' + i);

@@ -48,6 +48,13 @@ const fakeDB = {
 };
 const domListeners = {};
 const xlsxCalls = [];
+const blobs = [];
+class CapturingBlob {
+  constructor(parts, opts) { this.parts = parts; this.type = opts && opts.type; blobs.push(this); }
+}
+globalThis.Blob = CapturingBlob;
+URL.createObjectURL = () => 'blob:test';
+URL.revokeObjectURL = () => {};
 const printed = [];
 const win = new Proxy({
   __app: {},
@@ -62,7 +69,15 @@ const win = new Proxy({
 });
 globalThis.window = win;
 globalThis.self = win;
-win.XLSX = { utils: { json_to_sheet: () => ({}), aoa_to_sheet: () => ({}), book_new: () => ({}), book_append_sheet: () => {} }, writeFile: (wb, name) => { xlsxCalls.push({ wb, name }); } };
+win.XLSX = {
+  utils: {
+    json_to_sheet: () => ({}),
+    aoa_to_sheet: (aoa) => ({ __aoa: aoa }),
+    book_new: () => ({ Sheets: {}, SheetNames: [] }),
+    book_append_sheet: (wb, ws, name) => { wb.Sheets[name] = ws; wb.SheetNames.push(name); },
+  },
+  writeFile: (wb, name) => { xlsxCalls.push({ wb, name }); }
+};
 Object.defineProperty(globalThis, 'document', { value: {
   getElementById: (id) => getEl(id),
   querySelector: () => makeEl(),
@@ -122,9 +137,20 @@ try {
   await win.dbAdd('payments', { date: '2025-01-21', clientName: 'Maria Santos', clientId: cliId, amount: 50, type: 'Partial', createdAt: '2025-01-21T10:00:00.000Z' });
   await win.dbAdd('expenses', { date: '2025-01-10', category: 'Rent', description: 'stall rent', amount: 1000, payee: 'X', createdAt: '2025-01-10T10:00:00.000Z' });
 
+  // VAT settings + February sale/return + April phone-created sale
+  await win.dbAdd('settings', { key: 'shopName', value: 'Test Shop' });
+  await win.dbAdd('settings', { key: 'vatRate', value: '12' });
+  await win.dbAdd('settings', { key: 'registeredForVat', value: 'true' });
+  await win.dbAdd('settings', { key: 'businessTin', value: '123-456-789' });
+  await win.dbAdd('settings', { key: 'vatRegNo', value: 'VAT-001' });
+  const vatSaleId = await win.dbAdd('transactions', { invoiceNo: 'INV-VAT', date: '2025-02-10', clientName: 'Walk-in', clientId: null, paymentMethod: 'Cash', status: 'pending', grandTotal: 224, vatExclusive: 200, vatAmount: 24, vatRate: 0.12, items: [{ description: 'VAT Item', name: '2', unitCost: 112, invId }], createdAt: '2025-02-10T10:00:00.000Z' });
+  await win.dbAdd('transactions', { invoiceNo: 'INV-EXEMPT', date: '2025-02-11', clientName: 'Walk-in', clientId: null, paymentMethod: 'Cash', status: 'pending', grandTotal: 50, vatExclusive: 0, vatAmount: 0, items: [], createdAt: '2025-02-11T10:00:00.000Z' });
+  await win.dbAdd('transactions', { invoiceNo: 'INV-VAT-R', date: '2025-02-12', clientName: 'Walk-in', clientId: null, paymentMethod: 'Cash', status: 'return', grandTotal: -112, refId: vatSaleId, items: [{ description: 'VAT Item', name: '-1', qty: -1, unitCost: 112, invId }], createdAt: '2025-02-12T10:00:00.000Z' });
+  await win.dbAdd('transactions', { invoiceNo: 'INV-PHONE', date: '2025-04-05', clientName: 'Walk-in', clientId: null, paymentMethod: 'Cash', status: 'pending', grandTotal: 30, items: [{ description: 'Phone item', qty: 3, unitCost: 10 }], createdAt: '2025-04-05T10:00:00.000Z' });
+
   // --- aggregation ---
   await win.dbLoad('transactions'); await win.dbLoad('payments');
-  await win.dbLoad('expenses'); await win.dbLoad('inventory'); await win.dbLoad('clients');
+  await win.dbLoad('expenses'); await win.dbLoad('inventory'); await win.dbLoad('clients'); await win.dbLoad('settings');
   const d = win.monthlyReportData('2025-01');
   ok(d.label === 'January 2025', 'month label January 2025 (got ' + d.label + ')');
   ok(d.sales.length === 2, '2 January sales picked up, December excluded');
@@ -139,6 +165,63 @@ try {
   const mRow = d.collections.find(r => r.name === 'Maria Santos');
   ok(mRow && mRow.opening === 0 && mRow.paid === 50 && mRow.current === 200, 'collections merges name-only payment into client row');
   ok(d.collections.filter(r => r.name === 'Maria Santos').length === 1, 'no duplicate client rows');
+
+  // --- VAT rate normalization (settings store a percentage) ---
+  const vatSetting = win.state.settings.find(s => s.key === 'vatRate');
+  let vb = win.formatVATBreakdown(112);
+  ok(vb.vatExclusive === 100 && vb.vatAmount === 12, 'saved VAT percent is treated as 12%, not 1200%');
+  vatSetting.value = '0.12';
+  vb = win.formatVATBreakdown(112);
+  ok(vb.vatExclusive === 100 && vb.vatAmount === 12, 'legacy fractional VAT setting still works');
+  vatSetting.value = '12';
+
+  // --- February returns: monthly profit nets refunds and return COGS ---
+  const dFeb = win.monthlyReportData('2025-02');
+  ok(dFeb.revenue === 274 && dFeb.refunds === 112, 'February revenue 274, refunds 112');
+  ok(dFeb.cogs === 60, 'February COGS nets returned units (120 - 60)');
+  ok(dFeb.profit === 274 - 112 - 60, 'February profit subtracts refunds and return COGS');
+
+  // --- BIR exports: net VAT, refunds and configured rate ---
+  getEl('bir-month').value = '02';
+  getEl('bir-year').value = '2025';
+  await win.exportBIR2550M();
+  let csv = blobs[blobs.length - 1].parts.join('');
+  let birRow = csv.split('\r\n')[1].split(',');
+  ok(birRow[3] === '100.00', 'BIR 2550M taxable sales are net of VAT');
+  ok(birRow[4] === '12.00', 'BIR 2550M VAT output is computed from net taxable sales');
+  ok(birRow[5] === '0.00' && birRow[6] === '50.00', 'BIR 2550M zero-rated/exempt split');
+  ok(birRow[7] === '162.00', 'BIR 2550M total sales net of the return');
+  ok(birRow[8] === '2', 'BIR 2550M counts sales, not return rows');
+  ok(csv.includes('VAT Output (12%)'), 'BIR 2550M header shows the configured VAT rate');
+  vatSetting.value = '10';
+  await win.exportBIR2550M();
+  csv = blobs[blobs.length - 1].parts.join('');
+  birRow = csv.split('\r\n')[1].split(',');
+  ok(birRow[3] === '101.82' && birRow[4] === '10.18', 'BIR 2550M uses the configured 10% VAT rate');
+  ok(csv.includes('VAT Output (10%)'), 'BIR 2550M header follows a custom VAT rate');
+  vatSetting.value = '12';
+  getEl('bir-quarter').value = '1';
+  getEl('bir-qyear').value = '2025';
+  await win.exportBIR2551Q();
+  csv = blobs[blobs.length - 1].parts.join('');
+  const qRow = csv.split('\r\n')[1].split(',');
+  ok(qRow[3] === '612.00', 'BIR 2551Q gross sales net of refunds');
+  ok(qRow[4] === '18.36', 'BIR 2551Q 3% tax on net gross sales');
+  ok(qRow[5] === '4', 'BIR 2551Q counts sales, not return rows');
+
+  // --- Excel + thermal reprints show qty for phone-created lines ---
+  await win.exportXlsx();
+  const xlsxWb = xlsxCalls[xlsxCalls.length - 1].wb;
+  const txSheet = xlsxWb.Sheets['Transactions'];
+  const phoneRow = txSheet && txSheet.__aoa.find(r => r[0] === 'INV-PHONE');
+  ok(phoneRow && phoneRow[3].includes('Phone item x3'), '.xlsx export shows qty from a phone-created line');
+  await win.exportExcel();
+  const xlsHtml = blobs[blobs.length - 1].parts.join('');
+  ok(xlsHtml.includes('Phone item x3'), 'legacy .xls export shows qty from a phone-created line');
+  const thermalPhone = win.thermalReceipt({ invoiceNo: 'INV-T1', createdAt: '2025-01-05T10:00:00.000Z', items: [{ description: 'Phone item', qty: 3, unitCost: 10 }], subtotal: 30, grandTotal: 30 });
+  ok(thermalPhone.includes('x3') && thermalPhone.includes('30.00'), 'thermal receipt shows phone line qty 3');
+  const thermalDesk = win.thermalReceipt({ invoiceNo: 'INV-T2', createdAt: '2025-01-05T10:00:00.000Z', items: [{ description: 'Coke', name: '2', unitCost: 50 }], subtotal: 100, grandTotal: 100 });
+  ok(thermalDesk.includes('x2') && thermalDesk.includes('100.00'), 'thermal receipt shows desktop qty from name');
 
   // --- opening snapshots ---
   const nowKey = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0');
@@ -174,8 +257,9 @@ try {
 
   // --- Excel export (stub engine: plain sheets, no styling crash) ---
   getEl('rep-month').value = '2025-01';
+  const xlsxBefore = xlsxCalls.length;
   await win.exportMonthlyReportXlsx();
-  ok(xlsxCalls.length === 1 && xlsxCalls[0].name === 'Monthly_Report_2025-01.xlsx', 'monthly xlsx downloaded with month filename');
+  ok(xlsxCalls.length === xlsxBefore + 1 && xlsxCalls[xlsxCalls.length - 1].name === 'Monthly_Report_2025-01.xlsx', 'monthly xlsx downloaded with month filename');
 
   if (failures === 0) {
     console.log('MONTHLY REPORT OK: aggregation + modal + print + Excel export verified');

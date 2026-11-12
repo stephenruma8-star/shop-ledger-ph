@@ -40,6 +40,14 @@ function backupFileName() {
   return `backup-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.bak`;
 }
 
+// Local calendar date (YYYY-MM-DD). Auto-snapshot tracking must follow the shop's
+// wall clock: a UTC date runs twice (or skips a day) around midnight in UTC+8.
+function localDateStr(d) {
+  const x = d || new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return `${x.getFullYear()}-${p(x.getMonth() + 1)}-${p(x.getDate())}`;
+}
+
 function calculateFileChecksum(filePath) {
   try {
     const data = fs.readFileSync(filePath);
@@ -212,7 +220,7 @@ async function runRetention() {
 async function planLocalSnapshot() {
   const m = (await cfg.getSettings()) || {};
   if (m.autoSnapshotEnabled !== 'true') return { planned: false, reason: 'disabled' };
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = localDateStr();
   if (m.lastAutoSnapshot === todayStr) return { planned: false, reason: 'already-today' };
   const entry = await createBackup('', true);
   if (entry.status === 'ok') {
@@ -306,6 +314,8 @@ const IMPORT_SCHEMA = {
   balanceSnapshots: { month: 'string' }
 };
 const IMPORT_STORES = Object.keys(IMPORT_SCHEMA);
+// Non-store metadata written by getAllData()/cloud backups. Ignored on import.
+const IMPORT_META_KEYS = ['exportedAt'];
 
 function validateImportDump(dump) {
   if (!dump || typeof dump !== 'object' || Array.isArray(dump)) {
@@ -315,6 +325,10 @@ function validateImportDump(dump) {
   if (keys.length === 0) return { ok: false, error: 'Backup dump has no store arrays' };
   let total = 0;
   for (const key of keys) {
+    if (IMPORT_META_KEYS.includes(key)) {
+      if (typeof dump[key] !== 'string') return { ok: false, error: `Metadata "${key}" must be a string` };
+      continue;
+    }
     const rows = dump[key];
     if (!Array.isArray(rows)) return { ok: false, error: `Store "${key}" must be an array` };
     if (!IMPORT_STORES.includes(key)) return { ok: false, error: `Unknown store "${key}"` };
@@ -352,10 +366,83 @@ async function importJsonBackup({ filePath, password }) {
 
 // Validates and imports an already-parsed JSON dump (used by both the file importer and the
 // renderer restore flow). Keeps the live DB as .prerestore via replaceFromDump.
+const MASKED_SECRET = '********';
+
+function smtpPass(value) {
+  try { return JSON.parse(value || '{}').pass; } catch (e) { return null; }
+}
+
+function mergeMaskedSetting(setting, localByKey) {
+  if (!setting || typeof setting !== 'object') return setting;
+  if (!dbm.SENSITIVE_SETTINGS.includes(setting.key)) return setting;
+  const masked = setting.value === MASKED_SECRET ||
+    (setting.key === 'smtpConfig' && smtpPass(setting.value) === MASKED_SECRET);
+  if (!masked) return setting;
+  const local = localByKey.get(setting.key);
+  if (setting.key === 'smtpConfig') {
+    let parsed = null;
+    try { parsed = JSON.parse(setting.value || '{}'); } catch (e) {}
+    if (!parsed || typeof parsed !== 'object') {
+      return typeof local === 'string' && local ? { ...setting, value: local } : null;
+    }
+    let localCfg = {};
+    try { localCfg = JSON.parse(local || '{}'); } catch (e) { localCfg = {}; }
+    // Keep the incoming host/port/user; only the password is machine-local.
+    parsed.pass = localCfg.pass || '';
+    return { ...setting, value: JSON.stringify(parsed) };
+  }
+  if (typeof local === 'string' && local) return { ...setting, value: local };
+  return null;
+}
+
+// JSON backups deliberately strip user password hashes and mask secret settings.
+// Before replacing the live DB, carry those machine-local values back in so a
+// restore does not lock every account out or wipe cloud/SMTP credentials.
+async function preserveLocalCredentials(dump) {
+  let localUsers = [];
+  let localSettings = [];
+  try { localUsers = (await dbm.all('users')) || []; } catch (e) {}
+  try { localSettings = (await dbm.all('settings')) || []; } catch (e) {}
+
+  const next = { ...dump };
+  if (Array.isArray(dump.users)) {
+    if (dump.users.length === 0) {
+      if (localUsers.length) next.users = localUsers;
+    } else {
+      const byId = new Map(localUsers.filter(u => u && u.id != null).map(u => [u.id, u]));
+      const byName = new Map(localUsers.filter(u => u && u.username).map(u => [u.username, u]));
+      next.users = dump.users.map(u => {
+        if (!u || typeof u !== 'object') return u;
+        if (typeof u.password === 'string' && u.password) return u;
+        const cur = byId.get(u.id) || byName.get(u.username);
+        if (cur && typeof cur.password === 'string' && cur.password) return { ...u, password: cur.password };
+        return u;
+      });
+      // Cross-machine restore: if no imported account has a usable password,
+      // keep a local admin so the shop can still log in and reset accounts.
+      const hasPassword = next.users.some(u => u && typeof u.password === 'string' && u.password);
+      if (!hasPassword && localUsers.length) {
+        const fallback = localUsers.find(u => u && u.password && (u.role === 'admin' || u.role === 'owner')) ||
+          localUsers.find(u => u && u.password);
+        if (fallback) next.users = [...next.users, { ...fallback }];
+      }
+    }
+  } else if (localUsers.length) {
+    next.users = localUsers;
+  }
+
+  if (Array.isArray(dump.settings)) {
+    const localByKey = new Map(localSettings.filter(s => s && s.key).map(s => [s.key, s.value]));
+    next.settings = dump.settings.map(s => mergeMaskedSetting(s, localByKey)).filter(Boolean);
+  }
+  return next;
+}
+
 async function importJsonDump(dump, opts = {}) {
   const v = validateImportDump(dump);
   if (!v.ok) return { success: false, error: v.error };
-  const r = await dbm.replaceFromDump(dump);
+  const prepared = await preserveLocalCredentials(dump);
+  const r = await dbm.replaceFromDump(prepared);
   if (!r.ok) return { success: false, error: r.error };
   cfg.notify({ source: 'app', kind: 'import', file: opts.file || '' });
   return { success: true, counts: r.counts, validated: v.counts };

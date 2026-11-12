@@ -25,6 +25,14 @@ export const pesoBal = (n) => { const v = Number(n || 0); return v < 0 ? peso(Ma
 export const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
 export const VAT_RATE = 0.12;
+// Settings store the VAT rate as a percentage ("12" = 12%), while older data may
+// hold a fraction (0.12). Accept both so saving settings never silently changes
+// the tax math (e.g. "12" must not be treated as 1200%).
+export function vatRateFraction() {
+  const raw = parseFloat((state.settings || []).find(s => s.key === 'vatRate')?.value);
+  if (!Number.isFinite(raw) || raw <= 0) return VAT_RATE;
+  return raw >= 1 ? raw / 100 : raw;
+}
 export const calcVAT = (amount) => Math.round((Number(amount) || 0) * VAT_RATE * 100) / 100;
 export const calcVATinclusive = (amount) => Math.round((Number(amount) || 0) / (1 + VAT_RATE) * 100) / 100;
 export const calcVATexclusive = (amount) => Math.round((Number(amount) || 0) * VAT_RATE * 100) / 100;
@@ -64,6 +72,7 @@ Object.defineProperties(window, {
   today: { get: () => today, configurable: true },
   now: { get: () => now, configurable: true },
   VAT_RATE: { get: () => VAT_RATE, configurable: true },
+  vatRateFraction: { get: () => vatRateFraction, configurable: true },
   calcVAT: { get: () => calcVAT, configurable: true },
   calcVATinclusive: { get: () => calcVATinclusive, configurable: true },
   calcVATexclusive: { get: () => calcVATexclusive, configurable: true }

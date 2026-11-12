@@ -217,7 +217,7 @@ function createLanApiRouter(deps) {
   // Role gate: cashier phones are limited to counter work (sales, payments,
   // catalog reads, printing). Everything sensitive is owner-only. The house
   // token and legacy sessions without device identity count as owner.
-  const CASHIER_BLOCKED = [/^\/api\/stats/, /^\/api\/expenses/, /^\/api\/reports/, /^\/api\/settings\//, /^\/api\/sqlite\/enable/, /^\/api\/access-control/, /^\/api\/backups/, /^\/api\/audit/, /^\/api\/returns/, /^\/api\/inventory\/valuation/, /^\/api\/suppliers/, /^\/api\/purchase-orders/];
+  const CASHIER_BLOCKED = [/^\/api\/stats/, /^\/api\/expenses/, /^\/api\/reports/, /^\/api\/payments\/export\.csv/, /^\/api\/inventory\/export\.csv/, /^\/api\/settings\//, /^\/api\/sqlite\/enable/, /^\/api\/access-control/, /^\/api\/backups/, /^\/api\/audit/, /^\/api\/returns/, /^\/api\/inventory\/valuation/, /^\/api\/suppliers/, /^\/api\/purchase-orders/];
   router.use((req, res, next) => {
     try {
       const role = (req.device && req.device.role) || 'owner';
@@ -281,6 +281,38 @@ function createLanApiRouter(deps) {
 
   const active = (t) => t.status !== 'voided' && t.status !== 'interest';
   const dayTotal = (arr, f) => arr.filter(f).reduce((s, x) => s + (x.amount || x.grandTotal || 0), 0);
+  // Desktop sale lines keep the quantity in `name` (a numeric string) and the
+  // product label in `description`; phone-created lines also carry `qty`.
+  // Reports, returns, and stock movements must understand both shapes or a
+  // desktop sale of 3 pieces is counted/restocked as 1.
+  function itemQty(it) {
+    it = it || {};
+    const q = parseInt(it.qty, 10);
+    if (Number.isFinite(q) && q > 0) return q;
+    const n = String(it.name || '').trim();
+    if (/^\d+$/.test(n)) { const k = parseInt(n, 10); if (k > 0) return k; }
+    return 1;
+  }
+  // Return lines are stored with negative quantities; when counting how many
+  // units are still returnable we need their absolute size.
+  function lineQtyAbs(it) {
+    it = it || {};
+    const q = parseInt(it.qty, 10);
+    if (Number.isFinite(q) && q !== 0) return Math.abs(q);
+    const n = String(it.name || '').trim();
+    if (/^-?\d+$/.test(n)) { const k = parseInt(n, 10); if (k !== 0) return Math.abs(k); }
+    return 1;
+  }
+  // Signed quantity for void/stock-reversal paths: returns carry negative
+  // quantities, so adding the sign is what un-restocks them correctly.
+  function signedQty(it) {
+    it = it || {};
+    const q = parseInt(it.qty, 10);
+    if (Number.isFinite(q) && q !== 0) return q;
+    const n = String(it.name || '').trim();
+    if (/^-?\d+$/.test(n)) { const k = parseInt(n, 10); if (Number.isFinite(k) && k !== 0) return k; }
+    return 1;
+  }
   // Local calendar date — matches the renderer's today() so mobile and desktop
   // aggregates agree even between midnight and 8 AM (PH is UTC+8).
   const localDate = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -336,12 +368,18 @@ function createLanApiRouter(deps) {
     const name = String(b.name || '').trim();
     if (!name) return res.status(400).json({ error: 'Client name required' });
     if (name.length > 80) return res.status(400).json({ error: 'Name too long (max 80)' });
-    if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
+    // Opening debt is a money value: cashier phones may add the client but not
+    // invent a balance. (Balance changes from sales/payments remain automatic.)
+    const isCashier = ((req.device && req.device.role) || 'owner') === 'cashier';
     const opening = parseFloat(b.balance);
+    if (isCashier && isFinite(opening) && Math.abs(opening) > 0.004) {
+      return res.status(403).json({ error: 'Only the owner can set an opening balance', code: 'FORBIDDEN' });
+    }
+    if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
     const rec = {
       name, phone: String(b.phone || '').trim().slice(0, 20),
       address: String(b.address || '').trim().slice(0, 200),
-      balance: isFinite(opening) ? Math.max(-1e9, Math.min(1e9, opening)) : 0,
+      balance: isCashier ? 0 : (isFinite(opening) ? Math.max(-1e9, Math.min(1e9, opening)) : 0),
       dueDate: String(b.dueDate || '').slice(0, 10),
       isSC: !!b.isSC, isPWD: !!b.isPWD, createdAt: new Date().toISOString()
     };
@@ -357,10 +395,13 @@ function createLanApiRouter(deps) {
     if (!name) return res.status(400).json({ error: 'Client name required' });
     if (name.length > 80) return res.status(400).json({ error: 'Name too long (max 80)' });
     if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
+    // Balance corrections are owner-only. Cashier edits still save the contact
+    // fields, but any balance they send is ignored (never silently written).
+    const isCashier = ((req.device && req.device.role) || 'owner') === 'cashier';
     const rawBalance = parseFloat(b.balance);
     const hasBalance = b.balance !== undefined && b.balance !== null && b.balance !== '' && isFinite(rawBalance);
     const balance = hasBalance ? Math.max(-1e9, Math.min(1e9, rawBalance)) : null;
-    const setBalance = hasBalance ? `c.balance=${JSON.stringify(balance)};` : '';
+    const setBalance = hasBalance && !isCashier ? `c.balance=${JSON.stringify(balance)};` : '';
     const ok = JSON.parse(await deps.rendererExec(`JSON.stringify(await (async()=>{const c=await dbGet('clients',${JSON.stringify(req.params.id)});if(!c)return false;c.name=${JSON.stringify(name)};c.phone=${JSON.stringify(String(b.phone || '').trim().slice(0, 20))};c.address=${JSON.stringify(String(b.address || '').trim().slice(0, 200))};c.dueDate=${JSON.stringify(String(b.dueDate || '').slice(0, 10))};c.isSC=${!!b.isSC};c.isPWD=${!!b.isPWD};${setBalance}await dbPut('clients',c);return true;})())`));
     if (!ok) return res.status(404).json({ error: 'Client not found' });
     try { await deps.rendererExec(`(async()=>{try{await logAudit('client-edit','Updated client ' + ${JSON.stringify(name)} + ${JSON.stringify(devTag(req))});}catch(e){}})()`); } catch (e) {}
@@ -408,7 +449,7 @@ function createLanApiRouter(deps) {
       .map(t => ({
         id: t.id, invoiceNo: t.invoiceNo, date: t.date, grandTotal: t.grandTotal, paymentMethod: t.paymentMethod, status: t.status,
         items: (t.items || []).map(i => ({
-          description: i.description || i.name || 'Item', qty: i.qty || 1,
+          description: i.description || i.name || 'Item', qty: lineQtyAbs(i),
           unitCost: i.unitCost || 0, amount: i.amount || 0,
           intRate: i.intRate || 0, variantName: i.variantName || null
         }))
@@ -890,10 +931,12 @@ function createLanApiRouter(deps) {
     const monthExp = dayTotal(dump.expenses || [], e => (e.date || '').startsWith(mStr));
     const monthPay = dayTotal(dump.payments || [], p => (p.date || '').startsWith(mStr));
     const topItems = {};
-    (dump.transactions || []).filter(active).forEach(t => {
+    // Returns are refunds, not sales: including them would cancel the original
+    // item's quantity/amount in the ranking (the desktop report excludes them).
+    (dump.transactions || []).filter(t => active(t) && t.status !== 'return').forEach(t => {
       (t.items || []).forEach(it => {
         const nm = it.description || it.name || 'Item';
-        const q = parseInt(it.qty) || 1;
+        const q = itemQty(it);
         const amt = (it.amount || (q * (it.unitCost || 0))) || 0;
         if (!topItems[nm]) topItems[nm] = { name: nm, qty: 0, amount: 0 };
         topItems[nm].qty += q; topItems[nm].amount += amt;
@@ -938,7 +981,9 @@ function createLanApiRouter(deps) {
       .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')))
       .forEach(t => {
         (t.items && t.items.length ? t.items : [{}]).forEach(it => {
-          const q = parseFloat(it.qty) || 1;
+          // Signed qty: return lines are negative, so the Qty column agrees with
+          // the negative Amount instead of collapsing a multi-unit refund to 1.
+          const q = signedQty(it);
           const p = it.unitCost || it.price || 0;
           L.push([t.date || '', t.invoiceNo || '', t.clientName || '', it.description || it.name || '', q, p, (it.amount ?? (q * p)), t.paymentMethod || '', t.status || ''].map(csvCell).join(','));
         });
@@ -954,6 +999,41 @@ function createLanApiRouter(deps) {
       });
     res.set('Content-Type', 'text/csv; charset=utf-8');
     res.set('Content-Disposition', `attachment; filename="ShopLedger-${m}.csv"`);
+    res.send('﻿' + L.join('\n'));
+  }));
+
+  // Payment and inventory downloads used by the phone's Reports screen.
+  // Same raw-CSV contract as the monthly report: BOM + attachment headers.
+  // Both carry money/margin data, so the role gate keeps cashier phones out.
+  router.get('/api/payments/export.csv', wrap(async (req, res) => {
+    const dump = await load('payments', 'clients');
+    const names = {};
+    (dump.clients || []).forEach(c => { names[c.id] = c.name; });
+    const L = [];
+    L.push(['Date', 'Client', 'Amount', 'Type', 'Reference', 'Notes'].map(csvCell).join(','));
+    (dump.payments || [])
+      .slice()
+      .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.createdAt || '').localeCompare(String(b.createdAt || '')))
+      .forEach(p => {
+        L.push([p.date || '', names[p.clientId] || p.clientName || '', p.amount || 0, p.type || '', p.referenceNo || '', p.notes || ''].map(csvCell).join(','));
+      });
+    res.set('Content-Type', 'text/csv; charset=utf-8');
+    res.set('Content-Disposition', 'attachment; filename="ShopLedger-payments.csv"');
+    res.send('﻿' + L.join('\n'));
+  }));
+
+  router.get('/api/inventory/export.csv', wrap(async (req, res) => {
+    const dump = await load('inventory');
+    const L = [];
+    L.push(['Name', 'SKU', 'Barcode', 'Category', 'Sell Price', 'Cost Price', 'Stock', 'Min Stock', 'Unit', 'Expiry'].map(csvCell).join(','));
+    (dump.inventory || [])
+      .slice()
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))
+      .forEach(i => {
+        L.push([i.name || '', i.sku || '', i.barcode || '', i.category || '', i.sellPrice || i.price || 0, i.costPrice || 0, i.stock || 0, i.lowStock ?? i.minStock ?? 5, i.unit || 'pcs', i.expiryDate || ''].map(csvCell).join(','));
+      });
+    res.set('Content-Type', 'text/csv; charset=utf-8');
+    res.set('Content-Disposition', 'attachment; filename="ShopLedger-inventory.csv"');
     res.send('﻿' + L.join('\n'));
   }));
 
@@ -1135,11 +1215,11 @@ function createLanApiRouter(deps) {
       const t=list.find(x=>x.invoiceNo===${JSON.stringify(ref)}||String(x.id)===${JSON.stringify(ref)});
       if(!t)return {ok:false,error:'not found'};
       if(t.status==='voided'||t.status==='return'||t.status==='interest')return {ok:false,error:'closed'};
-      for(const it of (t.items||[])){if(it.invId){const i=await dbGet('inventory',it.invId);if(i){i.stock=(i.stock||0)+(parseInt(it.qty)||1);const vn=it.variantName;if(vn&&i.variants){const v=i.variants.find(x=>x.name===vn);if(v)v.stock=(v.stock||0)+(parseInt(it.qty)||1);}await dbPut('inventory',i);}}}
+      for(const it of (t.items||[])){if(it.invId){const i=await dbGet('inventory',it.invId);if(i){const q=(${itemQty.toString()})(it);i.stock=(i.stock||0)+q;const vn=it.variantName;if(vn&&i.variants){const v=i.variants.find(x=>x.name===vn);if(v)v.stock=(v.stock||0)+q;}await dbPut('inventory',i);}}}
       const oldAdded=!!(t.balanceAdded!==undefined?t.balanceAdded:(t.clientId&&t.paymentMethod!=='Cash'));
       if(oldAdded&&t.clientId){const c=await dbGet('clients',t.clientId);if(c){c.balance=(c.balance||0)-(t.grandTotal||0);await dbPut('clients',c);}}
       const newItems=${newItems};
-      for(const it of newItems){if(it.invId){const i=await dbGet('inventory',it.invId);if(i){i.stock=(i.stock||0)-(parseInt(it.qty)||1);const vn=it.variantName;if(vn&&i.variants){const v=i.variants.find(x=>x.name===vn);if(v)v.stock=(v.stock||0)-(parseInt(it.qty)||1);}await dbPut('inventory',i);}}}
+      for(const it of newItems){if(it.invId){const i=await dbGet('inventory',it.invId);if(i){const q=(${itemQty.toString()})(it);i.stock=(i.stock||0)-q;const vn=it.variantName;if(vn&&i.variants){const v=i.variants.find(x=>x.name===vn);if(v)v.stock=(v.stock||0)-q;}await dbPut('inventory',i);}}}
       const newAdded=!!(${cId} && ${JSON.stringify(payMethod)}!=='Cash');
       if(newAdded&&${cId}){const c=await dbGet('clients',${cId});if(c){c.balance=(c.balance||0)+${grandTotal};await dbPut('clients',c);}}
       t.items=newItems;t.subtotal=${subtotal};t.totalInterest=${totalInterest};t.discount=${d};t.scDiscount=0;t.grandTotal=${grandTotal};
@@ -1174,13 +1254,31 @@ function createLanApiRouter(deps) {
       const invNos = JSON.parse(await deps.rendererExec(`JSON.stringify(state.transactions.filter(t=>t.invoiceNo?.startsWith('INV-')).map(t=>parseInt(t.invoiceNo.replace('INV-',''))||0))`));
       const nextNo = invNos.length > 0 ? Math.max(...invNos) + 1 : 1;
       const invoiceNo = 'INV-' + String(nextNo).padStart(5,'0');
-      const subtotal = items.reduce((s, i) => s + ((i.qty||1) * (i.unitCost || 0)), 0);
+      const subtotal = Math.round(items.reduce((s, i) => s + ((i.qty||1) * (i.unitCost || 0)), 0) * 100) / 100;
       const totalInterest = Math.round(items.reduce((s, i) => s + lineInterest((i.qty||1) * (i.unitCost || 0), i.intRate, i.date, todayStr()), 0) * 100) / 100;
       const d = parseFloat(discount) || 0;
-      const grandTotal = Math.max(0, subtotal + totalInterest - d);
+      const grandTotal = Math.max(0, Math.round((subtotal + totalInterest - d) * 100) / 100);
       const clientData = clientId ? JSON.parse(await deps.rendererExec(`JSON.stringify(await dbGet('clients', ${JSON.stringify(clientId)}))`)) : null;
       const clientName = clientData ? clientData.name : 'Walk-in';
       const payMethod = paymentMethod || 'Cash';
+      // Resolve (or auto-create) inventory ids BEFORE serializing the sale: the
+      // saved line must carry invId so returns and voids can restock it later.
+      for (const item of items) {
+        if (item.invId || !item.description) continue;
+        item.invId = await deps.rendererExec(`(async()=>{
+          const desc = ${JSON.stringify(String(item.description).trim())};
+          const qty = ${Math.max(1, parseInt(item.qty) || 1)};
+          const unitCost = ${item.unitCost || 0};
+          if (!desc) return null;
+          const all = await dbAll('inventory');
+          const f = all.find(i => String(i.name || '').trim().toLowerCase() === desc.toLowerCase());
+          if (f) return f.id;
+          const n = { name: desc, description: '', sku: '', category: '', stock: qty, minStock: 5, lowStock: 5, costPrice: 0, sellPrice: unitCost, price: unitCost, image: null, variants: [], createdAt: new Date().toISOString() };
+          const id = await dbAdd('inventory', n);
+          try { await logAudit('inventory', 'Auto-created from sale: ' + desc + ${JSON.stringify(devTag(req))}); } catch (e) {}
+          return id;
+        })()`);
+      }
       const txnData = JSON.stringify({ invoiceNo, clientId: clientId || null, clientName, date: todayStr(), createdAt: new Date().toISOString(), items: items.map(i => { const sub = (i.qty||1) * (i.unitCost || 0); return { ...i, amount: Math.round((sub + lineInterest(sub, i.intRate, i.date, todayStr())) * 100) / 100 }; }), subtotal, totalInterest, discount: d, scDiscount: 0, grandTotal, paymentMethod: payMethod, status: grandTotal <= 0 ? 'paid' : 'pending', balanceAdded: !!(clientId && payMethod !== 'Cash') });
       const txnId = JSON.parse(await deps.rendererExec(`JSON.stringify(await dbAdd('transactions', ${txnData}))`));
       const stockUndo = [];
@@ -1188,23 +1286,7 @@ function createLanApiRouter(deps) {
       try {
         await deps.rendererExec(`(async()=>{try{await logAudit('sale','Mobile sale ${invoiceNo} - ₱${grandTotal.toFixed(2)}${devTag(req)}');}catch(e){}})()`);
       for (const item of items) {
-        let invId = item.invId;
-        if (!invId && item.description) {
-          invId = await deps.rendererExec(`(async()=>{
-            const desc = ${JSON.stringify(String(item.description).trim())};
-            const qty = ${Math.max(1, parseInt(item.qty) || 1)};
-            const unitCost = ${item.unitCost || 0};
-            if (!desc) return null;
-            const all = await dbAll('inventory');
-            const f = all.find(i => String(i.name || '').trim().toLowerCase() === desc.toLowerCase());
-            if (f) return f.id;
-            const n = { name: desc, description: '', sku: '', category: '', stock: qty, minStock: 5, lowStock: 5, costPrice: 0, sellPrice: unitCost, price: unitCost, image: null, variants: [], createdAt: new Date().toISOString() };
-            const id = await dbAdd('inventory', n);
-            try { await logAudit('inventory', 'Auto-created from sale: ' + desc + ${JSON.stringify(devTag(req))}); } catch (e) {}
-            return id;
-          })()`);
-          item.invId = invId;
-        }
+        const invId = item.invId;
         if (invId) {
           await deps.rendererExec(`(async()=>{const i=await dbGet('inventory',${JSON.stringify(invId)});if(i){i.stock=(i.stock||0)-${parseInt(item.qty)||1};const vn=${JSON.stringify(item.variantName || null)};if(vn&&i.variants){const v=i.variants.find(x=>x.name===vn);if(v)v.stock=(v.stock||0)-${parseInt(item.qty)||1};}await dbPut('inventory',i);}})()`);
           stockUndo.push({ invId, qty: parseInt(item.qty) || 1, variantName: item.variantName || null });
@@ -1320,21 +1402,23 @@ function createLanApiRouter(deps) {
           const invNos = JSON.parse(await deps.rendererExec(`JSON.stringify(state.transactions.filter(t=>t.invoiceNo?.startsWith('INV-')).map(t=>parseInt(t.invoiceNo.replace('INV-',''))||0))`));
           const nextNo = invNos.length > 0 ? Math.max(...invNos) + 1 : 1;
           const invoiceNo = 'INV-' + String(nextNo).padStart(5,'0');
-          const subtotal = items.reduce((s, i) => s + ((i.qty||1) * (i.unitCost || 0)), 0);
+          const subtotal = Math.round(items.reduce((s, i) => s + ((i.qty||1) * (i.unitCost || 0)), 0) * 100) / 100;
           const totalInterest = Math.round(items.reduce((s, i) => s + lineInterest((i.qty||1) * (i.unitCost || 0), i.intRate, i.date, todayStr()), 0) * 100) / 100;
           const d = parseFloat(discount) || 0;
-          const grandTotal = Math.max(0, subtotal + totalInterest - d);
+          const grandTotal = Math.max(0, Math.round((subtotal + totalInterest - d) * 100) / 100);
           const clientData = clientId ? JSON.parse(await deps.rendererExec(`JSON.stringify(await dbGet('clients', ${JSON.stringify(clientId)}))`)) : null;
           const clientName = clientData ? clientData.name : 'Walk-in';
           const payMethod = paymentMethod || 'Cash';
+          // Resolve inventory ids before saving the line (see POST /api/sales):
+          // returns/voids need invId on the stored item to restock it.
+          for (const item of items) {
+            if (item.invId || !item.description) continue;
+            item.invId = await deps.rendererExec(`(async()=>{const desc=${JSON.stringify(String(item.description).trim())};const qty=${Math.max(1,parseInt(item.qty)||1)};const unitCost=${item.unitCost||0};if(!desc)return null;const all=await dbAll('inventory');const f=all.find(i=>String(i.name||'').trim().toLowerCase()===desc.toLowerCase());if(f)return f.id;const n={name:desc,description:'',sku:'',category:'',stock:qty,minStock:5,lowStock:5,costPrice:0,sellPrice:unitCost,price:unitCost,image:null,variants:[],createdAt:new Date().toISOString()};const id=await dbAdd('inventory',n);return id;})()`);
+          }
           const txnData = JSON.stringify({ invoiceNo, clientId: clientId || null, clientName, date: todayStr(), createdAt: new Date().toISOString(), items: items.map(i => { const sub = (i.qty||1) * (i.unitCost || 0); return { ...i, amount: Math.round((sub + lineInterest(sub, i.intRate, i.date, todayStr())) * 100) / 100 }; }), subtotal, totalInterest, discount: d, scDiscount: 0, grandTotal, paymentMethod: payMethod, status: grandTotal <= 0 ? 'paid' : 'pending', balanceAdded: !!(clientId && payMethod !== 'Cash') });
           await deps.rendererExec(`dbAdd('transactions', ${txnData})`);
           for (const item of items) {
-            let invId = item.invId;
-            if (!invId && item.description) {
-              invId = await deps.rendererExec(`(async()=>{const desc=${JSON.stringify(String(item.description).trim())};const qty=${Math.max(1,parseInt(item.qty)||1)};const unitCost=${item.unitCost||0};if(!desc)return null;const all=await dbAll('inventory');const f=all.find(i=>String(i.name||'').trim().toLowerCase()===desc.toLowerCase());if(f)return f.id;const n={name:desc,description:'',sku:'',category:'',stock:qty,minStock:5,lowStock:5,costPrice:0,sellPrice:unitCost,price:unitCost,image:null,variants:[],createdAt:new Date().toISOString()};const id=await dbAdd('inventory',n);return id;})()`);
-              item.invId = invId;
-            }
+            const invId = item.invId;
             if (invId) await deps.rendererExec(`(async()=>{const i=await dbGet('inventory',${JSON.stringify(invId)});if(i){i.stock=(i.stock||0)-${parseInt(item.qty)||1};const vn=${JSON.stringify(item.variantName||null)};if(vn&&i.variants){const v=i.variants.find(x=>x.name===vn);if(v)v.stock=(v.stock||0)-${parseInt(item.qty)||1};}await dbPut('inventory',i);}})()`);
           }
           if (clientId) await deps.rendererExec(`(async()=>{const c=await dbGet('clients',${JSON.stringify(clientId)});if(c && ${JSON.stringify(payMethod)} !== 'Cash'){c.balance=(c.balance||0)+${grandTotal};await dbPut('clients',c);}})()`);
@@ -1467,25 +1551,36 @@ function createLanApiRouter(deps) {
   }));
 
   // Void a sale: reverses stock and any added credit balance, marks voided.
-  // Destroys nothing (record kept for audit). Owner-only: voids rewrite books.
+  // Returns void backward (the negative lines are un-restocked). Destroys
+  // nothing (record kept for audit). Owner-only: voids rewrite books.
   router.post('/api/void', wrap(async (req, res) => {
     const ref = req.body && (req.body.invoiceNo ?? req.body.id);
     if (ref === undefined || ref === null || String(ref).trim() === '') {
       return res.status(400).json({ error: 'invoiceNo required' });
     }
     if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
-    const ok = JSON.parse(await deps.rendererExec(`JSON.stringify(await (async()=>{
+    const r = JSON.parse(await deps.rendererExec(`JSON.stringify(await (async()=>{
       const list=await dbAll('transactions');
       const t=list.find(x=>x.invoiceNo===${JSON.stringify(String(ref))}||String(x.id)===${JSON.stringify(String(ref))});
-      if(!t||t.status==='voided')return false;
+      if(!t||t.status==='voided')return {ok:false,code:404,error:'Sale not found or already voided'};
+      if(t.status!=='pending'&&t.status!=='paid'&&t.status!=='return')return {ok:false,code:400,error:'Only active sales and returns can be voided'};
       for(const it of (t.items||[])){
-        if(it.invId){const i=await dbGet('inventory',it.invId);if(i){i.stock=(i.stock||0)+(parseInt(it.qty)||1);await dbPut('inventory',i);}}
+        if(it.invId){
+          const i=await dbGet('inventory',it.invId);
+          if(i){
+            const q=(${signedQty.toString()})(it);
+            i.stock=(i.stock||0)+q;
+            const vn=it.variantName;
+            if(vn&&i.variants){const v=i.variants.find(x=>x.name===vn);if(v)v.stock=(v.stock||0)+q;}
+            await dbPut('inventory',i);
+          }
+        }
       }
       if(t.balanceAdded&&t.clientId){const c=await dbGet('clients',t.clientId);if(c){c.balance=(c.balance||0)-(t.grandTotal||0);await dbPut('clients',c);}}
       t.status='voided';t.voidedAt=new Date().toISOString();
-      await dbPut('transactions',t);return t.invoiceNo||true;
+      await dbPut('transactions',t);return {ok:true,invoiceNo:t.invoiceNo};
     })())`));
-    if (!ok) return res.status(404).json({ error: 'Sale not found or already voided' });
+    if (!r || !r.ok) return res.status((r && r.code) || 400).json({ error: (r && r.error) || 'Void failed' });
     try { await deps.rendererExec(`(async()=>{try{await logAudit('sale-void','Mobile void ' + ${JSON.stringify(String(ref))} + ${JSON.stringify(devTag(req))});}catch(e){}})()`); } catch (e) {}
     deps.notify({ source: 'api', kind: 'void' });
     res.json({ success: true });
@@ -1553,19 +1648,32 @@ function createLanApiRouter(deps) {
     if (!deps.rendererReady()) return res.status(503).json({ error: 'Window not ready' });
     const orig = JSON.parse(await deps.rendererExec(`JSON.stringify((await dbAll('transactions')).find(t => t.invoiceNo === ${JSON.stringify(String(ref))} || String(t.id) === ${JSON.stringify(String(ref))}) || null)`));
     if (!orig) return res.status(404).json({ error: 'Original sale not found' });
+    // Returns only make sense against a live sale: a voided sale was cancelled
+    // and a return-of-a-return would corrupt stock and refunds.
+    if (orig.status === 'voided') return res.status(400).json({ error: 'Cannot return a voided sale' });
+    if (orig.status === 'return') return res.status(400).json({ error: 'Cannot return a return; void it instead if wrong' });
     if (!Array.isArray(orig.items) || !orig.items.length) return res.status(400).json({ error: 'Original sale has no item lines' });
     const prior = JSON.parse(await deps.rendererExec(`JSON.stringify((await dbAll('transactions')).filter(t => t.status === 'return' && (${JSON.stringify(orig.id)} !== null && t.refId === ${JSON.stringify(orig.id)} || t.refInvoiceNo === ${JSON.stringify(orig.invoiceNo || '')})))`)) || [];
     const keyOf = (i) => (i.invId !== undefined && i.invId !== null && i.invId !== '' ? 'id:' + i.invId : 'nm:' + String(i.description || i.name || '').trim().toLowerCase());
+    // Unit cost must be resolved from the ORIGINAL line (amount ÷ original
+    // qty) before qty is replaced by the requested count. Using the requested
+    // qty here inflates partial refunds on multi-unit lines.
+    const unitFromOrig = (line) => {
+      const q0 = lineQtyAbs(line);
+      const a = parseFloat(line.amount);
+      if (a) return a / q0;
+      return parseFloat(line.unitCost || line.price) || 0;
+    };
     const remaining = {};
     for (const i of orig.items) {
       const k = keyOf(i);
       remaining[k] = remaining[k] || { item: i, left: 0 };
-      remaining[k].left += parseInt(i.qty) || 1;
+      remaining[k].left += lineQtyAbs(i);
     }
     for (const r of prior) {
       for (const i of (r.items || [])) {
         const k = keyOf(i);
-        if (remaining[k]) remaining[k].left -= Math.abs(parseInt(i.qty) || 0);
+        if (remaining[k]) remaining[k].left -= lineQtyAbs(i);
       }
     }
     let requested = [];
@@ -1579,11 +1687,11 @@ function createLanApiRouter(deps) {
           return res.status(400).json({ error: 'Cannot return that much: ' + (probe.description || ('#' + probe.invId)) });
         }
         slot.left -= q;
-        requested.push({ ...slot.item, qty: q });
+        requested.push({ ...slot.item, qty: q, _u: unitFromOrig(slot.item) });
       }
     } else {
       for (const k of Object.keys(remaining)) {
-        if (remaining[k].left > 0) requested.push({ ...remaining[k].item, qty: remaining[k].left });
+        if (remaining[k].left > 0) requested.push({ ...remaining[k].item, qty: remaining[k].left, _u: unitFromOrig(remaining[k].item) });
       }
       if (!requested.length) return res.status(400).json({ error: 'That sale was already fully returned' });
     }
@@ -1593,19 +1701,17 @@ function createLanApiRouter(deps) {
       const invoiceNo = 'INV-' + String(nextNo).padStart(5, '0');
       // Line amounts already carry per-line interest (as stored by /api/sales);
       // discounts are prorated so a full return refunds exactly grandTotal.
-      const unitOf = (line) => {
-        const q = parseInt(line.qty) || 1;
-        const a = parseFloat(line.amount);
-        if (a) return a / q;
-        return parseFloat(line.unitCost || line.price) || 0;
-      };
-      const origSub = (orig.items || []).reduce((s, i) => s + ((parseInt(i.qty) || 1) * unitOf(i)), 0);
+      const unitOf = (line) => (typeof line._u === 'number') ? line._u : unitFromOrig(line);
+      const origSub = (orig.items || []).reduce((s, i) => s + (lineQtyAbs(i) * unitOf(i)), 0);
       let retSub = 0;
       const items = requested.map(r => {
         const unit = unitOf(r);
-        const amt = (parseInt(r.qty) || 1) * unit;
+        const q = Math.abs(parseInt(r.qty, 10)) || 1;
+        const amt = q * unit;
         retSub += amt;
-        return { ...r, qty: -(parseInt(r.qty) || 1), amount: -amt };
+        const clean = { ...r, qty: -q, amount: -amt };
+        delete clean._u;
+        return clean;
       });
       const discShare = origSub > 0 ? (parseFloat(orig.discount) || 0) * (retSub / origSub) : 0;
       const grandTotal = -(Math.max(0, retSub - discShare));
@@ -1617,7 +1723,8 @@ function createLanApiRouter(deps) {
       const txnData = JSON.stringify({ invoiceNo, clientId: orig.clientId || null, clientName: orig.clientName || 'Walk-in', date: todayStr(), createdAt: new Date().toISOString(), items, subtotal: -retSub, totalInterest: 0, discount: 0, scDiscount: 0, grandTotal, paymentMethod: orig.paymentMethod || 'Cash', status: 'return', refId: orig.id || null, refInvoiceNo: orig.invoiceNo || null, partial: !!partial });
       await deps.rendererExec(`dbAdd('transactions', ${txnData})`);
       for (const item of items) {
-        if (item.invId) await deps.rendererExec(`(async()=>{const i=await dbGet('inventory',${JSON.stringify(item.invId)});if(i){i.stock=(i.stock||0)+${Math.abs(parseInt(item.qty) || 1)};await dbPut('inventory',i);}})()`);
+        const q = Math.abs(parseInt(item.qty, 10)) || 1;
+        if (item.invId) await deps.rendererExec(`(async()=>{const i=await dbGet('inventory',${JSON.stringify(item.invId)});if(i){const q=${q};i.stock=(i.stock||0)+q;const vn=${JSON.stringify(item.variantName || null)};if(vn&&i.variants){const v=i.variants.find(x=>x.name===vn);if(v)v.stock=(v.stock||0)+q;}await dbPut('inventory',i);}})()`);
       }
       if (orig.clientId) await deps.rendererExec(`(async()=>{const c=await dbGet('clients',${JSON.stringify(orig.clientId)});if(c && ${JSON.stringify(orig.paymentMethod || 'Cash')} !== 'Cash'){c.balance=(c.balance||0)-${absTotal};await dbPut('clients',c);}})()`);
       await deps.rendererExec(`(async()=>{try{await logAudit('return','Mobile return ' + ${JSON.stringify(orig.invoiceNo || '')} + ' → ' + ${JSON.stringify(invoiceNo)} + ' - ₱' + (${absTotal}).toFixed(2) + ${partial ? ' (partial)' : ''} + ${JSON.stringify(devTag(req))});}catch(e){}})()`);

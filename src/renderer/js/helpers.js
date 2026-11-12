@@ -6,7 +6,7 @@ import { renderExpTable } from './expenses.js'
 import { toggleLang } from './i18n.js'
 import { renderPayTable } from './payments.js'
 import { navigate } from './router.js'
-import { now, peso, pesoBal, state, today, VAT_RATE } from './state.js'
+import { now, peso, pesoBal, state, today, vatRateFraction } from './state.js'
 import { renderTxTable, txCart, updateCartRowAmt, updateTMTotals } from './transactions.js'
 
 export function dp(d) { const p = (d||'').split('-'); return { y: p[0]||'', m: p[1]||'', d: p[2]||'' }; }
@@ -309,7 +309,7 @@ export function calcInterest(sub, ratePct, days) {
 }
 
 export function formatVATBreakdown(subtotal) {
-  const vatRate = parseFloat(state.settings.find(s => s.key === 'vatRate')?.value) || VAT_RATE;
+  const vatRate = vatRateFraction();
   const vatExclusive = Math.round((Number(subtotal) || 0) / (1 + vatRate) * 100) / 100;
   const vatAmount = Math.round(vatExclusive * vatRate * 100) / 100;
   const total = Math.round((Number(subtotal) || 0) * 100) / 100;

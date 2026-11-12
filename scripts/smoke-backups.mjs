@@ -107,7 +107,9 @@ fakeSettings.autoSnapshotEnabled = 'true';
 fakeSettings.snapshotKeepCount = '1';
 const plan1 = await svc.planLocalSnapshot();
 ok(plan1.planned === true && plan1.entry.status === 'ok' && plan1.entry.auto === true, 'planLocalSnapshot creates auto snapshot');
-ok(fakeSettings.lastAutoSnapshot === new Date().toISOString().split('T')[0], 'lastAutoSnapshot recorded for today');
+const localNow = new Date();
+const localToday = `${localNow.getFullYear()}-${String(localNow.getMonth() + 1).padStart(2, '0')}-${String(localNow.getDate()).padStart(2, '0')}`;
+ok(fakeSettings.lastAutoSnapshot === localToday, 'lastAutoSnapshot recorded for local calendar date');
 const plan2 = await svc.planLocalSnapshot();
 ok(plan2.planned === false && plan2.reason === 'already-today', 'planLocalSnapshot skips second run same day');
 const manual = await svc.createBackup('', false);
@@ -215,10 +217,32 @@ ok(v5.ok === false && /must be a valid number/i.test(v5.error), 'NaN amount reje
 const v6 = svc.validateImportDump({ clients: [{ id: 1, name: 123 }] });
 ok(v6.ok === false && /name must be a string/i.test(v6.error), 'numeric client name rejected');
 
-// 15 renderer restore path (importJsonDump) gains the same validation
-const dimport = await svc.importJsonDump(validDump);
-ok(dimport.success === true && dimport.validated === 5 && dimport.counts.clients === 2, 'importJsonDump imports validated dump');
+// 15 renderer restore path (importJsonDump) gains the same validation and keeps
+// machine-local credentials that JSON backups deliberately strip.
+await invoke(h, 'db-add', { store: 'users', obj: { id: 1, username: 'admin', password: 'pbkdf2$test', role: 'admin', name: 'Administrator' } });
+await invoke(h, 'db-add', { store: 'settings', obj: { id: 50, key: 'cloudBackupPassword', value: 'local-secret' } });
+const metaDump = {
+  ...validDump,
+  users: [{ id: 1, username: 'admin', role: 'admin', name: 'Administrator' }],
+  settings: [...validDump.settings, { id: 50, key: 'cloudBackupPassword', value: '********' }],
+  exportedAt: '2026-01-01T00:00:00.000Z'
+};
+ok(svc.validateImportDump(metaDump).ok === true, 'exportedAt metadata ignored during validation');
+const dimport = await svc.importJsonDump(metaDump);
+ok(dimport.success === true && dimport.validated === 7 && dimport.counts.clients === 2, 'importJsonDump imports validated dump with metadata');
 ok((await invoke(h, 'db-get', { store: 'clients', id: 2 })).name === 'Mang Jose', 'importJsonDump data readable after restore');
+const restoredUser = await invoke(h, 'db-get', { store: 'users', id: 1 });
+ok(restoredUser && restoredUser.password === 'pbkdf2$test', 'restore preserves password hash for matching user id');
+const restoredSecret = await invoke(h, 'db-get', { store: 'settings', id: 50 });
+ok(restoredSecret && restoredSecret.value === 'local-secret', 'restore keeps local value for masked secret setting');
+const dByName = await svc.importJsonDump({
+  clients: [{ id: 1, name: 'Aling Nena', balance: 125.5 }, { id: 2, name: 'Mang Jose', balance: 10 }],
+  users: [{ id: 99, username: 'admin', role: 'admin', name: 'Administrator' }]
+});
+const userByName = await invoke(h, 'db-get', { store: 'users', id: 99 });
+ok(dByName.success === true && userByName && userByName.password === 'pbkdf2$test', 'password merge falls back to matching username');
+const dNoUsers = await svc.importJsonDump({ clients: [{ id: 1, name: 'Aling Nena', balance: 125.5 }, { id: 2, name: 'Mang Jose', balance: 10 }] });
+ok(dNoUsers.success === true && !!(await invoke(h, 'db-get', { store: 'users', id: 99 })), 'dump without users keeps local accounts');
 const dbad = await svc.importJsonDump({ clients: [{ id: 1, name: 5 }] });
 ok(dbad.success === false && /name must be a string/i.test(dbad.error), 'importJsonDump rejects corrupted dump without wiping data');
 ok((await invoke(h, 'db-get', { store: 'clients', id: 2 })).name === 'Mang Jose', 'data intact after rejected import');

@@ -142,7 +142,9 @@ const writeRouter = createLanApiRouter({
   setSetting: async () => ({ success: true }),
   lanToken: 'test-token-123',
   wsPort: 3458,
-  verifyToken: (t) => (t === 'test-token-123' ? { ok: true, master: true, device: null } : { ok: false }),
+  verifyToken: (t) => t === 'test-token-123'
+    ? { ok: true, master: true, device: null }
+    : (t === 'dev_cash-1' ? { ok: true, master: false, device: { id: 'dev-2', name: 'Cash', role: 'cashier' } } : { ok: false }),
   notify: () => {}
 });
 
@@ -305,6 +307,47 @@ const server = app.listen(0, '127.0.0.1', async () => {
     const csvCash = await fetch(base + '/api/reports/export.csv?token=dev_cash-1');
     ok(csvCash.status === 403, 'cashier blocked from CSV export (403)');
 
+    // Desktop-created lines store the quantity in `name` (no qty field).
+    // Reports, history, and CSV must count all pieces, not collapse them to 1.
+    const deskId = await invoke('db-add', { store: 'transactions', obj: {
+      invoiceNo: 'INV-09999', clientId: 2, clientName: 'Mang Jose', date: '1999-12-15',
+      createdAt: '1999-12-15T10:00:00.000Z', status: 'paid', paymentMethod: 'Cash',
+      grandTotal: 60, subtotal: 60, totalInterest: 0, discount: 0, scDiscount: 0,
+      items: [{ description: 'Desktop Three', name: '3', unitCost: 20, amount: 60 }]
+    } });
+    const deskRetId = await invoke('db-add', { store: 'transactions', obj: {
+      invoiceNo: 'INV-09999-R', clientId: 2, clientName: 'Mang Jose', date: '1999-12-16',
+      createdAt: '1999-12-16T10:00:00.000Z', status: 'return', paymentMethod: 'Cash',
+      grandTotal: -40, subtotal: -40, totalInterest: 0, discount: 0, scDiscount: 0, refId: deskId,
+      items: [{ description: 'Desktop Three', qty: -2, unitCost: 20, amount: -40 }]
+    } });
+    const repQty = await json('/api/reports');
+    const deskTop = repQty.body.topItems.find(x => x.name === 'Desktop Three');
+    ok(deskTop && deskTop.qty === 3 && deskTop.amount === 60, 'GET /api/reports counts desktop qty stored in name');
+    const histQty = await json('/api/clients/2/history');
+    const deskSale = histQty.body.sales.find(s => s.invoiceNo === 'INV-09999');
+    ok(deskSale && deskSale.items[0].qty === 3, 'GET /api/clients/:id/history exposes desktop qty');
+    const deskReturn = histQty.body.sales.find(s => s.invoiceNo === 'INV-09999-R');
+    ok(deskReturn && deskReturn.items[0].qty === 2, 'client history shows returned units, not 1');
+    const csvDesk = await fetch(base + '/api/reports/export.csv?month=1999-12&token=test-token-123');
+    const csvDeskT = await csvDesk.text();
+    ok(csvDesk.status === 200 && csvDeskT.includes('Desktop Three,3,20,60'), 'monthly CSV writes desktop qty');
+    ok(csvDeskT.includes('Desktop Three,-2,20,-40'), 'monthly CSV writes signed qty for return lines');
+    await invoke('db-del', { store: 'transactions', id: deskRetId });
+    await invoke('db-del', { store: 'transactions', id: deskId });
+
+    // Payment + inventory downloads used by the phone Reports screen.
+    const payCsv = await fetch(base + '/api/payments/export.csv?token=test-token-123');
+    const payCsvT = await payCsv.text();
+    ok(payCsv.status === 200 && (payCsv.headers.get('content-type') || '').includes('text/csv') && payCsvT.includes('Date,Client,Amount,Type,Reference,Notes') && payCsvT.includes('Aling Nena,30'), 'GET /api/payments/export.csv serves a download');
+    const payCsvCash = await fetch(base + '/api/payments/export.csv?token=dev_cash-1');
+    ok(payCsvCash.status === 403, 'cashier blocked from payments CSV (403)');
+    const invCsv = await fetch(base + '/api/inventory/export.csv?token=test-token-123');
+    const invCsvT = await invCsv.text();
+    ok(invCsv.status === 200 && (invCsv.headers.get('content-type') || '').includes('text/csv') && invCsvT.includes('Name,SKU,Barcode,Category,Sell Price') && invCsvT.includes('Coke'), 'GET /api/inventory/export.csv serves a download');
+    const invCsvCash = await fetch(base + '/api/inventory/export.csv?token=dev_cash-1');
+    ok(invCsvCash.status === 403, 'cashier blocked from inventory CSV (403)');
+
     // product photos: validation first, renderer needed for the real thing
     const phBad = await json('/api/inventory/1/photo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: 'not-a-data-url' }) });
     ok(phBad.status === 400, 'POST /api/inventory/:id/photo rejects non-images (400)');
@@ -432,6 +475,16 @@ const server = app.listen(0, '127.0.0.1', async () => {
     rstores.inventory = [{ id: 11, name: 'Coke', stock: 5, sellPrice: 30, variants: [] }];
     rctx.state.transactions = [];
 
+    // Cashier role: client add is counter work, but inventing opening debt is not.
+    const cashCreate = await fetch(base + '/w/api/clients?token=dev_cash-1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Cashier Client', balance: 500 }) });
+    ok(cashCreate.status === 403, 'cashier blocked from setting an opening balance (403)');
+    const cashCreate0 = await fetch(base + '/w/api/clients?token=dev_cash-1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Cashier Client', balance: 0 }) });
+    const cashCreate0Body = await cashCreate0.json();
+    ok(cashCreate0.status === 200 && cashCreate0Body.success === true, 'cashier can still add a client with no balance');
+    const cashEdit = await fetch(base + '/w/api/clients/' + cashCreate0Body.id + '?token=dev_cash-1', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Cashier Client', balance: 9999 }) });
+    const cashAfter = rstores.clients.find(c => String(c.id) === String(cashCreate0Body.id));
+    ok(cashEdit.status === 200 && cashAfter && cashAfter.balance === 0, 'cashier edit cannot rewrite a client balance');
+
     const sale = await json('/w/api/sales', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId: 1, paymentMethod: 'Credit (Utang)', items: [{ description: 'Coke', qty: 2, unitCost: 30, invId: 11 }] }) });
     ok(sale.status === 200 && sale.body.success === true, 'POST /api/sales writes through a live renderer (200)');
     ok(sale.body.invoiceNo === 'INV-00001', 'POST /api/sales returns the new invoiceNo (regression: the response used to drop it)');
@@ -502,6 +555,36 @@ const server = app.listen(0, '127.0.0.1', async () => {
     ok(pay.status === 200 && pay.body.success === true, 'POST /api/payments writes through a live renderer (200)');
     ok(rstores.payments && rstores.payments.length === 1 && rstores.payments[0].amount === 30, 'the payment row is stored');
     ok(rAudits.some(a => a.action === 'payment' && String(a.details).includes('₱30.00')), 'the payment audit line survives an integer amount');
+
+    // Totals are currency: floating-point line math must not leak centavos.
+    const roundSale = await json('/w/api/sales', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: [{ description: 'Candy', qty: 3, unitCost: 0.1 }], paymentMethod: 'Cash' }) });
+    const roundRow = rstores.transactions.find(t => t.invoiceNo === roundSale.body.invoiceNo);
+    ok(roundSale.status === 200 && roundRow && roundRow.grandTotal === 0.3, 'sale totals round to centavos');
+
+    // Partial returns prorate the ORIGINAL line, not the requested quantity.
+    const retSale = await json('/w/api/sales', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: [{ description: 'Ret Item', qty: 5, unitCost: 20 }], paymentMethod: 'Cash' }) });
+    const retInv = rstores.inventory.find(i => i.name === 'Ret Item');
+    const retPart = await json('/w/api/returns', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ invoiceNo: retSale.body.invoiceNo, items: [{ invId: retInv.id, description: 'Ret Item', qty: 2 }] }) });
+    const retPartRow = rstores.transactions.find(t => t.status === 'return' && t.refInvoiceNo === retSale.body.invoiceNo);
+    ok(retPart.status === 200 && retPartRow && retPartRow.grandTotal === -40 && retPartRow.items[0].qty === -2, 'partial return refunds only the returned units');
+    const retRest = await json('/w/api/returns', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ invoiceNo: retSale.body.invoiceNo }) });
+    const retRestRow = rstores.transactions.find(t => t.status === 'return' && t.refInvoiceNo === retSale.body.invoiceNo && t.id !== retPartRow.id);
+    ok(retRest.status === 200 && retRestRow && retRestRow.grandTotal === -60, 'remaining units refund exactly after a partial return');
+    const retOfRet = await json('/w/api/returns', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ invoiceNo: retPartRow.invoiceNo }) });
+    ok(retOfRet.status === 400, 'a return cannot itself be returned (400)');
+
+    // Void restores desktop quantities and variant stock.
+    rstores.inventory.push({ id: 12, name: 'Shirt', stock: 2, sellPrice: 100, variants: [{ name: 'M', stock: 2 }] });
+    rstores.transactions.push({ id: 9000, invoiceNo: 'INV-09000', clientId: null, clientName: 'Walk-in', date: TODAY, createdAt: TODAY + 'T00:00:00.000Z', status: 'paid', paymentMethod: 'Cash', grandTotal: 300, subtotal: 300, totalInterest: 0, discount: 0, scDiscount: 0, items: [{ description: 'Shirt', name: '3', unitCost: 100, amount: 300, invId: 12, variantName: 'M' }] });
+    const voidDesk = await json('/w/api/void', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ invoiceNo: 'INV-09000' }) });
+    const shirt = rstores.inventory.find(i => i.id === 12);
+    ok(voidDesk.status === 200 && shirt.stock === 5 && shirt.variants[0].stock === 5, 'void restores desktop qty and variant stock');
+
+    // Voiding a return reverses its negative lines (un-restock).
+    rstores.inventory.push({ id: 13, name: 'Soap', stock: 3, sellPrice: 10, variants: [] });
+    rstores.transactions.push({ id: 9001, invoiceNo: 'INV-09001-R', clientId: null, clientName: 'Walk-in', date: TODAY, createdAt: TODAY + 'T00:00:00.000Z', status: 'return', paymentMethod: 'Cash', grandTotal: -20, subtotal: -20, totalInterest: 0, discount: 0, scDiscount: 0, items: [{ description: 'Soap', qty: -2, unitCost: 10, amount: -20, invId: 13 }] });
+    const voidRet = await json('/w/api/void', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ invoiceNo: 'INV-09001-R' }) });
+    ok(voidRet.status === 200 && rstores.inventory.find(i => i.id === 13).stock === 1, 'voiding a return un-restocks the returned units');
   } catch (e) {
     console.error('FAIL harness: ' + e.message);
     failed++;

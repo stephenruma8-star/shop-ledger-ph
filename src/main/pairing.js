@@ -92,11 +92,19 @@ function exportDevices() {
 }
 
 // Restores persisted registry at boot. Malformed entries are dropped, never trusted.
+// Duplicate ids/tokens are collapsed and the registry is capped so a corrupted or
+// hand-edited prefs file cannot exceed MAX_DEVICES or shadow an existing phone.
 function restoreDevices(arr) {
   _devices = [];
+  const seenIds = new Set();
+  const seenTokens = new Set();
   for (const d of Array.isArray(arr) ? arr : []) {
+    if (_devices.length >= MAX_DEVICES) break;
     if (!d || typeof d.id !== 'string' || typeof d.token !== 'string') continue;
     if (!/^dev-[0-9a-f]{8}$/.test(d.id) || !/^dev_[0-9a-f]{48}$/.test(d.token)) continue;
+    if (seenIds.has(d.id) || seenTokens.has(d.token)) continue;
+    seenIds.add(d.id);
+    seenTokens.add(d.token);
     _devices.push({ id: d.id, token: d.token, name: cleanName(d.name), role: cleanRole(d.role), createdAt: Number(d.createdAt) || Date.now(), lastSeen: null });
   }
   return _devices.length;

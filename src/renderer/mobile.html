@@ -572,6 +572,19 @@ async function apiGet(path) {
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }
+// CSV/export endpoints answer with raw text, not JSON. Same auth and session
+// handling as apiGet; the Reports screen shares the text instead of opening a
+// browser download.
+async function apiGetText(path) {
+  const r = await fetchTimeout(API + path, { headers: HDR() });
+  if (r.status === 401 && getToken()) {
+    try { localStorage.removeItem('slpToken'); localStorage.removeItem('slpRole'); } catch (e) {}
+    renderPairScreen(T('pair.session_expired'));
+    throw new Error('HTTP 401');
+  }
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.text();
+}
 // ---------- diagnostics ----------
 // JS errors are queued on-device (cap 50) and uploaded to the shop computer,
 // where they land in mobile-diag.json and the desktop logs. Without this a
@@ -6213,9 +6226,9 @@ function exportMonthCsv() {
 }
 async function exportMonthCsvLocal(m) {
   try {
-    const r = await apiGet('/api/reports/export.csv?month=' + m);
-    if (!r || !r.csv) throw new Error('empty report');
-    await shareText('ShopLedger-' + m + '.csv', r.csv);
+    const csv = await apiGetText('/api/reports/export.csv?month=' + m);
+    if (!csv) throw new Error('empty report');
+    await shareText('ShopLedger-' + m + '.csv', csv);
   } catch (e) { toast(T('rep.load_fail', { m, msg: e.message }), 'err'); }
 }
 async function shareMonthReport() {
@@ -6251,16 +6264,16 @@ async function exportExpensesCsv() {
 }
 async function exportPaymentsCsv() {
   try {
-    const r = await apiGet('/api/payments/export.csv');
-    if (!r || !r.csv) throw new Error('empty report');
-    await shareText('ShopLedger-payments.csv', r.csv);
+    const csv = await apiGetText('/api/payments/export.csv');
+    if (!csv) throw new Error('empty report');
+    await shareText('ShopLedger-payments.csv', csv);
   } catch (e) { toast(T('rep.load_fail', { m: '', msg: e.message }), 'err'); }
 }
 async function exportInventoryCsv() {
   try {
-    const r = await apiGet('/api/inventory/export.csv');
-    if (!r || !r.csv) throw new Error('empty report');
-    await shareText('ShopLedger-inventory.csv', r.csv);
+    const csv = await apiGetText('/api/inventory/export.csv');
+    if (!csv) throw new Error('empty report');
+    await shareText('ShopLedger-inventory.csv', csv);
   } catch (e) { toast(T('rep.load_fail', { m: '', msg: e.message }), 'err'); }
 }
 

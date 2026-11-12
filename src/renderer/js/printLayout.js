@@ -1,5 +1,5 @@
 import { toast } from './helpers.js'
-import { fmtDateTime, now, state, VAT_RATE } from './state.js'
+import { fmtDateTime, now, state, vatRateFraction } from './state.js'
 
 export function printCss(pageSize) {
   const size = pageSize || 'A4';
@@ -135,7 +135,7 @@ export function openPrintWindow(title, w, h, contentHtml, opts) {
   const o = opts || {};
   const size = o.size || 'A4';
   const win = window.open('', '_blank', `width=${w},height=${h},scrollbars=yes`);
-  if (!win) { toast('Popup blocked �?" allow popups for this site to print', 'error'); return null; }
+  if (!win) { toast('Popup blocked - allow popups for this site to print', 'error'); return null; }
   const toolbar = o.toolbarHtml === undefined ? printToolbar(size) : o.toolbarHtml;
   const bodyClass = o.bodyClass ? ` class="${escHtml(o.bodyClass)}"` : '';
   const doc = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${escHtml(title)}</title><style>${printCss(size)}${o.extraCss||''}</style></head><body${bodyClass}>
@@ -162,7 +162,7 @@ export function thermalReceipt(tx) {
   const vatRegNo = m['vatRegNo'] || '';
   const businessTin = m['businessTin'] || '';
   const registeredForVat = m['registeredForVat'] === 'true';
-  const vatRate = parseFloat(m['vatRate']) || VAT_RATE;
+  const vatRate = vatRateFraction();
   const cashierName = m['cashierName'] || '';
 
   const txnDate = tx.createdAt || tx.date;
@@ -190,7 +190,11 @@ export function thermalReceipt(tx) {
 
   html += `<div class="rct-items">`;
   (tx.items || []).forEach(item => {
-    const qty = item.quantity || 1;
+    // Desktop sale lines keep qty in `name`; phone lines carry `qty`; older
+    // receipts used `quantity`. Support all three so reprints never show x1.
+    const rawQty = item.name ?? item.qty ?? item.quantity ?? '1';
+    const qtyMatch = String(rawQty).match(/^-?[\d.]+/);
+    const qty = qtyMatch ? parseFloat(qtyMatch[0]) : 1;
     const itemTotal = item.total || (item.unitCost || 0) * qty;
     html += `<div class="rct-row"><span class="rct-name">${escHtml(item.description || item.name || 'Item')}</span><span class="rct-qty">x${qty}</span><span class="rct-price">₱${itemTotal.toFixed(2)}</span></div>`;
   });

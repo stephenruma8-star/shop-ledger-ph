@@ -102,6 +102,14 @@ async function apiGet(path) {
     throw new Error((e && e.json && e.json.error) || (e && e.message) || ('HTTP ' + (e && e.status)));
   }
 }
+// CSV routes on the local API return { success, csv }; expose the same raw
+// text contract as the LAN client so the shared Reports view works unchanged.
+async function apiGetText(path) {
+  const r = await apiGet(path);
+  if (typeof r === 'string') return r;
+  if (r && typeof r.csv === 'string') return r.csv;
+  throw new Error('empty report');
+}
 async function apiPostRaw(path, body, method) {
   let j;
   try {

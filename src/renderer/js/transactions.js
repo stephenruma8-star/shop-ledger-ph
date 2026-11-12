@@ -4,7 +4,7 @@ import { renderClientGrid } from './clients.js'
 import { dbAdd, dbAll, dbDel, dbGet, dbPut } from './database.js'
 import { calcInterest, closeModal, confirmModal, dbLoad, debounce, escapeHtml, filterByYear, intRateOptions, itemThumbHtml, modal, paginate, pushUndo, renderPagination, searchData, showUndoToast, toast, updateLowStockBadge } from './helpers.js'
 import { openPrintWindow } from './printLayout.js'
-import { fmtDate, fmtDateTime, now, peso, round2, state, today, VAT_RATE } from './state.js'
+import { fmtDate, fmtDateTime, now, peso, round2, state, today, vatRateFraction } from './state.js'
 
 export function getQty(name) { const m = String(name||'1').match(/^-?[\d.]+/); return m ? parseFloat(m[0]) : 1; }
 export async function adjustStock(invId, item, delta) {
@@ -271,7 +271,7 @@ export function updateTMTotals() {
   const commissionAmount = round2(grandTotal * commissionRate / 100);
   
   const registeredForVat = state.settings.find(s => s.key === 'registeredForVat')?.value === 'true';
-  const vatRate = parseFloat(state.settings.find(s => s.key === 'vatRate')?.value) || VAT_RATE;
+  const vatRate = vatRateFraction();
   let vatHtml = '';
   
   if (registeredForVat && grandTotal > 0) {
@@ -501,7 +501,7 @@ export async function doSaveTransaction() {
     }
 
     const registeredForVat = state.settings.find(s => s.key === 'registeredForVat')?.value === 'true';
-    const vatRateSetting = parseFloat(state.settings.find(s => s.key === 'vatRate')?.value) || VAT_RATE;
+    const vatRateSetting = vatRateFraction();
     let vatExclusive = 0;
     let vatAmount = 0;
     if (registeredForVat && grandTotal > 0) {

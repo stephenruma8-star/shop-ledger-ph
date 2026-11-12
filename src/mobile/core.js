@@ -247,6 +247,19 @@ async function apiGet(path) {
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }
+// CSV/export endpoints answer with raw text, not JSON. Same auth and session
+// handling as apiGet; the Reports screen shares the text instead of opening a
+// browser download.
+async function apiGetText(path) {
+  const r = await fetchTimeout(API + path, { headers: HDR() });
+  if (r.status === 401 && getToken()) {
+    try { localStorage.removeItem('slpToken'); localStorage.removeItem('slpRole'); } catch (e) {}
+    renderPairScreen(T('pair.session_expired'));
+    throw new Error('HTTP 401');
+  }
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.text();
+}
 // ---------- diagnostics ----------
 // JS errors are queued on-device (cap 50) and uploaded to the shop computer,
 // where they land in mobile-diag.json and the desktop logs. Without this a

@@ -1,21 +1,33 @@
 import { logAudit } from './auth.js'
-import { dbAll, dbClear, dbPut } from './database.js'
+import { dbAll } from './database.js'
 import { closeModal, confirmModal, dbLoad, escapeHtml, filterByYear, modal, paginate, renderPagination, toast } from './helpers.js'
 import { calculateInventoryValue } from './inventory.js'
 import { escHtml, excelTableCss, openPrintWindow } from './printLayout.js'
 import { loadAll, render } from './router.js'
-import { fmtDate, now, peso, state, today, VAT_RATE } from './state.js'
+import { fmtDate, now, peso, state, today, vatRateFraction } from './state.js'
 
 let _restoreResolve = null;
+
+function lineQty(it) {
+  const m = String((it && (it.name ?? it.qty)) ?? '1').match(/^-?[\d.]+/);
+  return m ? parseFloat(m[0]) : 1;
+}
+
+// Human-readable qty for item summaries. Desktop lines store qty in `name`,
+// phone-created lines store it in `qty` (their `name` is absent).
+function itemQtyLabel(it) {
+  const raw = it && (it.name ?? it.qty);
+  const m = String(raw ?? '1').match(/^-?[\d.]+/);
+  if (m) return m[0];
+  return String((it && it.qty) ?? '1');
+}
 
 function cogsOf(txList, invCost) {
   let cogs = 0;
   for (const t of txList) {
     for (const it of (t.items || [])) {
       if (it.invId == null) continue;
-      const m = String(it.name || it.qty || '1').match(/^-?[\d.]+/);
-      const qty = m ? parseFloat(m[0]) : 1;
-      cogs += qty * (invCost.get(it.invId) || 0);
+      cogs += lineQty(it) * (invCost.get(it.invId) || 0);
     }
   }
   return cogs;
@@ -250,7 +262,7 @@ export async function exportExcel() {
         { v: t.invoiceNo, opts: {} },
         { v: t.date ? fmtDate(t.date) : '', opts: { align: 'center' } },
         { v: t.clientName||'Walk-in', opts: {} },
-        { v: (t.items||[]).map(i => `${i.description||''} x${i.name||'1'}`).join('; '), opts: { align: 'left' } },
+        { v: (t.items||[]).map(i => `${i.description||''} x${itemQtyLabel(i)}`).join('; '), opts: { align: 'left' } },
         { v: pesoVal(t.grandTotal), opts: { align: 'right', fmt: '₱' } },
         { v: t.paymentMethod||'', opts: { align: 'center' } },
         { v: t.status||'', opts: { align: 'center', cls: t.status==='paid'?'status-paid':t.status==='voided'?'status-void':'' } }
@@ -399,7 +411,7 @@ export async function exportXlsx() {
     X.utils.book_append_sheet(wb, sheet(`${shopName} — Transactions`, ['Invoice', 'Date', 'Client', 'Items', 'Total', 'Payment', 'Status'],
       xTx.filter(t => t.invoiceNo).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(t => [
         t.invoiceNo, t.date ? fmtDate(t.date) : '', t.clientName || 'Walk-in',
-        (t.items || []).map(i => `${i.description || ''} x${i.name || '1'}`).join('; '),
+        (t.items || []).map(i => `${i.description || ''} x${itemQtyLabel(i)}`).join('; '),
         t.grandTotal, t.paymentMethod || '', t.status || ''
       ]), [4], [1, 5, 6]), 'Transactions');
     X.utils.book_append_sheet(wb, sheet(`${shopName} — Clients`, ['Name', 'Phone', 'Address', 'Balance', 'Due Date'],
@@ -746,14 +758,10 @@ export async function restoreEncryptedFlow() {
     const decryptResult = await window.electronAPI.decryptBackupData(fileResult.data, pw);
     if (!decryptResult.success) { toast('Decryption failed: ' + (decryptResult.error || 'Wrong password?'), 'error'); return; }
     const data = decryptResult.data;
-    const stores = ['clients','transactions','payments','inventory','quickItems','settings','users','expenses','suppliers','purchaseOrders','supplierPayments','notifications','auditLogs','balanceSnapshots'];
-    await Promise.all(stores.map(s => dbClear(s)));
-    for (const store of stores) {
-      const items = data[store];
-      if (items && Array.isArray(items)) {
-        for (const item of items) await dbPut(store, item);
-      }
-    }
+    // Use the same validated import path as JSON restore so a corrupt dump cannot
+    // wipe stores and the live DB is kept as .prerestore first.
+    const r = await window.electronAPI.importJsonDump(data);
+    if (!r || !r.success) { toast('Restore failed: ' + ((r && r.error) || 'unknown'), 'error'); return; }
     toast('Data restored successfully', 'success');
     await loadAll();
     await logAudit('backup', 'Data restored from encrypted backup');
@@ -897,30 +905,46 @@ export async function exportBIR2550M() {
     const year = document.getElementById('bir-year')?.value || new Date().getFullYear();
     const monthKey = `${year}-${month}`;
     
-    const vatRate = parseFloat(state.settings.find(s => s.key === 'vatRate')?.value) || VAT_RATE;
+    const vatRate = vatRateFraction();
+    const vatPct = +(vatRate * 100).toFixed(2);
     const settingsMap = {};
     state.settings.forEach(s => settingsMap[s.key] = s.value);
     const businessTin = settingsMap['businessTin'] || '';
     const vatRegNo = settingsMap['vatRegNo'] || '';
     
-    const txs = filterByYear(state.transactions, 'date').filter(t => 
-      t.status !== 'voided' && t.status !== 'interest' && t.status !== 'return' &&
+    const txs = (state.transactions || []).filter(t => 
+      t.status !== 'voided' && t.status !== 'interest' &&
       (t.date || '').startsWith(monthKey)
     );
+    const sales = txs.filter(t => t.status !== 'return');
+    const returns = txs.filter(t => t.status === 'return');
+    const txById = new Map((state.transactions || []).map(t => [t.id, t]));
     
     let taxableSales = 0;
     let zeroRatedSales = 0;
     let exemptSales = 0;
+    // A return carries no VAT fields of its own; use the original sale to decide
+    // which bucket the refund reduces. Missing originals fall back to exempt.
+    const vatBucket = (t) => {
+      if (Number(t && t.vatAmount) > 0) return 'taxable';
+      if (Number(t && t.vatExclusive) === 0 && Number(t && t.vatAmount) === 0) return 'exempt';
+      return 'zero';
+    };
     
-    for (const t of txs) {
+    for (const t of sales) {
       const grandTotal = t.grandTotal || 0;
-      if (t.vatAmount > 0) {
-        taxableSales += grandTotal;
-      } else if (t.vatExclusive === 0 && t.vatAmount === 0) {
-        exemptSales += grandTotal;
-      } else {
-        zeroRatedSales += grandTotal;
-      }
+      const bucket = vatBucket(t);
+      if (bucket === 'taxable') taxableSales += grandTotal;
+      else if (bucket === 'zero') zeroRatedSales += grandTotal;
+      else exemptSales += grandTotal;
+    }
+    for (const t of returns) {
+      const orig = t.refId != null ? txById.get(t.refId) : null;
+      const amount = Math.abs(t.grandTotal || 0);
+      const bucket = vatBucket(orig);
+      if (bucket === 'taxable') taxableSales -= amount;
+      else if (bucket === 'zero') zeroRatedSales -= amount;
+      else exemptSales -= amount;
     }
     
     const netTaxable = taxableSales / (1 + vatRate);
@@ -932,7 +956,7 @@ export async function exportBIR2550M() {
       'VAT Reg No',
       'Return Period',
       'Taxable Sales (Net of VAT)',
-      'VAT Output (12%)',
+      `VAT Output (${vatPct}%)`,
       'Zero-Rated Sales',
       'Exempt Sales',
       'Total Sales',
@@ -944,12 +968,12 @@ export async function exportBIR2550M() {
         businessTin,
         vatRegNo,
         `${year}-${month}`,
-        taxableSales.toFixed(2),
+        netTaxable.toFixed(2),
         vatOutput.toFixed(2),
         zeroRatedSales.toFixed(2),
         exemptSales.toFixed(2),
         totalSales.toFixed(2),
-        txs.length
+        sales.length
       ]
     ];
     
@@ -1001,11 +1025,14 @@ export async function exportBIR2551Q() {
     state.settings.forEach(s => settingsMap[s.key] = s.value);
     const businessTin = settingsMap['businessTin'] || '';
     
-    const txs = filterByYear(state.transactions, 'date').filter(t => 
-      t.status !== 'voided' && t.status !== 'interest' && t.status !== 'return' &&
+    const txs = (state.transactions || []).filter(t => 
+      t.status !== 'voided' && t.status !== 'interest' &&
       months.some(m => (t.date || '').startsWith(`${year}-${m}`))
     );
+    const sales = txs.filter(t => t.status !== 'return');
     
+    // Returns store negative grand totals, so summing every transaction gives
+    // gross sales net of refunds for the quarter.
     let grossSales = 0;
     for (const t of txs) {
       grossSales += t.grandTotal || 0;
@@ -1029,7 +1056,7 @@ export async function exportBIR2551Q() {
         `Q${quarter} ${year}`,
         grossSales.toFixed(2),
         percentageTax.toFixed(2),
-        txs.length
+        sales.length
       ]
     ];
     
@@ -1124,10 +1151,12 @@ export function monthlyReportData(monthKey) {
   const invCost = new Map((state.inventory || []).map(i => [i.id, i.costPrice || 0]));
   const revenue = sales.reduce((s, t) => s + (t.grandTotal || 0), 0);
   const refunds = returns.reduce((s, t) => s + Math.abs(t.grandTotal || 0), 0);
-  const cogs = cogsOf(sales, invCost);
+  // Return lines carry negative quantities, so adding their COGS credits the
+  // returned goods back out of cost of goods sold.
+  const cogs = cogsOf(sales, invCost) + cogsOf(returns, invCost);
   const expTotal = exps.reduce((s, e) => s + (e.amount || 0), 0);
   const payTotal = pays.reduce((s, p) => s + (p.amount || 0), 0);
-  const profit = revenue - cogs - expTotal;
+  const profit = revenue - refunds - cogs - expTotal;
   const creditSales = sales.filter(t => (t.paymentMethod || 'Cash') !== 'Cash').reduce((s, t) => s + (t.grandTotal || 0), 0);
   const itemAgg = {};
   sales.forEach(t => (t.items || []).forEach(it => {

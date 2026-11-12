@@ -158,9 +158,9 @@ function exportMonthCsv() {
 }
 async function exportMonthCsvLocal(m) {
   try {
-    const r = await apiGet('/api/reports/export.csv?month=' + m);
-    if (!r || !r.csv) throw new Error('empty report');
-    await shareText('ShopLedger-' + m + '.csv', r.csv);
+    const csv = await apiGetText('/api/reports/export.csv?month=' + m);
+    if (!csv) throw new Error('empty report');
+    await shareText('ShopLedger-' + m + '.csv', csv);
   } catch (e) { toast(T('rep.load_fail', { m, msg: e.message }), 'err'); }
 }
 async function shareMonthReport() {
@@ -196,16 +196,16 @@ async function exportExpensesCsv() {
 }
 async function exportPaymentsCsv() {
   try {
-    const r = await apiGet('/api/payments/export.csv');
-    if (!r || !r.csv) throw new Error('empty report');
-    await shareText('ShopLedger-payments.csv', r.csv);
+    const csv = await apiGetText('/api/payments/export.csv');
+    if (!csv) throw new Error('empty report');
+    await shareText('ShopLedger-payments.csv', csv);
   } catch (e) { toast(T('rep.load_fail', { m: '', msg: e.message }), 'err'); }
 }
 async function exportInventoryCsv() {
   try {
-    const r = await apiGet('/api/inventory/export.csv');
-    if (!r || !r.csv) throw new Error('empty report');
-    await shareText('ShopLedger-inventory.csv', r.csv);
+    const csv = await apiGetText('/api/inventory/export.csv');
+    if (!csv) throw new Error('empty report');
+    await shareText('ShopLedger-inventory.csv', csv);
   } catch (e) { toast(T('rep.load_fail', { m: '', msg: e.message }), 'err'); }
 }
 
