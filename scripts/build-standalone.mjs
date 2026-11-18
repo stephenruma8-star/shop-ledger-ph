@@ -51,6 +51,14 @@ const STANDALONE_MODULES = [
 
 const top = readFileSync(mob('shell-top.html'), 'utf8');
 const bottom = readFileSync(mob('shell-bottom.html'), 'utf8');
+// The standalone version drives the in-app update check. It must match the
+// APK version stamped into build.gradle, or an updated phone keeps offering
+// the same release forever.
+const mobilePkg = JSON.parse(readFileSync(resolve(root, 'mobile-app', 'package.json'), 'utf8'));
+const coreSrc = readFileSync(sa('standalone-core.js'), 'utf8');
+const verMatch = coreSrc.match(/const STANDALONE_VERSION = '([^']+)'/);
+if (!verMatch) throw new Error('standalone-core.js must declare STANDALONE_VERSION');
+if (verMatch[1] !== mobilePkg.version) throw new Error('STANDALONE_VERSION (' + verMatch[1] + ') must match mobile-app/package.json (' + mobilePkg.version + ')');
 if ((top.match(/<script>/g) || []).length !== 2) throw new Error('shell-top must hold the watchdog script plus exactly one open app <script>');
 if (!top.includes('SLP-WATCHDOG')) throw new Error('shell-top watchdog block missing');
 if (!top.trimEnd().endsWith('<script>')) throw new Error('shell-top must end with the open app <script>');

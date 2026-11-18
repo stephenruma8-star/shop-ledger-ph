@@ -24,9 +24,11 @@ function setupNativeBack() {
         const sc = document.getElementById('scan-overlay');
         if (sc && sc.style.display !== 'none') { stopBarcodeScan(); return; }
         if (document.getElementById('pin-lock')) return; // locked stays locked
-        if (navModalOpen) { closeNavModal(); return; }
+        // Detail sheets live in #modal-root, ABOVE the nav sheet. Peel them
+        // first so back never skips a modal and jumps straight home.
         const mr = document.getElementById('modal-root');
         if (mr && mr.firstChild) { closeQuick(); return; }
+        if (navModalOpen) { closeNavModal(); return; }
         if (typeof App.minimizeApp === 'function') App.minimizeApp();
       } catch (e) {}
     });

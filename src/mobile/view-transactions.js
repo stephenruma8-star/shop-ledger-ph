@@ -281,12 +281,19 @@ function bondReceiptCss() {
 .bond-receipt .bond-meta div{display:flex;justify-content:space-between;gap:.5rem;border-bottom:1px dotted #cbd5e1;padding:.16rem 0}
 .bond-receipt .bond-meta span{color:#64748b}
 .bond-receipt .bond-meta b{font-weight:700}
-.bond-receipt table.bond-table{width:100%;border-collapse:collapse;margin:.3rem 0 .15rem;border:1px solid #94a3b8}
-.bond-receipt table.bond-table th{background:#e2e8f0;border:1px solid #94a3b8;padding:.36rem .42rem;font-size:.63rem;text-transform:uppercase;letter-spacing:.4px;text-align:left}
-.bond-receipt table.bond-table td{border:1px solid #cbd5e1;padding:.34rem .42rem;vertical-align:top}
+.bond-receipt table.bond-table{width:100%;border-collapse:collapse;margin:.3rem 0 .15rem;border:1px solid #94a3b8;table-layout:fixed}
+.bond-receipt table.bond-table col.c-date{width:16%}
+.bond-receipt table.bond-table col.c-desc{width:34%}
+.bond-receipt table.bond-table col.c-qty{width:11%}
+.bond-receipt table.bond-table col.c-unit{width:14%}
+.bond-receipt table.bond-table col.c-int{width:10%}
+.bond-receipt table.bond-table col.c-amt{width:15%}
+.bond-receipt table.bond-table th{background:#e2e8f0;border:1px solid #94a3b8;padding:.32rem .3rem;font-size:.6rem;line-height:1.2;text-transform:uppercase;letter-spacing:.3px;text-align:left}
+.bond-receipt table.bond-table td{border:1px solid #cbd5e1;padding:.3rem;vertical-align:top;word-break:break-word}
 .bond-receipt table.bond-table tbody tr:nth-child(odd){background:#ffffff}
 .bond-receipt table.bond-table tbody tr:nth-child(even){background:#f1f5f9}
 .bond-receipt table.bond-table .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.bond-receipt table.bond-table .bond-date{white-space:nowrap;font-variant-numeric:tabular-nums;font-size:.68rem}
 .bond-receipt .bond-totals{width:100%;border-collapse:collapse;margin-top:.15rem}
 .bond-receipt .bond-totals td{padding:.28rem .42rem;border:1px solid #cbd5e1}
 .bond-receipt .bond-totals .lbl{background:#f8fafc;font-weight:600}
@@ -294,23 +301,35 @@ function bondReceiptCss() {
 .bond-receipt .bond-totals tr.grand td{background:#0f172a;color:#fff;font-weight:800;font-size:1rem;border-color:#0f172a}
 .bond-receipt .bond-sign{display:flex;gap:1.6rem;margin-top:1.15rem}
 .bond-receipt .bond-sign .line{flex:1;text-align:center;border-top:1px solid #94a3b8;padding-top:.26rem;font-size:.62rem;color:#475569}
-.bond-receipt .bond-foot{text-align:center;border-top:1px dashed #cbd5e1;margin-top:.9rem;padding-top:.5rem;font-size:.7rem;color:#475569}`;
+.bond-receipt .bond-foot{text-align:center;border-top:1px dashed #cbd5e1;margin-top:.9rem;padding-top:.5rem;font-size:.7rem;color:#475569}
+@media screen{.bond-receipt.bond-preview{min-width:34rem}}`;
 }
-function bondReceiptHtml(t) {
+function bondReceiptHtml(t, opts) {
+  const preview = !!(opts && opts.preview);
   const s = (typeof data !== 'undefined' && data.settings) || {};
-  const hasInt = (t.items || []).some(i => (Number(i.intRate) || 0) > 0);
   const money = (n) => peso(n);
+  // Item dates print as MM/DD/YY to fit the narrow bond table; the raw ISO
+  // value still feeds the interest proration.
+  const shortDate = (v) => {
+    const raw = String(v || '').slice(0, 10);
+    const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m ? m[2] + '/' + m[3] + '/' + m[1].slice(2) : raw;
+  };
   const rows = (t.items || []).map(i => {
-    const qty = Number(i.qty) || 1;
+    // Desktop sale lines store the quantity in `name`; phone lines use `qty`.
+    const qty = Number(i.qty) || parseFloat(i.name) || 1;
     const unit = Number(i.unitCost ?? i.price) || 0;
-    const amt = Number(i.amount) || qty * unit + lineIntCalc(qty * unit, i.intRate, i.date);
-    return `<tr><td>${esc(i.description || 'Item')}${i.variantName ? ' - ' + esc(i.variantName) : ''}</td><td class="num">${qty}</td><td class="num">${money(unit)}</td>${hasInt ? `<td class="num">${Number(i.intRate) || 0}%</td>` : ''}<td class="num">${money(amt)}</td></tr>`;
+    const rate = Number(i.intRate) || 0;
+    const rawDate = String(i.date || t.date || t.createdAt || '').slice(0, 10);
+    const amt = Number(i.amount) || qty * unit + lineIntCalc(qty * unit, rate, rawDate);
+    const desc = i.description || (isNaN(parseFloat(i.name)) ? i.name : '') || 'Item';
+    return `<tr><td class="bond-date">${esc(shortDate(rawDate))}</td><td>${esc(desc)}${i.variantName ? ' - ' + esc(i.variantName) : ''}</td><td class="num">${qty}</td><td class="num">${money(unit)}</td><td class="num">${rate}%</td><td class="num">${money(amt)}</td></tr>`;
   }).join('');
   const sc = Number(t.scDiscount) || 0;
   const extraDisc = Math.max(0, (Number(t.discount) || 0) - sc);
   const stamped = new Date().toLocaleString('en-PH', { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
   const dateOnly = String(t.createdAt || t.date || '').slice(0, 10);
-  return `<div class="bond-receipt">
+  return `<div class="bond-receipt${preview ? ' bond-preview' : ''}">
     <div class="bond-top"></div>
     ${t.status === 'voided' ? '<div class="bond-status" style="border-color:#dc2626;color:#dc2626">VOIDED</div>' : ''}
     ${t.status === 'return' ? '<div class="bond-status" style="border-color:#7c3aed;color:#7c3aed">RETURN / REFUND</div>' : ''}
@@ -330,8 +349,9 @@ function bondReceiptHtml(t) {
       <div><span>Payment</span><b>${esc(t.paymentMethod || 'Cash')}</b></div>
     </div>
     <table class="bond-table">
-      <thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Price</th>${hasInt ? '<th class="num">Int</th>' : ''}<th class="num">Amount</th></tr></thead>
-      <tbody>${rows || `<tr><td colspan="${hasInt ? 5 : 4}" style="text-align:center;color:#94a3b8">No items</td></tr>`}</tbody>
+      <colgroup><col class="c-date"><col class="c-desc"><col class="c-qty"><col class="c-unit"><col class="c-int"><col class="c-amt"></colgroup>
+      <thead><tr><th>Date</th><th>Item Description</th><th class="num">Qty/Name</th><th class="num">Unit Price</th><th class="num">Interest</th><th class="num">Amount</th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="6" style="text-align:center;color:#94a3b8">No items</td></tr>`}</tbody>
     </table>
     <table class="bond-totals">
       <tr><td class="lbl">Subtotal</td><td class="num">${money(t.subtotal)}</td></tr>
@@ -426,7 +446,7 @@ function showReceiptPreview(t, opts) {
         ${draft ? `<p class="text-[11px] font-semibold uppercase tracking-wider text-amber-400 mb-2">${esc(T('sale.preview_note'))}</p>` : ''}
         <div class="mb-2"><div class="text-[10px] uppercase tracking-wider text-gray-500 mb-1">${esc(T('receipt.paper'))}</div><div class="flex gap-1 p-1 rounded-xl" style="background:rgba(255,255,255,.05)">${tab('thermal', T('receipt.thermal'))}${tab('bond', T('receipt.bond'))}</div></div>
         ${paper === 'bond' ? `<div class="mb-2"><div class="text-[10px] uppercase tracking-wider text-gray-500 mb-1">${esc(T('receipt.bond_size'))}</div><div class="flex gap-1 p-1 rounded-xl" style="background:rgba(255,255,255,.05)">${['A4', 'Letter', 'Legal'].map(sz => `<button onclick="setReceiptBondSize('${sz}')" class="flex-1 py-1.5 rounded-lg text-xs font-semibold" style="${bondSize === sz ? 'background:rgba(59,130,246,.9);color:#fff' : 'background:transparent;color:#94a3b8'}">${sz}</button>`).join('')}</div></div>` : ''}
-        ${paper === 'bond' ? bondReceiptHtml(t) : `<pre class="receipt-paper">${esc(L.join('\n'))}</pre>`}
+        ${paper === 'bond' ? `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch">${bondReceiptHtml(t, { preview: true })}</div>` : `<pre class="receipt-paper">${esc(L.join('\n'))}</pre>`}
         ${draft
           ? `<button onclick="closeQuick()" class="btn btn-primary w-full">${esc(T('sale.preview_ok'))}</button>`
           : `<div class="grid grid-cols-2 gap-2">

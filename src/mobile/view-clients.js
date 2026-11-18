@@ -385,19 +385,17 @@ async function loadDetailHistory() {
 let statementPaper = 'thermal';
 function setStatementPaper(p) { statementPaper = p === 'bond' ? 'bond' : 'thermal'; previewClientStatement(); }
 function clientStatementBondCss() {
-  return `.st{border:1px solid #cbd5e1;border-radius:.7rem;padding:1rem;background:#fff;color:#0f172a;font-family:'Segoe UI',Arial,sans-serif;font-size:12px}
-.st h1{font-size:1.15rem;margin:0 0 .1rem}
-.st .muted{color:#475569;font-size:.72rem}
-.st .meta{display:flex;justify-content:space-between;border-bottom:2px solid #0f172a;padding-bottom:.4rem;margin:.4rem 0 .6rem;font-weight:700;font-size:.72rem}
-.st table{width:100%;border-collapse:collapse;border:1px solid #94a3b8}
-.st th{background:#e2e8f0;border:1px solid #94a3b8;padding:.35rem .42rem;font-size:.63rem;text-transform:uppercase;text-align:left}
-.st td{border:1px solid #cbd5e1;padding:.34rem .42rem}
-.st tbody tr:nth-child(even){background:#f1f5f9}
-.st .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
-.st .bal{margin-top:.6rem;display:flex;justify-content:flex-end;gap:1rem;font-weight:800;font-size:1rem}
-.st .foot{margin-top:.8rem;border-top:1px dashed #cbd5e1;padding-top:.5rem;text-align:center;color:#475569;font-size:.7rem}`;
+  // Reuse the receipt bond-paper base so every printed document matches.
+  return bondReceiptCss() + `
+.bond-receipt.st .st-bal{display:flex;justify-content:flex-end;gap:1rem;margin-top:.55rem;padding:.5rem .42rem;background:#0f172a;color:#fff;font-weight:800;font-size:1rem;border-radius:.25rem}
+.bond-receipt.st table.bond-table col.c-date{width:17%}
+.bond-receipt.st table.bond-table col.c-ref{width:20%}
+.bond-receipt.st table.bond-table col.c-what{width:33%}
+.bond-receipt.st table.bond-table col.c-amt{width:15%}
+.bond-receipt.st table.bond-table col.c-pay{width:15%}
+@media screen{.bond-receipt.st{min-width:34rem}}`;
 }
-// Bond-paper statement: Excel-style bordered table with zebra-striped rows.
+// Bond-paper statement: same card/header/table styling as the sale receipt.
 function clientStatementBondBody(h) {
   const s = data.settings || {};
   const c = (h && h.client) || {};
@@ -407,16 +405,30 @@ function clientStatementBondBody(h) {
   ((h && h.payments) || []).forEach(p => rows.push({ date: p.date || '', ref: p.referenceNo || '', what: 'Payment' + (p.type ? ' (' + p.type + ')' : '') + (p.notes ? ' - ' + p.notes : ''), amt: 0, pay: Number(p.amount) || 0 }));
   rows.sort((a, b) => String(a.date).localeCompare(String(b.date)));
   const body = rows.map(r => `<tr><td>${esc(r.date)}</td><td>${esc(r.ref)}</td><td>${esc(r.what)}</td><td class="num">${r.amt ? money(r.amt) : ''}</td><td class="num">${r.pay ? money(r.pay) : ''}</td></tr>`).join('') || `<tr><td colspan="5" style="text-align:center;color:#94a3b8">No activity</td></tr>`;
-  return `<div class="st">
-    <h1>${esc(s.shopName || 'Shop Ledger PH')}</h1>
-    ${s.shopAddress ? `<div class="muted">${esc(s.shopAddress)}</div>` : ''}
-    ${s.shopContact ? `<div class="muted">${esc(s.shopContact)}</div>` : ''}
-    <div class="meta"><span>STATEMENT OF ACCOUNT</span><span>${esc(phoneToday())}</span></div>
-    <div class="muted" style="margin-bottom:.5rem">Client: <b>${esc(c.name || '')}</b>${c.phone ? ' · ' + esc(c.phone) : ''}</div>
-    <table><thead><tr><th>Date</th><th>Ref</th><th>Particulars</th><th class="num">Amount</th><th class="num">Payment</th></tr></thead>
-    <tbody>${body}</tbody></table>
-    <div class="bal"><span>Balance:</span><span>${pesoBal(c.balance)}</span></div>
-    <div class="foot">${esc(s.receiptFooter || 'Please settle your balance. Thank you!')}</div>
+  const stamped = new Date().toLocaleString('en-PH', { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  return `<div class="bond-receipt st">
+    <div class="bond-top"></div>
+    <div class="bond-head">
+      <div>
+        <div class="bond-shop">${esc(s.shopName || 'Shop Ledger PH')}</div>
+        ${s.shopAddress ? `<div class="bond-muted">${esc(s.shopAddress)}</div>` : ''}
+        ${s.shopContact ? `<div class="bond-muted">${esc(s.shopContact)}</div>` : ''}
+      </div>
+      <div class="bond-badge">STATEMENT</div>
+    </div>
+    <div class="bond-meta">
+      <div><span>Client</span><b>${esc(c.name || '')}</b></div>
+      <div><span>Date</span><b>${esc(phoneToday())}</b></div>
+      <div><span>Phone</span><b>${esc(c.phone || '-')}</b></div>
+      <div><span>Balance</span><b>${pesoBal(c.balance)}</b></div>
+    </div>
+    <table class="bond-table">
+      <colgroup><col class="c-date"><col class="c-ref"><col class="c-what"><col class="c-amt"><col class="c-pay"></colgroup>
+      <thead><tr><th>Date</th><th>Ref</th><th>Particulars</th><th class="num">Amount</th><th class="num">Payment</th></tr></thead>
+      <tbody>${body}</tbody>
+    </table>
+    <div class="st-bal"><span>Balance:</span><span>${pesoBal(c.balance)}</span></div>
+    <div class="bond-foot">${esc(s.receiptFooter || 'Please settle your balance. Thank you!')}<br>Printed ${esc(stamped)}</div>
   </div>`;
 }
 function clientStatementBondHtml(h) {

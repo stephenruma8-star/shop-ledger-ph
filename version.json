@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.36",
+    "version":  "3.37.37",
     "buildDate":  "2026-11-12T00:00:00.000Z",
-    "notes":  "Reliability update: reports, client statements and CSV exports now show the correct quantities (including returned units), BIR 2550M/2551Q net VAT and refunds are computed correctly, restoring a backup keeps your login/PIN and printer secrets, phone pairing stays stable with repeated codes, and receipt/VAT quantity fixes from 3.37.35 are included. Phone 4.8.55 has the matching mobile fixes."
+    "notes":  "Bond-paper receipts now print a per-item table with Date, Item Description, Qty/Name, Unit Price, Interest %, and Amount, and client statements use the same bond-paper styling. Android back now closes an open detail sheet first, then the navigation sheet, instead of jumping straight to the home screen. Phone 4.8.56 has the same changes."
 }
