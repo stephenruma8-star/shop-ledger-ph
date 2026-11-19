@@ -729,8 +729,8 @@ async function announceClientBalance(clientId) {
     if (h && h.client) toast((h.client.name || 'Client') + ' now owes ' + pesoBal(h.client.balance || 0), 'info');
   } catch (e) {}
 }
-// Pre-save receipt preview: the same thermal layout the printer gets, built
-// from the current cart — so details can be verified before finalizing.
+// Pre-save receipt preview: the same bond receipt layout used for printing,
+// built from the current cart — so details can be verified before finalizing.
 function previewSaleDraft() {
   if (!cart.length) { toast(T('sale.need_items'), 'err'); return; }
   const sub = cart.reduce((s, i) => s + (i.qty || 1) * (i.price || 0), 0);

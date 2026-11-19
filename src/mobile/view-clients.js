@@ -382,8 +382,10 @@ async function loadDetailHistory() {
   catch (e) { toast(T('cli.load_fail', { msg: e.message }), 'err'); return null; }
   return detailClientHistory;
 }
-let statementPaper = 'thermal';
-function setStatementPaper(p) { statementPaper = p === 'bond' ? 'bond' : 'thermal'; previewClientStatement(); }
+let statementPaper = 'bond';
+function setStatementPaper(p) { previewClientStatement(p); }
+function setStatementBondSize(size) { savePrintPrefs(size, printPrefs().orientation); previewClientStatement(statementPaper); }
+function setStatementOrientation(orientation) { savePrintPrefs(printPrefs().size, orientation); previewClientStatement(statementPaper); }
 function clientStatementBondCss() {
   // Reuse the receipt bond-paper base so every printed document matches.
   return bondReceiptCss() + `
@@ -393,10 +395,12 @@ function clientStatementBondCss() {
 .bond-receipt.st table.bond-table col.c-what{width:33%}
 .bond-receipt.st table.bond-table col.c-amt{width:15%}
 .bond-receipt.st table.bond-table col.c-pay{width:15%}
-@media screen{.bond-receipt.st{min-width:34rem}}`;
+@media screen{.bond-receipt.st.bond-preview{min-width:34rem}.bond-receipt.st.bond-preview.bond-landscape{min-width:46rem}}`;
 }
 // Bond-paper statement: same card/header/table styling as the sale receipt.
-function clientStatementBondBody(h) {
+function clientStatementBondBody(h, opts) {
+  const preview = !!(opts && opts.preview);
+  const landscape = !!(opts && opts.orientation === 'landscape');
   const s = data.settings || {};
   const c = (h && h.client) || {};
   const money = (n) => peso(n);
@@ -404,9 +408,9 @@ function clientStatementBondBody(h) {
   ((h && h.sales) || []).forEach(t => rows.push({ date: t.date || '', ref: t.invoiceNo || '', what: 'Sale' + (t.status ? ' (' + t.status + ')' : ''), amt: Number(t.grandTotal) || 0, pay: 0 }));
   ((h && h.payments) || []).forEach(p => rows.push({ date: p.date || '', ref: p.referenceNo || '', what: 'Payment' + (p.type ? ' (' + p.type + ')' : '') + (p.notes ? ' - ' + p.notes : ''), amt: 0, pay: Number(p.amount) || 0 }));
   rows.sort((a, b) => String(a.date).localeCompare(String(b.date)));
-  const body = rows.map(r => `<tr><td>${esc(r.date)}</td><td>${esc(r.ref)}</td><td>${esc(r.what)}</td><td class="num">${r.amt ? money(r.amt) : ''}</td><td class="num">${r.pay ? money(r.pay) : ''}</td></tr>`).join('') || `<tr><td colspan="5" style="text-align:center;color:#94a3b8">No activity</td></tr>`;
+  const body = rows.map(r => `<tr><td>${esc(bondShortDate(r.date))}</td><td>${esc(r.ref)}</td><td>${esc(r.what)}</td><td class="num">${r.amt ? money(r.amt) : ''}</td><td class="num">${r.pay ? money(r.pay) : ''}</td></tr>`).join('') || `<tr><td colspan="5" style="text-align:center;color:#94a3b8">No activity</td></tr>`;
   const stamped = new Date().toLocaleString('en-PH', { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-  return `<div class="bond-receipt st">
+  return `<div class="bond-receipt st${preview ? ' bond-preview' : ''}${landscape ? ' bond-landscape' : ''}">
     <div class="bond-top"></div>
     <div class="bond-head">
       <div>
@@ -432,35 +436,42 @@ function clientStatementBondBody(h) {
   </div>`;
 }
 function clientStatementBondHtml(h) {
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Statement ${esc((h && h.client && h.client.name) || '')}</title><style>@page{size:A4;margin:12mm}body{margin:0}${clientStatementBondCss()}</style></head><body>${clientStatementBondBody(h)}</body></html>`;
+  const p = printPrefs();
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Statement ${esc((h && h.client && h.client.name) || '')}</title><style>${printPageRule(p.size, p.orientation)}body{margin:0}${clientStatementBondCss()}</style></head><body>${clientStatementBondBody(h)}</body></html>`;
 }
-async function previewClientStatement() {
+async function previewClientStatement(paper) {
+  // Every fresh preview starts on bond paper; only the page size and
+  // orientation are remembered between opens.
+  statementPaper = paper === 'thermal' ? 'thermal' : 'bond';
   const h = await loadDetailHistory();
   if (!h) return;
   const c = (h && h.client) || {};
-  const ptab = (val, label) => `<button onclick="setStatementPaper('${val}')" class="flex-1 py-1.5 rounded-lg text-xs font-semibold" style="${statementPaper === val ? 'background:rgba(59,130,246,.9);color:#fff' : 'background:transparent;color:#94a3b8'}">${esc(label)}</button>`;
+  const setup = printPrefs();
+  const wide = statementPaper === 'bond' && setup.orientation === 'landscape';
   const body = statementPaper === 'bond'
-    ? `<style>${clientStatementBondCss()}</style><div style="overflow:auto">${clientStatementBondBody(h)}</div>`
+    ? `<style>${clientStatementBondCss()}</style><div style="overflow-x:auto;-webkit-overflow-scrolling:touch">${clientStatementBondBody(h, { preview: true, orientation: setup.orientation })}</div>`
     : `<pre class="receipt-paper">${esc(statementLinesToText(clientStatementParts(h)))}</pre>`;
   document.getElementById('modal-root').innerHTML = `
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
-      <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:94vh;max-height:94dvh;overflow-y:auto" onclick="event.stopPropagation()">
+      <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:94vh;max-height:94dvh;overflow-y:auto${wide ? ';max-width:56rem' : ''}" onclick="event.stopPropagation()">
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
         <h3 class="font-bold text-gray-100 text-sm mb-3">${esc(c.name || '')} — statement</h3>
-        <div class="mb-2"><div class="text-[10px] uppercase tracking-wider text-gray-500 mb-1">${esc(T('receipt.paper'))}</div><div class="flex gap-1 p-1 rounded-xl" style="background:rgba(255,255,255,.05)">${ptab('thermal', T('receipt.thermal'))}${ptab('bond', T('receipt.bond'))}</div></div>
+        ${printChoiceRow(T('receipt.paper'), [{ value: 'thermal', label: T('receipt.thermal') }, { value: 'bond', label: T('receipt.bond') }], statementPaper, 'setStatementPaper')}
+        ${statementPaper === 'bond' ? printChoiceRow(T('receipt.bond_size'), PRINT_PAGE_SIZES.map(sz => ({ value: sz, label: sz })), setup.size, 'setStatementBondSize') : ''}
+        ${statementPaper === 'bond' ? printChoiceRow(T('receipt.orientation'), [{ value: 'portrait', label: T('receipt.portrait') }, { value: 'landscape', label: T('receipt.landscape') }], setup.orientation, 'setStatementOrientation') : ''}
         ${body}
         <div class="grid grid-cols-2 gap-2 mt-2">
-          <button onclick="printClientStatement()" class="btn btn-primary btn-sm">${icon('printer', 14)} ${T('txn.print')}</button>
+          <button onclick="printClientStatement(${jsArg(statementPaper)})" class="btn btn-primary btn-sm">${icon('printer', 14)} ${T('txn.print')}</button>
           <button onclick="shareClientStatement()" class="btn btn-ghost btn-sm">${icon('upload', 14)} ${T('txn.share')}</button>
         </div>
         <button onclick="openClientDetail(${jsArg(detailClientId)})" class="btn btn-ghost w-full mt-2">Back to client</button>
       </div>
     </div>`;
 }
-async function printClientStatement() {
+async function printClientStatement(paper) {
   const h = await loadDetailHistory();
   if (!h) return;
-  if (statementPaper === 'bond') { systemPrintHtml(clientStatementBondHtml(h), 'Statement'); return; }
+  if ((paper || 'bond') === 'bond') { systemPrintHtml(clientStatementBondHtml(h), 'Statement'); return; }
   const lines = clientStatementParts(h);
   toast(T('sale.sending_print'), 'info');
   try {

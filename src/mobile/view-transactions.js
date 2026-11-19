@@ -302,19 +302,13 @@ function bondReceiptCss() {
 .bond-receipt .bond-sign{display:flex;gap:1.6rem;margin-top:1.15rem}
 .bond-receipt .bond-sign .line{flex:1;text-align:center;border-top:1px solid #94a3b8;padding-top:.26rem;font-size:.62rem;color:#475569}
 .bond-receipt .bond-foot{text-align:center;border-top:1px dashed #cbd5e1;margin-top:.9rem;padding-top:.5rem;font-size:.7rem;color:#475569}
-@media screen{.bond-receipt.bond-preview{min-width:34rem}}`;
+@media screen{.bond-receipt.bond-preview{min-width:34rem}.bond-receipt.bond-preview.bond-landscape{min-width:46rem}}`;
 }
 function bondReceiptHtml(t, opts) {
   const preview = !!(opts && opts.preview);
+  const landscape = !!(opts && opts.orientation === 'landscape');
   const s = (typeof data !== 'undefined' && data.settings) || {};
   const money = (n) => peso(n);
-  // Item dates print as MM/DD/YY to fit the narrow bond table; the raw ISO
-  // value still feeds the interest proration.
-  const shortDate = (v) => {
-    const raw = String(v || '').slice(0, 10);
-    const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    return m ? m[2] + '/' + m[3] + '/' + m[1].slice(2) : raw;
-  };
   const rows = (t.items || []).map(i => {
     // Desktop sale lines store the quantity in `name`; phone lines use `qty`.
     const qty = Number(i.qty) || parseFloat(i.name) || 1;
@@ -323,13 +317,13 @@ function bondReceiptHtml(t, opts) {
     const rawDate = String(i.date || t.date || t.createdAt || '').slice(0, 10);
     const amt = Number(i.amount) || qty * unit + lineIntCalc(qty * unit, rate, rawDate);
     const desc = i.description || (isNaN(parseFloat(i.name)) ? i.name : '') || 'Item';
-    return `<tr><td class="bond-date">${esc(shortDate(rawDate))}</td><td>${esc(desc)}${i.variantName ? ' - ' + esc(i.variantName) : ''}</td><td class="num">${qty}</td><td class="num">${money(unit)}</td><td class="num">${rate}%</td><td class="num">${money(amt)}</td></tr>`;
+    return `<tr><td class="bond-date">${esc(bondShortDate(rawDate))}</td><td>${esc(desc)}${i.variantName ? ' - ' + esc(i.variantName) : ''}</td><td class="num">${qty}</td><td class="num">${money(unit)}</td><td class="num">${rate}%</td><td class="num">${money(amt)}</td></tr>`;
   }).join('');
   const sc = Number(t.scDiscount) || 0;
   const extraDisc = Math.max(0, (Number(t.discount) || 0) - sc);
   const stamped = new Date().toLocaleString('en-PH', { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
   const dateOnly = String(t.createdAt || t.date || '').slice(0, 10);
-  return `<div class="bond-receipt${preview ? ' bond-preview' : ''}">
+  return `<div class="bond-receipt${preview ? ' bond-preview' : ''}${landscape ? ' bond-landscape' : ''}">
     <div class="bond-top"></div>
     ${t.status === 'voided' ? '<div class="bond-status" style="border-color:#dc2626;color:#dc2626">VOIDED</div>' : ''}
     ${t.status === 'return' ? '<div class="bond-status" style="border-color:#7c3aed;color:#7c3aed">RETURN / REFUND</div>' : ''}
@@ -369,17 +363,23 @@ function bondReceiptHtml(t, opts) {
   </div>`;
 }
 function bondPrintDocument(t) {
-  const size = (receiptPreviewState && receiptPreviewState.bondSize) || 'A4';
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Receipt ${esc(t.invoiceNo || '')}</title><style>@page{size:${size};margin:12mm}body{margin:0;background:#fff}${bondReceiptCss()}</style></head><body>${bondReceiptHtml(t)}</body></html>`;
+  const p = printPrefs();
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Receipt ${esc(t.invoiceNo || '')}</title><style>${printPageRule(p.size, p.orientation)}body{margin:0;background:#fff}${bondReceiptCss()}</style></head><body>${bondReceiptHtml(t)}</body></html>`;
 }
-let receiptPreviewState = { t: null, draft: false, paper: 'thermal', bondSize: 'A4' };
+let receiptPreviewState = { t: null, draft: false, paper: 'bond' };
 function setReceiptPaper(paper) {
   if (!receiptPreviewState.t) return;
-  showReceiptPreview(receiptPreviewState.t, { draft: receiptPreviewState.draft, paper, bondSize: receiptPreviewState.bondSize });
+  showReceiptPreview(receiptPreviewState.t, { draft: receiptPreviewState.draft, paper });
 }
 function setReceiptBondSize(bondSize) {
   if (!receiptPreviewState.t) return;
-  showReceiptPreview(receiptPreviewState.t, { draft: receiptPreviewState.draft, paper: 'bond', bondSize });
+  savePrintPrefs(bondSize, printPrefs().orientation);
+  showReceiptPreview(receiptPreviewState.t, { draft: receiptPreviewState.draft, paper: 'bond' });
+}
+function setReceiptOrientation(orientation) {
+  if (!receiptPreviewState.t) return;
+  savePrintPrefs(printPrefs().size, orientation);
+  showReceiptPreview(receiptPreviewState.t, { draft: receiptPreviewState.draft, paper: 'bond' });
 }
 function printPreviewReceipt() {
   const st = receiptPreviewState;
@@ -432,21 +432,22 @@ async function openSystemPrintForSale(invoiceNo) {
 function showReceiptPreview(t, opts) {
   const o = opts || {};
   const draft = !!o.draft;
-  const paper = o.paper || 'thermal';
-  const bondSize = o.bondSize || 'A4';
-  receiptPreviewState = { t, draft, paper, bondSize };
+  const paper = o.paper || 'bond';
+  const setup = printPrefs();
+  const wide = paper === 'bond' && setup.orientation === 'landscape';
+  receiptPreviewState = { t, draft, paper };
   const L = receiptLines(t);
-  const tab = (val, label) => `<button onclick="setReceiptPaper('${val}')" class="flex-1 py-1.5 rounded-lg text-xs font-semibold" style="${paper === val ? 'background:rgba(59,130,246,.9);color:#fff' : 'background:transparent;color:#94a3b8'}">${esc(label)}</button>`;
   document.getElementById('modal-root').innerHTML = `
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
-      <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:94vh;max-height:94dvh;overflow-y:auto" onclick="event.stopPropagation()">
+      <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:94vh;max-height:94dvh;overflow-y:auto${wide ? ';max-width:56rem' : ''}" onclick="event.stopPropagation()">
         <style>${bondReceiptCss()}</style>
         <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
         <h3 class="font-bold text-gray-100 text-sm mb-3 flex items-center gap-2"><span class="icon-tile bg-blue-500/15 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>${draft ? esc(T('sale.preview_title')) : esc(t.invoiceNo || 'Receipt')}</h3>
         ${draft ? `<p class="text-[11px] font-semibold uppercase tracking-wider text-amber-400 mb-2">${esc(T('sale.preview_note'))}</p>` : ''}
-        <div class="mb-2"><div class="text-[10px] uppercase tracking-wider text-gray-500 mb-1">${esc(T('receipt.paper'))}</div><div class="flex gap-1 p-1 rounded-xl" style="background:rgba(255,255,255,.05)">${tab('thermal', T('receipt.thermal'))}${tab('bond', T('receipt.bond'))}</div></div>
-        ${paper === 'bond' ? `<div class="mb-2"><div class="text-[10px] uppercase tracking-wider text-gray-500 mb-1">${esc(T('receipt.bond_size'))}</div><div class="flex gap-1 p-1 rounded-xl" style="background:rgba(255,255,255,.05)">${['A4', 'Letter', 'Legal'].map(sz => `<button onclick="setReceiptBondSize('${sz}')" class="flex-1 py-1.5 rounded-lg text-xs font-semibold" style="${bondSize === sz ? 'background:rgba(59,130,246,.9);color:#fff' : 'background:transparent;color:#94a3b8'}">${sz}</button>`).join('')}</div></div>` : ''}
-        ${paper === 'bond' ? `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch">${bondReceiptHtml(t, { preview: true })}</div>` : `<pre class="receipt-paper">${esc(L.join('\n'))}</pre>`}
+        ${printChoiceRow(T('receipt.paper'), [{ value: 'thermal', label: T('receipt.thermal') }, { value: 'bond', label: T('receipt.bond') }], paper, 'setReceiptPaper')}
+        ${paper === 'bond' ? printChoiceRow(T('receipt.bond_size'), PRINT_PAGE_SIZES.map(sz => ({ value: sz, label: sz })), setup.size, 'setReceiptBondSize') : ''}
+        ${paper === 'bond' ? printChoiceRow(T('receipt.orientation'), [{ value: 'portrait', label: T('receipt.portrait') }, { value: 'landscape', label: T('receipt.landscape') }], setup.orientation, 'setReceiptOrientation') : ''}
+        ${paper === 'bond' ? `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch">${bondReceiptHtml(t, { preview: true, orientation: setup.orientation })}</div>` : `<pre class="receipt-paper">${esc(L.join('\n'))}</pre>`}
         ${draft
           ? `<button onclick="closeQuick()" class="btn btn-primary w-full">${esc(T('sale.preview_ok'))}</button>`
           : `<div class="grid grid-cols-2 gap-2">
@@ -476,6 +477,6 @@ async function previewSaleReceipt(invoiceNo, paper) {
     catch (e) { toast(T('txn.load_fail', { msg: e.message }), 'err'); return; }
   }
   if (!t) return;
-  showReceiptPreview(t, { paper: paper || 'thermal' });
+  showReceiptPreview(t, { paper: paper || 'bond' });
 }
 

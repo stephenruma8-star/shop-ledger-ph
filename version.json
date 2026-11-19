@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.37",
-    "buildDate":  "2026-11-12T00:00:00.000Z",
-    "notes":  "Bond-paper receipts now print a per-item table with Date, Item Description, Qty/Name, Unit Price, Interest %, and Amount, and client statements use the same bond-paper styling. Android back now closes an open detail sheet first, then the navigation sheet, instead of jumping straight to the home screen. Phone 4.8.56 has the same changes."
+    "version":  "3.37.38",
+    "buildDate":  "2026-11-19T00:00:00.000Z",
+    "notes":  "Phone print previews now open in the bond-paper look by default, with A4/Letter/Legal and portrait/landscape choices that are remembered for Print and Save PDF. Android printing honors the chosen paper size and orientation, and client statements match the receipt styling. Desktop printing and reports are unchanged. Phone 4.8.57 has the same changes."
 }

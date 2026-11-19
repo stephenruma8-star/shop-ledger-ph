@@ -63,6 +63,22 @@ public class ShopPrinter extends Plugin {
             return;
         }
         String jobName = call.getString("jobName", "Shop Ledger Receipt");
+        // Seed the system print dialog with the paper and orientation chosen
+        // in the app preview. The user can still change them in the dialog.
+        // Older cached pages do not send these fields; leave the dialog on
+        // its defaults for them.
+        String paperSize = call.getString("paperSize");
+        String orientation = call.getString("orientation", "portrait");
+        final PrintAttributes.MediaSize mediaSize;
+        if (paperSize == null || paperSize.isEmpty()) {
+            mediaSize = null;
+        } else {
+            PrintAttributes.MediaSize media;
+            if ("Legal".equalsIgnoreCase(paperSize)) media = PrintAttributes.MediaSize.NA_LEGAL;
+            else if ("Letter".equalsIgnoreCase(paperSize)) media = PrintAttributes.MediaSize.NA_LETTER;
+            else media = PrintAttributes.MediaSize.ISO_A4;
+            mediaSize = "landscape".equalsIgnoreCase(orientation) ? media.asLandscape() : media.asPortrait();
+        }
         final Activity activity = (Activity) getContext();
         if (activity == null) {
             call.reject("No activity available");
@@ -82,7 +98,11 @@ public class ShopPrinter extends Plugin {
                                 return;
                             }
                             PrintDocumentAdapter adapter = view.createPrintDocumentAdapter(jobName);
-                            printManager.print(jobName, adapter, new PrintAttributes.Builder().build());
+                            PrintAttributes.Builder builder = new PrintAttributes.Builder();
+                            if (mediaSize != null) {
+                                builder.setMediaSize(mediaSize).setMinMargins(PrintAttributes.Margins.NO_MARGINS);
+                            }
+                            printManager.print(jobName, adapter, builder.build());
                             JSObject ret = new JSObject();
                             ret.put("success", true);
                             call.resolve(ret);

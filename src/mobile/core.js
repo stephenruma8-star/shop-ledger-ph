@@ -382,6 +382,49 @@ function takeSubmitLock(key) {
 function releaseSubmitLock(key) {
   try { submitLocks[key] = false; } catch (e) {}
 }
+// ---------- PRINT PAGE SETUP ----------
+// Mobile receipts and statements print on bond paper by default. The page
+// size and orientation are remembered on the device so Print / Save PDF uses
+// the same setup the cashier last picked.
+const PRINT_PAGE_SIZES = ['A4', 'Letter', 'Legal'];
+function printPrefs() {
+  let size = 'A4';
+  let orientation = 'portrait';
+  try {
+    const saved = JSON.parse(localStorage.getItem('slpPrintPrefs') || 'null');
+    if (saved && PRINT_PAGE_SIZES.indexOf(saved.size) >= 0) size = saved.size;
+    if (saved && saved.orientation === 'landscape') orientation = 'landscape';
+  } catch (e) {}
+  return { size, orientation };
+}
+function savePrintPrefs(size, orientation) {
+  const sz = PRINT_PAGE_SIZES.indexOf(size) >= 0 ? size : 'A4';
+  const or = orientation === 'landscape' ? 'landscape' : 'portrait';
+  try { localStorage.setItem('slpPrintPrefs', JSON.stringify({ size: sz, orientation: or })); } catch (e) {}
+  return { size: sz, orientation: or };
+}
+function printPageRule(size, orientation) {
+  const sz = PRINT_PAGE_SIZES.indexOf(size) >= 0 ? size : 'A4';
+  const or = orientation === 'landscape' ? 'landscape' : 'portrait';
+  return `@page{size:${sz} ${or};margin:12mm}`;
+}
+// Read the page setup back out of a printable document so the Android print
+// bridge can open the system dialog with the same paper and orientation.
+function printPageFromHtml(html) {
+  const m = String(html || '').match(/@page\{size:([A-Za-z0-9]+)(?:\s+(portrait|landscape))?/);
+  return { size: m ? m[1] : 'A4', orientation: m && m[2] === 'landscape' ? 'landscape' : 'portrait' };
+}
+// Shared pill-row used by both previews so paper, size and orientation
+// controls look and behave the same everywhere.
+function printChoiceRow(label, choices, active, fnName) {
+  return `<div class="mb-2"><div class="text-[10px] uppercase tracking-wider text-gray-500 mb-1">${esc(label)}</div><div class="flex gap-1 p-1 rounded-xl" style="background:rgba(255,255,255,.05)">${choices.map(c => `<button onclick="${fnName}('${escAttr(c.value)}')" class="flex-1 py-1.5 rounded-lg text-xs font-semibold" style="${active === c.value ? 'background:rgba(59,130,246,.9);color:#fff' : 'background:transparent;color:#94a3b8'}">${esc(c.label)}</button>`).join('')}</div></div>`;
+}
+// MM/DD/YY for narrow bond-paper columns; calculations keep the raw ISO date.
+function bondShortDate(v) {
+  const raw = String(v || '').slice(0, 10);
+  const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? m[2] + '/' + m[3] + '/' + m[1].slice(2) : raw;
+}
 // Share chain used by receipts and reports: native sheet → Web Share API
 // → clipboard, whichever this phone supports.
 // Open the OS print dialog (printer selection / "search for printer", like
@@ -392,7 +435,8 @@ function systemPrintHtml(html, jobName) {
     const S = nativePlugin('ShopPrinter');
     if (S && typeof S.printHtml === 'function') {
       toast(T('receipt.search_printers'), 'info');
-      S.printHtml({ html, jobName: jobName || 'Receipt' }).catch(e => toast(T('sale.print_failed', { msg: e.message }), 'err'));
+      const page = printPageFromHtml(html);
+      S.printHtml({ html, jobName: jobName || 'Receipt', paperSize: page.size, orientation: page.orientation }).catch(e => toast(T('sale.print_failed', { msg: e.message }), 'err'));
       return true;
     }
   } catch (e) {}

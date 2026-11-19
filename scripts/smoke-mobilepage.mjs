@@ -329,7 +329,7 @@ try {
     gcall(`previewSaleDraft()`);
     const modal = getEl('modal-root').innerHTML;
     ok(modal.includes('PREVIEW'), 'sale draft preview shows PREVIEW banner');
-    ok(modal.includes('OFFICIAL RECEIPT'), 'sale draft preview shows thermal receipt layout');
+    ok(modal.includes('OFFICIAL RECEIPT') && modal.includes('bond-receipt'), 'sale draft preview opens in bond receipt layout');
     ok(!modal.includes('printSaleReceipt'), 'draft preview offers no print (nothing saved to print)');
     ok(posts.length === beforePreview, 'previewing the draft posts nothing');
   }
@@ -713,6 +713,18 @@ try {
   const stmt = gcall(`buildStatementText({ name: 'Maria', balance: 100 }, [{ date: '2026-01-01', invoiceNo: 'INV-1', grandTotal: 150, status: 'pending' }], [{ date: '2026-01-02', amount: 50 }])`);
   ok(String(stmt).includes('BALANCE') && String(stmt).includes('INV-1'), 'statement text builds from history');
 
+  // Statement preview opens on bond paper with size/orientation controls, and
+  // the page setup is remembered for the next Print / Save PDF.
+  await gcall(`previewClientStatement()`);
+  ok(getEl('modal-root').innerHTML.includes('setStatementBondSize') && getEl('modal-root').innerHTML.includes('setStatementOrientation'), 'statement preview exposes size + orientation controls');
+  ok(getEl('modal-root').innerHTML.includes('bond-receipt st bond-preview'), 'statement preview opens in bond layout by default');
+  await gcall(`setStatementBondSize('Legal')`);
+  await gcall(`setStatementOrientation('landscape')`);
+  ok(String(storage.get('slpPrintPrefs')).includes('"size":"Legal"') && String(storage.get('slpPrintPrefs')).includes('"orientation":"landscape"'), 'statement page setup saved on device');
+  ok(getEl('modal-root').innerHTML.includes('bond-landscape'), 'statement preview switches to landscape');
+  ok(String(gcall(`clientStatementBondHtml({ client: { name: 'Maria' }, sales: [], payments: [] })`)).includes('size:Legal landscape'), 'statement print uses the remembered page setup');
+  await gcall(`closeQuick()`);
+
   // ---- inventory: valuation card, add form, submit ----
   gcall(`showView('inventory')`);
   await wait(20);
@@ -882,6 +894,12 @@ try {
   // the OS printer chooser (system print), alongside the direct thermal print.
   await gcall(`showReceiptPreview({ invoiceNo: 'INV-00001', items: [], subtotal: 0, grandTotal: 0, paymentMethod: 'Cash' })`);
   ok(getEl('modal-root').innerHTML.includes('findPrinterForReceipt'), 'receipt preview offers Find printer');
+  ok(gget(`receiptPreviewState.paper`) === 'bond', 'receipt preview opens in bond layout by default');
+  ok(getEl('modal-root').innerHTML.includes('setReceiptBondSize') && getEl('modal-root').innerHTML.includes('setReceiptOrientation'), 'receipt preview exposes size + orientation controls');
+  ok(String(gcall(`bondPrintDocument({ invoiceNo: 'INV-00001', items: [], subtotal: 0, grandTotal: 0 })`)).includes('size:Legal landscape'), 'receipt print reuses the remembered page setup');
+  await gcall(`setReceiptBondSize('A4')`);
+  await gcall(`setReceiptOrientation('portrait')`);
+  ok(String(gcall(`bondPrintDocument({ invoiceNo: 'INV-00001', items: [], subtotal: 0, grandTotal: 0 })`)).includes('size:A4 portrait'), 'receipt size/orientation controls update the print page');
   await gcall(`closeQuick()`);
   await gcall(`saleSuccessSheet('INV-00001')`);
   ok(getEl('view').innerHTML.includes('previewSaleReceipt') && getEl('view').innerHTML.includes('Find printer'), 'sale success offers Find printer (via the preview chooser)');
