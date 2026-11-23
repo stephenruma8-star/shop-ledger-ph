@@ -156,8 +156,8 @@ async function openClientDetail(id) {
       ${(h.sales || []).slice(0, 20).map(t => `
         <div class="rounded-xl px-2 -mx-2 py-1 card-hover" onclick='openTxnDetail(${jsArg(t.invoiceNo || t.id)})' style="cursor:pointer">
           <div class="flex justify-between items-center text-sm gap-2">
-            <span class="text-gray-200 truncate">${esc(t.invoiceNo || '')} <span class="text-gray-500">A� ${fmtDate(t.date)}</span></span>
-            <span class="flex items-center gap-1 shrink-0"><span class="num ${Number(t.grandTotal) < 0 ? 'text-red-400' : ''}">${peso(t.grandTotal)}</span><span class="text-gray-600">�?�</span></span>
+            <span class="text-gray-200 truncate">${esc(t.invoiceNo || '')} <span class="text-gray-500">· ${fmtDate(t.date)}</span></span>
+            <span class="flex items-center gap-1 shrink-0"><span class="num ${Number(t.grandTotal) < 0 ? 'text-red-400' : ''}">${peso(t.grandTotal)}</span><span class="text-gray-600">›</span></span>
           </div>
           ${(t.items || []).length ? `<div class="mt-1 mb-0.5 pl-2 border-l border-white/10 space-y-0.5">${(t.items || []).map(i => `
             <div class="flex justify-between gap-2 text-[11px] text-gray-500">
@@ -329,7 +329,12 @@ async function shareClientStatement() {
   if (!detailClientId) return;
   let h = detailClientHistory || null;
   if (!h) { try { h = await apiGet('/api/clients/' + encodeURIComponent(detailClientId) + '/history'); } catch (e) { toast(T('cli.load_fail', { msg: e.message }), 'err'); return; } }
-  await shareText((h.client.name || '') + ' — statement', buildStatementText(h.client, h.sales || [], h.payments || []));
+  await shareText((h.client.name || '') + ' — statement', buildStatementText(h.client, statementSales(h), h.payments || []));
+}
+// Voided sales and interest ledger rows never moved the client's balance, so
+// they must not appear on a statement of account.
+function statementSales(h) {
+  return ((h && h.sales) || []).filter(t => t.status !== 'voided' && t.status !== 'interest');
 }
 // Client statement as printer lines (shared by preview and print).
 function clientStatementParts(h) {
@@ -346,7 +351,7 @@ function clientStatementParts(h) {
   if (c.phone) L.push({ text: 'Phone: ' + c.phone });
   L.push({ text: 'Date: ' + phoneToday() });
   L.push({ t: 'divider' });
-  const sales = (h && h.sales) || [];
+  const sales = statementSales(h);
   if (sales.length) {
     L.push({ bold: true, text: 'Sales' });
     sales.slice(0, 30).forEach((t) => L.push({ text: (t.invoiceNo || '') + '  ' + (t.date || '') + '  ' + peso(t.grandTotal) }));
@@ -405,7 +410,7 @@ function clientStatementBondBody(h, opts) {
   const c = (h && h.client) || {};
   const money = (n) => peso(n);
   const rows = [];
-  ((h && h.sales) || []).forEach(t => rows.push({ date: t.date || '', ref: t.invoiceNo || '', what: 'Sale' + (t.status ? ' (' + t.status + ')' : ''), amt: Number(t.grandTotal) || 0, pay: 0 }));
+  ((h && h.sales) || []).filter(t => t.status !== 'voided' && t.status !== 'interest').forEach(t => rows.push({ date: t.date || '', ref: t.invoiceNo || '', what: 'Sale' + (t.status ? ' (' + t.status + ')' : ''), amt: Number(t.grandTotal) || 0, pay: 0 }));
   ((h && h.payments) || []).forEach(p => rows.push({ date: p.date || '', ref: p.referenceNo || '', what: 'Payment' + (p.type ? ' (' + p.type + ')' : '') + (p.notes ? ' - ' + p.notes : ''), amt: 0, pay: Number(p.amount) || 0 }));
   rows.sort((a, b) => String(a.date).localeCompare(String(b.date)));
   const body = rows.map(r => `<tr><td>${esc(bondShortDate(r.date))}</td><td>${esc(r.ref)}</td><td>${esc(r.what)}</td><td class="num">${r.amt ? money(r.amt) : ''}</td><td class="num">${r.pay ? money(r.pay) : ''}</td></tr>`).join('') || `<tr><td colspan="5" style="text-align:center;color:#94a3b8">No activity</td></tr>`;

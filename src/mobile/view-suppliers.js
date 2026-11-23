@@ -53,7 +53,7 @@ async function deleteSupplier(id) {
     supplierDeleteArmed = id;
     const btn = document.getElementById('sup-del-' + id);
     if (btn) btn.textContent = 'Sure?';
-    setTimeout(() => { if (supplierDeleteArmed === id) { supplierDeleteArmed = null; if (typeof renderSuppliers === 'function') renderSuppliers(); } }, 5000);
+    setTimeout(() => { if (supplierDeleteArmed === id) { supplierDeleteArmed = null; if (currentView === 'suppliers') renderSuppliers(); } }, 5000);
     return;
   }
   supplierDeleteArmed = null;
@@ -121,6 +121,9 @@ async function renderSupplierPay(id) {
   supplierPayId = id;
   let hist = null;
   try { hist = await apiGet('/api/suppliers/' + encodeURIComponent(id) + '/payments'); } catch (e) {}
+  // A slower response for an earlier supplier must not paint over the sheet
+  // the user opened afterwards.
+  if (String(supplierPayId) !== String(id)) return;
   document.getElementById('modal-root').innerHTML = `
     <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
       <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:94vh;max-height:94dvh;overflow-y:auto" onclick="event.stopPropagation()">

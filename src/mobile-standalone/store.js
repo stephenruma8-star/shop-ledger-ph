@@ -341,6 +341,10 @@ function _mapInv(i) {
     id: i.id, name: i.name, price: parseFloat(i.sellPrice || 0) || 0,
     stock: i.stock || 0, lowStock: i.lowStock ?? i.minStock ?? 5,
     hasImage: !!i.image, sku: i.sku || '', barcode: i.barcode || '',
+    // The edit form repopulates from this list and PUT replaces the whole
+    // record, so these must travel too or editing would wipe them.
+    category: i.category || '', costPrice: parseFloat(i.costPrice || 0) || 0,
+    unit: i.unit || 'pcs', expiryDate: i.expiryDate || '',
     variants: _parseJson(i.variants, []), createdAt: i.createdAt
   };
 }

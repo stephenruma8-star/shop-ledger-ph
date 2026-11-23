@@ -2,7 +2,9 @@
 async function renderTransactions() {
   const v = document.getElementById('view');
   if (!data.transactions.length) { v.innerHTML = skeleton(T('common.loading')); await loadAll(); }
-  const total = data.transactions.reduce((s, t) => s + (t.grandTotal || 0), 0);
+  // Voided sales and interest postings are not sales; leave them out of the
+  // headline total so it matches what the shop actually rang up.
+  const total = data.transactions.reduce((s, t) => (t.status === 'voided' || t.status === 'interest') ? s : s + (t.grandTotal || 0), 0);
   v.innerHTML = `
     <div class="flex items-center justify-between gap-2 mb-3 fade-in">
       <h2 class="card-title text-base"><span class="icon-tile bg-blue-500/15 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>${T('view.transactions.title')}</h2>
@@ -16,7 +18,20 @@ async function renderTransactions() {
 }
 function txnListHTML(items) {
   if (!(items || []).length) return `<div class="text-center text-gray-500 py-10 fade-in md:col-span-2"><svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><p class="text-sm">No sales found.</p></div>`;
-  return items.map(t => `
+  return items.map(t => {
+    const st = t.status || '';
+    // "pending" is the app's default for every sale with a total; it only
+    // means utang when the sale actually added to a client's balance (the
+    // same rule the desktop uses: non-cash sales add to the balance).
+    const isCredit = st === 'pending' && t.paymentMethod && t.paymentMethod !== 'Cash';
+    const chipCls = st === 'return' || st === 'voided' ? 'chip-red'
+      : st === 'interest' ? 'chip-blue'
+      : isCredit ? 'chip-amber' : 'chip-green';
+    const chipTxt = st === 'return' ? T('txn.returned_chip')
+      : st === 'voided' ? T('txn.voided_chip')
+      : st === 'interest' ? T('txn.interest_chip')
+      : isCredit ? T('txn.credit') : T('txn.paid');
+    return `
         <div class="glass-card rounded-2xl p-3 row card-hover" onclick='openTxnDetail(${jsArg(t.invoiceNo || t.id)})' style="cursor:pointer">
           <div class="flex-1 min-w-0">
             <div class="font-semibold text-sm text-gray-200 truncate">${esc(t.clientName || 'Walk-in')}</div>
@@ -24,9 +39,10 @@ function txnListHTML(items) {
           </div>
           <div class="text-right shrink-0">
             <div class="font-bold text-sm ${Number(t.grandTotal) < 0 ? 'text-red-400' : 'text-green-400'} num">${peso(t.grandTotal)}</div>
-            <span class="chip ${(t.status || '') === 'pending' ? 'chip-amber' : (t.status === 'return' ? 'chip-red' : 'chip-green')}" style="padding:.1rem .5rem;font-size:.68rem">${esc(t.status == null ? '' : t.status === 'pending' ? T('txn.credit') : t.status === 'return' ? T('txn.returned_chip') : T('txn.paid'))}</span>
+            <span class="chip ${chipCls}" style="padding:.1rem .5rem;font-size:.68rem">${esc(chipTxt)}</span>
           </div>
-        </div>`).join('');
+        </div>`;
+  }).join('');
 }
 function filterTransactions(q) {
   q = (q || '').toLowerCase();
@@ -63,6 +79,7 @@ async function voidTxn(id) {
 }
 let returnArmTimer = null;
 let detailTxn = null;
+let detailTxnId = null;
 let returnSel = new Set();
 let settleArmedFor = null;
 let settleArmTimer = null;
@@ -72,6 +89,7 @@ async function openTxnDetail(id) {
   settleArmedFor = null;
   returnSel = new Set();
   detailTxn = null;
+  detailTxnId = String(id);
   try { if (returnArmTimer) clearTimeout(returnArmTimer); } catch (e) {}
   try { if (settleArmTimer) clearTimeout(settleArmTimer); } catch (e) {}
   document.getElementById('modal-root').innerHTML = `
@@ -84,11 +102,13 @@ async function openTxnDetail(id) {
   let t = null;
   try { t = await apiGet('/api/transactions/' + encodeURIComponent(id)); }
   catch (e) { toast(T('txn.load_fail', { msg: e.message }), 'err'); closeQuick(); return; }
+  // A slower response for an older invoice must not overwrite a newer detail.
+  if (detailTxnId !== String(id)) return;
   const box = document.getElementById('txn-detail-body');
   if (!box) return;
   detailTxn = t;
   const owner = phoneRole() !== 'cashier';
-  const canReturn = owner && t.status !== 'return';
+  const canReturn = owner && t.status !== 'return' && t.status !== 'voided';
   box.innerHTML = `
     <div class="flex items-center justify-between gap-2 mb-1"><h3 class="font-bold text-gray-100 text-sm flex items-center gap-2"><span class="icon-tile bg-blue-500/15 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>${esc(t.invoiceNo || 'Receipt')}</h3><button onclick="closeQuick()" aria-label="Close" class="w-9 h-9 rounded-xl btn-ghost flex items-center justify-center text-gray-400 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
     <p class="text-[11px] text-gray-500 mb-3">${esc(t.clientName || 'Walk-in')} · ${esc(t.date || '')} · ${esc(t.paymentMethod || 'Cash')}</p>
@@ -97,7 +117,7 @@ async function openTxnDetail(id) {
       ${(t.items || []).map((it, idx) => {
         const payoff = (parseFloat(it.amount) || 0) > 0 ? parseFloat(it.amount) : (parseFloat(it.qty) || 1) * (it.unitCost || it.price || 0);
         const clientBal = t.clientId ? ((((data.clients || []).find(x => String(x.id) === String(t.clientId))) || {}).balance || 0) : 0;
-        const canSettle = t.clientId && (t.status === 'pending') && !it.settled && clientBal > 0;
+        const canSettle = t.clientId && (t.status === 'pending') && t.paymentMethod !== 'Cash' && !it.settled && clientBal > 0;
         return `<div class="py-1">
         <div class="flex justify-between text-sm gap-2 ${canReturn ? 'rounded-xl px-2 -mx-2 py-1' : ''}" ${canReturn ? `id="ret-line-${idx}" onclick="toggleReturnLine(${idx})" style="cursor:pointer"` : ''}>
           <span class="text-gray-200 truncate">${esc(it.description || it.name || 'Item')} <span class="text-gray-500">x${it.qty || 1}</span></span>
@@ -211,6 +231,7 @@ async function returnTxn(id) {
   }
   returnArmedFor = null;
   try { if (returnArmTimer) clearTimeout(returnArmTimer); } catch (e) {}
+  if (!takeSubmitLock('return')) return;
   const reason = ((document.getElementById('txn-reason') || {}).value || '').trim().slice(0, 200);
   const body = { invoiceNo: id, reason };
   if (returnSel.size && detailTxn && Array.isArray(detailTxn.items)) {
@@ -226,6 +247,7 @@ async function returnTxn(id) {
     toast(r && r.invoiceNo ? T('txn.returned_as', { inv: r.invoiceNo }) : T('txn.returned'), 'ok');
     await refreshAll();
   } catch (e) { feelErr(); toast(T('txn.failed', { msg: e.message }), 'err'); }
+  finally { releaseSubmitLock('return'); }
 }
 // ---------- receipt preview ----------
 // 32-column thermal layout in monospace — what the printer gets, before it
@@ -427,7 +449,7 @@ async function openSystemPrintForSale(invoiceNo) {
   systemPrintHtml(bondPrintDocument(t), 'Receipt ' + (t.invoiceNo || ''));
 }
 // Modal shell for a receipt preview. opts.draft = unsaved sale: shows a
-// not-saved banner and only a "back to sale" action (no print/share yet �?"
+// not-saved banner and only a "back to sale" action (no print/share yet —
 // there is no invoice to print until the sale is saved).
 function showReceiptPreview(t, opts) {
   const o = opts || {};

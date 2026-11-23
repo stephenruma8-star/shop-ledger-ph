@@ -51,7 +51,7 @@ async function deletePO(id) {
     poDeleteArmed = id;
     const btn = document.getElementById('po-del-' + id);
     if (btn) btn.textContent = 'Sure?';
-    setTimeout(() => { if (poDeleteArmed === id) { poDeleteArmed = null; if (typeof renderPOs === 'function') renderPOs(); } }, 5000);
+    setTimeout(() => { if (poDeleteArmed === id) { poDeleteArmed = null; if (currentView === 'purchase-orders') renderPOs(); } }, 5000);
     return;
   }
   poDeleteArmed = null;

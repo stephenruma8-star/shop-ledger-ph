@@ -55,9 +55,13 @@ function closeQuick() { document.getElementById('modal-root').innerHTML = ''; qS
 function quickAdd(id) {
   const item = itemById(id);
   if (!item) return;
-  const qty = Math.max(1, Math.min(qStepQty || 1, item.stock || 1));
+  if ((item.stock || 0) <= 0) { feelErr(); toast(T('sale.oos_item', { name: item.name }), 'err'); return; }
+  if (cartAtStockCap(item.id)) { cartStockToast(item); return; }
+  // Cap against what is still unsold in the cart, not just the shelf count.
+  const remaining = cartStockCap(item.id) - cartQtyOf(item.id);
+  const qty = Math.max(1, Math.min(qStepQty || 1, remaining));
   const existing = cart.find(c => c.invId === id);
-  if (existing) existing.qty = Math.min(existing.qty + qty, item.stock || existing.qty);
+  if (existing) existing.qty += qty;
   else cartAdd({ invId: id, name: item.name, qty, price: item.price });
   closeQuick();
   updateCartUI();

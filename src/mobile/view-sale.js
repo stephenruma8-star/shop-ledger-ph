@@ -123,7 +123,7 @@ function renderSale(presetId) {
         return `
         <div class="py-2.5 px-1.5" id="mc-row-${idx}">
           <div class="row">
-            <span class="w-10 h-10 rounded-xl overflow-hidden bg-gray-800 border border-white/10 flex items-center justify-center shrink-0">${item && itemImage(item) ? '<img src="' + itemImage(item) + '" alt="" class="w-full h-full object-cover" />' : '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>'}</span>
+            <span class="w-10 h-10 rounded-xl overflow-hidden bg-gray-800 border border-white/10 flex items-center justify-center shrink-0">${item && itemImage(item) ? '<img src="' + itemImage(item) + '" alt="" class="w-full h-full object-cover" />' : '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>'}</span>
             <div class="flex-1 min-w-0">
               <div class="text-sm font-medium truncate text-gray-200">${esc(i.name)}${i.variantName ? ' <span class="text-gray-500">· ' + esc(i.variantName) + '</span>' : ''}</div>
               <div class="text-[11px] text-gray-500">${peso(i.price)} ${T('sale.each')}${i.date ? ' · ' + esc(i.date) : ''}</div>
@@ -498,8 +498,13 @@ function updateTender() {
 }
 function cartStep(idx, delta) {
   const c = cart[idx]; if (!c) return;
-  const stock = (itemById(c.invId)?.stock) || 9999;
-  c.qty = Math.min(Math.max(1, c.qty + delta), Math.max(1, stock));
+  const cap = cartStockCap(c.invId);
+  // While editing a saved sale the shelf may already hold less than what was
+  // sold. Keep the line's original quantity reachable so a step down can be
+  // undone (and never let an upward step drop the quantity below where it is).
+  const orig = editingSaleInvoice ? Math.max(1, Number(c.origQty) || 1) : 1;
+  const max = cap === Infinity ? 9999 : Math.max(1, cap, orig);
+  c.qty = delta > 0 ? Math.max(c.qty, Math.min(c.qty + delta, max)) : Math.max(1, c.qty + delta);
   updateCartUI();
   renderSale();
 }
@@ -512,7 +517,7 @@ function cartRemove(idx) {
   if (row && !reduceMotion) {
     cartRemoving = true;
     row.classList.add('row-out');
-    setTimeout(() => { cartRemoving = false; cart.splice(idx, 1); updateCartUI(); renderSale(); }, 220);
+    setTimeout(() => { cartRemoving = false; cart.splice(idx, 1); updateCartUI(); if (currentView === 'sale') renderSale(); }, 220);
   } else { cart.splice(idx, 1); updateCartUI(); renderSale(); }
 }
 // Add a line to the cart. When "Add item here" was tapped on a row, the new
@@ -524,6 +529,26 @@ function cartAdd(line) {
     cart.push(line);
   }
   cartInsertAfter = null;
+}
+// Stock cap for a cart line. Manual lines (no invId) and items no longer in
+// inventory are uncapped; everything else is capped at what the shelf has.
+function cartStockCap(invId) {
+  if (invId === null || invId === undefined) return Infinity;
+  const it = itemById(invId);
+  if (!it) return Infinity;
+  return Math.max(0, Number(it.stock) || 0);
+}
+function cartQtyOf(invId) {
+  return cart.reduce((n, l) => n + (l.invId === invId ? (Number(l.qty) || 0) : 0), 0);
+}
+function cartAtStockCap(invId) {
+  const cap = cartStockCap(invId);
+  return cap !== Infinity && cartQtyOf(invId) >= cap;
+}
+function cartStockToast(item) {
+  const cap = cartStockCap(item.id);
+  feelErr();
+  toast(T('sale.stock_limit', { n: cap === Infinity ? 0 : cap, name: item.name }), 'err');
 }
 function insertItemAfter(idx) {
   cartInsertAfter = (cartInsertAfter === idx) ? null : idx;
@@ -630,7 +655,11 @@ async function editSaleFromDetail(invoiceNo) {
   cart = (t.items || []).map(it => ({
     invId: it.invId, name: it.description || it.name || 'Item',
     qty: parseFloat(it.qty) || 1, price: it.unitCost || it.price || 0,
-    intRate: it.intRate || 0, date: it.date || t.date
+    intRate: it.intRate || 0, date: it.date || t.date,
+    variantName: it.variantName || null,
+    // Remember what was sold so cartStep can restore this quantity even when
+    // the shelf has since dropped below it.
+    origQty: parseFloat(it.qty) || 1
   }));
   tendered = 0;
   saleClientPreset = cid || null;
@@ -805,6 +834,7 @@ function counterAdd(id) {
   const item = (data.inventory || []).find(i => i.id === id);
   if (!item) return;
   if ((item.stock || 0) <= 0) { feelErr(); toast(T('sale.oos_item', { name: item.name }), 'err'); return; }
+  if (cartAtStockCap(item.id)) { cartStockToast(item); return; }
   const line = cart.find(c => c.invId === item.id);
   if (line) line.qty++;
   else cartAdd({ invId: item.id, name: item.name, qty: 1, price: item.price || 0 });
@@ -825,6 +855,7 @@ function quickAddItem(qi) {
   const item = (data.inventory || []).find(i => i.id === q.invId);
   if (item) {
     if ((item.stock || 0) <= 0) { feelErr(); toast(T('sale.oos_item', { name: item.name }), 'err'); return; }
+    if (cartAtStockCap(item.id)) { cartStockToast(item); return; }
     const line = cart.find(c => c.invId === item.id);
     if (line) line.qty++;
     else cartAdd({ invId: item.id, name: item.name, qty: 1, price: item.price || 0 });
@@ -975,6 +1006,7 @@ function scanToCart(code) {
     return;
   }
   if ((item.stock || 0) <= 0) { toast(T('sale.oos_item', { name: item.name }), 'err'); return; }
+  if (cartAtStockCap(item.id)) { cartStockToast(item); return; }
   const line = cart.find(c => c.invId === item.id);
   if (line) line.qty++;
   else cartAdd({ invId: item.id, name: item.name, qty: 1, price: item.price || 0 });
