@@ -179,7 +179,7 @@ async function _apiClients(method, parts, body) {
     const pays = await db.all('SELECT * FROM payments WHERE clientId = ? ORDER BY date DESC, createdAt DESC LIMIT 100', [c.id]);
     const byDate = (a, b) => String(b.date || b.createdAt || '').localeCompare(String(a.date || a.createdAt || ''));
     return {
-      client: { id: c.id, name: c.name, phone: c.phone, address: c.address, balance: c.balance || 0, loyaltyPoints: c.loyaltyPoints || 0, isSC: !!c.isSC, isPWD: !!c.isPWD },
+      client: { id: c.id, name: c.name, phone: c.phone, address: c.address, balance: c.balance || 0, dueDate: c.dueDate || '', loyaltyPoints: c.loyaltyPoints || 0, isSC: !!c.isSC, isPWD: !!c.isPWD },
       sales: txns.sort(byDate).slice(0, 100).map(t => ({
         id: t.id, invoiceNo: t.invoiceNo, date: t.date, grandTotal: t.grandTotal, paymentMethod: t.paymentMethod, status: t.status,
         items: _parseJson(t.items, []).map(i => ({

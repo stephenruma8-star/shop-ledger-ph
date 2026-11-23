@@ -458,9 +458,9 @@ function createLanApiRouter(deps) {
       .filter(p => String(p.clientId) === String(c.id))
       .sort((a, b) => String(b.date || b.createdAt || '').localeCompare(String(a.date || a.createdAt || '')))
       .slice(0, 100)
-      .map(p => ({ id: p.id, date: p.date, amount: p.amount, type: p.type }));
+      .map(p => ({ id: p.id, date: p.date, amount: p.amount, type: p.type, referenceNo: p.referenceNo || '' }));
     res.json({
-      client: { id: c.id, name: c.name, phone: c.phone, address: c.address, balance: c.balance || 0, loyaltyPoints: c.loyaltyPoints || 0, isSC: !!c.isSC, isPWD: !!c.isPWD },
+      client: { id: c.id, name: c.name, phone: c.phone, address: c.address, balance: c.balance || 0, dueDate: c.dueDate || '', loyaltyPoints: c.loyaltyPoints || 0, isSC: !!c.isSC, isPWD: !!c.isPWD },
       sales, payments: pays
     });
   }));

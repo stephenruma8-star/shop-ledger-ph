@@ -119,7 +119,7 @@ const fakeFetch = async (url, opts) => {
   else if (path.startsWith('/api/inventory/valuation')) payload = { items: 3, units: 15, costValue: 200, retailValue: 450 };
   else if (path.startsWith('/api/inventory')) payload = F.inventory.sort((a, b) => a.name.localeCompare(b.name));
   else if (/^\/api\/transactions\/[^/]+$/.test(path)) payload = { id: 1, invoiceNo: 'INV-00001', clientName: 'Maria Santos', paymentMethod: 'Cash', date: todayStr, grandTotal: 150, subtotal: 150, status: 'paid', items: [{ description: 'Coke 500ml', qty: 1, unitCost: 100 }] };
-  else if (/^\/api\/clients\/[^/]+\/history$/.test(path)) payload = { client: { id: 1, name: 'Maria Santos', phone: '0917', balance: 234.5, loyaltyPoints: 250 }, sales: [{ invoiceNo: 'INV-00001', date: todayStr, grandTotal: 150 }], payments: [{ date: todayStr, amount: 30 }] };
+  else if (/^\/api\/clients\/[^/]+\/history$/.test(path)) payload = { client: { id: 1, name: 'Maria Santos', phone: '0917', balance: 234.5, loyaltyPoints: 250 }, sales: [{ invoiceNo: 'INV-00001', date: todayStr, grandTotal: 150, status: 'pending', items: [{ description: 'Coke 500ml', qty: 2, unitCost: 50, amount: 100, intRate: 2 }] }], payments: [{ date: todayStr, amount: 30, type: 'Cash', referenceNo: 'P-1' }] };
   else if (path.startsWith('/api/version')) payload = { v: 7 };
   else if (path.startsWith('/api/transactions')) payload = F.transactions;
   else if (path.startsWith('/api/clients')) payload = F.clients;
@@ -718,6 +718,16 @@ try {
   await gcall(`previewClientStatement()`);
   ok(getEl('modal-root').innerHTML.includes('setStatementBondSize') && getEl('modal-root').innerHTML.includes('setStatementOrientation'), 'statement preview exposes size + orientation controls');
   ok(getEl('modal-root').innerHTML.includes('bond-receipt st bond-preview'), 'statement preview opens in bond layout by default');
+  {
+    const stmtHtml = getEl('modal-root').innerHTML;
+    ok(stmtHtml.includes('Item Description') && stmtHtml.includes('Qty/Name') && stmtHtml.includes('Unit Price') && stmtHtml.includes('Interest'), 'statement uses the invoice item columns');
+    ok(stmtHtml.includes('Coke 500ml') && stmtHtml.includes('INV-00001'), 'statement itemises sale lines');
+    ok(stmtHtml.includes('WITH BALANCE'), 'statement shows the client status');
+    ok(stmtHtml.includes('Payment (Cash)') && stmtHtml.includes('BALANCE'), 'statement keeps payments and balance');
+    ok(String(gcall(`clientStatusInfo({ balance: 100, dueDate: '2000-01-01' }).label`)).includes('OVERDUE'), 'overdue client status derives from the due date');
+    ok(String(gcall(`clientStatusInfo({ balance: 0 }).label`)) === 'PAID', 'paid client status');
+    ok(String(gcall(`clientStatusInfo({ balance: -5 }).label`)) === 'CREDIT', 'credit client status');
+  }
   await gcall(`setStatementBondSize('Legal')`);
   await gcall(`setStatementOrientation('landscape')`);
   ok(String(storage.get('slpPrintPrefs')).includes('"size":"Legal"') && String(storage.get('slpPrintPrefs')).includes('"orientation":"landscape"'), 'statement page setup saved on device');

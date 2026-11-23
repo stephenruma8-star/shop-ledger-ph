@@ -660,6 +660,8 @@ function buildStatementText(client, sales, payments) {
   L.push(client.name || '');
   if (client.phone) L.push(client.phone);
   if (client.address) L.push(client.address);
+  const status = (typeof clientStatusInfo === 'function') ? clientStatusInfo(client).label : '';
+  if (status) L.push('Status: ' + status);
   L.push('--------------------------------');
   (sales || []).forEach(t => {
     L.push(`${t.date || ''}  ${t.invoiceNo || ''}  ${peso(t.grandTotal)} (${t.status || ''})`);
@@ -3118,6 +3120,7 @@ async function openClientDetail(id) {
   if (!box || !h || !h.client) return;
   detailClientHistory = h;
   const c = h.client;
+  const st = clientStatusInfo(c);
   box.innerHTML = `
     <div class="flex items-center gap-3 mb-3">
       <span class="w-14 h-14 rounded-full bg-blue-600/20 text-blue-300 border border-blue-500/30 font-bold text-xl flex items-center justify-center shrink-0">${esc(((c.name || '?').trim().charAt(0) || '?').toUpperCase())}</span>
@@ -3125,6 +3128,7 @@ async function openClientDetail(id) {
         <div class="font-bold text-gray-100 truncate">${esc(c.name)}</div>
         <div class="text-[11px] text-gray-500 truncate">${esc(c.phone || '')}${c.address ? ' · ' + esc(c.address) : ''}</div>
         <div class="text-[11px] ${c.isSC || c.isPWD ? 'text-amber-400 font-semibold' : 'text-gray-500'}">${[c.isSC ? 'SC' : '', c.isPWD ? 'PWD' : ''].filter(Boolean).join(' + ') || ''}</div>
+        <div class="text-[11px] font-bold" style="color:${st.color}">${esc(st.label)}</div>
       </div>
       <div class="text-right shrink-0">
         <div class="font-bold num ${(c.balance || 0) <= 0 ? 'text-green-400' : 'text-orange-400'}">${pesoBal(c.balance)}</div>
@@ -3343,6 +3347,7 @@ function clientStatementParts(h) {
   L.push({ text: 'Client: ' + (c.name || '') });
   if (c.phone) L.push({ text: 'Phone: ' + c.phone });
   L.push({ text: 'Date: ' + phoneToday() });
+  L.push({ text: 'Status: ' + clientStatusInfo(c).label });
   L.push({ t: 'divider' });
   const sales = statementSales(h);
   if (sales.length) {
@@ -3387,26 +3392,89 @@ function setStatementOrientation(orientation) { savePrintPrefs(printPrefs().size
 function clientStatementBondCss() {
   // Reuse the receipt bond-paper base so every printed document matches.
   return bondReceiptCss() + `
-.bond-receipt.st .st-bal{display:flex;justify-content:flex-end;gap:1rem;margin-top:.55rem;padding:.5rem .42rem;background:#0f172a;color:#fff;font-weight:800;font-size:1rem;border-radius:.25rem}
-.bond-receipt.st table.bond-table col.c-date{width:17%}
-.bond-receipt.st table.bond-table col.c-ref{width:20%}
-.bond-receipt.st table.bond-table col.c-what{width:33%}
-.bond-receipt.st table.bond-table col.c-amt{width:15%}
-.bond-receipt.st table.bond-table col.c-pay{width:15%}
+.bond-receipt.st .st-line{font-size:.62rem;color:#64748b;margin-top:.1rem}
+.bond-receipt.st table.bond-table tr.st-pay td{background:#f0fdf4}
+.bond-receipt.st table.bond-table tr.st-pay td.num{color:#15803d;font-weight:600}
+.bond-receipt.st .bond-status{font-size:.72rem}
 @media screen{.bond-receipt.st.bond-preview{min-width:34rem}.bond-receipt.st.bond-preview.bond-landscape{min-width:46rem}}`;
 }
-// Bond-paper statement: same card/header/table styling as the sale receipt.
+// Client account status for the detail sheet and the printed statement.
+function clientStatusInfo(c) {
+  const bal = Number(c && c.balance) || 0;
+  const today = phoneToday();
+  if (bal < 0) return { label: 'CREDIT', color: '#15803d' };
+  if (bal === 0) return { label: 'PAID', color: '#15803d' };
+  if (c && c.dueDate && c.dueDate < today) {
+    const days = Math.max(1, Math.floor((new Date(today + 'T00:00:00') - new Date(c.dueDate + 'T00:00:00')) / 86400000));
+    return { label: 'OVERDUE — ' + days + ' DAY' + (days === 1 ? '' : 'S'), color: '#dc2626' };
+  }
+  if (c && c.dueDate) return { label: 'DUE ' + bondShortDate(c.dueDate), color: '#d97706' };
+  return { label: 'WITH BALANCE', color: '#d97706' };
+}
+// Itemised statement rows in the same six columns as the sale receipt.
+function clientStatementRows(h) {
+  const rows = [];
+  statementSales(h).forEach(t => {
+    const items = Array.isArray(t.items) ? t.items : [];
+    const ref = t.invoiceNo || '';
+    const status = t.status ? String(t.status) : '';
+    if (items.length) {
+      items.forEach(i => {
+        const qty = Number(i.qty) || parseFloat(i.name) || 1;
+        const unit = Number(i.unitCost ?? i.price) || 0;
+        const rate = Number(i.intRate) || 0;
+        const rawDate = String(i.date || t.date || t.createdAt || '').slice(0, 10);
+        const amt = Number(i.amount) || qty * unit + lineIntCalc(qty * unit, rate, rawDate);
+        const desc = i.description || (isNaN(parseFloat(i.name)) ? i.name : '') || 'Item';
+        rows.push({
+          kind: 'sale', date: rawDate, at: String(t.createdAt || ''),
+          desc, variant: i.variantName || '', qty, unit, rate, amt, ref, status
+        });
+      });
+    } else {
+      rows.push({
+        kind: 'sale', date: String(t.date || t.createdAt || '').slice(0, 10), at: String(t.createdAt || ''),
+        desc: 'Sale', variant: '', qty: '', unit: '', rate: '',
+        amt: Number(t.grandTotal) || 0, ref, status
+      });
+    }
+  });
+  ((h && h.payments) || []).forEach(p => {
+    rows.push({
+      kind: 'payment', date: String(p.date || p.createdAt || '').slice(0, 10), at: String(p.createdAt || ''),
+      desc: 'Payment' + (p.type ? ' (' + p.type + ')' : ''),
+      variant: '', qty: '', unit: '', rate: '',
+      amt: -(Number(p.amount) || 0), ref: p.referenceNo ? '#' + p.referenceNo : '', status: ''
+    });
+  });
+  rows.sort((a, b) => String(a.date).localeCompare(String(b.date))
+    || String(a.at).localeCompare(String(b.at))
+    || (a.kind === b.kind ? 0 : a.kind === 'sale' ? -1 : 1));
+  return rows;
+}
+// Bond-paper statement: same card/header/table columns as the sale receipt.
 function clientStatementBondBody(h, opts) {
   const preview = !!(opts && opts.preview);
   const landscape = !!(opts && opts.orientation === 'landscape');
   const s = data.settings || {};
   const c = (h && h.client) || {};
   const money = (n) => peso(n);
-  const rows = [];
-  ((h && h.sales) || []).filter(t => t.status !== 'voided' && t.status !== 'interest').forEach(t => rows.push({ date: t.date || '', ref: t.invoiceNo || '', what: 'Sale' + (t.status ? ' (' + t.status + ')' : ''), amt: Number(t.grandTotal) || 0, pay: 0 }));
-  ((h && h.payments) || []).forEach(p => rows.push({ date: p.date || '', ref: p.referenceNo || '', what: 'Payment' + (p.type ? ' (' + p.type + ')' : '') + (p.notes ? ' - ' + p.notes : ''), amt: 0, pay: Number(p.amount) || 0 }));
-  rows.sort((a, b) => String(a.date).localeCompare(String(b.date)));
-  const body = rows.map(r => `<tr><td>${esc(bondShortDate(r.date))}</td><td>${esc(r.ref)}</td><td>${esc(r.what)}</td><td class="num">${r.amt ? money(r.amt) : ''}</td><td class="num">${r.pay ? money(r.pay) : ''}</td></tr>`).join('') || `<tr><td colspan="5" style="text-align:center;color:#94a3b8">No activity</td></tr>`;
+  const st = clientStatusInfo(c);
+  const rows = clientStatementRows(h);
+  const saleTotal = statementSales(h).reduce((sum, t) => sum + (Number(t.grandTotal) || 0), 0);
+  const payTotal = ((h && h.payments) || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  const body = rows.map(r => {
+    const meta = [r.ref, r.status ? r.status.charAt(0).toUpperCase() + r.status.slice(1) : ''].filter(Boolean).join(' · ');
+    const desc = esc(r.desc) + (r.variant ? ' - ' + esc(r.variant) : '') + (meta ? `<div class="st-line">${esc(meta)}</div>` : '');
+    return `<tr class="${r.kind === 'payment' ? 'st-pay' : ''}">
+      <td class="bond-date">${esc(bondShortDate(r.date))}</td>
+      <td>${desc}</td>
+      <td class="num">${r.qty === '' ? '' : r.qty}</td>
+      <td class="num">${r.unit === '' ? '' : money(r.unit)}</td>
+      <td class="num">${r.rate === '' ? '' : r.rate + '%'}</td>
+      <td class="num">${r.amt < 0 ? '-' + money(Math.abs(r.amt)) : money(r.amt)}</td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="6" style="text-align:center;color:#94a3b8">No activity</td></tr>`;
   const stamped = new Date().toLocaleString('en-PH', { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
   return `<div class="bond-receipt st${preview ? ' bond-preview' : ''}${landscape ? ' bond-landscape' : ''}">
     <div class="bond-top"></div>
@@ -3418,18 +3486,23 @@ function clientStatementBondBody(h, opts) {
       </div>
       <div class="bond-badge">STATEMENT</div>
     </div>
+    <div class="bond-status" style="border-color:${st.color};color:${st.color}">${esc(st.label)}</div>
     <div class="bond-meta">
       <div><span>Client</span><b>${esc(c.name || '')}</b></div>
       <div><span>Date</span><b>${esc(phoneToday())}</b></div>
       <div><span>Phone</span><b>${esc(c.phone || '-')}</b></div>
-      <div><span>Balance</span><b>${pesoBal(c.balance)}</b></div>
+      <div><span>Due</span><b>${esc(c.dueDate ? bondShortDate(c.dueDate) : '-')}</b></div>
     </div>
     <table class="bond-table">
-      <colgroup><col class="c-date"><col class="c-ref"><col class="c-what"><col class="c-amt"><col class="c-pay"></colgroup>
-      <thead><tr><th>Date</th><th>Ref</th><th>Particulars</th><th class="num">Amount</th><th class="num">Payment</th></tr></thead>
+      <colgroup><col class="c-date"><col class="c-desc"><col class="c-qty"><col class="c-unit"><col class="c-int"><col class="c-amt"></colgroup>
+      <thead><tr><th>Date</th><th>Item Description</th><th class="num">Qty/Name</th><th class="num">Unit Price</th><th class="num">Interest</th><th class="num">Amount</th></tr></thead>
       <tbody>${body}</tbody>
     </table>
-    <div class="st-bal"><span>Balance:</span><span>${pesoBal(c.balance)}</span></div>
+    <table class="bond-totals">
+      <tr><td class="lbl">Sales</td><td class="num">${money(saleTotal)}</td></tr>
+      ${payTotal > 0 ? `<tr><td class="lbl">Payments</td><td class="num">-${money(payTotal)}</td></tr>` : ''}
+      <tr class="grand"><td>BALANCE</td><td class="num">${pesoBal(c.balance)}</td></tr>
+    </table>
     <div class="bond-foot">${esc(s.receiptFooter || 'Please settle your balance. Thank you!')}<br>Printed ${esc(stamped)}</div>
   </div>`;
 }
