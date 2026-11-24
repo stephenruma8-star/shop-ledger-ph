@@ -2,16 +2,9 @@
 async function renderDebts() {
   const v = document.getElementById('view');
   if (!data.clients.length) { v.innerHTML = skeleton(T('common.loading')); await loadAll(); }
-  const today = phoneToday();
   const debtors = (data.clients || [])
     .filter(c => (c.balance || 0) > 0)
-    .map(c => {
-      let overdueDays = 0;
-      if (c.dueDate && c.dueDate < today) {
-        overdueDays = Math.floor((new Date(today + 'T00:00:00') - new Date(c.dueDate + 'T00:00:00')) / 86400000);
-      }
-      return { ...c, overdueDays };
-    })
+    .map(c => ({ ...c, overdueDays: clientOverdueDays(c) }))
     .sort((a, b) => (b.balance || 0) - (a.balance || 0));
   const total = debtors.reduce((s, c) => s + (c.balance || 0), 0);
   const owner = phoneRole() !== 'cashier';
@@ -34,7 +27,7 @@ async function renderDebts() {
         <span class="w-10 h-10 rounded-full bg-orange-600/20 text-orange-300 border border-orange-500/30 font-bold text-sm flex items-center justify-center shrink-0">${esc(((c.name || '?').trim().charAt(0) || '?').toUpperCase())}</span>
         <div class="flex-1 min-w-0">
           <div class="font-semibold text-sm text-gray-200 truncate">${esc(c.name)}</div>
-          <div class="text-[11px] ${c.overdueDays > 0 ? 'text-red-400 font-semibold' : 'text-gray-500'}">${c.overdueDays > 0 ? T('debts.overdue', { n: c.overdueDays }) : (c.dueDate ? T('debts.due', { d: c.dueDate }) : '')}</div>
+          <div class="mt-0.5 flex items-center gap-1.5 flex-wrap">${clientStatusChip(c, { compact: true })}${c.dueDate ? `<span class="text-[10px] text-gray-500">${esc(T('debts.due', { d: bondShortDate(c.dueDate) }))}</span>` : ''}</div>
         </div>
         <div class="font-bold text-sm text-orange-400 num shrink-0">${pesoBal(c.balance)}</div>
       </div>`).join('') || `<div class="text-center text-gray-500 py-10"><svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#15803d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-2"><polyline points="20 6 9 17 4 12"/></svg><p class="text-sm">${T('debts.empty')}</p></div>`}

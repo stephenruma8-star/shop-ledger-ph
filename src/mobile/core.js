@@ -336,7 +336,7 @@ function buildStatementText(client, sales, payments) {
   if (client.phone) L.push(client.phone);
   if (client.address) L.push(client.address);
   const status = (typeof clientStatusInfo === 'function') ? clientStatusInfo(client).label : '';
-  if (status) L.push('Status: ' + status);
+  if (status) L.push(T('cli.status_line', { status }));
   L.push('--------------------------------');
   (sales || []).forEach(t => {
     L.push(`${t.date || ''}  ${t.invoiceNo || ''}  ${peso(t.grandTotal)} (${t.status || ''})`);

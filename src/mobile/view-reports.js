@@ -71,7 +71,6 @@ async function renderReports() {
 }
 // Debt aging buckets + per-client sales, computed on-device from cached data.
 function arAgingHTML() {
-  const today = phoneToday();
   const buckets = [
     { key: 'rep.ar_current', total: 0 },
     { key: 'rep.ar_30', total: 0 },
@@ -82,10 +81,8 @@ function arAgingHTML() {
     const bal = c.balance || 0;
     if (bal <= 0) continue;
     let idx = 0;
-    if (c.dueDate && c.dueDate < today) {
-      const days = Math.floor((new Date(today + 'T00:00:00') - new Date((c.dueDate || '') + 'T00:00:00')) / 86400000);
-      idx = days <= 30 ? 1 : days <= 60 ? 2 : 3;
-    }
+    const days = clientOverdueDays(c);
+    if (days > 0) idx = days <= 30 ? 1 : days <= 60 ? 2 : 3;
     buckets[idx].total += bal;
   }
   if (!buckets.some(b => b.total > 0)) return '';

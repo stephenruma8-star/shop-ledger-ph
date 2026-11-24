@@ -27,6 +27,12 @@ function _todayStr() {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 function _r2(n) { return Math.round((parseFloat(n) || 0) * 100) / 100; }
+// A past due date is stale once the client owes nothing. Carrying it into a
+// new credit sale would mark that fresh utang overdue on day one.
+function _staleDueDate(balance, dueDate, today) {
+  const due = String(dueDate || '').slice(0, 10);
+  return !!due && due < today && (Number(balance) || 0) <= 0;
+}
 function _validateAmount(v) {
   const n = parseFloat(v);
   return !isNaN(n) && isFinite(n) && n >= 0 && n <= 999999999;
@@ -583,7 +589,9 @@ async function _applySale(body) {
     if (clientId) {
       const c = await db.get('SELECT * FROM clients WHERE id = ?', [clientId]);
       if (c && payMethod !== 'Cash') {
-        await db.run('UPDATE clients SET balance = ? WHERE id = ?', [_r2((c.balance || 0) + grandTotal), c.id]);
+        const stale = _staleDueDate(c.balance, c.dueDate, today);
+        await db.run('UPDATE clients SET balance = ?, dueDate = ? WHERE id = ?',
+          [_r2((c.balance || 0) + grandTotal), stale ? '' : (c.dueDate || ''), c.id]);
       }
       if (c) {
         const s = await _settingsMap();
@@ -653,7 +661,9 @@ async function _apiSetPayment(ref, body) {
     const c = await db.get('SELECT * FROM clients WHERE id = ?', [t.clientId]);
     if (c) {
       const delta = newAdded ? (t.grandTotal || 0) : -(t.grandTotal || 0);
-      await db.run('UPDATE clients SET balance = ? WHERE id = ?', [_r2((c.balance || 0) + delta), c.id]);
+      const stale = newAdded && _staleDueDate(c.balance, c.dueDate, _todayStr());
+      await db.run('UPDATE clients SET balance = ?, dueDate = ? WHERE id = ?',
+        [_r2((c.balance || 0) + delta), stale ? '' : (c.dueDate || ''), c.id]);
     }
   }
   await db.run('UPDATE transactions SET paymentMethod = ?, balanceAdded = ?, editedAt = ? WHERE id = ?', [pm, newAdded ? 1 : 0, new Date().toISOString(), t.id]);
@@ -721,7 +731,11 @@ async function _apiSaleEdit(ref, body) {
     for (const it of items) await adjustStock(it.invId, it.variantName, -((parseInt(it.qty) || 1)));
     if (newAdded && clientId) {
       const c = await db.get('SELECT * FROM clients WHERE id = ?', [clientId]);
-      if (c) await db.run('UPDATE clients SET balance = ? WHERE id = ?', [_r2((c.balance || 0) + grandTotal), c.id]);
+      if (c) {
+        const stale = _staleDueDate(c.balance, c.dueDate, today);
+        await db.run('UPDATE clients SET balance = ?, dueDate = ? WHERE id = ?',
+          [_r2((c.balance || 0) + grandTotal), stale ? '' : (c.dueDate || ''), c.id]);
+      }
     }
     const storedItems = items.map(i => Object.assign({}, i, { amount: _r2(lineSub(i) + lineInt(i)) }));
     await db.run('UPDATE transactions SET clientId = ?, clientName = ?, items = ?, subtotal = ?, totalInterest = ?, discount = ?, scDiscount = 0, grandTotal = ?, paymentMethod = ?, status = ?, balanceAdded = ?, editedAt = ? WHERE id = ?',

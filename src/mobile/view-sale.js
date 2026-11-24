@@ -467,10 +467,15 @@ function updateSaleClientPreview() {
     const pay = (document.getElementById('sale-payment') || {}).value || 'Cash';
     const owes = (c && c.balance) || 0;
     const nm = (c && c.name) || '';
+    const prefix = c ? clientStatusChip(c, { compact: true }) + ' ' : '';
+    // Starting a credit sale from zero/credit drops a past due date (server
+    // rule); say so instead of leaving an alarming OVERDUE badge unexplained.
+    const staleNote = (pay !== 'Cash' && c && (Number(c.balance) || 0) <= 0 && clientOverdueDays(c) > 0)
+      ? ` <span class="text-[10px] text-gray-500">· ${esc(T('sale.stale_due'))}</span>` : '';
     if (pay !== 'Cash') {
-      box.innerHTML = `<span class="text-gray-400">${esc(T('sale.bal_owes', { amt: peso(owes) }))}</span> · <span class="text-orange-400 font-semibold">${esc(T('sale.bal_adds', { amt: peso(lastSaleTotal || 0) }))}</span>`;
+      box.innerHTML = prefix + `<span class="text-gray-400">${esc(T('sale.bal_owes', { amt: peso(owes) }))}</span> · <span class="text-orange-400 font-semibold">${esc(T('sale.bal_adds', { amt: peso(lastSaleTotal || 0) }))}</span>${staleNote}`;
     } else {
-      box.innerHTML = `<span class="text-gray-400">${esc(T('sale.bal_owes', { amt: peso(owes) }))}</span> · <span class="text-gray-500">${esc(T('sale.bal_cash', { name: nm }))}</span>`;
+      box.innerHTML = prefix + `<span class="text-gray-400">${esc(T('sale.bal_owes', { amt: peso(owes) }))}</span> · <span class="text-gray-500">${esc(T('sale.bal_cash', { name: nm }))}</span>`;
     }
   } catch (e) {}
 }

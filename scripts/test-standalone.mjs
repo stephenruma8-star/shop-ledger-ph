@@ -546,6 +546,36 @@ ok((await A('GET', '/api/clients/' + coC.id + '/history')).client.balance === -1
 await A('POST', '/api/sales', { clientId: coC.id, items: [{ description: 'Sugar', qty: 1, unitCost: 30 }], paymentMethod: 'Credit (Utang)' });
 ok((await A('GET', '/api/clients/' + coC.id + '/history')).client.balance === -70, 'a 30 utang draws the credit down (-100 + 30 = -70)');
 
+// A past due date is stale when the client owes nothing: starting a new credit
+// sale clears it instead of making the fresh utang overdue on day one.
+const sdC = await A('POST', '/api/clients', { name: 'Stale Due', dueDate: '2000-01-01' });
+await A('POST', '/api/sales', { clientId: sdC.id, items: [{ description: 'Stale Item', qty: 1, unitCost: 30 }], paymentMethod: 'Credit (Utang)' });
+const sdH = await A('GET', '/api/clients/' + sdC.id + '/history');
+ok(sdH.client.balance === 30 && sdH.client.dueDate === '', 'credit sale clears a stale due date at zero balance');
+// A credit balance also means nothing is outstanding.
+const scC = await A('POST', '/api/clients', { name: 'Stale Credit', dueDate: '2000-01-01' });
+await A('POST', '/api/payments', { clientId: scC.id, amount: 50 });
+await A('POST', '/api/sales', { clientId: scC.id, items: [{ description: 'Stale Item', qty: 1, unitCost: 30 }], paymentMethod: 'Credit (Utang)' });
+const scH = await A('GET', '/api/clients/' + scC.id + '/history');
+ok(scH.client.balance === -20 && scH.client.dueDate === '', 'credit sale from a credit balance clears a stale due date');
+// Real existing utang keeps its past due date: it is genuinely overdue.
+const kdC = await A('POST', '/api/clients', { name: 'Keep Due', balance: 20, dueDate: '2000-01-01' });
+await A('POST', '/api/sales', { clientId: kdC.id, items: [{ description: 'Stale Item', qty: 1, unitCost: 30 }], paymentMethod: 'Credit (Utang)' });
+const kdH = await A('GET', '/api/clients/' + kdC.id + '/history');
+ok(kdH.client.balance === 50 && kdH.client.dueDate === '2000-01-01', 'credit sale keeps a past due date while the client owes');
+// Editing a cash sale into credit from zero clears the stale date too.
+const seC = await A('POST', '/api/clients', { name: 'Edit Stale', dueDate: '2000-01-01' });
+const seSale = await A('POST', '/api/sales', { clientId: seC.id, items: [{ description: 'Stale Item', qty: 1, unitCost: 40 }], paymentMethod: 'Cash' });
+await A('PUT', '/api/sales/' + seSale.invoiceNo, { clientId: seC.id, items: [{ description: 'Stale Item', qty: 1, unitCost: 40 }], paymentMethod: 'Credit (Utang)' });
+const seH = await A('GET', '/api/clients/' + seC.id + '/history');
+ok(seH.client.balance === 40 && seH.client.dueDate === '', 'sale edit clears a stale due date when it starts the credit');
+// Flipping a cash sale to credit does the same.
+const pmdC = await A('POST', '/api/clients', { name: 'PM Stale', dueDate: '2000-01-01' });
+const pmdSale = await A('POST', '/api/sales', { clientId: pmdC.id, items: [{ description: 'Stale Item', qty: 1, unitCost: 25 }], paymentMethod: 'Cash' });
+await A('PUT', '/api/transactions/' + pmdSale.invoiceNo, { paymentMethod: 'Credit (Utang)' });
+const pmdH = await A('GET', '/api/clients/' + pmdC.id + '/history');
+ok(pmdH.client.balance === 25 && pmdH.client.dueDate === '', 'payment-method change clears a stale due date');
+
 // supplier payment edit + delete
 const supEP = await A('POST', '/api/suppliers', { name: 'Edit Sup' });
 await A('POST', '/api/supplier-payments', { supplierId: supEP.id, amount: 100, paymentMethod: 'Cash' });

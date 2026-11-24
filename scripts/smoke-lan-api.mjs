@@ -533,6 +533,27 @@ const server = app.listen(0, '127.0.0.1', async () => {
     ok(pmRes.status === 200 && pmRes.body.success === true, 'PUT /api/transactions/:id changes the payment method (200)');
     ok(rstores.clients[0].balance === 0, 'switching to Cash clears the utang balance');
 
+    // A stale past due date must not make a fresh credit sale overdue. The
+    // server clears it only when the client owes nothing (zero or credit).
+    rstores.clients[0].dueDate = '2000-01-01';
+    const pmStale = await json('/w/api/transactions/INV-00001', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paymentMethod: 'Credit (Utang)' }) });
+    ok(pmStale.status === 200 && rstores.clients[0].balance === 30 && rstores.clients[0].dueDate === '', 'Cash -> Credit clears a stale due date at zero balance');
+    rstores.clients[0].balance = 0;
+    rstores.clients[0].dueDate = '2000-01-01';
+    const staleSale = await json('/w/api/sales', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId: 1, paymentMethod: 'Credit (Utang)', items: [{ description: 'Coke', qty: 1, unitCost: 30, invId: 11 }] }) });
+    ok(staleSale.status === 200 && rstores.clients[0].balance === 30 && rstores.clients[0].dueDate === '', 'POST /api/sales clears a stale due date for a zero-balance client');
+    rstores.clients[0].dueDate = '2000-01-01';
+    const keepSale = await json('/w/api/sales', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId: 1, paymentMethod: 'Credit (Utang)', items: [{ description: 'Coke', qty: 1, unitCost: 30, invId: 11 }] }) });
+    ok(keepSale.status === 200 && rstores.clients[0].balance === 60 && rstores.clients[0].dueDate === '2000-01-01', 'POST /api/sales keeps a past due date while the client owes');
+    rstores.clients[0].balance = 0;
+    rstores.clients[0].dueDate = '2000-01-01';
+    const editStale = await json('/w/api/sales/INV-00001', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId: 1, paymentMethod: 'Credit (Utang)', items: [{ description: 'Coke', qty: 1, unitCost: 30, invId: 11 }] }) });
+    ok(editStale.status === 200 && rstores.clients[0].dueDate === '', 'PUT /api/sales clears a stale due date when the edit starts from zero');
+    rstores.clients[0].dueDate = '2000-01-01';
+    const cashStale = await json('/w/api/sales', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId: 1, paymentMethod: 'Cash', items: [{ description: 'Coke', qty: 1, unitCost: 30, invId: 11 }] }) });
+    const flipStale = await json('/w/api/transactions/' + cashStale.body.invoiceNo, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paymentMethod: 'Credit (Utang)' }) });
+    ok(cashStale.status === 200 && flipStale.status === 200 && rstores.clients[0].balance === 30 && rstores.clients[0].dueDate === '', 'payment-method change clears a stale due date for a zero-balance client');
+
     // DELETE /api/clients/:id (live): refuses history unless forced
     const delNo = await json('/w/api/clients/1', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
     ok(delNo.status === 400, 'DELETE /api/clients/:id refuses a client with history (400)');

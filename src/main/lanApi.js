@@ -1221,7 +1221,7 @@ function createLanApiRouter(deps) {
       const newItems=${newItems};
       for(const it of newItems){if(it.invId){const i=await dbGet('inventory',it.invId);if(i){const q=(${itemQty.toString()})(it);i.stock=(i.stock||0)-q;const vn=it.variantName;if(vn&&i.variants){const v=i.variants.find(x=>x.name===vn);if(v)v.stock=(v.stock||0)-q;}await dbPut('inventory',i);}}}
       const newAdded=!!(${cId} && ${JSON.stringify(payMethod)}!=='Cash');
-      if(newAdded&&${cId}){const c=await dbGet('clients',${cId});if(c){c.balance=(c.balance||0)+${grandTotal};await dbPut('clients',c);}}
+      if(newAdded&&${cId}){const c=await dbGet('clients',${cId});if(c){const stale=!!(c.dueDate&&c.dueDate<${JSON.stringify(todayStr())}&&(c.balance||0)<=0);c.balance=(c.balance||0)+${grandTotal};if(stale)c.dueDate='';await dbPut('clients',c);}}
       t.items=newItems;t.subtotal=${subtotal};t.totalInterest=${totalInterest};t.discount=${d};t.scDiscount=0;t.grandTotal=${grandTotal};
       t.clientId=${cId};t.clientName=${JSON.stringify(clientName)};t.paymentMethod=${JSON.stringify(payMethod)};t.balanceAdded=newAdded;
       t.status=${grandTotal}<=0?'paid':'pending';t.editedAt=new Date().toISOString();
@@ -1283,6 +1283,7 @@ function createLanApiRouter(deps) {
       const txnId = JSON.parse(await deps.rendererExec(`JSON.stringify(await dbAdd('transactions', ${txnData}))`));
       const stockUndo = [];
       let balanceUndo = false;
+      let dueUndo = null;
       try {
         await deps.rendererExec(`(async()=>{try{await logAudit('sale','Mobile sale ${invoiceNo} - ₱${grandTotal.toFixed(2)}${devTag(req)}');}catch(e){}})()`);
       for (const item of items) {
@@ -1293,7 +1294,8 @@ function createLanApiRouter(deps) {
         }
       }
       if (clientId && payMethod !== 'Cash') {
-        await deps.rendererExec(`(async()=>{const c=await dbGet('clients',${JSON.stringify(clientId)});if(c){c.balance=(c.balance||0)+${grandTotal};await dbPut('clients',c);}})()`);
+        const dueRes = JSON.parse(await deps.rendererExec(`JSON.stringify(await (async()=>{const c=await dbGet('clients',${JSON.stringify(clientId)});if(!c)return {cleared:false,oldDue:''};const oldDue=c.dueDate||'';const stale=!!(oldDue&&oldDue<${JSON.stringify(todayStr())}&&(c.balance||0)<=0);c.balance=(c.balance||0)+${grandTotal};if(stale)c.dueDate='';await dbPut('clients',c);return {cleared:stale,oldDue};})())`));
+        dueUndo = dueRes && dueRes.cleared ? dueRes.oldDue : null;
         balanceUndo = true;
       }
       // Loyalty earn mirrors the desktop: floor(grandTotal × pointsPerPeso)
@@ -1312,7 +1314,8 @@ function createLanApiRouter(deps) {
           } catch (e) {}
         }
         if (balanceUndo) {
-          try { await deps.rendererExec(`(async()=>{const c=await dbGet('clients',${JSON.stringify(clientId)});if(c){c.balance=(c.balance||0)-${grandTotal};await dbPut('clients',c);}})()`); } catch (e) {}
+          const dueRestore = dueUndo !== null ? `c.dueDate=${JSON.stringify(dueUndo)};` : '';
+          try { await deps.rendererExec(`(async()=>{const c=await dbGet('clients',${JSON.stringify(clientId)});if(c){c.balance=(c.balance||0)-${grandTotal};${dueRestore}await dbPut('clients',c);}})()`); } catch (e) {}
         }
         if (txnId !== null) {
           try { await deps.rendererExec(`dbDel('transactions', ${JSON.stringify(txnId)})`); } catch (e) {}
@@ -1538,7 +1541,7 @@ function createLanApiRouter(deps) {
       const newAdded=!!(t.clientId&&pm!=='Cash');
       if(oldAdded!==newAdded&&t.clientId){
         const c=await dbGet('clients',t.clientId);
-        if(c){const delta=newAdded?(t.grandTotal||0):-(t.grandTotal||0);c.balance=(c.balance||0)+delta;await dbPut('clients',c);}
+        if(c){const delta=newAdded?(t.grandTotal||0):-(t.grandTotal||0);const stale=!!(newAdded&&c.dueDate&&c.dueDate<${JSON.stringify(todayStr())}&&(c.balance||0)<=0);c.balance=(c.balance||0)+delta;if(stale)c.dueDate='';await dbPut('clients',c);}
       }
       t.paymentMethod=pm;t.balanceAdded=newAdded;t.editedAt=new Date().toISOString();
       await dbPut('transactions',t);

@@ -37,6 +37,7 @@ function clientListHTML(clients) {
       <div class="flex-1 min-w-0">
         <div class="font-semibold text-sm text-gray-200 truncate">${esc(c.name)}</div>
         <div class="text-xs text-gray-500 truncate">${esc(c.phone || '—')}</div>
+        <div class="mt-1">${clientStatusChip(c, { compact: true })}</div>
       </div>
       <div class="text-right shrink-0">
         <div class="font-bold text-sm num ${(c.balance || 0) <= 0 ? 'text-green-400' : 'text-orange-400'}">${pesoBal(c.balance)}</div>
@@ -125,7 +126,6 @@ async function openClientDetail(id) {
   if (!box || !h || !h.client) return;
   detailClientHistory = h;
   const c = h.client;
-  const st = clientStatusInfo(c);
   box.innerHTML = `
     <div class="flex items-center gap-3 mb-3">
       <span class="w-14 h-14 rounded-full bg-blue-600/20 text-blue-300 border border-blue-500/30 font-bold text-xl flex items-center justify-center shrink-0">${esc(((c.name || '?').trim().charAt(0) || '?').toUpperCase())}</span>
@@ -133,7 +133,7 @@ async function openClientDetail(id) {
         <div class="font-bold text-gray-100 truncate">${esc(c.name)}</div>
         <div class="text-[11px] text-gray-500 truncate">${esc(c.phone || '')}${c.address ? ' · ' + esc(c.address) : ''}</div>
         <div class="text-[11px] ${c.isSC || c.isPWD ? 'text-amber-400 font-semibold' : 'text-gray-500'}">${[c.isSC ? 'SC' : '', c.isPWD ? 'PWD' : ''].filter(Boolean).join(' + ') || ''}</div>
-        <div class="text-[11px] font-bold" style="color:${st.color}">${esc(st.label)}</div>
+        <div class="mt-1">${clientStatusChip(c)}</div>
       </div>
       <div class="text-right shrink-0">
         <div class="font-bold num ${(c.balance || 0) <= 0 ? 'text-green-400' : 'text-orange-400'}">${pesoBal(c.balance)}</div>
@@ -204,7 +204,7 @@ function renderClientForm(id) {
           </div>
           <div>
             <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${id ? T('cli.balance') : T('cli.open_bal')}</label>
-            <input id="cf-balance" type="number" step="0.01" min="0" value="${escAttr(String(id ? (c?.balance || 0) : 0))}" class="inp" />
+            <input id="cf-balance" type="number" step="0.01" inputmode="decimal" value="${escAttr(String(id ? (c?.balance || 0) : 0))}" class="inp" />
             <p class="text-[11px] text-gray-600 mt-1">${id ? T('cli.balance_hint') : T('cli.open_bal_hint')}</p>
           </div>
           <div>
@@ -241,7 +241,8 @@ async function submitClientForm(id, andSale) {
   // and payments still update the balance automatically.
   const balEl = document.getElementById('cf-balance');
   const balance = parseFloat(balEl && balEl.value);
-  body.balance = isFinite(balance) ? Math.max(0, balance) : 0;
+  // Negative balances are valid credits; never clamp them to zero on edit.
+  body.balance = isFinite(balance) ? balance : 0;
   const scEl = document.getElementById('cf-sc');
   const pwdEl = document.getElementById('cf-pwd');
   body.isSC = !!(scEl && scEl.checked);
@@ -352,7 +353,7 @@ function clientStatementParts(h) {
   L.push({ text: 'Client: ' + (c.name || '') });
   if (c.phone) L.push({ text: 'Phone: ' + c.phone });
   L.push({ text: 'Date: ' + phoneToday() });
-  L.push({ text: 'Status: ' + clientStatusInfo(c).label });
+  L.push({ text: T('cli.status_line', { status: clientStatusInfo(c).label }) });
   L.push({ t: 'divider' });
   const sales = statementSales(h);
   if (sales.length) {
@@ -403,18 +404,32 @@ function clientStatementBondCss() {
 .bond-receipt.st .bond-status{font-size:.72rem}
 @media screen{.bond-receipt.st.bond-preview{min-width:34rem}.bond-receipt.st.bond-preview.bond-landscape{min-width:46rem}}`;
 }
-// Client account status for the detail sheet and the printed statement.
+// Whole days past the due date; 0 means not overdue (also used by Debts and
+// Reports so every screen ages a debt the same way).
+function clientOverdueDays(c) {
+  const due = String((c && c.dueDate) || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(due)) return 0;
+  const today = phoneToday();
+  if (due >= today) return 0;
+  const days = Math.floor((new Date(today + 'T00:00:00') - new Date(due + 'T00:00:00')) / 86400000);
+  return Math.max(1, isFinite(days) ? days : 1);
+}
+// Client account status for the detail sheet, compact list chips, and the
+// printed statement. Labels are localized; colors stay stable across languages.
 function clientStatusInfo(c) {
   const bal = Number(c && c.balance) || 0;
-  const today = phoneToday();
-  if (bal < 0) return { label: 'CREDIT', color: '#15803d' };
-  if (bal === 0) return { label: 'PAID', color: '#15803d' };
-  if (c && c.dueDate && c.dueDate < today) {
-    const days = Math.max(1, Math.floor((new Date(today + 'T00:00:00') - new Date(c.dueDate + 'T00:00:00')) / 86400000));
-    return { label: 'OVERDUE — ' + days + ' DAY' + (days === 1 ? '' : 'S'), color: '#dc2626' };
-  }
-  if (c && c.dueDate) return { label: 'DUE ' + bondShortDate(c.dueDate), color: '#d97706' };
-  return { label: 'WITH BALANCE', color: '#d97706' };
+  if (bal < 0) return { key: 'credit', label: T('status.credit'), color: '#15803d' };
+  if (bal === 0) return { key: 'paid', label: T('status.paid'), color: '#15803d' };
+  const days = clientOverdueDays(c);
+  if (days > 0) return { key: 'overdue', days, label: T(days === 1 ? 'status.overdue_one' : 'status.overdue', { n: days }), color: '#dc2626' };
+  if (c && c.dueDate) return { key: 'due', label: T('status.due', { d: bondShortDate(c.dueDate) }), color: '#d97706' };
+  return { key: 'balance', label: T('status.balance'), color: '#d97706' };
+}
+// Small inline badge shared by the client list/detail, Pay, New Sale, and Debts.
+function clientStatusChip(c, opts) {
+  const st = clientStatusInfo(c);
+  const compact = !!(opts && opts.compact);
+  return `<span class="inline-flex items-center rounded-full font-bold uppercase tracking-wider align-middle ${compact ? 'text-[9px] px-1.5 py-0' : 'text-[10px] px-2 py-0.5'}" style="background:${st.color}1f;color:${st.color};border:1px solid ${st.color}55">${esc(st.label)}</span>`;
 }
 // Itemised statement rows in the same six columns as the sale receipt.
 function clientStatementRows(h) {

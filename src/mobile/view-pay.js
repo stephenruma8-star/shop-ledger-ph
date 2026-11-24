@@ -8,7 +8,8 @@ async function renderPay(preselectedId) {
       <div class="space-y-3.5">
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('sale.client')}</label>
-          <select id="pay-client" class="inp">${data.clients.map(c => '<option value="' + c.id + '"' + (String(c.id) === String(preselectedId) ? ' selected' : '') + '>' + esc(c.name) + ' — ' + pesoBal(c.balance) + '</option>').join('')}</select>
+          <select id="pay-client" onchange="payClientChanged()" class="inp">${data.clients.map(c => '<option value="' + c.id + '"' + (String(c.id) === String(preselectedId) ? ' selected' : '') + '>' + esc(c.name) + ' — ' + pesoBal(c.balance) + '</option>').join('')}</select>
+          <div id="pay-client-status" class="mt-1.5"></div>
         </div>
         <div>
           <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 block mb-1.5">${T('pay.date')}</label>
@@ -49,6 +50,15 @@ async function renderPay(preselectedId) {
       <button onclick="submitPay()" class="btn btn-success btn-lg w-full"><svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>${T('pay.record')}</button>
     </div>
     <div style="height:6rem"></div>`;
+  payClientChanged();
+}
+// Keep the due/overdue badge in step with the client picker.
+function payClientChanged() {
+  const sel = document.getElementById('pay-client');
+  const box = document.getElementById('pay-client-status');
+  if (!box) return;
+  const c = (data.clients || []).find(x => String(x.id) === String(sel && sel.value));
+  box.innerHTML = c ? clientStatusChip(c) : '';
 }
 function setAmt(val) {
   const input = document.getElementById('pay-amount');

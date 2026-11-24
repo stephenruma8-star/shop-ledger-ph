@@ -272,6 +272,33 @@ try {
   await gcall(`submitClientForm(1)`);
   const cliPut = posts.slice(beforeClientPut).find(p => p.path === '/api/clients/1');
   ok(cliPut && cliPut.body.balance === 300.25, 'client edit submits balance');
+
+  // credit balances survive edit; status chips are shared across screens
+  getEl('cf-balance').value = '-50.75';
+  const beforeCreditPut = posts.length;
+  await gcall(`submitClientForm(1)`);
+  const creditPut = posts.slice(beforeCreditPut).find(p => p.path === '/api/clients/1');
+  ok(creditPut && creditPut.body.balance === -50.75, 'client edit preserves a negative credit balance');
+  ok(cliHtml.includes('WITH BALANCE') && cliHtml.includes('PAID'), 'client list shows compact status chips');
+  gcall(`data.clients[0].dueDate = '2000-01-01'`);
+  gcall(`filterClients('')`);
+  ok(getEl('client-grid').innerHTML.includes('OVERDUE'), 'client list flags an overdue client');
+  gcall(`showView('pay', 1)`);
+  getEl('pay-client').value = '1';
+  gcall(`payClientChanged()`);
+  ok(getEl('pay-client-status').innerHTML.includes('OVERDUE'), 'pay screen shows the selected client status');
+  gcall(`showView('sale')`);
+  gcall(`data.clients[1].dueDate = '2000-01-01'`);
+  getEl('sale-client').value = '2';
+  getEl('sale-payment').value = 'Credit (Utang)';
+  gcall(`updateSaleClientPreview()`);
+  ok(getEl('sale-client-bal').innerHTML.includes('old due date will be cleared'), 'new-sale preview explains the stale due date');
+  getEl('sale-payment').value = 'Cash';
+  gcall(`delete data.clients[1].dueDate`);
+  gcall(`showView('debts')`);
+  ok(getEl('view').innerHTML.includes('OVERDUE'), 'debts view uses the shared status chip');
+  gcall(`delete data.clients[0].dueDate`);
+  gcall(`showView('clients')`);
   getEl('cf-name').value = '';
   getEl('cf-balance').value = '0';
 
@@ -727,6 +754,9 @@ try {
     ok(String(gcall(`clientStatusInfo({ balance: 100, dueDate: '2000-01-01' }).label`)).includes('OVERDUE'), 'overdue client status derives from the due date');
     ok(String(gcall(`clientStatusInfo({ balance: 0 }).label`)) === 'PAID', 'paid client status');
     ok(String(gcall(`clientStatusInfo({ balance: -5 }).label`)) === 'CREDIT', 'credit client status');
+    storage.set('slpLang', 'fil');
+    ok(String(gcall(`clientStatusInfo({ balance: 0 }).label`)) === 'BAYAD NA', 'status labels are localized');
+    storage.set('slpLang', 'en');
   }
   await gcall(`setStatementBondSize('Legal')`);
   await gcall(`setStatementOrientation('landscape')`);
