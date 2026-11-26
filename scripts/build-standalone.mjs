@@ -27,6 +27,7 @@ const STANDALONE_MODULES = [
   ['mob', 'display.js'],
   ['mob', 'nav.js'],
   ['mob', 'lang.js'],
+  ['mob', 'whats-new.js'],
   ['mob', 'weather.js'],
   ['mob', 'debt-form.js'],
   ['mob', 'view-home.js'],
@@ -64,7 +65,13 @@ if (!top.includes('SLP-WATCHDOG')) throw new Error('shell-top watchdog block mis
 if (!top.trimEnd().endsWith('<script>')) throw new Error('shell-top must end with the open app <script>');
 if (bottom.includes('<script')) throw new Error('shell-bottom must not contain scripts');
 
-let js = '';
+const whatsNewRaw = readFileSync(resolve(root, 'src', 'shared', 'whats-new.json'), 'utf8');
+const whatsNewData = JSON.parse(whatsNewRaw);
+if (!Array.isArray(whatsNewData) || !whatsNewData.length) throw new Error('src/shared/whats-new.json must be a non-empty array');
+const whatsNewJs = JSON.stringify(whatsNewData);
+if (whatsNewJs.includes('</script')) throw new Error('whats-new.json contains a script-closing tag');
+
+let js = '\n// ===== src/shared/whats-new.json =====\nconst SHOP_WHATS_NEW = ' + whatsNewJs + ';\n';
 for (const [dir, f] of STANDALONE_MODULES) {
   const src = readFileSync(dir === 'sa' ? sa(f) : mob(f), 'utf8');
   if (src.includes('</script')) throw new Error(f + ' contains a script-closing tag');

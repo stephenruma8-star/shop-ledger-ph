@@ -54,7 +54,12 @@ Object.defineProperty(globalThis, 'document', { value: {
   addEventListener: (ev, fn) => { (domListeners[ev] ||= []).push(fn); },
   body: makeEl(), documentElement: makeEl(), head: makeEl(),
 }, configurable: true });
-Object.defineProperty(globalThis, 'localStorage', { value: { getItem: () => null, setItem: noop, removeItem: noop }, configurable: true });
+const localStore = new Map();
+Object.defineProperty(globalThis, 'localStorage', { value: {
+  getItem: (k) => (localStore.has(k) ? localStore.get(k) : null),
+  setItem: (k, v) => { localStore.set(k, String(v)); },
+  removeItem: (k) => { localStore.delete(k); },
+}, configurable: true });
 Object.defineProperty(globalThis, 'sessionStorage', { value: { getItem: () => null, setItem: noop, removeItem: noop }, configurable: true });
 Object.defineProperty(globalThis, 'indexedDB', { value: {
   open: () => {
@@ -159,6 +164,14 @@ try {
   if (typeof win.applyI18n !== 'function') throw new Error('applyI18n missing');
   win.toggleLang(); win.toggleLang();
   console.log('I18N OK: toggle cycle + applyI18n run clean');
+  if (typeof win.openWhatsNew !== 'function') throw new Error('openWhatsNew missing');
+  if (typeof win.whatsNewLatest !== 'function' || !win.whatsNewLatest() || win.whatsNewLatest().version !== '3.37.38') throw new Error("desktop What's New latest release is wrong");
+  if (typeof win.whatsNewUnseen !== 'function') throw new Error('whatsNewUnseen missing');
+  if (win.whatsNewUnseen() !== true) throw new Error("desktop What's New should start unseen");
+  win.openWhatsNew();
+  if (win.whatsNewUnseen() !== false) throw new Error("opening What's New should mark it seen");
+  if (globalThis.localStorage.getItem('slpWhatsNewSeenDesktop') !== win.whatsNewLatest().id) throw new Error("desktop What's New did not persist the seen id");
+  console.log('WHATSNEW OK: desktop sheet opens with v' + win.whatsNewLatest().version + ' and clears the unseen badge');
   console.log('DEEP SMOKE OK: boot() + all views executed without errors');
   process.exit(0);
 } catch (e) {

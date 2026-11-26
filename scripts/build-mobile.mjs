@@ -16,7 +16,7 @@ const CHECK = process.argv.includes('--check');
 
 const MODULES = [
   'icons.js', 'core.js', 'pair.js', 'pwa.js', 'pin.js', 'display.js', 'ptr.js',
-  'offline.js', 'nav.js', 'lang.js', 'weather.js', 'debt-form.js', 'view-home.js', 'view-clients.js',
+  'offline.js', 'nav.js', 'lang.js', 'whats-new.js', 'weather.js', 'debt-form.js', 'view-home.js', 'view-clients.js',
   'view-catalog.js', 'view-quick.js', 'view-sale.js', 'view-pay.js',
   'view-inventory.js', 'view-transactions.js', 'view-expenses.js',
   'view-suppliers.js',   'view-po.js', 'view-reports.js', 'view-settings.js', 'view-stocktake.js',
@@ -25,12 +25,17 @@ const MODULES = [
 
 const top = readFileSync(mob('shell-top.html'), 'utf8');
 const bottom = readFileSync(mob('shell-bottom.html'), 'utf8');
+const whatsNewRaw = readFileSync(resolve(root, 'src', 'shared', 'whats-new.json'), 'utf8');
+const whatsNewData = JSON.parse(whatsNewRaw);
+if (!Array.isArray(whatsNewData) || !whatsNewData.length) throw new Error('src/shared/whats-new.json must be a non-empty array');
+const whatsNewJs = JSON.stringify(whatsNewData);
+if (whatsNewJs.includes('</script')) throw new Error('whats-new.json contains a script-closing tag');
 if ((top.match(/<script>/g) || []).length !== 2) throw new Error('shell-top must hold the watchdog script plus exactly one open app <script>');
 if (!top.includes('SLP-WATCHDOG')) throw new Error('shell-top watchdog block missing');
 if (!top.trimEnd().endsWith('<script>')) throw new Error('shell-top must end with the open app <script>');
 if (bottom.includes('<script')) throw new Error('shell-bottom must not contain scripts');
 
-let js = '';
+let js = '\n// ===== src/shared/whats-new.json =====\nconst SHOP_WHATS_NEW = ' + whatsNewJs + ';\n';
 for (const f of MODULES) {
   const src = readFileSync(mob(f), 'utf8');
   if (src.includes('</script')) throw new Error(f + ' contains a script-closing tag');

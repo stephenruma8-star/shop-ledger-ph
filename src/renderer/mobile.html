@@ -65,6 +65,7 @@ select.inp option{background:#0f172a;color:#f1f5f9}
 .chip-red{background:rgba(239,68,68,.14);color:#f87171;border:1px solid rgba(239,68,68,.3)}
 .chip-blue{background:rgba(59,130,246,.15);color:#60a5fa;border:1px solid rgba(59,130,246,.3)}
 header{position:sticky;top:0;z-index:30;padding-top:env(safe-area-inset-top, 0px);background:rgba(15,23,42,.9);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,.07)}
+#wn-dot{box-shadow:0 0 0 2px #0f172a}
 #tabnav{display:none}
 @media(min-width:768px){#tabnav{display:flex}}
 .nav-btn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;flex:1;min-width:64px;min-height:2.6rem;padding:0 .6rem;border-radius:.65rem;font-size:.83rem;font-weight:600;color:#94a3b8;transition:background .15s ease,color .15s ease;cursor:pointer;border:none}
@@ -103,6 +104,7 @@ button is never stuck under the fold (small screens, open keyboards). */
 html,body{overscroll-behavior-y:none}
 body.day{background:#e8edf3;color:#0f172a;background-image:none}
 body.day header{background:rgba(255,255,255,.93);border-bottom-color:rgba(15,23,42,.08)}
+body.day #wn-dot{box-shadow:0 0 0 2px #fff}
 body.day .glass,body.day .glass-card,body.day .stat-card{background:#fff;border-color:rgba(15,23,42,.09);box-shadow:0 1px 3px rgba(15,23,42,.08)}
 body.day .glass-input{background:#f1f5f9;border-color:rgba(15,23,42,.12)}
 body.day .btn-ghost{background:rgba(15,23,42,.05);color:#334155;border-color:rgba(15,23,42,.1)}
@@ -160,7 +162,10 @@ body.big-text .btn-sm{font-size:.85rem}
         <p class="text-[10px] leading-none flex items-center gap-1.5 mt-1"><span id="conn-dot" class="w-1.5 h-1.5 rounded-full bg-green-400 inline-block"></span><span id="conn-status" class="text-gray-400">&#9679; Connected</span></p>
       </div>
     </div>
-    <button class="btn btn-ghost w-10 h-10 p-0 rounded-xl" onclick="refreshAll()" title="Refresh"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
+    <div class="flex items-center gap-1">
+      <button id="wn-btn" class="btn btn-ghost w-10 h-10 p-0 rounded-xl relative" onclick="openWhatsNew()" title="What's New" aria-label="What's New" data-i18n-title="wn.title" data-i18n-aria="wn.title"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><span id="wn-dot" class="hidden absolute -top-1 -right-2 w-2 h-2 rounded-full bg-amber-500" aria-label="New updates" data-i18n-aria="wn.unseen"></span></button>
+      <button class="btn btn-ghost w-10 h-10 p-0 rounded-xl" onclick="refreshAll()" title="Refresh"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
+    </div>
   </div>
 </header>
 
@@ -246,6 +251,9 @@ setTimeout(function () {
 } catch (_) {}
 </script>
 <script>
+
+// ===== src/shared/whats-new.json =====
+const SHOP_WHATS_NEW = [{"id":"mobile-4.8.60","app":"mobile","version":"4.8.60","date":"2026-11-24","title":{"en":"Credit balances and clearer client status","fil":"Mga credit balance at mas malinaw na status ng kliyente"},"changes":[{"type":"new","text":{"en":"Credit balances now stay negative when you edit a client and are shown as CREDIT.","fil":"Nananatiling negative ang credit balance kapag in-edit ang kliyente at makikita bilang CREDIT."}},{"type":"improved","text":{"en":"Compact status chips (PAID, DUE, OVERDUE, CREDIT) now appear on Clients, Pay, New Sale, Debts, and Reports.","fil":"May compact status chips (PAID, DUE, OVERDUE, CREDIT) na sa Clients, Pay, New Sale, Debts, at Reports."}},{"type":"fixed","text":{"en":"Starting a new credit sale for a client with no balance clears an old past due date instead of marking the new utang overdue.","fil":"Kapag walang balanse ang kliyente, binubura ang lumang past due date sa bagong credit sale para hindi agad ma-overdue ang bagong utang."}},{"type":"improved","text":{"en":"Client status labels now follow your English or Filipino language setting.","fil":"Sumusunod na ang status labels sa English o Filipino na setting mo."}}]},{"id":"mobile-4.8.59","app":"mobile","version":"4.8.59","date":"2026-11-23","title":{"en":"Cleaner client statements","fil":"Mas malinis na statement ng kliyente"},"changes":[{"type":"new","text":{"en":"Client statements now print in the same invoice style as sales, with a running balance.","fil":"Ang statement ng kliyente ay katulad na ng invoice ng benta, may running balance."}},{"type":"improved","text":{"en":"The client's current status is printed on the statement.","fil":"Nakalathala na ang kasalukuyang status ng kliyente sa statement."}}]},{"id":"mobile-4.8.58","app":"mobile","version":"4.8.58","date":"2026-11-23","title":{"en":"Audit fixes for stock and statements","fil":"Mga audit fix sa stock at statement"},"changes":[{"type":"fixed","text":{"en":"Cart quantities can no longer go above the stock on hand.","fil":"Hindi na puwedeng lumampas ang dami sa cart sa available na stock."}},{"type":"fixed","text":{"en":"Returns and statement figures stay consistent after edits.","fil":"Nananatiling tugma ang returns at statement pagkatapos ng edits."}},{"type":"fixed","text":{"en":"Editing an inventory item keeps all of its saved fields.","fil":"Naiiwan ang lahat ng saved fields kapag in-edit ang inventory item."}}]},{"id":"desktop-3.37.38","app":"desktop","version":"3.37.38","date":"2026-11-19","title":{"en":"Print previews remember your paper","fil":"Naaalala ng print preview ang papel mo"},"changes":[{"type":"new","text":{"en":"Bond print previews now remember the selected paper size and orientation.","fil":"Naaalala na ng bond print preview ang napiling paper size at orientation."}},{"type":"improved","text":{"en":"Repeat printing takes fewer steps because your last choice is kept.","fil":"Mas mabilis mag-print muli dahil naka-save ang huling pinili mo."}}]},{"id":"desktop-3.37.37","app":"desktop","version":"3.37.37","date":"2026-11-19","title":{"en":"Clearer bond receipts","fil":"Mas malinaw na bond receipt"},"changes":[{"type":"improved","text":{"en":"Bond receipt item columns line up for easier reading.","fil":"Maayos nang nakahanay ang mga column ng item sa bond receipt."}},{"type":"fixed","text":{"en":"The Android back button now closes phone screens in the right order.","fil":"Tama na ang order ng pagsasara ng Android back button sa mga screen ng phone."}}]},{"id":"desktop-3.37.36","app":"desktop","version":"3.37.36","date":"2026-11-12","title":{"en":"Report, VAT, and backup fixes","fil":"Mga fix sa report, VAT, at backup"},"changes":[{"type":"fixed","text":{"en":"Report and export quantities now match the sales records.","fil":"Tugma na ang quantities sa reports at exports sa sales records."}},{"type":"fixed","text":{"en":"BIR VAT totals are calculated correctly.","fil":"Tama na ang pagkalkula ng BIR VAT totals."}},{"type":"fixed","text":{"en":"Backup restore no longer exposes saved secrets, and phone pairing is more stable.","fil":"Hindi na lumalabas ang saved secrets sa backup restore, at mas stable ang pairing ng phone."}}]}];
 
 // ===== src/mobile/icons.js =====
 // ---------- SHARED ICON SET ----------
@@ -1945,6 +1953,11 @@ const LANG_STRINGS = {
     'upd.title': 'Phone app update',
     'upd.body': 'Version {tag} is ready. Download it, then tap the file to install — your pairing and settings stay.',
     'upd.download': 'Download update', 'upd.later': 'Later',
+    'wn.title': "What's New", 'wn.sub': 'Latest updates and fixes',
+    'wn.open': "See what's new", 'wn.settings_desc': 'See the latest improvements and fixes in this update.',
+    'wn.new': 'New', 'wn.improved': 'Improved', 'wn.fixed': 'Fixed',
+    'wn.badge': 'NEW', 'wn.close': 'Got it', 'wn.empty': 'No release notes yet.',
+    'wn.unseen': 'New updates',
     'txn.print': '🖨️ Print', 'txn.share': '📤 Share', 'txn.preview': '👁 Preview', 'txn.back_detail': '← Back to receipt',
     'txn.change_payment': 'Payment', 'txn.payment_title': 'Change payment method',
     'txn.payment_method': 'Payment method', 'txn.payment_saved': 'Payment method updated',
@@ -2344,6 +2357,11 @@ const LANG_STRINGS = {
     'upd.title': 'Update ng phone app',
     'upd.body': 'Handa na ang bersyong {tag}. I-download ito, tapos pindutin ang file para i-install — mananatili ang pairing at settings.',
     'upd.download': 'I-download ang update', 'upd.later': 'Mamaya',
+    'wn.title': "Ano'ng Bago", 'wn.sub': 'Mga pinakabagong update at fix',
+    'wn.open': 'Tingnan ang bago', 'wn.settings_desc': 'Tingnan ang mga pinakabagong pagbabago at fix sa update na ito.',
+    'wn.new': 'Bago', 'wn.improved': 'Pinahusay', 'wn.fixed': 'Naayos',
+    'wn.badge': 'BAGO', 'wn.close': 'Sige', 'wn.empty': 'Wala pang release notes.',
+    'wn.unseen': 'Mga bagong update',
     'txn.print': '🖨️ I-print', 'txn.share': '📤 I-share', 'txn.preview': '👁 Silipin', 'txn.back_detail': '← Bumalik sa resibo',
     'txn.change_payment': 'Bayad', 'txn.payment_title': 'Palitan ang paraan ng bayad',
     'txn.payment_method': 'Paraan ng bayad', 'txn.payment_saved': 'Na-update ang paraan ng bayad',
@@ -2447,7 +2465,118 @@ function applyStaticLang() {
       const k = el.getAttribute('data-i18n');
       if (k) el.textContent = T(k);
     });
+    document.querySelectorAll('[data-i18n-title]').forEach(el => {
+      const k = el.getAttribute('data-i18n-title');
+      if (k) el.setAttribute('title', T(k));
+    });
+    document.querySelectorAll('[data-i18n-aria]').forEach(el => {
+      const k = el.getAttribute('data-i18n-aria');
+      if (k) el.setAttribute('aria-label', T(k));
+    });
   } catch (e) {}
+}
+
+// ===== src/mobile/whats-new.js =====
+// ---------- WHAT'S NEW (phone) ----------
+// Release notes come from the shared src/shared/whats-new.json, injected as
+// SHOP_WHATS_NEW by scripts/build-mobile.mjs and scripts/build-standalone.mjs.
+// Opening the sheet marks the latest phone release as seen, clearing the
+// header dot and the Settings badge.
+const WHATS_NEW_SEEN_KEY = 'slpWhatsNewSeenMobile';
+const WN_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function whatsNewEntries() {
+  const all = (typeof SHOP_WHATS_NEW !== 'undefined' && Array.isArray(SHOP_WHATS_NEW)) ? SHOP_WHATS_NEW : [];
+  return all
+    .filter(e => e && e.app === 'mobile')
+    .slice()
+    .sort((a, b) => {
+      const byDate = String(b.date || '').localeCompare(String(a.date || ''));
+      return byDate || String(b.version || '').localeCompare(String(a.version || ''), undefined, { numeric: true });
+    });
+}
+function whatsNewLatest() { return whatsNewEntries()[0] || null; }
+function whatsNewUnseen() {
+  const latest = whatsNewLatest();
+  if (!latest) return false;
+  try { return localStorage.getItem(WHATS_NEW_SEEN_KEY) !== latest.id; } catch (e) { return false; }
+}
+function markWhatsNewSeen() {
+  const latest = whatsNewLatest();
+  if (!latest) return;
+  try { localStorage.setItem(WHATS_NEW_SEEN_KEY, latest.id); } catch (e) { /* storage unavailable */ }
+}
+function updateWhatsNewBadges() {
+  const unseen = whatsNewUnseen();
+  const dot = document.getElementById('wn-dot');
+  if (dot) dot.classList.toggle('hidden', !unseen);
+  const badge = document.getElementById('wn-settings-badge');
+  if (badge) badge.classList.toggle('hidden', !unseen);
+}
+function wnDateLabel(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
+  if (!m) return String(iso || '');
+  return WN_MONTHS[(parseInt(m[2], 10) || 1) - 1] + ' ' + (parseInt(m[3], 10) || 1) + ', ' + m[1];
+}
+function wnTextFor(value, lang) {
+  if (!value) return '';
+  return value[lang] || value.en || '';
+}
+function wnChangeLabel(type) {
+  if (type === 'new') return T('wn.new');
+  if (type === 'fixed') return T('wn.fixed');
+  return T('wn.improved');
+}
+function wnChangeClass(type) {
+  if (type === 'new') return 'bg-green-500/15 text-green-400';
+  if (type === 'fixed') return 'bg-amber-500/15 text-amber-400';
+  return 'bg-blue-500/15 text-blue-400';
+}
+function openWhatsNew() {
+  const entries = whatsNewEntries();
+  const wasUnseen = whatsNewUnseen();
+  const lang = phoneLang();
+  const rows = entries.map((entry, index) => {
+    const isLatest = index === 0;
+    const changes = (entry.changes || []).map(change => `
+      <li class="flex items-start gap-2">
+        <span class="shrink-0 mt-0.5 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${wnChangeClass(change.type)}">${esc(wnChangeLabel(change.type))}</span>
+        <span class="text-xs leading-tight text-gray-400">${esc(wnTextFor(change.text, lang))}</span>
+      </li>`).join('');
+    return `
+      <section class="rounded-xl p-3" style="border:1px solid rgba(148,163,184,.18)">
+        <div class="flex items-center justify-between gap-2 mb-1">
+          <div class="flex items-center gap-1.5 min-w-0">
+            <span class="text-[11px] font-bold text-blue-400">v${esc(entry.version)}</span>
+            ${isLatest && wasUnseen ? `<span class="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-green-500/15 text-green-400">${esc(T('wn.badge'))}</span>` : ''}
+          </div>
+          <span class="text-[10px] text-gray-500 shrink-0">${esc(wnDateLabel(entry.date))}</span>
+        </div>
+        <div class="text-sm font-semibold text-gray-200 mb-1.5">${esc(wnTextFor(entry.title, lang))}</div>
+        <ul class="space-y-1.5">${changes}</ul>
+      </section>`;
+  }).join('');
+  document.getElementById('modal-root').innerHTML = `
+    <div class="fixed inset-0 bg-black/70 z-[45] flex items-end sm:items-center justify-center fade-in" onclick="if(event.target===this)closeQuick()">
+      <div class="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 pb-6 slide-up glass-card" style="max-height:94vh;max-height:94dvh;overflow-y:auto" onclick="event.stopPropagation()">
+        <div class="grabber mb-3" style="margin-bottom:.9rem"></div>
+        <div class="flex items-start justify-between gap-2 mb-3">
+          <div class="min-w-0">
+            <h3 class="font-bold text-gray-100 text-base flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-amber-400 shrink-0"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              ${esc(T('wn.title'))}
+            </h3>
+            <p class="text-[11px] text-gray-500 mt-0.5">${esc(T('wn.sub'))}</p>
+          </div>
+          <button onclick="closeQuick()" aria-label="${escAttr(T('wn.close'))}" class="w-9 h-9 rounded-xl btn-ghost flex items-center justify-center text-gray-400 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        </div>
+        <div class="space-y-2">${rows || `<p class="text-sm text-gray-500 text-center py-6">${esc(T('wn.empty'))}</p>`}</div>
+        <button onclick="closeQuick()" class="btn btn-primary btn-lg mt-3">${esc(T('wn.close'))}</button>
+      </div>
+    </div>`;
+  markWhatsNewSeen();
+  updateWhatsNewBadges();
+  feelOk();
 }
 
 // ===== src/mobile/weather.js =====
@@ -6599,6 +6728,11 @@ async function renderSettings() {
       <div id="update-row"></div>
     </section>
     <section class="glass-card rounded-2xl p-4 mb-3 fade-in">
+      <h3 class="card-title mb-1 flex items-center gap-2"><span class="icon-tile bg-amber-500/15 text-amber-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span>${T('wn.title')}<span id="wn-settings-badge" class="hidden ml-auto text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-green-500/15 text-green-400">${T('wn.badge')}</span></h3>
+      <p class="text-[11px] text-gray-500 mb-2">${T('wn.settings_desc')}</p>
+      <button onclick="openWhatsNew()" class="btn btn-ghost w-full"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>${T('wn.open')}</button>
+    </section>
+    <section class="glass-card rounded-2xl p-4 mb-3 fade-in">
       <h3 class="card-title mb-1 flex items-center gap-2"><span class="icon-tile bg-purple-500/15 text-purple-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>${T('diag.title')}</h3>
       <div id="diag-row"></div>
     </section>
@@ -6615,6 +6749,7 @@ async function renderSettings() {
   updateDiagRow();
   if (typeof updateBackupRow === 'function') updateBackupRow();
   updateWeatherRow();
+  updateWhatsNewBadges();
 }
 function renderShopEdit() {
   const s = data.settings || {};
@@ -7137,6 +7272,7 @@ async function startApp() {
   const ls = document.getElementById('loading-screen');
   if (ls) ls.classList.add('hidden');
   showView('home');
+  updateWhatsNewBadges();
   connectWS();
   setInterval(() => { /* keep WS alive */ }, 25000);
   watchPinActivity(); armAutoLock();

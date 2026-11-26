@@ -23,6 +23,7 @@ async function startStandalone() {
   const ls = document.getElementById('loading-screen');
   if (ls) ls.classList.add('hidden');
   showView('home');
+  updateWhatsNewBadges();
   watchPinActivity(); armAutoLock();
   setupNativeBack();
   try {

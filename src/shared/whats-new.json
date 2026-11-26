@@ -1,0 +1,186 @@
+[
+  {
+    "id": "mobile-4.8.60",
+    "app": "mobile",
+    "version": "4.8.60",
+    "date": "2026-11-24",
+    "title": {
+      "en": "Credit balances and clearer client status",
+      "fil": "Mga credit balance at mas malinaw na status ng kliyente"
+    },
+    "changes": [
+      {
+        "type": "new",
+        "text": {
+          "en": "Credit balances now stay negative when you edit a client and are shown as CREDIT.",
+          "fil": "Nananatiling negative ang credit balance kapag in-edit ang kliyente at makikita bilang CREDIT."
+        }
+      },
+      {
+        "type": "improved",
+        "text": {
+          "en": "Compact status chips (PAID, DUE, OVERDUE, CREDIT) now appear on Clients, Pay, New Sale, Debts, and Reports.",
+          "fil": "May compact status chips (PAID, DUE, OVERDUE, CREDIT) na sa Clients, Pay, New Sale, Debts, at Reports."
+        }
+      },
+      {
+        "type": "fixed",
+        "text": {
+          "en": "Starting a new credit sale for a client with no balance clears an old past due date instead of marking the new utang overdue.",
+          "fil": "Kapag walang balanse ang kliyente, binubura ang lumang past due date sa bagong credit sale para hindi agad ma-overdue ang bagong utang."
+        }
+      },
+      {
+        "type": "improved",
+        "text": {
+          "en": "Client status labels now follow your English or Filipino language setting.",
+          "fil": "Sumusunod na ang status labels sa English o Filipino na setting mo."
+        }
+      }
+    ]
+  },
+  {
+    "id": "mobile-4.8.59",
+    "app": "mobile",
+    "version": "4.8.59",
+    "date": "2026-11-23",
+    "title": {
+      "en": "Cleaner client statements",
+      "fil": "Mas malinis na statement ng kliyente"
+    },
+    "changes": [
+      {
+        "type": "new",
+        "text": {
+          "en": "Client statements now print in the same invoice style as sales, with a running balance.",
+          "fil": "Ang statement ng kliyente ay katulad na ng invoice ng benta, may running balance."
+        }
+      },
+      {
+        "type": "improved",
+        "text": {
+          "en": "The client's current status is printed on the statement.",
+          "fil": "Nakalathala na ang kasalukuyang status ng kliyente sa statement."
+        }
+      }
+    ]
+  },
+  {
+    "id": "mobile-4.8.58",
+    "app": "mobile",
+    "version": "4.8.58",
+    "date": "2026-11-23",
+    "title": {
+      "en": "Audit fixes for stock and statements",
+      "fil": "Mga audit fix sa stock at statement"
+    },
+    "changes": [
+      {
+        "type": "fixed",
+        "text": {
+          "en": "Cart quantities can no longer go above the stock on hand.",
+          "fil": "Hindi na puwedeng lumampas ang dami sa cart sa available na stock."
+        }
+      },
+      {
+        "type": "fixed",
+        "text": {
+          "en": "Returns and statement figures stay consistent after edits.",
+          "fil": "Nananatiling tugma ang returns at statement pagkatapos ng edits."
+        }
+      },
+      {
+        "type": "fixed",
+        "text": {
+          "en": "Editing an inventory item keeps all of its saved fields.",
+          "fil": "Naiiwan ang lahat ng saved fields kapag in-edit ang inventory item."
+        }
+      }
+    ]
+  },
+  {
+    "id": "desktop-3.37.38",
+    "app": "desktop",
+    "version": "3.37.38",
+    "date": "2026-11-19",
+    "title": {
+      "en": "Print previews remember your paper",
+      "fil": "Naaalala ng print preview ang papel mo"
+    },
+    "changes": [
+      {
+        "type": "new",
+        "text": {
+          "en": "Bond print previews now remember the selected paper size and orientation.",
+          "fil": "Naaalala na ng bond print preview ang napiling paper size at orientation."
+        }
+      },
+      {
+        "type": "improved",
+        "text": {
+          "en": "Repeat printing takes fewer steps because your last choice is kept.",
+          "fil": "Mas mabilis mag-print muli dahil naka-save ang huling pinili mo."
+        }
+      }
+    ]
+  },
+  {
+    "id": "desktop-3.37.37",
+    "app": "desktop",
+    "version": "3.37.37",
+    "date": "2026-11-19",
+    "title": {
+      "en": "Clearer bond receipts",
+      "fil": "Mas malinaw na bond receipt"
+    },
+    "changes": [
+      {
+        "type": "improved",
+        "text": {
+          "en": "Bond receipt item columns line up for easier reading.",
+          "fil": "Maayos nang nakahanay ang mga column ng item sa bond receipt."
+        }
+      },
+      {
+        "type": "fixed",
+        "text": {
+          "en": "The Android back button now closes phone screens in the right order.",
+          "fil": "Tama na ang order ng pagsasara ng Android back button sa mga screen ng phone."
+        }
+      }
+    ]
+  },
+  {
+    "id": "desktop-3.37.36",
+    "app": "desktop",
+    "version": "3.37.36",
+    "date": "2026-11-12",
+    "title": {
+      "en": "Report, VAT, and backup fixes",
+      "fil": "Mga fix sa report, VAT, at backup"
+    },
+    "changes": [
+      {
+        "type": "fixed",
+        "text": {
+          "en": "Report and export quantities now match the sales records.",
+          "fil": "Tugma na ang quantities sa reports at exports sa sales records."
+        }
+      },
+      {
+        "type": "fixed",
+        "text": {
+          "en": "BIR VAT totals are calculated correctly.",
+          "fil": "Tama na ang pagkalkula ng BIR VAT totals."
+        }
+      },
+      {
+        "type": "fixed",
+        "text": {
+          "en": "Backup restore no longer exposes saved secrets, and phone pairing is more stable.",
+          "fil": "Hindi na lumalabas ang saved secrets sa backup restore, at mas stable ang pairing ng phone."
+        }
+      }
+    ]
+  }
+]

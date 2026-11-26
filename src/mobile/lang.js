@@ -328,6 +328,11 @@ const LANG_STRINGS = {
     'upd.title': 'Phone app update',
     'upd.body': 'Version {tag} is ready. Download it, then tap the file to install — your pairing and settings stay.',
     'upd.download': 'Download update', 'upd.later': 'Later',
+    'wn.title': "What's New", 'wn.sub': 'Latest updates and fixes',
+    'wn.open': "See what's new", 'wn.settings_desc': 'See the latest improvements and fixes in this update.',
+    'wn.new': 'New', 'wn.improved': 'Improved', 'wn.fixed': 'Fixed',
+    'wn.badge': 'NEW', 'wn.close': 'Got it', 'wn.empty': 'No release notes yet.',
+    'wn.unseen': 'New updates',
     'txn.print': '🖨️ Print', 'txn.share': '📤 Share', 'txn.preview': '👁 Preview', 'txn.back_detail': '← Back to receipt',
     'txn.change_payment': 'Payment', 'txn.payment_title': 'Change payment method',
     'txn.payment_method': 'Payment method', 'txn.payment_saved': 'Payment method updated',
@@ -727,6 +732,11 @@ const LANG_STRINGS = {
     'upd.title': 'Update ng phone app',
     'upd.body': 'Handa na ang bersyong {tag}. I-download ito, tapos pindutin ang file para i-install — mananatili ang pairing at settings.',
     'upd.download': 'I-download ang update', 'upd.later': 'Mamaya',
+    'wn.title': "Ano'ng Bago", 'wn.sub': 'Mga pinakabagong update at fix',
+    'wn.open': 'Tingnan ang bago', 'wn.settings_desc': 'Tingnan ang mga pinakabagong pagbabago at fix sa update na ito.',
+    'wn.new': 'Bago', 'wn.improved': 'Pinahusay', 'wn.fixed': 'Naayos',
+    'wn.badge': 'BAGO', 'wn.close': 'Sige', 'wn.empty': 'Wala pang release notes.',
+    'wn.unseen': 'Mga bagong update',
     'txn.print': '🖨️ I-print', 'txn.share': '📤 I-share', 'txn.preview': '👁 Silipin', 'txn.back_detail': '← Bumalik sa resibo',
     'txn.change_payment': 'Bayad', 'txn.payment_title': 'Palitan ang paraan ng bayad',
     'txn.payment_method': 'Paraan ng bayad', 'txn.payment_saved': 'Na-update ang paraan ng bayad',
@@ -829,6 +839,14 @@ function applyStaticLang() {
     document.querySelectorAll('[data-i18n]').forEach(el => {
       const k = el.getAttribute('data-i18n');
       if (k) el.textContent = T(k);
+    });
+    document.querySelectorAll('[data-i18n-title]').forEach(el => {
+      const k = el.getAttribute('data-i18n-title');
+      if (k) el.setAttribute('title', T(k));
+    });
+    document.querySelectorAll('[data-i18n-aria]').forEach(el => {
+      const k = el.getAttribute('data-i18n-aria');
+      if (k) el.setAttribute('aria-label', T(k));
     });
   } catch (e) {}
 }

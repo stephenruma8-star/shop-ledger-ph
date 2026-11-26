@@ -19,6 +19,10 @@ const translations = {
     shortcuts: 'Shortcuts', help: 'Help', 'change-password': 'Change Password',
     logout: 'Logout', 'signin-sub': 'Sign in to your store',
     'forgot-password': 'Forgot Password?', 'toggle-theme': 'Toggle Theme',
+    'whats-new': "What's New", 'wn-sub': 'Latest improvements and fixes',
+    'wn-new': 'New', 'wn-improved': 'Improved', 'wn-fixed': 'Fixed',
+    'wn-badge': 'NEW', 'wn-close': 'Got it',
+    'wn-empty': 'No release notes yet.', 'wn-unseen': 'New updates',
   },
   fil: {
     dashboard: 'Dashboard', clients: 'Mga Kliyente', debts: 'Mga Utang',
@@ -41,6 +45,10 @@ const translations = {
     shortcuts: 'Mga Shortcut', help: 'Tulong', 'change-password': 'Palitan ang Password',
     logout: 'Mag-logout', 'signin-sub': 'Mag-sign in sa iyong tindahan',
     'forgot-password': 'Nakalimutan ang Password?', 'toggle-theme': 'Palitan ang Tema',
+    'whats-new': "Ano'ng Bago", 'wn-sub': 'Mga pinakabagong pagbabago at fix',
+    'wn-new': 'Bago', 'wn-improved': 'Pinahusay', 'wn-fixed': 'Naayos',
+    'wn-badge': 'BAGO', 'wn-close': 'Sige',
+    'wn-empty': 'Wala pang release notes.', 'wn-unseen': 'Mga bagong update',
   }
 };
 
@@ -68,6 +76,8 @@ export function applyI18n() {
   try {
     document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
     document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = t(el.dataset.i18nPh) + (el.dataset.i18nSuffix || ''); });
+    document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = t(el.dataset.i18nTitle); });
+    document.querySelectorAll('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', t(el.dataset.i18nAria)); });
   } catch (e) {}
 }
 

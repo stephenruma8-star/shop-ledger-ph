@@ -7,6 +7,7 @@ async function startApp() {
   const ls = document.getElementById('loading-screen');
   if (ls) ls.classList.add('hidden');
   showView('home');
+  updateWhatsNewBadges();
   connectWS();
   setInterval(() => { /* keep WS alive */ }, 25000);
   watchPinActivity(); armAutoLock();

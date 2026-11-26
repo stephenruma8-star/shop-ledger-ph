@@ -1,5 +1,6 @@
 // Unit tests for pure functions — run with: node scripts/test-unit.mjs
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -144,6 +145,34 @@ test('verifyPassword rejects null', async () => {
 
 test('verifyPassword rejects empty', async () => {
   assert.ok(!(await verifyPassword('test', '')));
+});
+
+console.log('\n=== whats-new ===');
+const whatsNew = JSON.parse(readFileSync(new URL('../src/shared/whats-new.json', import.meta.url), 'utf8'));
+const desktopPkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+const mobilePkg = JSON.parse(readFileSync(new URL('../mobile-app/package.json', import.meta.url), 'utf8'));
+test('release notes are a non-empty array', () => assert.ok(Array.isArray(whatsNew) && whatsNew.length > 0));
+test('release ids are unique', () => {
+  const ids = whatsNew.map(e => e.id);
+  assert.strictEqual(new Set(ids).size, ids.length);
+});
+test('every release has bilingual title and typed changes', () => {
+  for (const entry of whatsNew) {
+    assert.ok(entry.id && entry.app && entry.version && entry.date, 'missing release fields');
+    assert.ok(entry.app === 'mobile' || entry.app === 'desktop', 'unknown app: ' + entry.app);
+    assert.ok(entry.title && entry.title.en && entry.title.fil, 'missing bilingual title: ' + entry.id);
+    assert.ok(Array.isArray(entry.changes) && entry.changes.length > 0, 'no changes: ' + entry.id);
+    for (const change of entry.changes) {
+      assert.ok(['new', 'improved', 'fixed'].includes(change.type), 'bad change type: ' + change.type);
+      assert.ok(change.text && change.text.en && change.text.fil, 'missing bilingual change text: ' + entry.id);
+    }
+  }
+});
+test('current desktop version has release notes', () => {
+  assert.ok(whatsNew.some(e => e.app === 'desktop' && e.version === desktopPkg.version), 'add desktop notes for ' + desktopPkg.version);
+});
+test('current mobile version has release notes', () => {
+  assert.ok(whatsNew.some(e => e.app === 'mobile' && e.version === mobilePkg.version), 'add mobile notes for ' + mobilePkg.version);
 });
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);

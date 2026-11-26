@@ -49,6 +49,11 @@ async function renderSettings() {
       <div id="update-row"></div>
     </section>
     <section class="glass-card rounded-2xl p-4 mb-3 fade-in">
+      <h3 class="card-title mb-1 flex items-center gap-2"><span class="icon-tile bg-amber-500/15 text-amber-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span>${T('wn.title')}<span id="wn-settings-badge" class="hidden ml-auto text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-green-500/15 text-green-400">${T('wn.badge')}</span></h3>
+      <p class="text-[11px] text-gray-500 mb-2">${T('wn.settings_desc')}</p>
+      <button onclick="openWhatsNew()" class="btn btn-ghost w-full"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>${T('wn.open')}</button>
+    </section>
+    <section class="glass-card rounded-2xl p-4 mb-3 fade-in">
       <h3 class="card-title mb-1 flex items-center gap-2"><span class="icon-tile bg-purple-500/15 text-purple-400"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>${T('diag.title')}</h3>
       <div id="diag-row"></div>
     </section>
@@ -65,6 +70,7 @@ async function renderSettings() {
   updateDiagRow();
   if (typeof updateBackupRow === 'function') updateBackupRow();
   updateWeatherRow();
+  updateWhatsNewBadges();
 }
 function renderShopEdit() {
   const s = data.settings || {};
