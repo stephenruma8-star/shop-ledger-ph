@@ -1,5 +1,5 @@
 {
-    "version":  "3.37.38",
-    "buildDate":  "2026-11-19T00:00:00.000Z",
-    "notes":  "Phone print previews now open in the bond-paper look by default, with A4/Letter/Legal and portrait/landscape choices that are remembered for Print and Save PDF. Android printing honors the chosen paper size and orientation, and client statements match the receipt styling. Desktop printing and reports are unchanged. Phone 4.8.57 has the same changes."
+    "version":  "3.37.39",
+    "buildDate":  "2026-11-26T00:00:00.000Z",
+    "notes":  "What's New is here: a new sidebar button opens bilingual release notes for the latest desktop and phone releases, with an unseen dot that clears when you read them. No popups - the notes wait until you ask. This build also carries every fix from 3.37.38. Phone 4.8.61 adds the same feature from the header sparkle and a Settings card."
 }

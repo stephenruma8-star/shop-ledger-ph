@@ -165,7 +165,7 @@ try {
   win.toggleLang(); win.toggleLang();
   console.log('I18N OK: toggle cycle + applyI18n run clean');
   if (typeof win.openWhatsNew !== 'function') throw new Error('openWhatsNew missing');
-  if (typeof win.whatsNewLatest !== 'function' || !win.whatsNewLatest() || win.whatsNewLatest().version !== '3.37.38') throw new Error("desktop What's New latest release is wrong");
+  if (typeof win.whatsNewLatest !== 'function' || !win.whatsNewLatest() || win.whatsNewLatest().version !== '3.37.39') throw new Error("desktop What's New latest release is wrong");
   if (typeof win.whatsNewUnseen !== 'function') throw new Error('whatsNewUnseen missing');
   if (win.whatsNewUnseen() !== true) throw new Error("desktop What's New should start unseen");
   win.openWhatsNew();

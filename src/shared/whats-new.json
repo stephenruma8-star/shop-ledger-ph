@@ -1,5 +1,71 @@
 [
   {
+    "id": "desktop-3.37.39",
+    "app": "desktop",
+    "version": "3.37.39",
+    "date": "2026-11-26",
+    "title": {
+      "en": "What's New is here",
+      "fil": "Nandito na ang Ano'ng Bago"
+    },
+    "changes": [
+      {
+        "type": "new",
+        "text": {
+          "en": "A What's New button in the sidebar opens the latest release notes, with a dot when something is unseen.",
+          "fil": "May What's New button sa sidebar na nagbubukas ng pinakabagong release notes, may dot kapag may hindi pa nabasa."
+        }
+      },
+      {
+        "type": "new",
+        "text": {
+          "en": "Release notes are written in English and Filipino, so the whole team can read what changed.",
+          "fil": "Nakasulat ang release notes sa English at Filipino, kaya mababasa ng buong team ang mga pagbabago."
+        }
+      },
+      {
+        "type": "improved",
+        "text": {
+          "en": "No automatic popups: the dot waits until you open What's New yourself.",
+          "fil": "Walang kusang popup: hintayin ka ng dot hanggang ikaw mismo ang magbukas ng Ano'ng Bago."
+        }
+      }
+    ]
+  },
+  {
+    "id": "mobile-4.8.61",
+    "app": "mobile",
+    "version": "4.8.61",
+    "date": "2026-11-26",
+    "title": {
+      "en": "What's New on your phone",
+      "fil": "Ano'ng Bago sa phone mo"
+    },
+    "changes": [
+      {
+        "type": "new",
+        "text": {
+          "en": "Tap the sparkle in the header or the Settings card to see the latest fixes and improvements.",
+          "fil": "Pindutin ang sparkle sa header o ang card sa Settings para makita ang pinakabagong fix at improvement."
+        }
+      },
+      {
+        "type": "new",
+        "text": {
+          "en": "A dot on the header and a NEW badge in Settings appear until you open the notes.",
+          "fil": "May dot sa header at NEW badge sa Settings hanggang buksan mo ang notes."
+        }
+      },
+      {
+        "type": "improved",
+        "text": {
+          "en": "Notes are in English and Filipino and follow your language setting.",
+          "fil": "Nasa English at Filipino ang notes at sumusunod sa language setting mo."
+        }
+      }
+    ]
+  },
+  {
     "id": "mobile-4.8.60",
     "app": "mobile",
     "version": "4.8.60",

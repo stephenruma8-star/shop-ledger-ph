@@ -484,14 +484,14 @@ try {
   ok(setHtml.includes("What's New") && setHtml.includes("See what's new"), "settings shows the What's New card");
 
   // ---- What's New sheet (shared release notes) ----
-  ok(gget(`whatsNewLatest().version`) === '4.8.60', "What's New latest mobile release is 4.8.60");
+  ok(gget(`whatsNewLatest().version`) === '4.8.61', "What's New latest mobile release is 4.8.61");
   ok(gget(`whatsNewEntries().length`) >= 3, "What's New lists recent mobile releases");
   ok(gget(`whatsNewUnseen()`) === true, "What's New starts unseen");
   gcall(`openWhatsNew()`);
   const wnHtml = getEl('modal-root').innerHTML;
-  ok(wnHtml.includes("What's New") && wnHtml.includes('4.8.60') && wnHtml.includes('Credit balances'), "What's New sheet shows the latest release");
+  ok(wnHtml.includes("What's New") && wnHtml.includes('4.8.61') && wnHtml.includes('Tap the sparkle'), "What's New sheet shows the latest release");
   ok(wnHtml.includes('NEW'), "What's New marks the unseen release");
-  ok(gget(`whatsNewUnseen()`) === false && storage.get('slpWhatsNewSeenMobile') === 'mobile-4.8.60', "opening What's New marks the latest release seen");
+  ok(gget(`whatsNewUnseen()`) === false && storage.get('slpWhatsNewSeenMobile') === 'mobile-4.8.61', "opening What's New marks the latest release seen");
   gcall(`closeQuick()`);
 
   // ---- offline write queue (v3.4.35) ----
